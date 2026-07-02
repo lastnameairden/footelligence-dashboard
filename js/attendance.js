@@ -18,6 +18,7 @@ import {
   signOut
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import { db, auth } from "./firebase-init.js";
+import { applyDataLabels } from "./ui-utils.js";
 
 const STATUS_OPTIONS = ["A", "I", "R", "P"];
 const SCORE_OPTIONS = [1, 2, 3, 4];
@@ -298,6 +299,7 @@ async function loadPendingApprovals() {
     tr.appendChild(actionTd);
     pendingApprovalsBody.appendChild(tr);
   }
+  applyDataLabels(pendingApprovalsBody);
 }
 
 async function approveCoach(coachId, team) {
@@ -441,6 +443,7 @@ async function loadCoachDirectory() {
 
     coachDirectoryBody.appendChild(tr);
   }
+  applyDataLabels(coachDirectoryBody);
 }
 
 async function reassignCoachTeam(coachId, team) {
@@ -552,6 +555,7 @@ async function loadDailyProgress(dateStr) {
     }
     progressTableBody.appendChild(tr);
   }
+  applyDataLabels(progressTableBody);
 
   renderProgressPie(rows);
 }
@@ -731,6 +735,7 @@ function renderPlayerList() {
     tr.appendChild(actionTd);
     playerListBody.appendChild(tr);
   }
+  applyDataLabels(playerListBody);
 }
 
 function startEditPlayer(p) {
@@ -949,6 +954,7 @@ function renderRoster(existingMap) {
 
     rosterBody.appendChild(tr);
   }
+  applyDataLabels(rosterBody);
 }
 
 async function saveAttendanceField(playerId, field, value) {

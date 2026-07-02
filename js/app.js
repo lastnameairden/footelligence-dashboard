@@ -8,6 +8,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import { db, auth } from "./firebase-init.js";
+import { applyDataLabels } from "./ui-utils.js";
 
 // สถานะที่นับว่า "มาซ้อม" ตาม legend ของ Logbook (A หรือค่าประเมิน 1-4)
 const ATTENDED_CODES = new Set(["A", "1", "2", "3", "4"]);
@@ -136,6 +137,7 @@ function renderPlayersGroups(playerGroups, teamLabels) {
       </div>
     `;
     playersGroupsEl.appendChild(wrapper);
+    applyDataLabels(wrapper.querySelector("tbody"));
   }
 }
 
@@ -308,6 +310,7 @@ function renderOverview(playerGroups, teamStats, coachNames) {
         </tr>`;
     })
     .join("");
+  applyDataLabels(teamSummaryBodyEl);
 }
 
 function renderAttendanceGroups(playerGroups, teamStats, teamLabels) {
@@ -356,6 +359,7 @@ function renderAttendanceGroups(playerGroups, teamStats, teamLabels) {
       </div>
     `;
     attendanceGroupsEl.appendChild(wrapper);
+    applyDataLabels(wrapper.querySelector("tbody"));
   }
 }
 
@@ -461,6 +465,7 @@ async function loadAgeGroupProgress(team, dateStr) {
         </tr>`;
     })
     .join("");
+  applyDataLabels(ageProgressTableBody);
 
   renderAgeProgressPie(rows);
 }

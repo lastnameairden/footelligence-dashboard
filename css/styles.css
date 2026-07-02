@@ -185,3 +185,82 @@ table.pro-table td.emphasis { font-weight: 600; color: #0f172a; }
   font-size: 0.75rem;
   color: #94a3b8;
 }
+
+/* ==========================================================================
+   โหมดมือถือ (iOS / Android) — คงหน้าตาแบบ PC ไว้เหมือนเดิม ปรับเฉพาะจอแคบ
+   ใช้ media query ตามความกว้างจอแทนการเช็ค user-agent (แนวทางมาตรฐาน
+   responsive design ที่ครอบคลุมมือถือทุกยี่ห้อโดยไม่กระทบ PC)
+   ========================================================================== */
+@media (max-width: 640px) {
+  /* Header: ย่อขนาด ลดช่องไฟ ให้พอดีจอแคบ */
+  .app-header .max-w-6xl,
+  .app-header .max-w-5xl {
+    padding-left: 1rem;
+    padding-right: 1rem;
+    padding-top: 0.85rem;
+    padding-bottom: 0.85rem;
+  }
+  .app-header h1 { font-size: 1rem; }
+  .app-header p { font-size: 0.7rem; }
+  .app-header img { width: 2rem; height: 2rem; }
+  .app-header .btn { padding: 0.45rem 0.75rem; font-size: 0.75rem; }
+
+  main { padding-left: 1rem; padding-right: 1rem; }
+  .card-pad { padding: 1.1rem; }
+
+  /* หัวข้อหน้า: ไอคอนเล็กลง ระยะห่างแน่นขึ้น */
+  .page-heading { gap: 0.6rem; }
+  .icon-badge-lg { width: 2.25rem; height: 2.25rem; font-size: 1.15rem; border-radius: 0.6rem; }
+  .page-heading h2 { font-size: 1.05rem; }
+  .page-heading p { font-size: 0.75rem; }
+
+  /* ปุ่ม/ปุ่มกดสถานะ: ขยายพื้นที่แตะให้เหมาะกับนิ้ว (ตามแนวทาง touch target ของ iOS/Android) */
+  .btn { padding: 0.65rem 1.1rem; font-size: 0.875rem; }
+  .btn-sm { padding: 0.5rem 0.85rem; font-size: 0.8125rem; }
+  .toggle-pill { padding: 0.55rem 1rem; font-size: 0.875rem; }
+  .field-input { padding: 0.65rem 0.85rem; font-size: 1rem; } /* 16px ป้องกัน iOS ซูมอัตโนมัติตอนโฟกัส input */
+
+  /* สถิติภาพรวม: การ์ดสถิติเรียงคอลัมน์เดียวให้อ่านง่าย */
+  #overview-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.65rem; }
+  .stat-card { padding: 1rem; }
+  .stat-value { font-size: 1.35rem; }
+
+  /* ตาราง: แปลงเป็นรูปแบบการ์ดสไตล์มือถือ อ่านง่ายกว่าเลื่อนแนวนอน */
+  table.pro-table thead { display: none; }
+  table.pro-table, table.pro-table tbody, table.pro-table tr, table.pro-table td {
+    display: block;
+    width: 100%;
+  }
+  table.pro-table tbody tr {
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    margin: 0.65rem;
+    overflow: hidden;
+  }
+  table.pro-table tbody tr:hover { background: transparent; }
+  table.pro-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.6rem 0.9rem;
+    border-bottom: 1px solid #f1f5f9;
+    text-align: right;
+  }
+  table.pro-table tr td:last-child { border-bottom: none; }
+  table.pro-table td[data-label]::before {
+    content: attr(data-label);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #94a3b8;
+    text-align: left;
+    flex-shrink: 0;
+  }
+  /* เซลล์ที่เป็นปุ่มกดสถานะ/คะแนน หลายปุ่มในแถวเดียว ให้ห่อบรรทัดและชิดซ้ายแทน */
+  table.pro-table td.space-x-2 {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+}
