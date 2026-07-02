@@ -26,6 +26,15 @@ const adminTeamBar = document.getElementById("admin-team-bar");
 const adminTeamSelectDashboard = document.getElementById("admin-team-select-dashboard");
 const adminViewTeamBtn = document.getElementById("admin-view-team-btn");
 const adminTeamBarStatus = document.getElementById("admin-team-bar-status");
+const ageProgressSection = document.getElementById("age-group-progress-section");
+const ageProgressDateInput = document.getElementById("age-progress-date-input");
+const ageProgressRefreshBtn = document.getElementById("age-progress-refresh-btn");
+const ageProgressTableBody = document.getElementById("age-progress-table-body");
+const ageProgressPie = document.getElementById("age-progress-pie");
+const ageProgressLegend = document.getElementById("age-progress-legend");
+
+let currentScopeTeam = null;
+let currentTeamPlayers = [];
 
 function setStatus(message, isError = false) {
   if (!statusEl) return;
@@ -106,6 +115,7 @@ function renderPlayersGroups(playerGroups, teamLabels) {
               <th>ชื่อเล่น</th>
               <th>ชื่อ-นามสกุล</th>
               <th>วันเกิด</th>
+              <th>รุ่นอายุ</th>
             </tr>
           </thead>
           <tbody>
@@ -117,6 +127,7 @@ function renderPlayersGroups(playerGroups, teamLabels) {
                 <td class="emphasis">${p.nickname ?? "-"}</td>
                 <td>${p.fullName ?? "-"}</td>
                 <td>${p.birthday ?? "-"}</td>
+                <td>${p.ageGroup ?? "-"}</td>
               </tr>`
               )
               .join("")}
@@ -348,15 +359,173 @@ function renderAttendanceGroups(playerGroups, teamStats, teamLabels) {
   }
 }
 
+// ---------- ความคืบหน้าการประเมินรายวัน แยกตามรุ่นอายุ (เฉพาะตอนดูข้อมูลทีมใดทีมหนึ่ง) ----------
+const AGE_PROGRESS_COLORS = {
+  complete: "#10b981",
+  partial: "#f59e0b",
+  not_started: "#ef4444",
+  no_training: "#94a3b8"
+};
+const AGE_PROGRESS_LABELS = {
+  complete: "ประเมินครบแล้ว",
+  partial: "ประเมินบางส่วน",
+  not_started: "ยังไม่เริ่มประเมิน",
+  no_training: "ไม่มีฝึกซ้อม"
+};
+const UNASSIGNED_AGE_GROUP = "ไม่ระบุรุ่นอายุ";
+
+async function loadAgeGroupProgress(team, dateStr) {
+  ageProgressTableBody.innerHTML =
+    '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>';
+
+  const ageGroups = new Map();
+  for (const p of currentTeamPlayers) {
+    const ag = p.ageGroup || UNASSIGNED_AGE_GROUP;
+    if (!ageGroups.has(ag)) ageGroups.set(ag, []);
+    ageGroups.get(ag).push(p);
+  }
+
+  if (ageGroups.size === 0) {
+    ageProgressTableBody.innerHTML =
+      '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">ยังไม่มีนักกีฬาในทีมนี้</td></tr>';
+    renderAgeProgressPie([]);
+    return;
+  }
+
+  const sessionSnap = await getDocs(
+    query(collection(db, "sessions"), where("date", "==", dateStr), where("team", "==", team))
+  );
+
+  let noTraining = false;
+  let attendanceRecords = [];
+  if (!sessionSnap.empty) {
+    const sessionDoc = sessionSnap.docs[0];
+    noTraining = !!sessionDoc.data().noTraining;
+    if (!noTraining) {
+      const attSnap = await getDocs(
+        query(
+          collection(db, "attendance"),
+          where("sessionId", "==", sessionDoc.id),
+          where("team", "==", team)
+        )
+      );
+      attSnap.forEach((d) => attendanceRecords.push(d.data()));
+    }
+  }
+
+  const rows = [];
+  for (const [ageGroup, groupPlayers] of ageGroups) {
+    if (noTraining) {
+      rows.push({ ageGroup, totalPlayers: groupPlayers.length, evaluated: 0, noTraining: true, completedAt: null });
+      continue;
+    }
+    const evaluatedRecords = attendanceRecords.filter(
+      (a) => a.status && groupPlayers.some((p) => p.id === a.playerId)
+    );
+    let completedAt = null;
+    if (groupPlayers.length > 0 && evaluatedRecords.length >= groupPlayers.length) {
+      for (const a of evaluatedRecords) {
+        if (a.updatedAt && typeof a.updatedAt.toDate === "function") {
+          const t = a.updatedAt.toDate();
+          if (!completedAt || t > completedAt) completedAt = t;
+        }
+      }
+    }
+    rows.push({ ageGroup, totalPlayers: groupPlayers.length, evaluated: evaluatedRecords.length, noTraining: false, completedAt });
+  }
+
+  rows.sort((a, b) => a.ageGroup.localeCompare(b.ageGroup));
+
+  ageProgressTableBody.innerHTML = rows
+    .map((r) => {
+      const notEvaluated = Math.max(r.totalPlayers - r.evaluated, 0);
+      if (r.noTraining) {
+        return `
+          <tr>
+            <td class="emphasis">${r.ageGroup}</td>
+            <td>${r.totalPlayers}</td>
+            <td class="text-slate-400" colspan="2">ไม่มีฝึกซ้อม</td>
+            <td>-</td>
+          </tr>`;
+      }
+      const completedAtText = r.completedAt
+        ? r.completedAt.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }) + " น."
+        : "-";
+      return `
+        <tr>
+          <td class="emphasis">${r.ageGroup}</td>
+          <td>${r.totalPlayers}</td>
+          <td class="text-emerald-600 font-medium">${r.evaluated}</td>
+          <td class="text-red-500 font-medium">${notEvaluated}</td>
+          <td>${completedAtText}</td>
+        </tr>`;
+    })
+    .join("");
+
+  renderAgeProgressPie(rows);
+}
+
+function categorizeAgeProgress(r) {
+  if (r.noTraining) return "no_training";
+  if (r.totalPlayers === 0) return null;
+  if (r.evaluated >= r.totalPlayers) return "complete";
+  if (r.evaluated > 0) return "partial";
+  return "not_started";
+}
+
+function renderAgeProgressPie(rows) {
+  const counts = { complete: 0, partial: 0, not_started: 0, no_training: 0 };
+  for (const r of rows) {
+    const cat = categorizeAgeProgress(r);
+    if (cat) counts[cat] += 1;
+  }
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+
+  if (total === 0) {
+    ageProgressPie.style.background = "conic-gradient(#e2e8f0 0% 100%)";
+    ageProgressLegend.innerHTML = '<p class="text-slate-400 text-center">ไม่มีข้อมูล</p>';
+    return;
+  }
+
+  let acc = 0;
+  const segments = [];
+  for (const key of Object.keys(counts)) {
+    if (counts[key] === 0) continue;
+    const percent = (counts[key] / total) * 100;
+    const start = acc;
+    acc += percent;
+    segments.push(`${AGE_PROGRESS_COLORS[key]} ${start}% ${acc}%`);
+  }
+  ageProgressPie.style.background = `conic-gradient(${segments.join(", ")})`;
+
+  ageProgressLegend.innerHTML = Object.keys(counts)
+    .filter((key) => counts[key] > 0)
+    .map(
+      (key) => `
+      <div class="flex items-center gap-2">
+        <span class="w-3 h-3 rounded-full inline-block" style="background:${AGE_PROGRESS_COLORS[key]}"></span>
+        <span class="text-slate-600">${AGE_PROGRESS_LABELS[key]}: ${counts[key]} รุ่น</span>
+      </div>`
+    )
+    .join("");
+}
+
+ageProgressRefreshBtn.addEventListener("click", () => {
+  if (!currentScopeTeam || !ageProgressDateInput.value) return;
+  loadAgeGroupProgress(currentScopeTeam, ageProgressDateInput.value);
+});
+
 // scopeTeam: null = ผู้ดูแลระบบ เห็นทุกทีม / string = โค้ช เห็นเฉพาะทีมตัวเอง
 async function loadDashboard(scopeTeam) {
   try {
     setStatus("กำลังโหลดข้อมูล...");
+    currentScopeTeam = scopeTeam;
     const [players, attendanceRecords, coaches] = await Promise.all([
       scopeTeam ? loadCollectionForTeam("players", scopeTeam) : loadCollection("players"),
       scopeTeam ? loadCollectionForTeam("attendance", scopeTeam) : loadCollection("attendance"),
       loadCollection("coaches")
     ]);
+    currentTeamPlayers = scopeTeam ? players : [];
     const coachNames = buildCoachNames(coaches);
     const teamLabels = buildTeamLabels(coachNames);
     const playerGroups = groupByTeam(players);
@@ -365,6 +534,14 @@ async function loadDashboard(scopeTeam) {
     renderPlayersGroups(playerGroups, teamLabels);
     renderAttendanceGroups(playerGroups, teamStats, teamLabels);
     setStatus(`โหลดข้อมูลสำเร็จ • ผู้เล่น ${players.length} คน • ${playerGroups.size} ทีม`);
+
+    ageProgressSection.classList.toggle("hidden", !scopeTeam);
+    if (scopeTeam) {
+      if (!ageProgressDateInput.value) {
+        ageProgressDateInput.value = new Date().toISOString().slice(0, 10);
+      }
+      await loadAgeGroupProgress(scopeTeam, ageProgressDateInput.value);
+    }
   } catch (err) {
     console.error(err);
     setStatus(

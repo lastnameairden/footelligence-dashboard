@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Footelligence Dashboard</title>
+  <title>FOOTELLIGENCE DATA — Dashboard</title>
+  <link rel="icon" href="./assets/logo.png" />
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="./css/styles.css" />
 </head>
@@ -11,10 +12,10 @@
   <header class="app-header text-white sticky top-0 z-10 shadow-sm">
     <div class="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <div class="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center text-lg">⚽</div>
+        <img src="./assets/logo.png" alt="Footelligence" class="w-9 h-9 object-contain" />
         <div>
-          <h1 class="text-xl font-bold leading-tight">Footelligence Dashboard</h1>
-          <p class="text-xs text-slate-300">ภาพรวมข้อมูลผู้เล่นและการฝึกซ้อมทุกทีม</p>
+          <h1 class="text-xl font-bold leading-tight tracking-tight">FOOTELLIGENCE DATA</h1>
+          <p class="text-xs text-slate-300">ภาพรวมข้อมูลผู้เล่นและการฝึกซ้อม</p>
         </div>
       </div>
       <a href="./attendance.html" class="btn btn-secondary">
@@ -28,24 +29,34 @@
 
     <!-- แสดงเมื่อยังไม่ได้ล็อกอิน หรือบัญชียังไม่ได้รับการอนุมัติ -->
     <section id="login-gate" class="hidden card card-pad max-w-md mx-auto text-center">
-      <h2 class="text-lg font-semibold mb-2">กรุณาเข้าสู่ระบบ</h2>
-      <p id="login-gate-message" class="text-sm text-slate-500 mb-4">
+      <img src="./assets/logo.png" alt="Footelligence Data" class="w-20 h-20 mx-auto object-contain mb-3" />
+      <h2 class="text-xl font-bold tracking-tight mb-1">FOOTELLIGENCE DATA</h2>
+      <p class="text-sm text-slate-500 mb-4" id="login-gate-message">
         ต้องเข้าสู่ระบบด้วยบัญชีโค้ชหรือผู้ดูแลระบบก่อน จึงจะดูข้อมูล Dashboard ได้
       </p>
       <a href="./attendance.html" class="btn btn-primary">เข้าสู่ระบบที่นี่ →</a>
     </section>
 
     <!-- แถบเลือกทีม สำหรับผู้ดูแลระบบเท่านั้น (โค้ชจะเห็นเฉพาะทีมตัวเองอัตโนมัติ ไม่ต้องเลือก) -->
-    <section id="admin-team-bar" class="hidden card card-pad flex flex-wrap items-end gap-4">
-      <div>
-        <label class="field-label">เลือกทีมที่ต้องการดูข้อมูล</label>
-        <select id="admin-team-select-dashboard" class="field-input w-56">
-          <option value="">-- เลือกทีม --</option>
-          <option value="__ALL__">ทุกทีม (ภาพรวม)</option>
-        </select>
+    <section id="admin-team-bar" class="hidden card card-pad">
+      <div class="page-heading">
+        <div class="icon-badge icon-badge-lg">🛡️</div>
+        <div>
+          <h2>โหมดผู้ดูแลระบบ</h2>
+          <p>เลือกทีมที่ต้องการดูข้อมูล หรือเลือก "ทุกทีม" เพื่อดูภาพรวม</p>
+        </div>
       </div>
-      <button id="admin-view-team-btn" class="btn btn-primary">ดูข้อมูล</button>
-      <p id="admin-team-bar-status" class="text-sm text-slate-500 w-full"></p>
+      <div class="flex flex-wrap items-end gap-4">
+        <div>
+          <label class="field-label">เลือกทีมที่ต้องการดูข้อมูล</label>
+          <select id="admin-team-select-dashboard" class="field-input w-56">
+            <option value="">-- เลือกทีม --</option>
+            <option value="__ALL__">ทุกทีม (ภาพรวม)</option>
+          </select>
+        </div>
+        <button id="admin-view-team-btn" class="btn btn-primary">ดูข้อมูล</button>
+        <p id="admin-team-bar-status" class="text-sm text-slate-500 w-full"></p>
+      </div>
     </section>
 
     <!-- เนื้อหา Dashboard (แสดงหลังล็อกอินและได้รับอนุมัติแล้วเท่านั้น) -->
@@ -53,7 +64,7 @@
 
     <!-- ภาพรวมทั้งหมด -->
     <section>
-      <h2 class="section-title mb-4">ภาพรวมทั้งหมด</h2>
+      <h2 class="section-title mb-4"><span class="icon-badge">📈</span> ภาพรวมทั้งหมด</h2>
       <div id="overview-cards" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         <p class="text-slate-400 text-sm col-span-full">กำลังโหลด...</p>
       </div>
@@ -95,9 +106,43 @@
       </div>
     </section>
 
+    <!-- ความคืบหน้าการประเมินรายวัน แยกตามรุ่นอายุ (แสดงเฉพาะตอนดูข้อมูลทีมใดทีมหนึ่ง) -->
+    <section id="age-group-progress-section" class="hidden">
+      <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <h2 class="section-title"><span class="icon-badge">📊</span> ความคืบหน้าการประเมินรายวัน — แยกตามรุ่นอายุ</h2>
+        <div class="flex items-center gap-2">
+          <input id="age-progress-date-input" type="date" class="field-input w-auto" />
+          <button id="age-progress-refresh-btn" class="btn btn-primary">โหลด</button>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div class="lg:col-span-2 card table-wrap">
+          <table class="pro-table">
+            <thead>
+              <tr>
+                <th>รุ่นอายุ</th>
+                <th>นักกีฬาทั้งหมด</th>
+                <th>ประเมินแล้ว</th>
+                <th>ยังไม่ประเมิน</th>
+                <th>เวลาที่ครบทุกคน</th>
+              </tr>
+            </thead>
+            <tbody id="age-progress-table-body">
+              <tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card card-pad flex flex-col items-center justify-center">
+          <div id="age-progress-pie" class="w-36 h-36 rounded-full mb-4"
+            style="background: conic-gradient(#e2e8f0 0% 100%);"></div>
+          <div id="age-progress-legend" class="text-sm space-y-1 w-full"></div>
+        </div>
+      </div>
+    </section>
+
     <!-- รายชื่อผู้เล่น แยกตามทีม/โค้ชผู้รับผิดชอบ -->
     <section>
-      <h2 class="section-title mb-4">รายชื่อผู้เล่น — แยกตามทีม</h2>
+      <h2 class="section-title mb-4"><span class="icon-badge">👤</span> รายชื่อผู้เล่น — แยกตามทีม</h2>
       <div id="players-groups" class="space-y-6">
         <p class="text-slate-400 text-sm">กำลังโหลด...</p>
       </div>
@@ -105,7 +150,7 @@
 
     <!-- สถิติการฝึกซ้อม แยกตามทีม/โค้ชผู้รับผิดชอบ -->
     <section>
-      <h2 class="section-title mb-4">สถิติการฝึกซ้อม — แยกตามทีม</h2>
+      <h2 class="section-title mb-4"><span class="icon-badge">📊</span> สถิติการฝึกซ้อม — แยกตามทีม</h2>
       <div id="attendance-groups" class="space-y-6">
         <p class="text-slate-400 text-sm">กำลังโหลด...</p>
       </div>
@@ -113,6 +158,8 @@
 
     </div>
   </main>
+
+  <footer class="app-footer">FOOTELLIGENCE DATA © 2026 — ระบบจัดการข้อมูลนักกีฬาและการฝึกซ้อม</footer>
 
   <script type="module" src="./js/app.js"></script>
 </body>

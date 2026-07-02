@@ -11,42 +11,59 @@ service cloud.firestore {
     function myCoachDoc() {
       return get(/databases/$(database)/documents/coaches/$(request.auth.uid)).data;
     }
-    function isAdmin() { return isCoach() && myCoachDoc().role == 'admin'; }
-    function isApprovedCoach() { return isCoach() && myCoachDoc().status == 'approved'; }
+    function myRole() { return myCoachDoc().role; }
+    function isApproved() { return isCoach() && myCoachDoc().status == 'approved'; }
+    function isAdmin() { return isCoach() && myRole() == 'admin'; }
+    // โค้ช = จัดการข้อมูล (เขียนได้) / ผู้บริหารทีม = ดูอย่างเดียว (อ่านได้ เขียนไม่ได้)
+    function canManageTeam() { return isApproved() && myRole() == 'coach'; }
+    function canViewTeam() { return isApproved() && (myRole() == 'coach' || myRole() == 'executive'); }
     function myTeam() { return myCoachDoc().team; }
     function ownsTeam() { return 'team' in resource.data && resource.data.team == myTeam(); }
 
     match /coaches/{coachId} {
       allow read: if isSignedIn();
-      // โค้ชใหม่สร้างโปรไฟล์ของตัวเองได้ (สถานะ pending) แต่กำหนด team/role เองไม่ได้
-      // ผู้ดูแลระบบเป็นผู้กำหนด team ให้ตอนอนุมัติ (หรือเปลี่ยนภายหลังได้)
+      // ผู้ลงทะเบียนใหม่สร้างโปรไฟล์ของตัวเองได้ (สถานะ pending) เลือกบทบาทได้แค่ coach/executive
+      // (กำหนด admin หรือ team เองไม่ได้) ผู้ดูแลระบบเป็นผู้กำหนด team ให้ตอนอนุมัติ (หรือเปลี่ยนภายหลังได้)
       allow create: if isSignedIn()
                      && request.auth.uid == coachId
-                     && request.resource.data.keys().hasOnly(['name', 'email', 'status', 'createdAt'])
+                     && request.resource.data.keys().hasOnly(['name', 'email', 'phone', 'role', 'status', 'createdAt'])
                      && request.resource.data.email == request.auth.token.email
+                     && request.resource.data.role in ['coach', 'executive']
                      && request.resource.data.status == 'pending';
-      // ผู้ดูแลระบบเท่านั้นที่อนุมัติ/กำหนด team หรือแก้ไข/ลบบัญชีโค้ชได้
+      // ผู้ดูแลระบบเท่านั้นที่อนุมัติ/กำหนด team หรือแก้ไข/ลบบัญชีได้
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ดัชนีเบอร์โทร -> อีเมล เพื่อให้ล็อกอินด้วยเบอร์โทรได้ (ไม่ใช่ระบบยืนยัน OTP จริง)
+    // เอกสารมีแค่ฟิลด์ email เท่านั้น อ่านได้เฉพาะกรณีรู้เบอร์ที่แน่นอนอยู่แล้ว (get ไม่ใช่ list)
+    match /phoneIndex/{phone} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if isSignedIn()
+                     && request.resource.data.keys().hasOnly(['email'])
+                     && request.resource.data.email == request.auth.token.email;
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     match /players/{id} {
-      allow read: if isAdmin() || (isApprovedCoach() && ownsTeam());
-      allow create: if isAdmin() || (isApprovedCoach() && request.resource.data.team == myTeam());
-      allow update: if isAdmin() || (isApprovedCoach() && ownsTeam() && request.resource.data.team == myTeam());
-      allow delete: if isAdmin() || (isApprovedCoach() && ownsTeam());
+      allow read: if isAdmin() || (canViewTeam() && ownsTeam());
+      allow create: if isAdmin() || (canManageTeam() && request.resource.data.team == myTeam());
+      allow update: if isAdmin() || (canManageTeam() && ownsTeam() && request.resource.data.team == myTeam());
+      allow delete: if isAdmin() || (canManageTeam() && ownsTeam());
     }
 
     match /sessions/{id} {
-      allow read: if isAdmin() || (isApprovedCoach() && ownsTeam());
-      allow create: if isAdmin() || (isApprovedCoach() && request.resource.data.team == myTeam());
-      allow update: if isAdmin() || (isApprovedCoach() && ownsTeam());
+      allow read: if isAdmin() || (canViewTeam() && ownsTeam());
+      allow create: if isAdmin() || (canManageTeam() && request.resource.data.team == myTeam());
+      allow update: if isAdmin() || (canManageTeam() && ownsTeam());
       allow delete: if false;
     }
 
     match /attendance/{id} {
-      allow read: if isAdmin() || (isApprovedCoach() && ownsTeam());
-      allow write: if isAdmin() || (isApprovedCoach() && request.resource.data.team == myTeam());
+      allow read: if isAdmin() || (canViewTeam() && ownsTeam());
+      allow write: if isAdmin() || (canManageTeam() && request.resource.data.team == myTeam());
     }
   }
 }

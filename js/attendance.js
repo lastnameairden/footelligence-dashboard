@@ -24,6 +24,7 @@ const SCORE_OPTIONS = [1, 2, 3, 4];
 const TEAMS = ["KHAMPHEE FOOTBALL", "THAWEE SC", "THAMMASATHIT"];
 
 const loginSection = document.getElementById("login-section");
+const brandHero = document.getElementById("brand-hero");
 const coachBar = document.getElementById("coach-bar");
 const menuSection = document.getElementById("menu-section");
 const addPlayerSection = document.getElementById("add-player-section");
@@ -40,8 +41,10 @@ const registerForm = document.getElementById("register-form");
 const registerError = document.getElementById("register-error");
 const pendingSection = document.getElementById("pending-section");
 const pendingLogoutBtn = document.getElementById("pending-logout-btn");
+const executiveSection = document.getElementById("executive-section");
 const coachEmailEl = document.getElementById("coach-email");
 const coachTeamEl = document.getElementById("coach-team");
+const coachRoleBadgeEl = document.getElementById("coach-role-badge");
 const adminPanelLink = document.getElementById("admin-panel-link");
 const adminSection = document.getElementById("admin-section");
 const pendingApprovalsBody = document.getElementById("pending-approvals-body");
@@ -98,16 +101,33 @@ function authErrorMessage(err) {
   return AUTH_ERROR_TH[err.code] || err.message;
 }
 
-// ---------- Login ----------
+// ---------- Login (รองรับอีเมล หรือ เบอร์โทรศัพท์) ----------
+function normalizePhone(v) {
+  return v.replace(/\D/g, "");
+}
+function looksLikeEmail(v) {
+  return v.includes("@");
+}
+async function resolveLoginEmail(identifier) {
+  if (looksLikeEmail(identifier)) return identifier;
+  const phone = normalizePhone(identifier);
+  const snap = await getDoc(doc(db, "phoneIndex", phone));
+  if (!snap.exists()) {
+    throw new Error("ไม่พบบัญชีที่ใช้เบอร์โทรศัพท์นี้");
+  }
+  return snap.data().email;
+}
+
 loginForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   loginError.textContent = "";
-  const email = document.getElementById("login-email").value.trim();
+  const identifier = document.getElementById("login-identifier").value.trim();
   const password = document.getElementById("login-password").value;
   try {
+    const email = await resolveLoginEmail(identifier);
     await signInWithEmailAndPassword(auth, email, password);
   } catch (err) {
-    loginError.textContent = "เข้าสู่ระบบไม่สำเร็จ: " + authErrorMessage(err);
+    loginError.textContent = "เข้าสู่ระบบไม่สำเร็จ: " + (err.code ? authErrorMessage(err) : err.message);
   }
 });
 
@@ -130,12 +150,15 @@ tabRegister.addEventListener("click", () => {
   loginForm.classList.add("hidden");
 });
 
-// ---------- ลงทะเบียนโค้ชใหม่ ----------
+// ---------- ลงทะเบียนใหม่ (โค้ช หรือ ผู้บริหารทีม) ----------
 registerForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   registerError.textContent = "";
+  const role = document.querySelector('input[name="register-role"]:checked').value;
   const name = document.getElementById("register-name").value.trim();
   const email = document.getElementById("register-email").value.trim();
+  const phoneRaw = document.getElementById("register-phone").value.trim();
+  const phone = phoneRaw ? normalizePhone(phoneRaw) : null;
   const password = document.getElementById("register-password").value;
   const passwordConfirm = document.getElementById("register-password-confirm").value;
 
@@ -144,14 +167,22 @@ registerForm.addEventListener("submit", async (e) => {
     return;
   }
 
+  if (phone) {
+    const existingPhone = await getDoc(doc(db, "phoneIndex", phone));
+    if (existingPhone.exists()) {
+      registerError.textContent = "เบอร์โทรศัพท์นี้มีผู้ใช้งานแล้ว กรุณาใช้เบอร์อื่นหรือเว้นว่างไว้";
+      return;
+    }
+  }
+
   try {
     const cred = await createUserWithEmailAndPassword(auth, email, password);
-    await setDoc(doc(db, "coaches", cred.user.uid), {
-      name,
-      email,
-      status: "pending",
-      createdAt: serverTimestamp()
-    });
+    const payload = { name, email, role, status: "pending", createdAt: serverTimestamp() };
+    if (phone) payload.phone = phone;
+    await setDoc(doc(db, "coaches", cred.user.uid), payload);
+    if (phone) {
+      await setDoc(doc(db, "phoneIndex", phone), { email });
+    }
     registerForm.reset();
     // onAuthStateChanged จะทำงานต่อเองและแสดงหน้า "รอผู้ดูแลระบบอนุมัติ"
   } catch (err) {
@@ -161,6 +192,7 @@ registerForm.addEventListener("submit", async (e) => {
 
 function hideAllScreens() {
   pendingSection.classList.add("hidden");
+  executiveSection.classList.add("hidden");
   adminSection.classList.add("hidden");
   menuSection.classList.add("hidden");
   addPlayerSection.classList.add("hidden");
@@ -212,9 +244,15 @@ for (const btn of backButtons) {
 adminPanelLink.addEventListener("click", showAdminPanel);
 
 // ---------- ผู้ดูแลระบบ: อนุมัติ/ปฏิเสธคำขอลงทะเบียน ----------
+function roleLabel(role) {
+  if (role === "admin") return '<span class="badge badge-info">ผู้ดูแลระบบ</span>';
+  if (role === "executive") return '<span class="badge badge-neutral">ผู้บริหารทีม</span>';
+  return '<span class="badge badge-success">โค้ช</span>';
+}
+
 async function loadPendingApprovals() {
   pendingApprovalsBody.innerHTML =
-    '<tr><td colspan="4" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>';
+    '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>';
   const q = query(collection(db, "coaches"), where("status", "==", "pending"));
   const snapshot = await getDocs(q);
   const pending = [];
@@ -222,7 +260,7 @@ async function loadPendingApprovals() {
 
   if (pending.length === 0) {
     pendingApprovalsBody.innerHTML =
-      '<tr><td colspan="4" class="px-4 py-6 text-center text-slate-400">ไม่มีคำขอที่รอการอนุมัติ</td></tr>';
+      '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">ไม่มีคำขอที่รอการอนุมัติ</td></tr>';
     return;
   }
 
@@ -232,6 +270,7 @@ async function loadPendingApprovals() {
     tr.innerHTML = `
       <td class="emphasis">${c.name ?? "-"}</td>
       <td>${c.email ?? "-"}</td>
+      <td>${roleLabel(c.role)}</td>
     `;
 
     const teamTd = document.createElement("td");
@@ -318,7 +357,7 @@ function isSessionOnTime(session, attendanceForSession) {
 
 async function loadCoachDirectory() {
   coachDirectoryBody.innerHTML =
-    '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>';
+    '<tr><td colspan="7" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>';
   const [coachSnap, sessionSnap, attendanceSnap] = await Promise.all([
     getDocs(collection(db, "coaches")),
     getDocs(collection(db, "sessions")),
@@ -334,7 +373,7 @@ async function loadCoachDirectory() {
 
   if (coaches.length === 0) {
     coachDirectoryBody.innerHTML =
-      '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">ยังไม่มีโค้ชในระบบ</td></tr>';
+      '<tr><td colspan="7" class="px-4 py-6 text-center text-slate-400">ยังไม่มีโค้ชในระบบ</td></tr>';
     return;
   }
 
@@ -356,13 +395,32 @@ async function loadCoachDirectory() {
           : '<span class="badge badge-warning">รอการอนุมัติ</span>';
 
     const tr = document.createElement("tr");
+
+    const roleTd = document.createElement("td");
+    roleTd.innerHTML = roleLabel(c.role);
+
+    const teamTd = document.createElement("td");
+    if (c.role !== "admin" && c.team) {
+      const viewBtn = document.createElement("button");
+      viewBtn.textContent = c.team;
+      viewBtn.title = "คลิกเพื่อดู/จัดการข้อมูลทีมนี้";
+      viewBtn.className = "btn btn-secondary btn-sm";
+      viewBtn.addEventListener("click", () => enterTeamManagementMode(c.team));
+      teamTd.appendChild(viewBtn);
+    } else {
+      teamTd.textContent = c.team ?? "-";
+    }
+
     tr.innerHTML = `
       <td class="emphasis">${c.name ?? "-"}</td>
       <td>${c.email ?? "-"}</td>
-      <td>${c.team ?? "-"}</td>
-      <td>${statusBadge}</td>
-      <td>${c.role === "admin" ? "-" : percentText}</td>
     `;
+    tr.appendChild(roleTd);
+    tr.appendChild(teamTd);
+    tr.insertAdjacentHTML(
+      "beforeend",
+      `<td>${statusBadge}</td><td>${c.role === "admin" ? "-" : percentText}</td>`
+    );
 
     const reassignTd = document.createElement("td");
     if (c.role !== "admin") {
@@ -420,7 +478,7 @@ async function loadDailyProgress(dateStr) {
   const coaches = [];
   coachSnap.forEach((d) => {
     const data = d.data();
-    if (data.status === "approved" && data.role !== "admin" && data.team) {
+    if (data.status === "approved" && data.role === "coach" && data.team) {
       coaches.push({ id: d.id, ...data });
     }
   });
@@ -548,26 +606,31 @@ progressRefreshBtn.addEventListener("click", () => {
   loadDailyProgress(progressDateInput.value);
 });
 
-adminSelectTeamBtn.addEventListener("click", async () => {
+async function enterTeamManagementMode(team) {
+  myTeam = team;
+  coachTeamEl.textContent = `${team} (จัดการโดยผู้ดูแลระบบ)`;
+  if (!dateInput.value) {
+    dateInput.value = new Date().toISOString().slice(0, 10);
+  }
+  await loadPlayers();
+  showMenu();
+}
+
+adminSelectTeamBtn.addEventListener("click", () => {
   const team = adminTeamSelect.value;
   if (!team) {
     adminStatus.textContent = "กรุณาระบุทีมที่ต้องการจัดการ";
     adminStatus.className = "text-sm text-red-600 w-full";
     return;
   }
-  myTeam = team;
-  coachTeamEl.textContent = `${team} (โหมดผู้ดูแลระบบ)`;
-  if (!dateInput.value) {
-    dateInput.value = new Date().toISOString().slice(0, 10);
-  }
-  await loadPlayers();
-  showMenu();
+  enterTeamManagementMode(team);
 });
 
 // ---------- ล็อกอิน: แยกเส้นทางตามบทบาท (ผู้ดูแลระบบ / โค้ชที่อนุมัติแล้ว / รอการอนุมัติ) ----------
 onAuthStateChanged(auth, async (user) => {
   const isCoachSession = !!user && !user.isAnonymous;
   loginSection.classList.toggle("hidden", isCoachSession);
+  brandHero.classList.toggle("hidden", isCoachSession);
   coachBar.classList.toggle("hidden", !isCoachSession);
   if (!isCoachSession) {
     hideAllScreens();
@@ -592,11 +655,24 @@ onAuthStateChanged(auth, async (user) => {
     adminPanelLink.classList.toggle("hidden", !currentIsAdmin);
 
     if (currentIsAdmin) {
-      coachTeamEl.textContent = "ผู้ดูแลระบบ (เข้าถึงได้ทุกทีม)";
+      coachRoleBadgeEl.textContent = "ผู้ดูแลระบบ";
+      coachRoleBadgeEl.className = "badge badge-info";
+      coachTeamEl.textContent = "เข้าถึงได้ทุกทีม";
       showAdminPanel();
       return;
     }
 
+    if (data.role === "executive") {
+      coachRoleBadgeEl.textContent = "ผู้บริหารทีม";
+      coachRoleBadgeEl.className = "badge badge-neutral";
+      coachTeamEl.textContent = data.team;
+      hideAllScreens();
+      executiveSection.classList.remove("hidden");
+      return;
+    }
+
+    coachRoleBadgeEl.textContent = "โค้ช";
+    coachRoleBadgeEl.className = "badge badge-success";
     myTeam = data.team;
     coachTeamEl.textContent = myTeam;
     if (!dateInput.value) {
@@ -624,7 +700,7 @@ function renderPlayerList() {
   playerListBody.innerHTML = "";
   if (players.length === 0) {
     playerListBody.innerHTML =
-      '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">ยังไม่มีนักกีฬาในทีมนี้</td></tr>';
+      '<tr><td colspan="7" class="px-4 py-6 text-center text-slate-400">ยังไม่มีนักกีฬาในทีมนี้</td></tr>';
     return;
   }
   for (const p of players) {
@@ -634,6 +710,7 @@ function renderPlayerList() {
       <td class="emphasis">${p.nickname ?? "-"}</td>
       <td>${p.fullName ?? "-"}</td>
       <td>${p.birthday ?? "-"}</td>
+      <td>${p.ageGroup ?? "-"}</td>
       <td>${p.position ?? "-"}</td>
     `;
     const actionTd = document.createElement("td");
@@ -662,6 +739,7 @@ function startEditPlayer(p) {
   document.getElementById("player-nickname").value = p.nickname ?? "";
   document.getElementById("player-fullname").value = p.fullName ?? "";
   document.getElementById("player-birthday").value = p.birthday ?? "";
+  document.getElementById("player-age-group").value = p.ageGroup ?? "";
   document.getElementById("player-position").value = p.position ?? "";
   addPlayerSubmitBtn.textContent = "บันทึกการแก้ไข";
   cancelEditPlayerBtn.classList.remove("hidden");
@@ -715,6 +793,7 @@ addPlayerForm.addEventListener("submit", async (e) => {
   const nickname = document.getElementById("player-nickname").value.trim();
   const fullName = document.getElementById("player-fullname").value.trim();
   const birthday = document.getElementById("player-birthday").value;
+  const ageGroup = document.getElementById("player-age-group").value;
   const position = document.getElementById("player-position").value.trim();
 
   const payload = {
@@ -722,6 +801,7 @@ addPlayerForm.addEventListener("submit", async (e) => {
     nickname,
     fullName,
     birthday: birthday || null,
+    ageGroup: ageGroup || null,
     position: position || null,
     team: myTeam
   };

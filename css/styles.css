@@ -12,14 +12,46 @@ body {
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 1px rgba(15, 23, 42, 0.03);
 }
 .card-pad { padding: 1.5rem; }
+.card-warning { background: #fffbeb; border-color: #fde68a; }
+.card-success { background: #ecfdf5; border-color: #a7f3d0; }
 
 .section-title {
   font-size: 1.05rem;
   font-weight: 600;
   color: #0f172a;
   letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 .section-sub { font-size: 0.8125rem; color: #64748b; margin-top: 0.125rem; }
+
+.icon-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.6rem;
+  font-size: 1.05rem;
+  background: #f1f5f9;
+  flex-shrink: 0;
+}
+.icon-badge-lg {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.75rem;
+  font-size: 1.5rem;
+}
+
+.page-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin-bottom: 0.5rem;
+}
+.page-heading h2 { font-size: 1.35rem; font-weight: 700; color: #0f172a; letter-spacing: -0.01em; }
+.page-heading p { font-size: 0.8125rem; color: #64748b; margin-top: 0.1rem; }
 
 /* ---------- Tables ---------- */
 .table-wrap { overflow-x: auto; }
@@ -145,3 +177,11 @@ table.pro-table td.emphasis { font-weight: 600; color: #0f172a; }
 }
 .stat-label { font-size: 0.8125rem; color: #64748b; }
 .stat-value { font-size: 1.7rem; font-weight: 700; color: #0f172a; margin-top: 0.25rem; letter-spacing: -0.02em; }
+
+.app-footer {
+  border-top: 1px solid #e5e7eb;
+  padding: 1.5rem 0;
+  text-align: center;
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
