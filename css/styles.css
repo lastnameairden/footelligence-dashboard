@@ -1,0 +1,147 @@
+@import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap');
+
+body {
+  font-family: 'Prompt', 'Segoe UI', sans-serif;
+}
+
+/* ---------- Layout primitives ---------- */
+.card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.9rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 1px rgba(15, 23, 42, 0.03);
+}
+.card-pad { padding: 1.5rem; }
+
+.section-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+}
+.section-sub { font-size: 0.8125rem; color: #64748b; margin-top: 0.125rem; }
+
+/* ---------- Tables ---------- */
+.table-wrap { overflow-x: auto; }
+table.pro-table { width: 100%; font-size: 0.875rem; text-align: left; border-collapse: collapse; }
+table.pro-table thead th {
+  background: #f8fafc;
+  color: #64748b;
+  text-transform: uppercase;
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  padding: 0.75rem 1rem;
+  white-space: nowrap;
+  border-bottom: 1px solid #e5e7eb;
+}
+table.pro-table tbody td {
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid #f1f5f9;
+  color: #334155;
+  vertical-align: middle;
+}
+table.pro-table tbody tr:last-child td { border-bottom: none; }
+table.pro-table tbody tr:hover { background: #f8fafc; }
+table.pro-table td.emphasis { font-weight: 600; color: #0f172a; }
+
+/* ---------- Buttons ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border-radius: 0.55rem;
+  padding: 0.55rem 1.1rem;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.btn-block { width: 100%; }
+.btn-sm { padding: 0.35rem 0.75rem; font-size: 0.75rem; border-radius: 0.45rem; }
+.btn-primary { background: #0f172a; color: #fff; }
+.btn-primary:hover { background: #1e293b; }
+.btn-secondary { background: #fff; color: #334155; border-color: #e2e8f0; }
+.btn-secondary:hover { background: #f8fafc; }
+.btn-success { background: #059669; color: #fff; }
+.btn-success:hover { background: #047857; }
+.btn-danger-soft { background: #fef2f2; color: #b91c1c; }
+.btn-danger-soft:hover { background: #fee2e2; }
+.btn-warning-soft { background: #fffbeb; color: #92400e; border-color: #fde68a; }
+.btn-warning-soft:hover { background: #fef3c7; }
+.btn-ghost { background: transparent; color: #64748b; padding-left: 0.25rem; padding-right: 0.25rem; }
+.btn-ghost:hover { color: #0f172a; }
+.btn-ghost-danger { background: transparent; color: #dc2626; padding-left: 0.25rem; padding-right: 0.25rem; }
+.btn-ghost-danger:hover { color: #991b1b; }
+
+.toggle-pill {
+  padding: 0.4rem 0.95rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border-radius: 0.5rem;
+}
+.toggle-pill-active { background: #0f172a; color: #fff; }
+.toggle-pill-idle { background: #f1f5f9; color: #475569; }
+.toggle-pill-idle:hover { background: #e2e8f0; }
+
+/* ---------- Badges ---------- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 0.2rem 0.65rem;
+  border-radius: 9999px;
+  white-space: nowrap;
+}
+.badge-success { background: #d1fae5; color: #065f46; }
+.badge-warning { background: #fef3c7; color: #92400e; }
+.badge-info { background: #e0e7ff; color: #3730a3; }
+.badge-neutral { background: #f1f5f9; color: #475569; }
+
+/* ---------- Inputs ---------- */
+.field-label { display: block; font-size: 0.8125rem; font-weight: 500; color: #475569; margin-bottom: 0.35rem; }
+.field-input {
+  width: 100%;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.55rem;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.875rem;
+  color: #0f172a;
+  background: #fff;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.field-input:focus {
+  outline: none;
+  border-color: #0f172a;
+  box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.08);
+}
+
+/* ---------- Tabs ---------- */
+.tab-btn {
+  padding-bottom: 0.6rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-bottom: 2px solid transparent;
+  color: #94a3b8;
+}
+.tab-btn:hover { color: #475569; }
+.tab-btn-active { color: #0f172a; border-bottom-color: #0f172a; }
+
+/* ---------- App shell ---------- */
+.app-header {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+}
+.stat-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.9rem;
+  padding: 1.25rem 1.4rem;
+}
+.stat-label { font-size: 0.8125rem; color: #64748b; }
+.stat-value { font-size: 1.7rem; font-weight: 700; color: #0f172a; margin-top: 0.25rem; letter-spacing: -0.02em; }

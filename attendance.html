@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>เช็คชื่อการฝึกซ้อม — Footelligence</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="./css/styles.css" />
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-900">
+  <header class="app-header text-white sticky top-0 z-10 shadow-sm">
+    <div class="max-w-5xl mx-auto px-6 py-5 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center text-lg">✅</div>
+        <div>
+          <h1 class="text-xl font-bold leading-tight">เช็คชื่อการฝึกซ้อม</h1>
+          <p class="text-xs text-slate-300">สำหรับโค้ชและผู้ดูแลระบบ (ต้องล็อกอิน)</p>
+        </div>
+      </div>
+      <a href="./index.html" class="btn btn-secondary">← กลับหน้า Dashboard</a>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-6 py-8 space-y-8">
+
+    <!-- ฟอร์มล็อกอินโค้ช -->
+    <section id="login-section" class="card card-pad max-w-sm">
+      <div class="flex gap-5 mb-5 border-b border-slate-200">
+        <button id="tab-login" type="button" class="tab-btn tab-btn-active">เข้าสู่ระบบ</button>
+        <button id="tab-register" type="button" class="tab-btn">ลงทะเบียนโค้ชใหม่</button>
+      </div>
+
+      <form id="login-form" class="space-y-4">
+        <div>
+          <label class="field-label">อีเมล</label>
+          <input id="login-email" type="email" required class="field-input" />
+        </div>
+        <div>
+          <label class="field-label">รหัสผ่าน</label>
+          <input id="login-password" type="password" required class="field-input" />
+        </div>
+        <p id="login-error" class="text-sm text-red-600"></p>
+        <button type="submit" class="btn btn-primary btn-block">เข้าสู่ระบบ</button>
+      </form>
+
+      <form id="register-form" class="space-y-4 hidden">
+        <div>
+          <label class="field-label">ชื่อเล่นโค้ช</label>
+          <input id="register-name" type="text" required class="field-input" />
+        </div>
+        <div>
+          <label class="field-label">อีเมล</label>
+          <input id="register-email" type="email" required class="field-input" />
+        </div>
+        <div>
+          <label class="field-label">รหัสผ่าน (อย่างน้อย 6 ตัวอักษร)</label>
+          <input id="register-password" type="password" required minlength="6" class="field-input" />
+        </div>
+        <div>
+          <label class="field-label">ยืนยันรหัสผ่าน</label>
+          <input id="register-password-confirm" type="password" required minlength="6" class="field-input" />
+        </div>
+        <p id="register-error" class="text-sm text-red-600"></p>
+        <button type="submit" class="btn btn-primary btn-block">ลงทะเบียน</button>
+        <p class="text-xs text-slate-400">หลังลงทะเบียน ต้องรอผู้ดูแลระบบกำหนดทีมและอนุมัติก่อน จึงจะเริ่มใช้งานได้</p>
+      </form>
+    </section>
+
+    <!-- ข้อความสำหรับโค้ชที่ลงทะเบียนแล้วแต่ยังไม่ได้รับการอนุมัติ -->
+    <section id="pending-section" class="hidden card card-pad max-w-sm" style="background:#fffbeb; border-color:#fde68a;">
+      <h2 class="text-lg font-semibold mb-2 text-amber-800">รอผู้ดูแลระบบกำหนดทีมและอนุมัติ</h2>
+      <p class="text-sm text-amber-700">บัญชีของคุณลงทะเบียนสำเร็จแล้ว แต่ยังไม่ได้รับการกำหนดทีมและอนุมัติจากผู้ดูแลระบบ กรุณารอหรือติดต่อผู้ดูแลระบบ</p>
+      <button id="pending-logout-btn" class="btn btn-ghost-danger mt-4 px-0">ออกจากระบบ</button>
+    </section>
+
+    <!-- แถบสถานะโค้ช (แสดงหลังล็อกอินสำเร็จ ทุกหน้าจอย่อย) -->
+    <div id="coach-bar" class="hidden card card-pad flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <p class="text-sm text-slate-500">
+        ล็อกอินเป็น: <span id="coach-email" class="font-medium text-slate-700"></span>
+        <span class="mx-1">•</span>
+        <span id="coach-team-label">ทีมที่รับผิดชอบ: <span id="coach-team" class="font-medium text-slate-700"></span></span>
+      </p>
+      <div class="flex items-center gap-2">
+        <button id="admin-panel-link" class="hidden btn btn-secondary btn-sm">🛡️ แผงควบคุมผู้ดูแล</button>
+        <button id="logout-btn" class="btn btn-ghost-danger btn-sm">ออกจากระบบ</button>
+      </div>
+    </div>
+
+    <!-- แผงควบคุมผู้ดูแลระบบ -->
+    <section id="admin-section" class="hidden space-y-8">
+      <div>
+        <h2 class="section-title mb-3">รายชื่อโค้ชในระบบ</h2>
+        <div class="card table-wrap">
+          <table class="pro-table">
+            <thead>
+              <tr>
+                <th>ชื่อ</th>
+                <th>อีเมล</th>
+                <th>ทีม</th>
+                <th>สถานะ</th>
+                <th>% ส่งข้อมูลตรงเวลา (ก่อน 20:00 น.)</th>
+                <th>เปลี่ยนทีม</th>
+              </tr>
+            </thead>
+            <tbody id="coach-directory-body">
+              <tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div>
+        <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <h2 class="section-title">ความคืบหน้าการประเมินรายวัน</h2>
+          <div class="flex items-center gap-2">
+            <input id="progress-date-input" type="date" class="field-input w-auto" />
+            <button id="progress-refresh-btn" class="btn btn-primary">โหลด</button>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div class="lg:col-span-2 card table-wrap">
+            <table class="pro-table">
+              <thead>
+                <tr>
+                  <th>โค้ช</th>
+                  <th>ทีม</th>
+                  <th>นักกีฬาทั้งหมด</th>
+                  <th>ประเมินแล้ว</th>
+                  <th>ยังไม่ประเมิน</th>
+                  <th>เวลาที่ครบทุกคน</th>
+                </tr>
+              </thead>
+              <tbody id="progress-table-body">
+                <tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card card-pad flex flex-col items-center justify-center">
+            <div id="progress-pie" class="w-36 h-36 rounded-full mb-4"
+              style="background: conic-gradient(#e2e8f0 0% 100%);"></div>
+            <div id="progress-legend" class="text-sm space-y-1 w-full"></div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h2 class="section-title mb-3">คำขอลงทะเบียนที่รอการอนุมัติ</h2>
+        <div class="card table-wrap">
+          <table class="pro-table">
+            <thead>
+              <tr>
+                <th>ชื่อ</th>
+                <th>อีเมล</th>
+                <th>กำหนดทีม</th>
+                <th>ดำเนินการ</th>
+              </tr>
+            </thead>
+            <tbody id="pending-approvals-body">
+              <tr><td colspan="4" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card card-pad flex flex-wrap items-end gap-4">
+        <div>
+          <label class="field-label">เลือกทีมที่ต้องการจัดการข้อมูล</label>
+          <select id="admin-team-select" class="field-input w-56"></select>
+        </div>
+        <button id="admin-select-team-btn" class="btn btn-primary">จัดการข้อมูลทีมนี้</button>
+        <p id="admin-status" class="text-sm text-slate-500 w-full"></p>
+      </div>
+    </section>
+
+    <!-- เมนูหลัก: เลือกว่าจะเพิ่มข้อมูล หรือ เช็คชื่อฝึกซ้อม -->
+    <section id="menu-section" class="hidden">
+      <h2 class="section-title mb-4">เลือกรายการที่ต้องการดำเนินการ</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <button id="menu-add-player" type="button"
+          class="text-left card card-pad hover:shadow-md hover:ring-2 hover:ring-slate-900 transition">
+          <div class="text-lg font-semibold mb-1">➕ เพิ่มข้อมูลนักกีฬา</div>
+          <p class="text-sm text-slate-500">กรอกข้อมูลนักกีฬาใหม่เข้าสู่ทีมของคุณ</p>
+        </button>
+        <button id="menu-checkin" type="button"
+          class="text-left card card-pad hover:shadow-md hover:ring-2 hover:ring-slate-900 transition">
+          <div class="text-lg font-semibold mb-1">✅ เช็คชื่อการฝึกซ้อม</div>
+          <p class="text-sm text-slate-500">บันทึกการเข้าร่วมและให้คะแนนการฝึกซ้อม</p>
+        </button>
+      </div>
+    </section>
+
+    <!-- หน้าจอเพิ่มนักกีฬา -->
+    <section id="add-player-section" class="hidden space-y-6">
+      <button data-back class="btn btn-ghost px-0">← กลับเมนู</button>
+      <div class="card card-pad">
+        <h2 class="section-title mb-4">เพิ่มข้อมูลนักกีฬา</h2>
+        <form id="add-player-form" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="field-label">เบอร์/ลำดับ</label>
+            <input id="player-number" type="number" class="field-input" />
+          </div>
+          <div>
+            <label class="field-label">ชื่อเล่น</label>
+            <input id="player-nickname" type="text" required class="field-input" />
+          </div>
+          <div>
+            <label class="field-label">ชื่อ-นามสกุล</label>
+            <input id="player-fullname" type="text" required class="field-input" />
+          </div>
+          <div>
+            <label class="field-label">วันเกิด</label>
+            <input id="player-birthday" type="date" class="field-input" />
+          </div>
+          <div>
+            <label class="field-label">ตำแหน่ง (ถ้ามี)</label>
+            <input id="player-position" type="text" class="field-input" />
+          </div>
+          <div class="sm:col-span-2 flex items-center gap-4">
+            <button type="submit" id="add-player-submit-btn" class="btn btn-primary">เพิ่มนักกีฬา</button>
+            <button type="button" id="cancel-edit-player-btn" class="btn btn-secondary hidden">ยกเลิกการแก้ไข</button>
+            <p id="add-player-status" class="text-sm text-slate-500"></p>
+          </div>
+        </form>
+      </div>
+
+      <div>
+        <h2 class="section-title mb-3">รายชื่อนักกีฬาในทีม</h2>
+        <div class="card table-wrap">
+          <table class="pro-table">
+            <thead>
+              <tr>
+                <th>เบอร์</th>
+                <th>ชื่อเล่น</th>
+                <th>ชื่อ-นามสกุล</th>
+                <th>วันเกิด</th>
+                <th>ตำแหน่ง</th>
+                <th>ดำเนินการ</th>
+              </tr>
+            </thead>
+            <tbody id="player-list-body">
+              <tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">ยังไม่มีนักกีฬาในทีมนี้</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- หน้าจอเช็คชื่อ -->
+    <section id="checkin-section" class="hidden space-y-6">
+      <button data-back class="btn btn-ghost px-0">← กลับเมนู</button>
+
+      <div class="card card-pad flex flex-wrap items-end gap-4">
+        <div>
+          <label class="field-label">วันที่ฝึกซ้อม</label>
+          <input id="session-date" type="date" class="field-input" />
+        </div>
+        <button id="load-session-btn" class="btn btn-primary">โหลด / สร้างวันซ้อมนี้</button>
+        <button id="mark-no-training-btn" class="btn btn-warning-soft">วันนี้ไม่มีฝึกซ้อม</button>
+        <p id="attendance-status" class="text-sm text-slate-500 w-full">เลือกวันที่แล้วกดปุ่ม เพื่อเริ่มเช็คชื่อ</p>
+      </div>
+
+      <!-- แสดงเมื่อวันที่เลือกถูกทำเครื่องหมายว่าไม่มีฝึกซ้อม -->
+      <div id="no-training-banner" class="hidden card card-pad flex items-center justify-between"
+        style="background:#fffbeb; border-color:#fde68a;">
+        <p class="text-sm text-amber-800">📌 วันนี้ถูกบันทึกว่า <strong>ไม่มีฝึกซ้อม</strong></p>
+        <button id="undo-no-training-btn" class="btn btn-ghost px-0">ยกเลิก (มีฝึกซ้อมจริง)</button>
+      </div>
+
+      <!-- แสดงเมื่อประเมินนักกีฬาครบทุกคนแล้ว (โค้ชแก้ไขต่อไม่ได้ ดูได้อย่างเดียว) -->
+      <div id="roster-locked-banner" class="hidden card card-pad flex items-center justify-between"
+        style="background:#ecfdf5; border-color:#a7f3d0;">
+        <p class="text-sm text-emerald-800">✅ ประเมินนักกีฬาครบทุกคนแล้ว — ข้อมูลถูกล็อกเพื่อความถูกต้อง ดูได้อย่างเดียว (ติดต่อผู้ดูแลระบบหากต้องการแก้ไข)</p>
+      </div>
+
+      <div id="roster-wrap" class="card table-wrap">
+        <table class="pro-table">
+          <thead>
+            <tr>
+              <th>ผู้เล่น</th>
+              <th>สถานะ (A=มา, I=บาดเจ็บ, R=พักฟื้น, P=ลา)</th>
+              <th>คะแนนฝึกซ้อม (1=แย่ 2=ปานกลาง 3=ดี 4=ยอดเยี่ยม)</th>
+            </tr>
+          </thead>
+          <tbody id="roster-table-body">
+            <tr><td colspan="3" class="px-4 py-6 text-center text-slate-400">เลือกวันที่ก่อน</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="./js/attendance.js"></script>
+</body>
+</html>

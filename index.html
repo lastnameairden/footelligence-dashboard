@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Footelligence Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="./css/styles.css" />
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-900">
+  <header class="app-header text-white sticky top-0 z-10 shadow-sm">
+    <div class="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center text-lg">⚽</div>
+        <div>
+          <h1 class="text-xl font-bold leading-tight">Footelligence Dashboard</h1>
+          <p class="text-xs text-slate-300">ภาพรวมข้อมูลผู้เล่นและการฝึกซ้อมทุกทีม</p>
+        </div>
+      </div>
+      <a href="./attendance.html" class="btn btn-secondary">
+        เช็คชื่อการฝึกซ้อม (โค้ช) →
+      </a>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-6 py-8 space-y-10">
+    <p id="status-message" class="text-sm text-slate-500">กำลังเชื่อมต่อ...</p>
+
+    <!-- แสดงเมื่อยังไม่ได้ล็อกอิน หรือบัญชียังไม่ได้รับการอนุมัติ -->
+    <section id="login-gate" class="hidden card card-pad max-w-md mx-auto text-center">
+      <h2 class="text-lg font-semibold mb-2">กรุณาเข้าสู่ระบบ</h2>
+      <p id="login-gate-message" class="text-sm text-slate-500 mb-4">
+        ต้องเข้าสู่ระบบด้วยบัญชีโค้ชหรือผู้ดูแลระบบก่อน จึงจะดูข้อมูล Dashboard ได้
+      </p>
+      <a href="./attendance.html" class="btn btn-primary">เข้าสู่ระบบที่นี่ →</a>
+    </section>
+
+    <!-- แถบเลือกทีม สำหรับผู้ดูแลระบบเท่านั้น (โค้ชจะเห็นเฉพาะทีมตัวเองอัตโนมัติ ไม่ต้องเลือก) -->
+    <section id="admin-team-bar" class="hidden card card-pad flex flex-wrap items-end gap-4">
+      <div>
+        <label class="field-label">เลือกทีมที่ต้องการดูข้อมูล</label>
+        <select id="admin-team-select-dashboard" class="field-input w-56">
+          <option value="">-- เลือกทีม --</option>
+          <option value="__ALL__">ทุกทีม (ภาพรวม)</option>
+        </select>
+      </div>
+      <button id="admin-view-team-btn" class="btn btn-primary">ดูข้อมูล</button>
+      <p id="admin-team-bar-status" class="text-sm text-slate-500 w-full"></p>
+    </section>
+
+    <!-- เนื้อหา Dashboard (แสดงหลังล็อกอินและได้รับอนุมัติแล้วเท่านั้น) -->
+    <div id="dashboard-content" class="hidden space-y-10">
+
+    <!-- ภาพรวมทั้งหมด -->
+    <section>
+      <h2 class="section-title mb-4">ภาพรวมทั้งหมด</h2>
+      <div id="overview-cards" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+        <p class="text-slate-400 text-sm col-span-full">กำลังโหลด...</p>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+        <div class="card card-pad">
+          <h3 class="section-title text-sm mb-4">สัดส่วนนักกีฬาต่อทีม</h3>
+          <div class="flex items-center gap-6">
+            <div id="players-pie" class="w-28 h-28 rounded-full flex-shrink-0"
+              style="background: conic-gradient(#e2e8f0 0% 100%);"></div>
+            <div id="players-pie-legend" class="text-sm space-y-1"></div>
+          </div>
+        </div>
+        <div class="card card-pad">
+          <h3 class="section-title text-sm mb-4">% เข้าร่วมฝึกซ้อมแต่ละทีม</h3>
+          <div id="attendance-bars" class="space-y-3"></div>
+        </div>
+        <div class="card card-pad">
+          <h3 class="section-title text-sm mb-4">คะแนนเฉลี่ยแต่ละทีม (เต็ม 4)</h3>
+          <div id="score-bars" class="space-y-3"></div>
+        </div>
+      </div>
+
+      <div id="team-summary-wrap" class="card table-wrap">
+        <table class="pro-table">
+          <thead>
+            <tr>
+              <th>ทีม</th>
+              <th>โค้ช</th>
+              <th>จำนวนนักกีฬา</th>
+              <th>% เข้าร่วมฝึกซ้อม</th>
+              <th>คะแนนเฉลี่ย</th>
+            </tr>
+          </thead>
+          <tbody id="team-summary-body">
+            <tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- รายชื่อผู้เล่น แยกตามทีม/โค้ชผู้รับผิดชอบ -->
+    <section>
+      <h2 class="section-title mb-4">รายชื่อผู้เล่น — แยกตามทีม</h2>
+      <div id="players-groups" class="space-y-6">
+        <p class="text-slate-400 text-sm">กำลังโหลด...</p>
+      </div>
+    </section>
+
+    <!-- สถิติการฝึกซ้อม แยกตามทีม/โค้ชผู้รับผิดชอบ -->
+    <section>
+      <h2 class="section-title mb-4">สถิติการฝึกซ้อม — แยกตามทีม</h2>
+      <div id="attendance-groups" class="space-y-6">
+        <p class="text-slate-400 text-sm">กำลังโหลด...</p>
+      </div>
+    </section>
+
+    </div>
+  </main>
+
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>
