@@ -8,7 +8,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import { db, auth } from "./firebase-init.js";
-import { applyDataLabels } from "./ui-utils.js";
+import { applyDataLabels, computeAvgScore, isPlayerFullyEvaluated } from "./ui-utils.js";
 
 // สถานะที่นับว่า "มาซ้อม" ตาม legend ของ Logbook (A หรือค่าประเมิน 1-4)
 const ATTENDED_CODES = new Set(["A", "1", "2", "3", "4"]);
@@ -33,6 +33,12 @@ const ageProgressRefreshBtn = document.getElementById("age-progress-refresh-btn"
 const ageProgressTableBody = document.getElementById("age-progress-table-body");
 const ageProgressPie = document.getElementById("age-progress-pie");
 const ageProgressLegend = document.getElementById("age-progress-legend");
+const trainingReportsSection = document.getElementById("training-reports-section");
+const trainingReportsBody = document.getElementById("training-reports-body");
+const trainingReportsLocationHeader = document.getElementById("training-reports-location-header");
+const headerAttendanceLink = document.getElementById("header-attendance-link");
+
+let currentViewerRole = null; // "admin" | "coach" | "executive"
 
 let currentScopeTeam = null;
 let currentTeamPlayers = [];
@@ -49,6 +55,7 @@ function showLoginGate(message) {
   loginGateMessage.textContent = message;
   loginGate.classList.remove("hidden");
   dashboardContent.classList.add("hidden");
+  headerAttendanceLink.classList.add("hidden");
   setStatus("");
 }
 
@@ -155,9 +162,9 @@ function computeAttendanceStats(players, records) {
     } else {
       stat.missed += 1;
     }
-    const score = Number(r.score);
-    if (score >= 1 && score <= 4) {
-      stat.scoreSum += score;
+    const avgScore = computeAvgScore(r.scores);
+    if (avgScore !== null) {
+      stat.scoreSum += avgScore;
       stat.scoreCount += 1;
     }
   }
@@ -424,7 +431,7 @@ async function loadAgeGroupProgress(team, dateStr) {
       continue;
     }
     const evaluatedRecords = attendanceRecords.filter(
-      (a) => a.status && groupPlayers.some((p) => p.id === a.playerId)
+      (a) => isPlayerFullyEvaluated(a) && groupPlayers.some((p) => p.id === a.playerId)
     );
     let completedAt = null;
     if (groupPlayers.length > 0 && evaluatedRecords.length >= groupPlayers.length) {
@@ -520,6 +527,74 @@ ageProgressRefreshBtn.addEventListener("click", () => {
   loadAgeGroupProgress(currentScopeTeam, ageProgressDateInput.value);
 });
 
+// ---------- รายงานสถานะการฝึกซ้อมประจำวัน ส่งโดยโค้ช (เฉพาะตอนดูข้อมูลทีมใดทีมหนึ่ง) ----------
+const PERIOD_TYPE_LABELS = { morning: "ซ้อมเช้า", evening: "ซ้อมเย็น" };
+
+function formatReportPeriod(r) {
+  if (!r.periodType) return "-";
+  const label = r.periodType === "other" ? r.periodOtherText || "อื่นๆ" : PERIOD_TYPE_LABELS[r.periodType] || r.periodType;
+  const timeRange = r.periodStartTime && r.periodEndTime ? `${r.periodStartTime} - ${r.periodEndTime} น.` : "";
+  return timeRange ? `${label} (${timeRange})` : label;
+}
+
+function formatReportAttended(r) {
+  const autoTag = r.autoFromNoTraining
+    ? ' <span class="text-xs text-slate-400">(ซิงก์จากวันไม่มีฝึกซ้อม)</span>'
+    : "";
+  if (r.attended === true) return `<span class="badge badge-success">มีการซ้อม</span>${autoTag}`;
+  if (r.attended === false) return `<span class="badge badge-warning">ไม่มีการซ้อม</span>${autoTag}`;
+  return '<span class="text-slate-400">-</span>';
+}
+
+// พิกัด GPS บันทึกไว้เบื้องหลังเพื่อให้ผู้ดูแลระบบ/ผู้บริหารทีมตรวจสอบเท่านั้น
+// บัญชีโค้ชห้ามเห็นคอลัมน์นี้เด็ดขาด (ทั้งหัวตารางและลิงก์แผนที่ในแต่ละแถว)
+async function loadTrainingReports(team) {
+  const showLocation = currentViewerRole !== "coach";
+  trainingReportsLocationHeader.classList.toggle("hidden", !showLocation);
+  const colCount = showLocation ? 7 : 6;
+
+  trainingReportsBody.innerHTML =
+    `<tr><td colspan="${colCount}" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>`;
+
+  const snap = await getDocs(query(collection(db, "trainingReports"), where("team", "==", team)));
+  const reports = [];
+  snap.forEach((d) => reports.push({ id: d.id, ...d.data() }));
+  reports.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+
+  if (reports.length === 0) {
+    trainingReportsBody.innerHTML =
+      `<tr><td colspan="${colCount}" class="px-4 py-6 text-center text-slate-400">ยังไม่มีรายงานจากโค้ช</td></tr>`;
+    return;
+  }
+
+  trainingReportsBody.innerHTML = reports
+    .map((r) => {
+      const postedAt =
+        r.updatedAt && typeof r.updatedAt.toDate === "function"
+          ? r.updatedAt.toDate().toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" })
+          : "-";
+      const mapCell = showLocation
+        ? `<td>${
+            r.location
+              ? `<a href="https://www.google.com/maps?q=${r.location.lat},${r.location.lng}" target="_blank" rel="noopener" class="text-blue-600 underline">ดูแผนที่</a>`
+              : "-"
+          }</td>`
+        : "";
+      return `
+        <tr>
+          <td class="emphasis">${r.date ?? "-"}</td>
+          <td>${r.coachName ?? "-"}</td>
+          <td>${formatReportPeriod(r)}</td>
+          <td>${formatReportAttended(r)}</td>
+          <td>${r.notes ?? "-"}</td>
+          <td>${postedAt}</td>
+          ${mapCell}
+        </tr>`;
+    })
+    .join("");
+  applyDataLabels(trainingReportsBody);
+}
+
 // scopeTeam: null = ผู้ดูแลระบบ เห็นทุกทีม / string = โค้ช เห็นเฉพาะทีมตัวเอง
 async function loadDashboard(scopeTeam) {
   try {
@@ -541,11 +616,13 @@ async function loadDashboard(scopeTeam) {
     setStatus(`โหลดข้อมูลสำเร็จ • ผู้เล่น ${players.length} คน • ${playerGroups.size} ทีม`);
 
     ageProgressSection.classList.toggle("hidden", !scopeTeam);
+    trainingReportsSection.classList.toggle("hidden", !scopeTeam);
     if (scopeTeam) {
       if (!ageProgressDateInput.value) {
         ageProgressDateInput.value = new Date().toISOString().slice(0, 10);
       }
       await loadAgeGroupProgress(scopeTeam, ageProgressDateInput.value);
+      await loadTrainingReports(scopeTeam);
     }
   } catch (err) {
     console.error(err);
@@ -591,6 +668,8 @@ onAuthStateChanged(auth, async (user) => {
     }
 
     loginGate.classList.add("hidden");
+    headerAttendanceLink.classList.remove("hidden");
+    currentViewerRole = data.role;
 
     const isAdmin = data.role === "admin";
     if (isAdmin) {

@@ -63,7 +63,18 @@ service cloud.firestore {
 
     match /attendance/{id} {
       allow read: if isAdmin() || (canViewTeam() && ownsTeam());
-      allow write: if isAdmin() || (canManageTeam() && request.resource.data.team == myTeam());
+      allow create: if isAdmin() || (canManageTeam() && request.resource.data.team == myTeam());
+      allow update: if isAdmin() || (canManageTeam() && ownsTeam() && request.resource.data.team == myTeam());
+      allow delete: if false;
+    }
+
+    // รายงานการฝึกซ้อม (รายชื่อนักกีฬาที่ไม่ได้เข้าซ้อม + พิกัด GPS ตอนส่ง)
+    // โค้ชสร้าง/แก้ไขได้เฉพาะรายงานของทีมตัวเอง ผู้บริหารทีมดูได้อย่างเดียว (canViewTeam)
+    match /trainingReports/{id} {
+      allow read: if isAdmin() || (canViewTeam() && ownsTeam());
+      allow create: if isAdmin() || (canManageTeam() && request.resource.data.team == myTeam());
+      allow update: if isAdmin() || (canManageTeam() && ownsTeam() && request.resource.data.team == myTeam());
+      allow delete: if isAdmin();
     }
   }
 }

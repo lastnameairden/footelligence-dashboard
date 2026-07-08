@@ -18,11 +18,19 @@ import {
   signOut
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import { db, auth } from "./firebase-init.js";
-import { applyDataLabels } from "./ui-utils.js";
+import { applyDataLabels, SCORE_CATEGORIES, computeAvgScore, isPlayerFullyEvaluated } from "./ui-utils.js";
 
 const STATUS_OPTIONS = ["A", "I", "R", "P"];
 const SCORE_OPTIONS = [1, 2, 3, 4];
 const TEAMS = ["KHAMPHEE FOOTBALL", "THAWEE SC", "THAMMASATHIT"];
+
+for (let i = 0; i < SCORE_CATEGORIES.length; i++) {
+  const th = document.getElementById(`score-header-${i}`);
+  if (th) {
+    th.textContent = SCORE_CATEGORIES[i].short;
+    th.title = SCORE_CATEGORIES[i].label;
+  }
+}
 
 const loginSection = document.getElementById("login-section");
 const brandHero = document.getElementById("brand-hero");
@@ -32,6 +40,19 @@ const addPlayerSection = document.getElementById("add-player-section");
 const checkinSection = document.getElementById("checkin-section");
 const menuAddPlayerBtn = document.getElementById("menu-add-player");
 const menuCheckinBtn = document.getElementById("menu-checkin");
+const menuReportBtn = document.getElementById("menu-report");
+const reportSection = document.getElementById("report-section");
+const reportDateInput = document.getElementById("report-date");
+const reportLoadBtn = document.getElementById("report-load-btn");
+const reportLoadStatus = document.getElementById("report-load-status");
+const reportForm = document.getElementById("report-form");
+const reportPeriodSection = document.getElementById("report-period-section");
+const reportPeriodSegmentedWrap = document.getElementById("report-period-segmented");
+const reportPeriodDetailWrap = document.getElementById("report-period-detail-wrap");
+const reportAttendSegmentedWrap = document.getElementById("report-attend-segmented");
+const reportNotesInput = document.getElementById("report-notes");
+const reportSubmitBtn = document.getElementById("report-submit-btn");
+const reportStatus = document.getElementById("report-status");
 const backButtons = document.querySelectorAll("[data-back]");
 const loginForm = document.getElementById("login-form");
 const loginError = document.getElementById("login-error");
@@ -43,8 +64,12 @@ const registerError = document.getElementById("register-error");
 const pendingSection = document.getElementById("pending-section");
 const pendingLogoutBtn = document.getElementById("pending-logout-btn");
 const executiveSection = document.getElementById("executive-section");
+const coachNameEl = document.getElementById("coach-name");
 const coachEmailEl = document.getElementById("coach-email");
 const coachTeamEl = document.getElementById("coach-team");
+const coachPhoneEl = document.getElementById("coach-phone");
+const coachStatusBadgeEl = document.getElementById("coach-status-badge");
+const coachAgeGroupsEl = document.getElementById("coach-age-groups");
 const coachRoleBadgeEl = document.getElementById("coach-role-badge");
 const adminPanelLink = document.getElementById("admin-panel-link");
 const adminSection = document.getElementById("admin-section");
@@ -79,9 +104,11 @@ let currentSessionId = null;
 let currentSessionData = null;
 let currentAttendanceMap = new Map();
 let myTeam = null;
+let myCoachName = null;
 let players = [];
 let editingPlayerId = null;
 let currentIsAdmin = false;
+let currentReportId = null;
 
 function setAttendanceStatus(message, isError = false) {
   attendanceStatus.textContent = message;
@@ -198,6 +225,7 @@ function hideAllScreens() {
   menuSection.classList.add("hidden");
   addPlayerSection.classList.add("hidden");
   checkinSection.classList.add("hidden");
+  reportSection.classList.add("hidden");
 }
 
 function showMenu() {
@@ -233,6 +261,17 @@ menuCheckinBtn.addEventListener("click", () => {
   menuSection.classList.add("hidden");
   checkinSection.classList.remove("hidden");
   showRosterView();
+});
+
+menuReportBtn.addEventListener("click", () => {
+  menuSection.classList.add("hidden");
+  reportSection.classList.remove("hidden");
+  reportForm.classList.add("hidden");
+  reportStatus.textContent = "";
+  reportLoadStatus.textContent = "";
+  if (!reportDateInput.value) {
+    reportDateInput.value = new Date().toISOString().slice(0, 10);
+  }
 });
 
 for (const btn of backButtons) {
@@ -514,7 +553,7 @@ async function loadDailyProgress(dateStr) {
       );
       const evaluatedRecords = attendanceSnap.docs
         .map((d) => d.data())
-        .filter((a) => a.status);
+        .filter((a) => isPlayerFullyEvaluated(a));
       let completedAt = null;
       if (totalPlayers > 0 && evaluatedRecords.length >= totalPlayers) {
         for (const a of evaluatedRecords) {
@@ -612,11 +651,13 @@ progressRefreshBtn.addEventListener("click", () => {
 
 async function enterTeamManagementMode(team) {
   myTeam = team;
+  myCoachName = myCoachName || auth.currentUser?.email;
   coachTeamEl.textContent = `${team} (จัดการโดยผู้ดูแลระบบ)`;
   if (!dateInput.value) {
     dateInput.value = new Date().toISOString().slice(0, 10);
   }
   await loadPlayers();
+  renderAgeGroupsFromPlayers();
   showMenu();
 }
 
@@ -630,6 +671,46 @@ adminSelectTeamBtn.addEventListener("click", () => {
   enterTeamManagementMode(team);
 });
 
+// แสดงโปรไฟล์ผู้ใช้งานที่มีในระบบให้ครบทุกส่วน (ชื่อ, อีเมล, ทีม, เบอร์โทร, สถานะบัญชี, รุ่นอายุที่รับผิดชอบ)
+// ฟิลด์ "รุ่นอายุที่รับผิดชอบ" อัปเดตแยกต่างหากหลังโหลดรายชื่อนักกีฬาของทีมเสร็จ (ดู renderAgeGroupsFromPlayers /
+// updateAgeGroupsForTeam) เพราะต้องอ้างอิงข้อมูลนักกีฬาจริงในทีม ไม่ใช่ฟิลด์ตรงของโค้ช
+function renderCoachProfile(user, data, teamText) {
+  coachNameEl.textContent = (data && data.name) || user.email;
+  coachEmailEl.textContent = user.email;
+  coachTeamEl.textContent = teamText || "-";
+  coachPhoneEl.textContent = (data && data.phone) || "-";
+  coachStatusBadgeEl.innerHTML =
+    data && data.status === "approved"
+      ? '<span class="badge badge-success">อนุมัติแล้ว</span>'
+      : '<span class="badge badge-warning">รอการอนุมัติ</span>';
+  coachAgeGroupsEl.textContent = "-";
+}
+
+function formatAgeGroups(playerList) {
+  const groups = new Set();
+  for (const p of playerList) {
+    if (p.ageGroup) groups.add(p.ageGroup);
+  }
+  return groups.size > 0 ? Array.from(groups).sort().join(", ") : "-";
+}
+
+// ใช้ตอนมีรายชื่อนักกีฬาของทีมโหลดไว้แล้วในตัวแปร players (โค้ช / ผู้ดูแลระบบที่กำลังจัดการทีมใดทีมหนึ่ง)
+function renderAgeGroupsFromPlayers() {
+  coachAgeGroupsEl.textContent = formatAgeGroups(players);
+}
+
+// ใช้ตอนยังไม่มี players โหลดไว้ (เช่น ผู้บริหารทีมที่ไม่ได้เข้าหน้าจัดการนักกีฬา) ต้อง query แยก
+async function updateAgeGroupsForTeam(team) {
+  if (!team) {
+    coachAgeGroupsEl.textContent = "-";
+    return;
+  }
+  const snap = await getDocs(query(collection(db, "players"), where("team", "==", team)));
+  const teamPlayers = [];
+  snap.forEach((d) => teamPlayers.push(d.data()));
+  coachAgeGroupsEl.textContent = formatAgeGroups(teamPlayers);
+}
+
 // ---------- ล็อกอิน: แยกเส้นทางตามบทบาท (ผู้ดูแลระบบ / โค้ชที่อนุมัติแล้ว / รอการอนุมัติ) ----------
 onAuthStateChanged(auth, async (user) => {
   const isCoachSession = !!user && !user.isAnonymous;
@@ -641,8 +722,6 @@ onAuthStateChanged(auth, async (user) => {
     return;
   }
 
-  coachEmailEl.textContent = user.email;
-
   try {
     const coachDoc = await getDoc(doc(db, "coaches", user.uid));
     const data = coachDoc.exists() ? coachDoc.data() : null;
@@ -650,6 +729,7 @@ onAuthStateChanged(auth, async (user) => {
     if (!data || data.status !== "approved") {
       currentIsAdmin = false;
       adminPanelLink.classList.add("hidden");
+      renderCoachProfile(user, data, (data && data.team) || "รอผู้ดูแลระบบกำหนดทีม");
       hideAllScreens();
       pendingSection.classList.remove("hidden");
       return;
@@ -661,7 +741,7 @@ onAuthStateChanged(auth, async (user) => {
     if (currentIsAdmin) {
       coachRoleBadgeEl.textContent = "ผู้ดูแลระบบ";
       coachRoleBadgeEl.className = "badge badge-info";
-      coachTeamEl.textContent = "เข้าถึงได้ทุกทีม";
+      renderCoachProfile(user, data, "เข้าถึงได้ทุกทีม");
       showAdminPanel();
       return;
     }
@@ -669,7 +749,8 @@ onAuthStateChanged(auth, async (user) => {
     if (data.role === "executive") {
       coachRoleBadgeEl.textContent = "ผู้บริหารทีม";
       coachRoleBadgeEl.className = "badge badge-neutral";
-      coachTeamEl.textContent = data.team;
+      renderCoachProfile(user, data, data.team);
+      await updateAgeGroupsForTeam(data.team);
       hideAllScreens();
       executiveSection.classList.remove("hidden");
       return;
@@ -678,11 +759,13 @@ onAuthStateChanged(auth, async (user) => {
     coachRoleBadgeEl.textContent = "โค้ช";
     coachRoleBadgeEl.className = "badge badge-success";
     myTeam = data.team;
-    coachTeamEl.textContent = myTeam;
+    myCoachName = data.name || user.email;
+    renderCoachProfile(user, data, myTeam);
     if (!dateInput.value) {
       dateInput.value = new Date().toISOString().slice(0, 10);
     }
     await loadPlayers();
+    renderAgeGroupsFromPlayers();
     showMenu();
   } catch (err) {
     console.error(err);
@@ -867,7 +950,7 @@ async function loadExistingAttendance(sessionId) {
   const map = new Map();
   snapshot.forEach((docSnap) => {
     const data = docSnap.data();
-    map.set(data.playerId, { status: data.status, score: data.score, updatedAt: data.updatedAt });
+    map.set(data.playerId, { status: data.status, scores: data.scores || {}, updatedAt: data.updatedAt });
   });
   return map;
 }
@@ -877,15 +960,24 @@ function formatEvalTime(timestamp) {
   return timestamp.toDate().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
 }
 
-function activeBtnClass(isActive) {
-  return isActive
-    ? "toggle-pill toggle-pill-active"
-    : "toggle-pill toggle-pill-idle";
+// สร้างกลุ่มปุ่มแบบ segmented control (กดเลือกได้ทีละค่า) ใช้ทั้งสถานะและคะแนนแต่ละด้าน
+function createSegmentedGroup(options, activeValue, onSelect) {
+  const group = document.createElement("div");
+  group.className = "segmented";
+  for (const opt of options) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = String(opt);
+    btn.className = "segmented-btn" + (activeValue === opt ? " active" : "");
+    btn.addEventListener("click", () => onSelect(opt));
+    group.appendChild(btn);
+  }
+  return group;
 }
 
-// ประเมินครบทุกคนแล้ว = ทุกคนมีฟิลด์ status ถูกบันทึกไว้
+// ประเมินครบทุกคนแล้ว = ทุกคนมีสถานะ และถ้ามาซ้อม (A) ต้องให้คะแนนครบทั้ง 4 ด้าน
 function isRosterComplete(existingMap) {
-  return players.length > 0 && players.every((p) => !!existingMap.get(p.id)?.status);
+  return players.length > 0 && players.every((p) => isPlayerFullyEvaluated(existingMap.get(p.id)));
 }
 
 function renderRoster(existingMap) {
@@ -896,11 +988,12 @@ function renderRoster(existingMap) {
   rosterBody.innerHTML = "";
   if (players.length === 0) {
     rosterBody.innerHTML =
-      '<tr><td colspan="3" class="px-4 py-6 text-center text-slate-400">ยังไม่มีผู้เล่นในทีมนี้</td></tr>';
+      '<tr><td colspan="7" class="px-4 py-6 text-center text-slate-400">ยังไม่มีผู้เล่นในทีมนี้</td></tr>';
     return;
   }
   for (const p of players) {
     const existing = existingMap.get(p.id) || {};
+    const scores = existing.scores || {};
     const tr = document.createElement("tr");
 
     const nameTd = document.createElement("td");
@@ -909,55 +1002,50 @@ function renderRoster(existingMap) {
     tr.appendChild(nameTd);
 
     const statusTd = document.createElement("td");
-    statusTd.className = "space-x-2";
     if (locked) {
       statusTd.innerHTML = existing.status
         ? `<span class="badge badge-neutral">${existing.status}</span>`
         : '<span class="text-slate-400">-</span>';
     } else {
-      for (const status of STATUS_OPTIONS) {
-        const btn = document.createElement("button");
-        btn.textContent = status;
-        btn.className = activeBtnClass(existing.status === status);
-        btn.addEventListener("click", () =>
-          saveAttendanceField(p.id, "status", status)
-        );
-        statusTd.appendChild(btn);
-      }
+      statusTd.appendChild(
+        createSegmentedGroup(STATUS_OPTIONS, existing.status, (status) => saveStatus(p.id, status))
+      );
     }
     tr.appendChild(statusTd);
 
-    const scoreTd = document.createElement("td");
-    scoreTd.className = "space-x-2";
-    if (locked) {
-      scoreTd.innerHTML = existing.score
-        ? `<span class="badge badge-neutral">${existing.score}</span>`
-        : '<span class="text-slate-400">-</span>';
-    } else {
-      for (const score of SCORE_OPTIONS) {
-        const btn = document.createElement("button");
-        btn.textContent = String(score);
-        btn.className = activeBtnClass(existing.score === score);
-        btn.addEventListener("click", () =>
-          saveAttendanceField(p.id, "score", score)
+    for (const category of SCORE_CATEGORIES) {
+      const catTd = document.createElement("td");
+      if (locked) {
+        const val = scores[category.key];
+        catTd.innerHTML = val
+          ? `<span class="badge badge-neutral">${val}</span>`
+          : '<span class="text-slate-400">-</span>';
+      } else {
+        catTd.appendChild(
+          createSegmentedGroup(SCORE_OPTIONS, scores[category.key], (score) =>
+            saveScoreCategory(p.id, category.key, score)
+          )
         );
-        scoreTd.appendChild(btn);
       }
+      tr.appendChild(catTd);
     }
-    const timeSpan = document.createElement("span");
-    timeSpan.className = "text-xs text-slate-400 ml-2";
-    timeSpan.textContent = formatEvalTime(existing.updatedAt)
-      ? `ประเมินเมื่อ ${formatEvalTime(existing.updatedAt)} น.`
+
+    const avgTd = document.createElement("td");
+    const avg = computeAvgScore(scores);
+    const timeText = formatEvalTime(existing.updatedAt)
+      ? `<span class="text-xs text-slate-400 ml-2">อัปเดตล่าสุด ${formatEvalTime(existing.updatedAt)} น.</span>`
       : "";
-    scoreTd.appendChild(timeSpan);
-    tr.appendChild(scoreTd);
+    avgTd.innerHTML = avg !== null
+      ? `<span class="emphasis">${avg.toFixed(2)}</span>${timeText}`
+      : '<span class="text-slate-400">-</span>';
+    tr.appendChild(avgTd);
 
     rosterBody.appendChild(tr);
   }
   applyDataLabels(rosterBody);
 }
 
-async function saveAttendanceField(playerId, field, value) {
+async function saveStatus(playerId, status) {
   if (!currentSessionId) return;
   try {
     const docId = `${playerId}_${currentSessionId}`;
@@ -968,13 +1056,40 @@ async function saveAttendanceField(playerId, field, value) {
         sessionId: currentSessionId,
         team: myTeam,
         date: dateInput.value,
-        [field]: value,
+        status,
         updatedAt: serverTimestamp()
       },
       { merge: true }
     );
     const prev = currentAttendanceMap.get(playerId) || {};
-    currentAttendanceMap.set(playerId, { ...prev, [field]: value, updatedAt: { toDate: () => new Date() } });
+    currentAttendanceMap.set(playerId, { ...prev, status, updatedAt: { toDate: () => new Date() } });
+    renderRoster(currentAttendanceMap);
+    setAttendanceStatus("บันทึกแล้ว ✓");
+  } catch (err) {
+    console.error(err);
+    setAttendanceStatus("บันทึกไม่สำเร็จ: " + err.message, true);
+  }
+}
+
+async function saveScoreCategory(playerId, categoryKey, value) {
+  if (!currentSessionId) return;
+  try {
+    const prev = currentAttendanceMap.get(playerId) || {};
+    const newScores = { ...(prev.scores || {}), [categoryKey]: value };
+    const docId = `${playerId}_${currentSessionId}`;
+    await setDoc(
+      doc(db, "attendance", docId),
+      {
+        playerId,
+        sessionId: currentSessionId,
+        team: myTeam,
+        date: dateInput.value,
+        scores: newScores,
+        updatedAt: serverTimestamp()
+      },
+      { merge: true }
+    );
+    currentAttendanceMap.set(playerId, { ...prev, scores: newScores, updatedAt: { toDate: () => new Date() } });
     renderRoster(currentAttendanceMap);
     setAttendanceStatus("บันทึกแล้ว ✓");
   } catch (err) {
@@ -1049,8 +1164,9 @@ markNoTrainingBtn.addEventListener("click", async () => {
     );
     currentSessionId = session.id;
     currentSessionData = { ...session.data, noTraining: true };
+    await syncTrainingReportForNoTraining(dateStr, true);
     showNoTrainingView();
-    setAttendanceStatus(`บันทึกวันที่ ${dateStr} เป็น "ไม่มีฝึกซ้อม" แล้ว ✓`);
+    setAttendanceStatus(`บันทึกวันที่ ${dateStr} เป็น "ไม่มีฝึกซ้อม" แล้ว ✓ (ซิงก์กับรายงานการฝึกซ้อมอัตโนมัติ)`);
   } catch (err) {
     console.error(err);
     setAttendanceStatus("บันทึกไม่สำเร็จ: " + err.message, true);
@@ -1066,9 +1182,332 @@ undoNoTrainingBtn.addEventListener("click", async () => {
       { noTraining: false, updatedAt: serverTimestamp() },
       { merge: true }
     );
+    await syncTrainingReportForNoTraining(dateInput.value, false);
     await loadSessionForDate(dateInput.value);
   } catch (err) {
     console.error(err);
     setAttendanceStatus("ยกเลิกไม่สำเร็จ: " + err.message, true);
+  }
+});
+
+// ---------- รายงานการฝึกซ้อม (ช่วงเวลาฝึกซ้อม + สถานะการฝึกซ้อม + หมายเหตุ + พิกัด GPS) ----------
+// เชื่อมโยงกับปุ่ม "วันนี้ไม่มีฝึกซ้อม" ในหน้าเช็คชื่อ: เมื่อทำเครื่องหมายวันใดว่าไม่มีฝึกซ้อม
+// ให้ซิงก์สถานะไปที่รายงานการฝึกซ้อมของวันนั้นอัตโนมัติ (attended: false) เพื่อไม่ให้ข้อมูล
+// สองจุดขัดแย้งกัน — ถ้ายกเลิก "ไม่มีฝึกซ้อม" ในภายหลัง และรายงานยังเป็นค่าที่ซิงก์อัตโนมัติอยู่
+// (โค้ชยังไม่เคยแก้ไขเอง) จะล้างค่ากลับเป็นค่าว่างให้โค้ชกรอกตามจริงอีกครั้ง
+const AUTO_NO_TRAINING_NOTE = "ไม่มีฝึกซ้อม (บันทึกอัตโนมัติจากการทำเครื่องหมายวันไม่มีฝึกซ้อมในหน้าเช็คชื่อ)";
+
+async function syncTrainingReportForNoTraining(dateStr, isNoTraining) {
+  const q = query(
+    collection(db, "trainingReports"),
+    where("team", "==", myTeam),
+    where("date", "==", dateStr)
+  );
+  const snap = await getDocs(q);
+  const existing = snap.empty ? null : { id: snap.docs[0].id, ...snap.docs[0].data() };
+
+  if (isNoTraining) {
+    const payload = {
+      team: myTeam,
+      date: dateStr,
+      coachId: auth.currentUser.uid,
+      coachName: myCoachName || auth.currentUser.email,
+      periodType: null,
+      periodStartTime: null,
+      periodEndTime: null,
+      periodOtherText: null,
+      attended: false,
+      notes: existing && existing.notes ? existing.notes : AUTO_NO_TRAINING_NOTE,
+      autoFromNoTraining: true,
+      location: existing ? existing.location ?? null : null,
+      updatedAt: serverTimestamp()
+    };
+    if (existing) {
+      await updateDoc(doc(db, "trainingReports", existing.id), payload);
+    } else {
+      await addDoc(collection(db, "trainingReports"), { ...payload, createdAt: serverTimestamp() });
+    }
+  } else if (existing && existing.autoFromNoTraining) {
+    await updateDoc(doc(db, "trainingReports", existing.id), {
+      attended: null,
+      notes: null,
+      autoFromNoTraining: false,
+      updatedAt: serverTimestamp()
+    });
+  }
+}
+
+const PERIOD_LABELS = { morning: "ซ้อมเช้า", evening: "ซ้อมเย็น", other: "อื่นๆ โปรดระบุ" };
+const PERIOD_CODES_BY_LABEL = Object.fromEntries(
+  Object.entries(PERIOD_LABELS).map(([code, label]) => [label, code])
+);
+// ใช้คำว่า "มีการซ้อม / ไม่มีการซ้อม" แทน "เข้า / ไม่เข้า" เพื่อไม่ให้ตีความผิดว่าโค้ชขาดงานเอง
+// (สถานะนี้บันทึกว่า "วันนี้มีการฝึกซ้อมเกิดขึ้นหรือไม่" ไม่ใช่การประเมินตัวโค้ช)
+const ATTEND_LABELS = { true: "มีการซ้อม", false: "ไม่มีการซ้อม" };
+
+let reportPeriodType = null; // "morning" | "evening" | "other"
+let reportPeriodStartTime = "";
+let reportPeriodEndTime = "";
+let reportPeriodOtherText = "";
+let reportAttended = null; // true | false
+
+function renderPeriodSegmented() {
+  reportPeriodSegmentedWrap.innerHTML = "";
+  reportPeriodSegmentedWrap.appendChild(
+    createSegmentedGroup(
+      Object.values(PERIOD_LABELS),
+      reportPeriodType ? PERIOD_LABELS[reportPeriodType] : null,
+      (label) => {
+        reportPeriodType = PERIOD_CODES_BY_LABEL[label];
+        renderPeriodSegmented();
+        renderPeriodDetail();
+      }
+    )
+  );
+}
+
+function renderPeriodDetail() {
+  reportPeriodDetailWrap.innerHTML = "";
+  if (!reportPeriodType) {
+    reportPeriodDetailWrap.classList.add("hidden");
+    return;
+  }
+  reportPeriodDetailWrap.classList.remove("hidden");
+
+  if (reportPeriodType === "other") {
+    const otherInput = document.createElement("input");
+    otherInput.type = "text";
+    otherInput.className = "field-input mb-3";
+    otherInput.placeholder = "ระบุประเภทช่วงเวลาฝึกซ้อม เช่น ซ้อมบ่าย, ซ้อมพิเศษ";
+    otherInput.value = reportPeriodOtherText;
+    otherInput.addEventListener("input", () => {
+      reportPeriodOtherText = otherInput.value;
+    });
+    reportPeriodDetailWrap.appendChild(otherInput);
+  }
+
+  const timeRow = document.createElement("div");
+  timeRow.className = "flex items-center gap-3";
+
+  const startWrap = document.createElement("div");
+  startWrap.innerHTML = '<label class="field-label">เวลาเริ่ม</label>';
+  const startInput = document.createElement("input");
+  startInput.type = "time";
+  startInput.className = "field-input w-40";
+  startInput.value = reportPeriodStartTime;
+  startInput.addEventListener("input", () => {
+    reportPeriodStartTime = startInput.value;
+  });
+  startWrap.appendChild(startInput);
+
+  const endWrap = document.createElement("div");
+  endWrap.innerHTML = '<label class="field-label">เวลาสิ้นสุด</label>';
+  const endInput = document.createElement("input");
+  endInput.type = "time";
+  endInput.className = "field-input w-40";
+  endInput.value = reportPeriodEndTime;
+  endInput.addEventListener("input", () => {
+    reportPeriodEndTime = endInput.value;
+  });
+  endWrap.appendChild(endInput);
+
+  timeRow.appendChild(startWrap);
+  timeRow.appendChild(endWrap);
+  reportPeriodDetailWrap.appendChild(timeRow);
+}
+
+// แสดงส่วน "ช่วงเวลาฝึกซ้อม" เฉพาะตอนสถานะเป็น "มีการซ้อม" เท่านั้น
+// (ถ้า "ไม่มีการซ้อม" ไม่จำเป็นต้องระบุช่วงเวลา เพราะไม่มีการฝึกซ้อมเกิดขึ้นจริง)
+function updatePeriodSectionVisibility() {
+  reportPeriodSection.classList.toggle("hidden", reportAttended !== true);
+}
+
+function renderAttendSegmented() {
+  reportAttendSegmentedWrap.innerHTML = "";
+  reportAttendSegmentedWrap.appendChild(
+    createSegmentedGroup(
+      Object.values(ATTEND_LABELS),
+      reportAttended === null ? null : ATTEND_LABELS[reportAttended],
+      (label) => {
+        reportAttended = label === ATTEND_LABELS.true;
+        renderAttendSegmented();
+        updatePeriodSectionVisibility();
+      }
+    )
+  );
+  updatePeriodSectionVisibility();
+}
+
+async function loadReportForDate(dateStr) {
+  const q = query(
+    collection(db, "trainingReports"),
+    where("team", "==", myTeam),
+    where("date", "==", dateStr)
+  );
+  const snap = await getDocs(q);
+  const existing = snap.empty ? null : { id: snap.docs[0].id, ...snap.docs[0].data() };
+
+  currentReportId = existing ? existing.id : null;
+  reportPeriodType = existing ? existing.periodType || null : null;
+  reportPeriodStartTime = existing ? existing.periodStartTime || "" : "";
+  reportPeriodEndTime = existing ? existing.periodEndTime || "" : "";
+  reportPeriodOtherText = existing ? existing.periodOtherText || "" : "";
+  reportAttended = existing && typeof existing.attended === "boolean" ? existing.attended : null;
+  reportNotesInput.value = existing ? existing.notes || "" : "";
+
+  renderPeriodSegmented();
+  renderPeriodDetail();
+  renderAttendSegmented();
+
+  reportStatus.textContent = "";
+  reportForm.classList.remove("hidden");
+  if (existing && existing.autoFromNoTraining) {
+    reportLoadStatus.textContent = `วันที่ ${dateStr} ถูกทำเครื่องหมายว่า "ไม่มีฝึกซ้อม" ไว้ในหน้าเช็คชื่อ — ระบบซิงก์สถานะมาให้อัตโนมัติ แก้ไขเพิ่มเติมได้ตามจริง`;
+    reportLoadStatus.className = "text-sm text-amber-600 w-full";
+  } else {
+    reportLoadStatus.textContent = existing
+      ? `พบรายงานที่เคยส่งไว้สำหรับวันที่ ${dateStr} — แก้ไข/ส่งซ้ำได้`
+      : `ยังไม่มีรายงานสำหรับวันที่ ${dateStr} — กรอกข้อมูลด้านล่างเพื่อส่งรายงานใหม่`;
+    reportLoadStatus.className = "text-sm text-slate-500 w-full";
+  }
+}
+
+reportLoadBtn.addEventListener("click", async () => {
+  const dateStr = reportDateInput.value;
+  if (!dateStr) {
+    reportLoadStatus.textContent = "กรุณาเลือกวันที่ก่อน";
+    reportLoadStatus.className = "text-sm text-red-600 w-full";
+    return;
+  }
+  if (!myTeam) {
+    reportLoadStatus.textContent = "ยังไม่ทราบทีมที่รับผิดชอบ";
+    reportLoadStatus.className = "text-sm text-red-600 w-full";
+    return;
+  }
+  try {
+    reportLoadStatus.textContent = "กำลังโหลด...";
+    reportLoadStatus.className = "text-sm text-slate-500 w-full";
+    await loadReportForDate(dateStr);
+  } catch (err) {
+    console.error(err);
+    reportLoadStatus.textContent = "โหลดไม่สำเร็จ: " + err.message;
+    reportLoadStatus.className = "text-sm text-red-600 w-full";
+  }
+});
+
+// ขอพิกัด GPS ปัจจุบัน ณ ขณะกดส่งรายงาน (ไม่ใช้ตำแหน่งเก่าที่ cache ไว้)
+function getCurrentPosition() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error("อุปกรณ์นี้ไม่รองรับการระบุพิกัด GPS"));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve(pos),
+      (err) => reject(new Error(`ไม่สามารถระบุพิกัด GPS ได้ (${err.message}) กรุณาอนุญาตการเข้าถึงตำแหน่งของเบราว์เซอร์`)),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  });
+}
+
+reportForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const dateStr = reportDateInput.value;
+  if (!myTeam) {
+    reportStatus.textContent = "ยังไม่ทราบทีมที่รับผิดชอบ";
+    reportStatus.className = "text-sm text-red-600";
+    return;
+  }
+  if (!dateStr) {
+    reportStatus.textContent = "กรุณาเลือกวันที่ก่อน";
+    reportStatus.className = "text-sm text-red-600";
+    return;
+  }
+
+  if (reportAttended === null) {
+    reportStatus.textContent = "กรุณาเลือกสถานะการฝึกซ้อม";
+    reportStatus.className = "text-sm text-red-600";
+    return;
+  }
+
+  if (reportAttended === false && !reportNotesInput.value.trim()) {
+    reportStatus.textContent = "กรุณาระบุเหตุผลที่ไม่มีการซ้อมในช่องหมายเหตุ";
+    reportStatus.className = "text-sm text-red-600";
+    return;
+  }
+
+  // ต้องระบุช่วงเวลาฝึกซ้อมเฉพาะตอน "มีการซ้อม" เท่านั้น
+  if (reportAttended === true) {
+    if (!reportPeriodType) {
+      reportStatus.textContent = "กรุณาเลือกช่วงเวลาฝึกซ้อม";
+      reportStatus.className = "text-sm text-red-600";
+      return;
+    }
+    if (reportPeriodType === "other" && !reportPeriodOtherText.trim()) {
+      reportStatus.textContent = "กรุณาระบุประเภทช่วงเวลาฝึกซ้อม";
+      reportStatus.className = "text-sm text-red-600";
+      return;
+    }
+    if (!reportPeriodStartTime || !reportPeriodEndTime) {
+      reportStatus.textContent = "กรุณาระบุเวลาเริ่มและเวลาสิ้นสุดการฝึกซ้อม";
+      reportStatus.className = "text-sm text-red-600";
+      return;
+    }
+    if (reportPeriodStartTime >= reportPeriodEndTime) {
+      reportStatus.textContent = "เวลาสิ้นสุดต้องอยู่หลังเวลาเริ่ม";
+      reportStatus.className = "text-sm text-red-600";
+      return;
+    }
+  }
+
+  reportSubmitBtn.disabled = true;
+  reportStatus.textContent = "กำลังส่งรายงาน...";
+  reportStatus.className = "text-sm text-slate-500";
+
+  try {
+    let location = null;
+    try {
+      const pos = await getCurrentPosition();
+      location = {
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        accuracy: pos.coords.accuracy
+      };
+    } catch (gpsErr) {
+      console.warn(gpsErr);
+      // ไม่บล็อกการส่งรายงานหากขอพิกัดไม่สำเร็จ (เช่น ผู้ใช้ปฏิเสธสิทธิ์)
+    }
+
+    const payload = {
+      team: myTeam,
+      date: dateStr,
+      coachId: auth.currentUser.uid,
+      coachName: myCoachName || auth.currentUser.email,
+      periodType: reportAttended === true ? reportPeriodType : null,
+      periodStartTime: reportAttended === true ? reportPeriodStartTime : null,
+      periodEndTime: reportAttended === true ? reportPeriodEndTime : null,
+      periodOtherText: reportAttended === true && reportPeriodType === "other" ? reportPeriodOtherText.trim() : null,
+      attended: reportAttended,
+      notes: reportNotesInput.value.trim() || null,
+      autoFromNoTraining: false,
+      location,
+      updatedAt: serverTimestamp()
+    };
+
+    if (currentReportId) {
+      await updateDoc(doc(db, "trainingReports", currentReportId), payload);
+    } else {
+      const newDoc = await addDoc(collection(db, "trainingReports"), { ...payload, createdAt: serverTimestamp() });
+      currentReportId = newDoc.id;
+    }
+
+    reportStatus.textContent = "ส่งรายงานเรียบร้อย ✓";
+    reportStatus.className = "text-sm text-emerald-600";
+  } catch (err) {
+    console.error(err);
+    reportStatus.textContent = "ส่งรายงานไม่สำเร็จ: " + err.message;
+    reportStatus.className = "text-sm text-red-600";
+  } finally {
+    reportSubmitBtn.disabled = false;
   }
 });

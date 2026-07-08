@@ -18,8 +18,8 @@
           <p class="text-xs text-slate-300">ภาพรวมข้อมูลผู้เล่นและการฝึกซ้อม</p>
         </div>
       </div>
-      <a href="./attendance.html" class="btn btn-secondary">
-        เช็คชื่อการฝึกซ้อม (โค้ช) →
+      <a id="header-attendance-link" href="./attendance.html" class="hidden btn btn-secondary">
+        ← กลับเมนูหลัก
       </a>
     </div>
   </header>
@@ -137,6 +137,29 @@
             style="background: conic-gradient(#e2e8f0 0% 100%);"></div>
           <div id="age-progress-legend" class="text-sm space-y-1 w-full"></div>
         </div>
+      </div>
+    </section>
+
+    <!-- รายงานสถานะการฝึกซ้อมประจำวัน ส่งโดยโค้ช (แสดงเฉพาะตอนดูข้อมูลทีมใดทีมหนึ่ง) -->
+    <section id="training-reports-section" class="hidden">
+      <h2 class="section-title mb-4"><span class="icon-badge">📝</span> รายงานสถานะการฝึกซ้อม — ส่งโดยโค้ช</h2>
+      <div class="card table-wrap">
+        <table class="pro-table">
+          <thead>
+            <tr>
+              <th>วันที่</th>
+              <th>โค้ชผู้ส่ง</th>
+              <th>ช่วงเวลาฝึกซ้อม</th>
+              <th>สถานะ</th>
+              <th>หมายเหตุ</th>
+              <th>เวลาส่งรายงาน</th>
+              <th id="training-reports-location-header">พิกัด</th>
+            </tr>
+          </thead>
+          <tbody id="training-reports-body">
+            <tr><td colspan="7" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
+          </tbody>
+        </table>
       </div>
     </section>
 
