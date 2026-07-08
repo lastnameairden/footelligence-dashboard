@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FOOTELLIGENCE DATA — พิมพ์สรุป Dashboard</title>
+  <link rel="icon" href="./assets/logo.png" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="./css/styles.css" />
+  <style>
+    @media print {
+      .no-print { display: none !important; }
+      body { background: #fff; }
+      .card { box-shadow: none; border-color: #cbd5e1; }
+    }
+    @page { size: A4; margin: 1.5cm; }
+  </style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-900">
+  <header class="app-header text-white sticky top-0 z-10 shadow-sm no-print">
+    <div class="max-w-5xl mx-auto px-6 py-5 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <img src="./assets/logo.png" alt="Footelligence" class="w-9 h-9 object-contain" />
+        <h1 class="text-xl font-bold leading-tight tracking-tight">FOOTELLIGENCE DATA</h1>
+      </div>
+      <a href="./attendance.html" class="btn btn-ghost-header">← กลับเมนูหลัก</a>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-6 py-8 space-y-6">
+    <p id="status-message" class="text-sm text-slate-500 no-print">กำลังเชื่อมต่อ...</p>
+
+    <!-- แสดงเมื่อยังไม่ได้ล็อกอิน หรือไม่ใช่บัญชีผู้ดูแลระบบ -->
+    <section id="access-gate" class="hidden card card-pad max-w-md mx-auto text-center no-print">
+      <div class="icon-badge icon-badge-lg mx-auto mb-3">🛡️</div>
+      <h2 class="text-lg font-semibold mb-2">เฉพาะผู้ดูแลระบบเท่านั้น</h2>
+      <p class="text-sm text-slate-500 mb-4" id="access-gate-message">
+        ต้องเข้าสู่ระบบด้วยบัญชีผู้ดูแลระบบก่อน จึงจะสร้างสรุปสำหรับพิมพ์ได้
+      </p>
+      <a href="./attendance.html" class="btn btn-primary">ไปที่หน้าเข้าสู่ระบบ →</a>
+    </section>
+
+    <!-- เนื้อหาสรุปสำหรับพิมพ์ -->
+    <div id="print-content" class="hidden space-y-6">
+      <div class="flex items-center justify-between flex-wrap gap-3 no-print">
+        <p class="text-sm text-slate-500">ตรวจสอบข้อมูลให้เรียบร้อยก่อนกดพิมพ์</p>
+        <button id="print-btn" class="btn btn-primary">🖨️ พิมพ์ / บันทึกเป็น PDF</button>
+      </div>
+
+      <div class="card card-pad text-center">
+        <img src="./assets/logo.png" alt="Footelligence" class="w-14 h-14 object-contain mx-auto mb-2" />
+        <h2 class="text-xl font-bold tracking-tight">FOOTELLIGENCE DATA — สรุปผลการฝึกซ้อม</h2>
+        <p id="print-scope-label" class="text-sm text-slate-500 mt-1"></p>
+        <p id="print-generated-at" class="text-xs text-slate-400 mt-1"></p>
+      </div>
+
+      <div id="overview-cards" class="grid grid-cols-3 gap-4"></div>
+
+      <div class="card table-wrap">
+        <table class="pro-table">
+          <thead>
+            <tr>
+              <th>เบอร์</th>
+              <th>ชื่อเล่น</th>
+              <th>ชื่อ-นามสกุล</th>
+              <th>รุ่นอายุ</th>
+              <th>จำนวนครั้งที่บันทึก</th>
+              <th>มาซ้อม</th>
+              <th>ขาด/บาดเจ็บ/ลา</th>
+              <th>% เข้าร่วม</th>
+              <th>คะแนนเฉลี่ย</th>
+            </tr>
+          </thead>
+          <tbody id="print-table-body">
+            <tr><td colspan="9" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <footer class="app-footer no-print">FOOTELLIGENCE DATA © 2026 — ระบบจัดการข้อมูลนักกีฬาและการฝึกซ้อม</footer>
+
+  <script type="module" src="./js/print.js"></script>
+</body>
+</html>

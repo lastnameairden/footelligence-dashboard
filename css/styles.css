@@ -108,6 +108,9 @@ table.pro-table td.emphasis { font-weight: 600; color: #0f172a; }
 .btn-ghost:hover { color: #0f172a; }
 .btn-ghost-danger { background: transparent; color: #dc2626; padding-left: 0.25rem; padding-right: 0.25rem; }
 .btn-ghost-danger:hover { color: #991b1b; }
+/* ปุ่ม "กลับเมนู" แบบ ghost แต่ใช้บนพื้นหลังเข้มของ header (เช่น app-header) */
+.btn-ghost-header { background: transparent; border-color: transparent; color: #cbd5e1; padding-left: 0.25rem; padding-right: 0.25rem; }
+.btn-ghost-header:hover { color: #fff; }
 
 /* ---------- Segmented control (สถานะ/คะแนน แบบกดเลือกค่าเดียว) ---------- */
 .segmented {

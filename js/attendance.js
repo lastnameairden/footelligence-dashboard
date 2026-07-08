@@ -36,6 +36,7 @@ const loginSection = document.getElementById("login-section");
 const brandHero = document.getElementById("brand-hero");
 const coachBar = document.getElementById("coach-bar");
 const menuSection = document.getElementById("menu-section");
+const menuBackBtn = document.getElementById("menu-back-btn");
 const addPlayerSection = document.getElementById("add-player-section");
 const checkinSection = document.getElementById("checkin-section");
 const menuAddPlayerBtn = document.getElementById("menu-add-player");
@@ -61,22 +62,47 @@ const tabLogin = document.getElementById("tab-login");
 const tabRegister = document.getElementById("tab-register");
 const registerForm = document.getElementById("register-form");
 const registerError = document.getElementById("register-error");
+const registerAgeGroupWrap = document.getElementById("register-age-group-wrap");
+const registerAgeGroupSelect = document.getElementById("register-age-group");
 const pendingSection = document.getElementById("pending-section");
 const pendingLogoutBtn = document.getElementById("pending-logout-btn");
 const executiveSection = document.getElementById("executive-section");
 const coachNameEl = document.getElementById("coach-name");
 const coachEmailEl = document.getElementById("coach-email");
 const coachTeamEl = document.getElementById("coach-team");
+const coachPhoneWrap = document.getElementById("coach-phone-wrap");
 const coachPhoneEl = document.getElementById("coach-phone");
 const coachStatusBadgeEl = document.getElementById("coach-status-badge");
 const coachAgeGroupsEl = document.getElementById("coach-age-groups");
+const coachAgeGroupsWrap = document.getElementById("coach-age-groups-wrap");
 const coachRoleBadgeEl = document.getElementById("coach-role-badge");
 const adminPanelLink = document.getElementById("admin-panel-link");
-const adminSection = document.getElementById("admin-section");
+const adminMenuSection = document.getElementById("admin-menu-section");
+const adminCoachesSection = document.getElementById("admin-coaches-section");
+const adminProgressSection = document.getElementById("admin-progress-section");
+const adminApprovalsSection = document.getElementById("admin-approvals-section");
+const adminManageTeamSection = document.getElementById("admin-manage-team-section");
+const adminDashboardSection = document.getElementById("admin-dashboard-section");
+const adminPrintSection = document.getElementById("admin-print-section");
+const adminMenuCoachesBtn = document.getElementById("admin-menu-coaches");
+const adminMenuProgressBtn = document.getElementById("admin-menu-progress");
+const adminMenuApprovalsBtn = document.getElementById("admin-menu-approvals");
+const adminMenuManageTeamBtn = document.getElementById("admin-menu-manage-team");
+const adminMenuDashboardBtn = document.getElementById("admin-menu-dashboard");
+const adminMenuPrintBtn = document.getElementById("admin-menu-print");
+const adminBackButtons = document.querySelectorAll("[data-admin-back]");
 const pendingApprovalsBody = document.getElementById("pending-approvals-body");
 const adminTeamSelect = document.getElementById("admin-team-select");
 const adminSelectTeamBtn = document.getElementById("admin-select-team-btn");
+const adminDashboardTeamSelect = document.getElementById("admin-dashboard-team-select");
+const adminViewDashboardBtn = document.getElementById("admin-view-dashboard-btn");
+const adminPrintTeamSelect = document.getElementById("admin-print-team-select");
+const adminPrintAgeGroupSelect = document.getElementById("admin-print-age-group-select");
+const adminGeneratePrintBtn = document.getElementById("admin-generate-print-btn");
+const adminPrintStatus = document.getElementById("admin-print-status");
 const adminStatus = document.getElementById("admin-status");
+const menuDashboardCard = document.getElementById("menu-dashboard-card");
+const menuCardsGrid = document.getElementById("menu-cards-grid");
 const dateInput = document.getElementById("session-date");
 const loadSessionBtn = document.getElementById("load-session-btn");
 const markNoTrainingBtn = document.getElementById("mark-no-training-btn");
@@ -105,6 +131,7 @@ let currentSessionData = null;
 let currentAttendanceMap = new Map();
 let myTeam = null;
 let myCoachName = null;
+let myAgeGroup = null; // รุ่นอายุที่โค้ชคนนี้รับผิดชอบ (ถ้ามี) — ล็อกช่องเลือกรุ่นอายุตอนเพิ่มนักกีฬาให้เหลือรุ่นเดียว
 let players = [];
 let editingPlayerId = null;
 let currentIsAdmin = false;
@@ -179,6 +206,16 @@ tabRegister.addEventListener("click", () => {
 });
 
 // ---------- ลงทะเบียนใหม่ (โค้ช หรือ ผู้บริหารทีม) ----------
+// รุ่นอายุที่รับผิดชอบ ระบุได้เฉพาะตอนลงทะเบียนเป็นโค้ชเท่านั้น (ผู้บริหารทีมดูภาพรวมทั้งทีม ไม่ผูกกับรุ่นใดรุ่นหนึ่ง)
+function updateRegisterAgeGroupVisibility() {
+  const role = document.querySelector('input[name="register-role"]:checked').value;
+  registerAgeGroupWrap.classList.toggle("hidden", role !== "coach");
+}
+for (const radio of document.querySelectorAll('input[name="register-role"]')) {
+  radio.addEventListener("change", updateRegisterAgeGroupVisibility);
+}
+updateRegisterAgeGroupVisibility();
+
 registerForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   registerError.textContent = "";
@@ -189,9 +226,15 @@ registerForm.addEventListener("submit", async (e) => {
   const phone = phoneRaw ? normalizePhone(phoneRaw) : null;
   const password = document.getElementById("register-password").value;
   const passwordConfirm = document.getElementById("register-password-confirm").value;
+  const ageGroup = registerAgeGroupSelect.value;
 
   if (password !== passwordConfirm) {
     registerError.textContent = "รหัสผ่านทั้งสองช่องไม่ตรงกัน";
+    return;
+  }
+
+  if (role === "coach" && !ageGroup) {
+    registerError.textContent = "กรุณาเลือกรุ่นอายุที่รับผิดชอบ";
     return;
   }
 
@@ -207,6 +250,7 @@ registerForm.addEventListener("submit", async (e) => {
     const cred = await createUserWithEmailAndPassword(auth, email, password);
     const payload = { name, email, role, status: "pending", createdAt: serverTimestamp() };
     if (phone) payload.phone = phone;
+    if (role === "coach") payload.ageGroup = ageGroup;
     await setDoc(doc(db, "coaches", cred.user.uid), payload);
     if (phone) {
       await setDoc(doc(db, "phoneIndex", phone), { email });
@@ -221,7 +265,13 @@ registerForm.addEventListener("submit", async (e) => {
 function hideAllScreens() {
   pendingSection.classList.add("hidden");
   executiveSection.classList.add("hidden");
-  adminSection.classList.add("hidden");
+  adminMenuSection.classList.add("hidden");
+  adminCoachesSection.classList.add("hidden");
+  adminProgressSection.classList.add("hidden");
+  adminApprovalsSection.classList.add("hidden");
+  adminManageTeamSection.classList.add("hidden");
+  adminDashboardSection.classList.add("hidden");
+  adminPrintSection.classList.add("hidden");
   menuSection.classList.add("hidden");
   addPlayerSection.classList.add("hidden");
   checkinSection.classList.add("hidden");
@@ -239,21 +289,92 @@ function populateTeamSelect(selectEl, placeholder) {
     TEAMS.map((t) => `<option value="${t}">${t}</option>`).join("");
 }
 
+// เมนูผู้ดูแลระบบ: แสดงเป็นการ์ดให้เลือกทำทีละอย่าง (ไม่โหลดข้อมูลทุกส่วนพร้อมกันเหมือนก่อน)
+// ข้อมูลของแต่ละส่วนจะโหลดก็ต่อเมื่อกดเข้าไปดูจริงๆ เท่านั้น ดู handler ของปุ่มการ์ดแต่ละอันด้านล่าง
 function showAdminPanel() {
   hideAllScreens();
-  adminSection.classList.remove("hidden");
-  populateTeamSelect(adminTeamSelect, null);
-  loadPendingApprovals();
+  adminMenuSection.classList.remove("hidden");
+}
+
+adminMenuCoachesBtn.addEventListener("click", () => {
+  hideAllScreens();
+  adminCoachesSection.classList.remove("hidden");
   loadCoachDirectory();
+});
+
+adminMenuProgressBtn.addEventListener("click", () => {
+  hideAllScreens();
+  adminProgressSection.classList.remove("hidden");
   if (!progressDateInput.value) {
     progressDateInput.value = new Date().toISOString().slice(0, 10);
   }
   loadDailyProgress(progressDateInput.value);
+});
+
+adminMenuApprovalsBtn.addEventListener("click", () => {
+  hideAllScreens();
+  adminApprovalsSection.classList.remove("hidden");
+  loadPendingApprovals();
+});
+
+adminMenuManageTeamBtn.addEventListener("click", () => {
+  hideAllScreens();
+  adminManageTeamSection.classList.remove("hidden");
+  populateTeamSelect(adminTeamSelect, null);
+});
+
+adminMenuDashboardBtn.addEventListener("click", () => {
+  hideAllScreens();
+  adminDashboardSection.classList.remove("hidden");
+  // มีตัวเลือก "ทุกทีม (ภาพรวม)" เพิ่มจากทีมเดี่ยว เพราะหน้า Dashboard เองตัดตัวเลือกทีมออกไปแล้ว
+  // (เลือกทีมได้ที่นี่จุดเดียว)
+  adminDashboardTeamSelect.innerHTML =
+    '<option value="">-- เลือกทีม --</option>' +
+    '<option value="__ALL__">ทุกทีม (ภาพรวม)</option>' +
+    TEAMS.map((t) => `<option value="${t}">${t}</option>`).join("");
+});
+
+adminMenuPrintBtn.addEventListener("click", () => {
+  hideAllScreens();
+  adminPrintSection.classList.remove("hidden");
+  populateTeamSelect(adminPrintTeamSelect, null);
+  adminPrintAgeGroupSelect.value = "__ALL__";
+  adminPrintStatus.textContent = "";
+});
+
+adminGeneratePrintBtn.addEventListener("click", () => {
+  const team = adminPrintTeamSelect.value;
+  if (!team) {
+    adminPrintStatus.textContent = "กรุณาเลือกทีมก่อน";
+    return;
+  }
+  const ageGroup = adminPrintAgeGroupSelect.value;
+  adminPrintStatus.textContent = "";
+  // ใช้ "/print" (ไม่ใช่ "/print.html") ตรงๆ เหมือนหน้า Dashboard เพราะเซิร์ฟเวอร์แบบ clean-url
+  // จะ redirect ไฟล์ .html ไปที่ path ไม่มีนามสกุล และอาจตัด query string ทิ้งระหว่างทาง
+  window.location.href = `${window.location.origin}/print?team=${encodeURIComponent(team)}&ageGroup=${encodeURIComponent(ageGroup)}`;
+});
+
+for (const btn of adminBackButtons) {
+  btn.addEventListener("click", showAdminPanel);
+}
+
+// ล็อกช่องเลือกรุ่นอายุของนักกีฬาให้เหลือเฉพาะรุ่นที่โค้ชคนนี้รับผิดชอบ (ถ้ามีการระบุไว้ตอนลงทะเบียน)
+// ผู้ดูแลระบบที่จัดการแทนโค้ช หรือโค้ชเก่าที่ลงทะเบียนก่อนมีฟีเจอร์นี้ (myAgeGroup ว่าง) เลือกได้อิสระตามเดิม
+function applyAgeGroupLock() {
+  const select = document.getElementById("player-age-group");
+  if (myAgeGroup) {
+    select.value = myAgeGroup;
+    select.disabled = true;
+  } else {
+    select.disabled = false;
+  }
 }
 
 menuAddPlayerBtn.addEventListener("click", () => {
   menuSection.classList.add("hidden");
   addPlayerSection.classList.remove("hidden");
+  applyAgeGroupLock();
   renderPlayerList();
 });
 
@@ -398,7 +519,7 @@ function isSessionOnTime(session, attendanceForSession) {
 
 async function loadCoachDirectory() {
   coachDirectoryBody.innerHTML =
-    '<tr><td colspan="7" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>';
+    '<tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>';
   const [coachSnap, sessionSnap, attendanceSnap] = await Promise.all([
     getDocs(collection(db, "coaches")),
     getDocs(collection(db, "sessions")),
@@ -414,7 +535,7 @@ async function loadCoachDirectory() {
 
   if (coaches.length === 0) {
     coachDirectoryBody.innerHTML =
-      '<tr><td colspan="7" class="px-4 py-6 text-center text-slate-400">ยังไม่มีโค้ชในระบบ</td></tr>';
+      '<tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">ยังไม่มีโค้ชในระบบ</td></tr>';
     return;
   }
 
@@ -460,10 +581,11 @@ async function loadCoachDirectory() {
     tr.appendChild(teamTd);
     tr.insertAdjacentHTML(
       "beforeend",
-      `<td>${statusBadge}</td><td>${c.role === "admin" ? "-" : percentText}</td>`
+      `<td>${c.role === "coach" ? c.ageGroup ?? "-" : "-"}</td><td>${statusBadge}</td><td>${c.role === "admin" ? "-" : percentText}</td>`
     );
 
     const reassignTd = document.createElement("td");
+    reassignTd.className = "space-x-2";
     if (c.role !== "admin") {
       const teamSelect = document.createElement("select");
       teamSelect.className = "field-input w-40 inline-block";
@@ -471,7 +593,7 @@ async function loadCoachDirectory() {
       if (c.team) teamSelect.value = c.team;
       const saveBtn = document.createElement("button");
       saveBtn.textContent = "บันทึก";
-      saveBtn.className = "btn btn-secondary btn-sm ml-2";
+      saveBtn.className = "btn btn-secondary btn-sm";
       saveBtn.addEventListener("click", () => reassignCoachTeam(c.id, teamSelect.value));
       reassignTd.appendChild(teamSelect);
       reassignTd.appendChild(saveBtn);
@@ -652,14 +774,33 @@ progressRefreshBtn.addEventListener("click", () => {
 async function enterTeamManagementMode(team) {
   myTeam = team;
   myCoachName = myCoachName || auth.currentUser?.email;
+  myAgeGroup = null; // ผู้ดูแลระบบจัดการทีมแทนโค้ช เลือกรุ่นอายุของนักกีฬาได้อิสระทุกรุ่น
   coachTeamEl.textContent = `${team} (จัดการโดยผู้ดูแลระบบ)`;
   if (!dateInput.value) {
     dateInput.value = new Date().toISOString().slice(0, 10);
   }
+  // ผู้ดูแลระบบมีตัวเลือก "ดู Dashboard ทีมนี้" แยกไว้ที่แผงควบคุมอยู่แล้ว จึงตัดการ์ด Dashboard
+  // ออกจากเมนูจัดการข้อมูลทีมนี้ ไม่ให้ซ้ำซ้อน (เหลือ 3 ตัวเลือก: เพิ่มนักกีฬา/เช็คชื่อ/รายงาน)
+  menuDashboardCard.classList.add("hidden");
+  menuCardsGrid.classList.remove("lg:grid-cols-4");
+  menuCardsGrid.classList.add("lg:grid-cols-3");
+  // เมนูนี้ถูกเข้าถึงผ่านผู้ดูแลระบบ (ไม่ใช่โค้ชล็อกอินเอง) จึงต้องมีปุ่มกลับไปแผงควบคุมผู้ดูแลด้วย
+  menuBackBtn.classList.remove("hidden");
   await loadPlayers();
-  renderAgeGroupsFromPlayers();
   showMenu();
 }
+
+adminViewDashboardBtn.addEventListener("click", () => {
+  const team = adminDashboardTeamSelect.value;
+  if (!team) {
+    adminStatus.textContent = "กรุณาเลือกทีมที่ต้องการดู Dashboard";
+    adminStatus.className = "text-sm text-red-600 w-full";
+    return;
+  }
+  // ไปที่ "/" ตรงๆ (ไม่ใช่ "/index.html") เพราะเซิร์ฟเวอร์แบบ clean-url (เช่น serve) จะ redirect
+  // "/index.html" ไปที่ "/" และตัด query string ทิ้งระหว่างทาง ถ้ายิงตรงที่ "/" ตั้งแต่แรกจะไม่โดน redirect
+  window.location.href = `${window.location.origin}/?team=${encodeURIComponent(team)}`;
+});
 
 adminSelectTeamBtn.addEventListener("click", () => {
   const team = adminTeamSelect.value;
@@ -672,8 +813,8 @@ adminSelectTeamBtn.addEventListener("click", () => {
 });
 
 // แสดงโปรไฟล์ผู้ใช้งานที่มีในระบบให้ครบทุกส่วน (ชื่อ, อีเมล, ทีม, เบอร์โทร, สถานะบัญชี, รุ่นอายุที่รับผิดชอบ)
-// ฟิลด์ "รุ่นอายุที่รับผิดชอบ" อัปเดตแยกต่างหากหลังโหลดรายชื่อนักกีฬาของทีมเสร็จ (ดู renderAgeGroupsFromPlayers /
-// updateAgeGroupsForTeam) เพราะต้องอ้างอิงข้อมูลนักกีฬาจริงในทีม ไม่ใช่ฟิลด์ตรงของโค้ช
+// ฟิลด์ "รุ่นอายุที่รับผิดชอบ" แสดงเฉพาะบทบาทโค้ชเท่านั้น (ผู้ดูแลระบบ/ผู้บริหารทีมไม่ต้องแสดง — ซ่อนด้วย
+// coachAgeGroupsWrap) และอัปเดตแยกหลังโหลดรายชื่อนักกีฬาของทีมเสร็จ (ดู renderAgeGroupsFromPlayers)
 function renderCoachProfile(user, data, teamText) {
   coachNameEl.textContent = (data && data.name) || user.email;
   coachEmailEl.textContent = user.email;
@@ -694,21 +835,9 @@ function formatAgeGroups(playerList) {
   return groups.size > 0 ? Array.from(groups).sort().join(", ") : "-";
 }
 
-// ใช้ตอนมีรายชื่อนักกีฬาของทีมโหลดไว้แล้วในตัวแปร players (โค้ช / ผู้ดูแลระบบที่กำลังจัดการทีมใดทีมหนึ่ง)
+// ใช้ตอนมีรายชื่อนักกีฬาของทีมโหลดไว้แล้วในตัวแปร players (เฉพาะบทบาทโค้ช)
 function renderAgeGroupsFromPlayers() {
   coachAgeGroupsEl.textContent = formatAgeGroups(players);
-}
-
-// ใช้ตอนยังไม่มี players โหลดไว้ (เช่น ผู้บริหารทีมที่ไม่ได้เข้าหน้าจัดการนักกีฬา) ต้อง query แยก
-async function updateAgeGroupsForTeam(team) {
-  if (!team) {
-    coachAgeGroupsEl.textContent = "-";
-    return;
-  }
-  const snap = await getDocs(query(collection(db, "players"), where("team", "==", team)));
-  const teamPlayers = [];
-  snap.forEach((d) => teamPlayers.push(d.data()));
-  coachAgeGroupsEl.textContent = formatAgeGroups(teamPlayers);
 }
 
 // ---------- ล็อกอิน: แยกเส้นทางตามบทบาท (ผู้ดูแลระบบ / โค้ชที่อนุมัติแล้ว / รอการอนุมัติ) ----------
@@ -730,6 +859,8 @@ onAuthStateChanged(auth, async (user) => {
       currentIsAdmin = false;
       adminPanelLink.classList.add("hidden");
       renderCoachProfile(user, data, (data && data.team) || "รอผู้ดูแลระบบกำหนดทีม");
+      coachAgeGroupsWrap.classList.add("hidden");
+      coachPhoneWrap.classList.remove("hidden");
       hideAllScreens();
       pendingSection.classList.remove("hidden");
       return;
@@ -742,6 +873,8 @@ onAuthStateChanged(auth, async (user) => {
       coachRoleBadgeEl.textContent = "ผู้ดูแลระบบ";
       coachRoleBadgeEl.className = "badge badge-info";
       renderCoachProfile(user, data, "เข้าถึงได้ทุกทีม");
+      coachAgeGroupsWrap.classList.add("hidden");
+      coachPhoneWrap.classList.add("hidden"); // ผู้ดูแลระบบไม่ผูกกับทีม/รุ่นใดรุ่นหนึ่ง ไม่จำเป็นต้องแสดงเบอร์โทร
       showAdminPanel();
       return;
     }
@@ -750,7 +883,8 @@ onAuthStateChanged(auth, async (user) => {
       coachRoleBadgeEl.textContent = "ผู้บริหารทีม";
       coachRoleBadgeEl.className = "badge badge-neutral";
       renderCoachProfile(user, data, data.team);
-      await updateAgeGroupsForTeam(data.team);
+      coachAgeGroupsWrap.classList.add("hidden");
+      coachPhoneWrap.classList.remove("hidden");
       hideAllScreens();
       executiveSection.classList.remove("hidden");
       return;
@@ -760,7 +894,11 @@ onAuthStateChanged(auth, async (user) => {
     coachRoleBadgeEl.className = "badge badge-success";
     myTeam = data.team;
     myCoachName = data.name || user.email;
+    myAgeGroup = data.ageGroup || null;
     renderCoachProfile(user, data, myTeam);
+    coachAgeGroupsWrap.classList.remove("hidden");
+    coachPhoneWrap.classList.remove("hidden");
+    menuBackBtn.classList.add("hidden"); // โค้ชล็อกอินเข้าเมนูตัวเองโดยตรง ไม่ต้องมีปุ่มกลับแผงผู้ดูแล
     if (!dateInput.value) {
       dateInput.value = new Date().toISOString().slice(0, 10);
     }
@@ -829,6 +967,7 @@ function startEditPlayer(p) {
   document.getElementById("player-birthday").value = p.birthday ?? "";
   document.getElementById("player-age-group").value = p.ageGroup ?? "";
   document.getElementById("player-position").value = p.position ?? "";
+  applyAgeGroupLock();
   addPlayerSubmitBtn.textContent = "บันทึกการแก้ไข";
   cancelEditPlayerBtn.classList.remove("hidden");
   addPlayerStatus.textContent = `กำลังแก้ไข "${p.nickname ?? p.fullName}"`;
@@ -839,6 +978,7 @@ function startEditPlayer(p) {
 function stopEditPlayer() {
   editingPlayerId = null;
   addPlayerForm.reset();
+  applyAgeGroupLock();
   addPlayerSubmitBtn.textContent = "เพิ่มนักกีฬา";
   cancelEditPlayerBtn.classList.add("hidden");
 }
@@ -906,6 +1046,7 @@ addPlayerForm.addEventListener("submit", async (e) => {
     } else {
       await addDoc(collection(db, "players"), { ...payload, createdAt: serverTimestamp() });
       addPlayerForm.reset();
+      applyAgeGroupLock();
       addPlayerStatus.textContent = `เพิ่ม "${nickname}" สำเร็จ ✓`;
       addPlayerStatus.className = "text-sm text-emerald-600";
     }

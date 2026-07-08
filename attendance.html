@@ -14,7 +14,6 @@
       <img src="./assets/logo.png" alt="Footelligence" class="w-9 h-9 object-contain" />
       <div>
         <h1 class="text-xl font-bold leading-tight tracking-tight">FOOTELLIGENCE DATA</h1>
-        <p class="text-xs text-slate-300">เช็คชื่อการฝึกซ้อม — สำหรับโค้ชและผู้ดูแลระบบ</p>
       </div>
     </div>
   </header>
@@ -59,6 +58,23 @@
               <input type="radio" name="register-role" value="executive" /> ผู้บริหารทีม
             </label>
           </div>
+        </div>
+        <div id="register-age-group-wrap">
+          <label class="field-label">รุ่นอายุที่รับผิดชอบ</label>
+          <select id="register-age-group" class="field-input">
+            <option value="">-- เลือกรุ่นอายุ --</option>
+            <option value="U9">U9</option>
+            <option value="U10">U10</option>
+            <option value="U11">U11</option>
+            <option value="U12">U12</option>
+            <option value="U13">U13</option>
+            <option value="U14">U14</option>
+            <option value="U15">U15</option>
+            <option value="U16">U16</option>
+            <option value="U17">U17</option>
+            <option value="U18">U18</option>
+          </select>
+          <p class="text-xs text-slate-400 mt-1">โค้ชแต่ละคนดูแลได้เพียงรุ่นอายุเดียว เมื่อเลือกแล้วจะเพิ่มนักกีฬาได้เฉพาะรุ่นนี้</p>
         </div>
         <div>
           <label class="field-label">ชื่อเล่น</label>
@@ -121,20 +137,20 @@
           <button id="logout-btn" class="btn btn-ghost-danger btn-sm">ออกจากระบบ</button>
         </div>
       </div>
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-5 pt-5 border-t border-slate-100">
-        <div>
+      <div class="flex flex-wrap gap-x-10 gap-y-4 mt-5 pt-5 border-t border-slate-100">
+        <div class="min-w-[9rem]">
           <p class="text-xs text-slate-400 uppercase tracking-wide">ทีมที่รับผิดชอบ</p>
           <p id="coach-team" class="font-medium text-slate-700 mt-0.5">-</p>
         </div>
-        <div>
+        <div id="coach-phone-wrap" class="min-w-[9rem]">
           <p class="text-xs text-slate-400 uppercase tracking-wide">เบอร์โทรศัพท์</p>
           <p id="coach-phone" class="font-medium text-slate-700 mt-0.5">-</p>
         </div>
-        <div>
+        <div class="min-w-[9rem]">
           <p class="text-xs text-slate-400 uppercase tracking-wide">สถานะบัญชี</p>
           <p id="coach-status-badge" class="mt-0.5">-</p>
         </div>
-        <div>
+        <div id="coach-age-groups-wrap" class="hidden min-w-[9rem]">
           <p class="text-xs text-slate-400 uppercase tracking-wide">รุ่นอายุที่รับผิดชอบ</p>
           <p id="coach-age-groups" class="font-medium text-slate-700 mt-0.5">-</p>
         </div>
@@ -142,103 +158,234 @@
     </div>
 
     <!-- แผงควบคุมผู้ดูแลระบบ -->
-    <section id="admin-section" class="hidden space-y-8">
+    <!-- เมนูผู้ดูแลระบบ: เลือกรายการที่ต้องการดำเนินการ -->
+    <section id="admin-menu-section" class="hidden">
       <div class="page-heading">
         <div class="icon-badge icon-badge-lg">🛡️</div>
         <div>
           <h2>แผงควบคุมผู้ดูแลระบบ</h2>
-          <p>จัดการโค้ช ทีม และตรวจสอบความคืบหน้าการประเมินประจำวัน</p>
+          <p>เลือกรายการที่ต้องการดำเนินการ</p>
         </div>
       </div>
-
-      <div>
-        <h2 class="section-title mb-3"><span class="icon-badge">👥</span> รายชื่อโค้ชในระบบ</h2>
-        <div class="card table-wrap">
-          <table class="pro-table">
-            <thead>
-              <tr>
-                <th>ชื่อ</th>
-                <th>อีเมล</th>
-                <th>บทบาท</th>
-                <th>ทีม</th>
-                <th>สถานะ</th>
-                <th>% ส่งข้อมูลตรงเวลา (ก่อน 20:00 น.)</th>
-                <th>เปลี่ยนทีม</th>
-              </tr>
-            </thead>
-            <tbody id="coach-directory-body">
-              <tr><td colspan="7" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
-            </tbody>
-          </table>
-        </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <button id="admin-menu-coaches" type="button"
+          class="text-left card card-pad hover:shadow-md hover:ring-2 hover:ring-slate-900 transition">
+          <div class="icon-badge icon-badge-lg mb-3">👥</div>
+          <div class="text-lg font-semibold mb-1">รายชื่อโค้ชในระบบ</div>
+          <p class="text-sm text-slate-500">ดูโค้ชทั้งหมด สถานะ % ส่งข้อมูลตรงเวลา และเปลี่ยนทีมได้</p>
+        </button>
+        <button id="admin-menu-progress" type="button"
+          class="text-left card card-pad hover:shadow-md hover:ring-2 hover:ring-slate-900 transition">
+          <div class="icon-badge icon-badge-lg mb-3">📊</div>
+          <div class="text-lg font-semibold mb-1">ความคืบหน้าการประเมินรายวัน</div>
+          <p class="text-sm text-slate-500">ตรวจสอบว่าแต่ละทีมประเมินนักกีฬาครบแล้วหรือยัง</p>
+        </button>
+        <button id="admin-menu-approvals" type="button"
+          class="text-left card card-pad hover:shadow-md hover:ring-2 hover:ring-slate-900 transition">
+          <div class="icon-badge icon-badge-lg mb-3">📝</div>
+          <div class="text-lg font-semibold mb-1">คำขอลงทะเบียนที่รอการอนุมัติ</div>
+          <p class="text-sm text-slate-500">อนุมัติหรือปฏิเสธผู้ลงทะเบียนใหม่ พร้อมกำหนดทีม</p>
+        </button>
+        <button id="admin-menu-manage-team" type="button"
+          class="text-left card card-pad hover:shadow-md hover:ring-2 hover:ring-slate-900 transition">
+          <div class="icon-badge icon-badge-lg mb-3">🗂️</div>
+          <div class="text-lg font-semibold mb-1">จัดการข้อมูลทีม</div>
+          <p class="text-sm text-slate-500">เพิ่มนักกีฬา เช็คชื่อ และส่งรายงานแทนโค้ชของทีมที่เลือก</p>
+        </button>
+        <button id="admin-menu-dashboard" type="button"
+          class="text-left card card-pad hover:shadow-md hover:ring-2 hover:ring-slate-900 transition">
+          <div class="icon-badge icon-badge-lg mb-3">📈</div>
+          <div class="text-lg font-semibold mb-1">ดู Dashboard ทีม</div>
+          <p class="text-sm text-slate-500">ดูภาพรวมข้อมูลนักกีฬาและผลการประเมินของทีมที่เลือก</p>
+        </button>
+        <button id="admin-menu-print" type="button"
+          class="text-left card card-pad hover:shadow-md hover:ring-2 hover:ring-slate-900 transition">
+          <div class="icon-badge icon-badge-lg mb-3">🖨️</div>
+          <div class="text-lg font-semibold mb-1">พิมพ์สรุป Dashboard</div>
+          <p class="text-sm text-slate-500">เลือกทีมและรุ่นอายุ แล้วสร้างสรุปสำหรับพิมพ์หรือบันทึกเป็น PDF</p>
+        </button>
       </div>
+    </section>
 
-      <div>
-        <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
-          <h2 class="section-title"><span class="icon-badge">📊</span> ความคืบหน้าการประเมินรายวัน</h2>
-          <div class="flex items-center gap-2">
-            <input id="progress-date-input" type="date" class="field-input w-auto" />
-            <button id="progress-refresh-btn" class="btn btn-primary">โหลด</button>
-          </div>
-        </div>
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div class="lg:col-span-2 card table-wrap">
-            <table class="pro-table">
-              <thead>
-                <tr>
-                  <th>โค้ช</th>
-                  <th>ทีม</th>
-                  <th>นักกีฬาทั้งหมด</th>
-                  <th>ประเมินแล้ว</th>
-                  <th>ยังไม่ประเมิน</th>
-                  <th>เวลาที่ครบทุกคน</th>
-                </tr>
-              </thead>
-              <tbody id="progress-table-body">
-                <tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
-              </tbody>
-            </table>
-          </div>
-          <div class="card card-pad flex flex-col items-center justify-center">
-            <div id="progress-pie" class="w-36 h-36 rounded-full mb-4"
-              style="background: conic-gradient(#e2e8f0 0% 100%);"></div>
-            <div id="progress-legend" class="text-sm space-y-1 w-full"></div>
-          </div>
-        </div>
-      </div>
-
-      <div>
-        <h2 class="section-title mb-3"><span class="icon-badge">📝</span> คำขอลงทะเบียนที่รอการอนุมัติ</h2>
-        <div class="card table-wrap">
-          <table class="pro-table">
-            <thead>
-              <tr>
-                <th>ชื่อ</th>
-                <th>อีเมล</th>
-                <th>บทบาทที่ขอ</th>
-                <th>กำหนดทีม</th>
-                <th>ดำเนินการ</th>
-              </tr>
-            </thead>
-            <tbody id="pending-approvals-body">
-              <tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="card card-pad flex flex-wrap items-end gap-4">
+    <!-- รายชื่อโค้ชในระบบ -->
+    <section id="admin-coaches-section" class="hidden space-y-6">
+      <button data-admin-back class="btn btn-ghost px-0">← กลับเมนูผู้ดูแล</button>
+      <div class="page-heading">
+        <div class="icon-badge icon-badge-lg">👥</div>
         <div>
-          <label class="field-label">เลือกทีมที่ต้องการจัดการข้อมูล</label>
-          <select id="admin-team-select" class="field-input w-56"></select>
+          <h2>รายชื่อโค้ชในระบบ</h2>
+          <p>ดูโค้ชทั้งหมด สถานะ % ส่งข้อมูลตรงเวลา และเปลี่ยนทีมได้</p>
         </div>
-        <button id="admin-select-team-btn" class="btn btn-primary">จัดการข้อมูลทีมนี้</button>
-        <p id="admin-status" class="text-sm text-slate-500 w-full"></p>
+      </div>
+      <div class="card table-wrap">
+        <table class="pro-table">
+          <thead>
+            <tr>
+              <th>ชื่อ</th>
+              <th>อีเมล</th>
+              <th>บทบาท</th>
+              <th>ทีม</th>
+              <th>รุ่นอายุ</th>
+              <th>สถานะ</th>
+              <th title="เปอร์เซ็นต์ของวันที่ส่งข้อมูลก่อน 20:00 น. เทียบกับจำนวนวันที่บันทึกทั้งหมด">% ตรงเวลา</th>
+              <th>เปลี่ยนทีม</th>
+            </tr>
+          </thead>
+          <tbody id="coach-directory-body">
+            <tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p id="admin-status" class="text-sm text-slate-500 w-full"></p>
+    </section>
+
+    <!-- ความคืบหน้าการประเมินรายวัน -->
+    <section id="admin-progress-section" class="hidden space-y-6">
+      <button data-admin-back class="btn btn-ghost px-0">← กลับเมนูผู้ดูแล</button>
+      <div class="flex items-center justify-between mb-3 flex-wrap gap-3">
+        <div class="page-heading mb-0">
+          <div class="icon-badge icon-badge-lg">📊</div>
+          <div>
+            <h2>ความคืบหน้าการประเมินรายวัน</h2>
+            <p>ตรวจสอบว่าแต่ละทีมประเมินนักกีฬาครบแล้วหรือยัง</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <input id="progress-date-input" type="date" class="field-input w-auto" />
+          <button id="progress-refresh-btn" class="btn btn-primary">โหลด</button>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div class="lg:col-span-2 card table-wrap">
+          <table class="pro-table">
+            <thead>
+              <tr>
+                <th>โค้ช</th>
+                <th>ทีม</th>
+                <th>นักกีฬาทั้งหมด</th>
+                <th>ประเมินแล้ว</th>
+                <th>ยังไม่ประเมิน</th>
+                <th>เวลาที่ครบทุกคน</th>
+              </tr>
+            </thead>
+            <tbody id="progress-table-body">
+              <tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card card-pad flex flex-col items-center justify-center">
+          <div id="progress-pie" class="w-36 h-36 rounded-full mb-4"
+            style="background: conic-gradient(#e2e8f0 0% 100%);"></div>
+          <div id="progress-legend" class="text-sm space-y-1 w-full"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- คำขอลงทะเบียนที่รอการอนุมัติ -->
+    <section id="admin-approvals-section" class="hidden space-y-6">
+      <button data-admin-back class="btn btn-ghost px-0">← กลับเมนูผู้ดูแล</button>
+      <div class="page-heading">
+        <div class="icon-badge icon-badge-lg">📝</div>
+        <div>
+          <h2>คำขอลงทะเบียนที่รอการอนุมัติ</h2>
+          <p>อนุมัติหรือปฏิเสธผู้ลงทะเบียนใหม่ พร้อมกำหนดทีม</p>
+        </div>
+      </div>
+      <div class="card table-wrap">
+        <table class="pro-table">
+          <thead>
+            <tr>
+              <th>ชื่อ</th>
+              <th>อีเมล</th>
+              <th>บทบาทที่ขอ</th>
+              <th>กำหนดทีม</th>
+              <th>ดำเนินการ</th>
+            </tr>
+          </thead>
+          <tbody id="pending-approvals-body">
+            <tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- จัดการข้อมูลทีม -->
+    <section id="admin-manage-team-section" class="hidden space-y-6">
+      <button data-admin-back class="btn btn-ghost px-0">← กลับเมนูผู้ดูแล</button>
+      <div class="page-heading">
+        <div class="icon-badge icon-badge-lg">🗂️</div>
+        <div>
+          <h2>จัดการข้อมูลทีม</h2>
+          <p>เลือกทีมที่ต้องการเพิ่มนักกีฬา เช็คชื่อ หรือส่งรายงานแทนโค้ช</p>
+        </div>
+      </div>
+      <div class="card card-pad space-y-3 max-w-sm">
+        <div>
+          <label class="field-label">เลือกทีมที่จะจัดการข้อมูล</label>
+          <select id="admin-team-select" class="field-input w-full"></select>
+        </div>
+        <button id="admin-select-team-btn" class="btn btn-primary btn-block">จัดการข้อมูลทีมนี้ →</button>
+      </div>
+    </section>
+
+    <!-- ดู Dashboard ทีม -->
+    <section id="admin-dashboard-section" class="hidden space-y-6">
+      <button data-admin-back class="btn btn-ghost px-0">← กลับเมนูผู้ดูแล</button>
+      <div class="page-heading">
+        <div class="icon-badge icon-badge-lg">📈</div>
+        <div>
+          <h2>ดู Dashboard ทีม</h2>
+          <p>เลือกทีมที่ต้องการดูภาพรวมข้อมูลนักกีฬาและผลการประเมิน หรือเลือก "ทุกทีม" เพื่อดูภาพรวมทั้งหมด</p>
+        </div>
+      </div>
+      <div class="card card-pad space-y-3 max-w-sm">
+        <div>
+          <label class="field-label">เลือกทีมที่ต้องการดู Dashboard</label>
+          <select id="admin-dashboard-team-select" class="field-input w-full"></select>
+        </div>
+        <button id="admin-view-dashboard-btn" class="btn btn-secondary btn-block">ดู Dashboard →</button>
+      </div>
+    </section>
+
+    <!-- พิมพ์สรุป Dashboard -->
+    <section id="admin-print-section" class="hidden space-y-6">
+      <button data-admin-back class="btn btn-ghost px-0">← กลับเมนูผู้ดูแล</button>
+      <div class="page-heading">
+        <div class="icon-badge icon-badge-lg">🖨️</div>
+        <div>
+          <h2>พิมพ์สรุป Dashboard</h2>
+          <p>เลือกทีมและรุ่นอายุที่ต้องการ แล้วสร้างสรุปสำหรับพิมพ์หรือบันทึกเป็น PDF</p>
+        </div>
+      </div>
+      <div class="card card-pad space-y-3 max-w-sm">
+        <div>
+          <label class="field-label">เลือกทีม</label>
+          <select id="admin-print-team-select" class="field-input w-full"></select>
+        </div>
+        <div>
+          <label class="field-label">เลือกรุ่นอายุ</label>
+          <select id="admin-print-age-group-select" class="field-input w-full">
+            <option value="__ALL__">ทุกรุ่นอายุ</option>
+            <option value="U9">U9</option>
+            <option value="U10">U10</option>
+            <option value="U11">U11</option>
+            <option value="U12">U12</option>
+            <option value="U13">U13</option>
+            <option value="U14">U14</option>
+            <option value="U15">U15</option>
+            <option value="U16">U16</option>
+            <option value="U17">U17</option>
+            <option value="U18">U18</option>
+          </select>
+        </div>
+        <button id="admin-generate-print-btn" class="btn btn-primary btn-block">สร้างสรุปสำหรับพิมพ์ →</button>
+        <p id="admin-print-status" class="text-sm text-red-600 w-full"></p>
       </div>
     </section>
 
     <!-- เมนูหลัก: เลือกว่าจะเพิ่มข้อมูล หรือ เช็คชื่อฝึกซ้อม -->
     <section id="menu-section" class="hidden">
+      <button id="menu-back-btn" data-back class="hidden btn btn-ghost px-0 mb-4">← กลับเมนูผู้ดูแล</button>
       <div class="page-heading">
         <div class="icon-badge icon-badge-lg">📋</div>
         <div>
@@ -246,7 +393,7 @@
           <p>จัดการข้อมูลนักกีฬาและบันทึกการฝึกซ้อมของทีมคุณ</p>
         </div>
       </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div id="menu-cards-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <button id="menu-add-player" type="button"
           class="text-left card card-pad hover:shadow-md hover:ring-2 hover:ring-slate-900 transition">
           <div class="icon-badge icon-badge-lg mb-3">➕</div>
@@ -265,7 +412,7 @@
           <div class="text-lg font-semibold mb-1">รายงานการฝึกซ้อม</div>
           <p class="text-sm text-slate-500">แจ้งช่วงเวลาและสถานะการฝึกซ้อมของทีมประจำวัน</p>
         </button>
-        <a href="./index.html"
+        <a id="menu-dashboard-card" href="./index.html"
           class="text-left card card-pad hover:shadow-md hover:ring-2 hover:ring-slate-900 transition">
           <div class="icon-badge icon-badge-lg mb-3">📈</div>
           <div class="text-lg font-semibold mb-1">Dashboard</div>

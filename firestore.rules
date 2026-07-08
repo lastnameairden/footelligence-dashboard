@@ -24,12 +24,15 @@ service cloud.firestore {
       allow read: if isSignedIn();
       // ผู้ลงทะเบียนใหม่สร้างโปรไฟล์ของตัวเองได้ (สถานะ pending) เลือกบทบาทได้แค่ coach/executive
       // (กำหนด admin หรือ team เองไม่ได้) ผู้ดูแลระบบเป็นผู้กำหนด team ให้ตอนอนุมัติ (หรือเปลี่ยนภายหลังได้)
+      // โค้ชต้องระบุ ageGroup (รุ่นอายุที่รับผิดชอบ) ตั้งแต่ตอนลงทะเบียน — ผู้บริหารทีมไม่ต้องระบุ
       allow create: if isSignedIn()
                      && request.auth.uid == coachId
-                     && request.resource.data.keys().hasOnly(['name', 'email', 'phone', 'role', 'status', 'createdAt'])
+                     && request.resource.data.keys().hasOnly(['name', 'email', 'phone', 'role', 'status', 'createdAt', 'ageGroup'])
                      && request.resource.data.email == request.auth.token.email
                      && request.resource.data.role in ['coach', 'executive']
-                     && request.resource.data.status == 'pending';
+                     && request.resource.data.status == 'pending'
+                     && (request.resource.data.role != 'coach'
+                         || ('ageGroup' in request.resource.data && request.resource.data.ageGroup is string && request.resource.data.ageGroup.size() > 0));
       // ผู้ดูแลระบบเท่านั้นที่อนุมัติ/กำหนด team หรือแก้ไข/ลบบัญชีได้
       allow update: if isAdmin();
       allow delete: if isAdmin();

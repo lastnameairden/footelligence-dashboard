@@ -18,15 +18,16 @@ const TEAMS = ["KHAMPHEE FOOTBALL", "THAWEE SC", "THAMMASATHIT"];
 const playersGroupsEl = document.getElementById("players-groups");
 const attendanceGroupsEl = document.getElementById("attendance-groups");
 const overviewCardsEl = document.getElementById("overview-cards");
+const playersPieTitleEl = document.getElementById("players-pie-title");
+const attendanceBarsTitleEl = document.getElementById("attendance-bars-title");
+const scoreBarsTitleEl = document.getElementById("score-bars-title");
+const teamSummaryColGroupEl = document.getElementById("team-summary-col-group");
 const teamSummaryBodyEl = document.getElementById("team-summary-body");
 const statusEl = document.getElementById("status-message");
 const loginGate = document.getElementById("login-gate");
 const loginGateMessage = document.getElementById("login-gate-message");
 const dashboardContent = document.getElementById("dashboard-content");
-const adminTeamBar = document.getElementById("admin-team-bar");
-const adminTeamSelectDashboard = document.getElementById("admin-team-select-dashboard");
-const adminViewTeamBtn = document.getElementById("admin-view-team-btn");
-const adminTeamBarStatus = document.getElementById("admin-team-bar-status");
+const adminPickTeamPrompt = document.getElementById("admin-pick-team-prompt");
 const ageProgressSection = document.getElementById("age-group-progress-section");
 const ageProgressDateInput = document.getElementById("age-progress-date-input");
 const ageProgressRefreshBtn = document.getElementById("age-progress-refresh-btn");
@@ -102,6 +103,16 @@ function groupByTeam(items) {
   return groups;
 }
 
+function groupByAgeGroup(items) {
+  const groups = new Map();
+  for (const item of items) {
+    const ageGroup = item.ageGroup || UNASSIGNED_AGE_GROUP;
+    if (!groups.has(ageGroup)) groups.set(ageGroup, []);
+    groups.get(ageGroup).push(item);
+  }
+  return new Map([...groups.entries()].sort((a, b) => a[0].localeCompare(b[0])));
+}
+
 function renderPlayersGroups(playerGroups, teamLabels) {
   playersGroupsEl.innerHTML = "";
   if (playerGroups.size === 0) {
@@ -171,24 +182,40 @@ function computeAttendanceStats(players, records) {
   return Array.from(statsMap.values());
 }
 
+function sumStats(statsArray) {
+  return statsArray.reduce(
+    (acc, s) => {
+      acc.attended += s.attended;
+      acc.missed += s.missed;
+      acc.total += s.total;
+      acc.scoreSum += s.scoreSum;
+      acc.scoreCount += s.scoreCount;
+      return acc;
+    },
+    { attended: 0, missed: 0, total: 0, scoreSum: 0, scoreCount: 0 }
+  );
+}
+
 // รวมสถิติของแต่ละทีม (ต่อผู้เล่น + ผลรวมทั้งทีม) ไว้ที่เดียว ใช้ซ้ำได้ทั้งตารางละเอียดและภาพรวม
 function computeTeamStats(playerGroups, attendanceRecords) {
   const result = new Map();
   for (const [team, players] of playerGroups) {
     const teamRecords = attendanceRecords.filter((r) => (r.team || UNASSIGNED_TEAM) === team);
     const stats = computeAttendanceStats(players, teamRecords);
-    const totals = stats.reduce(
-      (acc, s) => {
-        acc.attended += s.attended;
-        acc.missed += s.missed;
-        acc.total += s.total;
-        acc.scoreSum += s.scoreSum;
-        acc.scoreCount += s.scoreCount;
-        return acc;
-      },
-      { attended: 0, missed: 0, total: 0, scoreSum: 0, scoreCount: 0 }
-    );
-    result.set(team, { stats, totals, playerCount: players.length });
+    result.set(team, { stats, totals: sumStats(stats), playerCount: players.length });
+  }
+  return result;
+}
+
+// เหมือน computeTeamStats แต่แบ่งกลุ่มตามรุ่นอายุแทนทีม (ใช้ตอนดูข้อมูลทีมใดทีมหนึ่งโดยเฉพาะ เช่น
+// หน้าจอของโค้ช/ผู้บริหารทีม — เพราะดูทีมเดียวอยู่แล้ว การแยกตามทีมซ้ำจึงไม่มีประโยชน์เท่าแยกตามรุ่นอายุ)
+function computeAgeGroupStats(ageGroupGroups, attendanceRecords) {
+  const result = new Map();
+  for (const [ageGroup, groupPlayers] of ageGroupGroups) {
+    const playerIds = new Set(groupPlayers.map((p) => p.id));
+    const groupRecords = attendanceRecords.filter((r) => playerIds.has(r.playerId));
+    const stats = computeAttendanceStats(groupPlayers, groupRecords);
+    result.set(ageGroup, { stats, totals: sumStats(stats), playerCount: groupPlayers.length });
   }
   return result;
 }
@@ -258,9 +285,15 @@ function renderBarChart(containerId, entries, valueFormatter, maxValue) {
     .join("");
 }
 
-function renderOverview(playerGroups, teamStats, coachNames) {
+// mode "team": ดูภาพรวมทุกทีม (ผู้ดูแลระบบเลือก "ทุกทีม") — แบ่งกลุ่มตามทีม, coachNamesOrSingleName เป็น
+//   Map<team, coachName>
+// mode "ageGroup": ดูข้อมูลทีมใดทีมหนึ่งโดยเฉพาะ (โค้ช/ผู้บริหารทีม/ผู้ดูแลระบบที่เลือกทีมเดียว) — แบ่งกลุ่ม
+//   ตามรุ่นอายุแทน เพราะดูทีมเดียวอยู่แล้ว แบ่งตามทีมซ้ำไม่มีประโยชน์ coachNamesOrSingleName เป็นชื่อโค้ชคนเดียว (string)
+function renderOverview(groups, groupStats, mode, coachNamesOrSingleName) {
+  const isAgeGroupMode = mode === "ageGroup";
+
   const overall = { players: 0, attended: 0, missed: 0, total: 0, scoreSum: 0, scoreCount: 0 };
-  for (const [team, { totals, playerCount }] of teamStats) {
+  for (const [, { totals, playerCount }] of groupStats) {
     overall.players += playerCount;
     overall.attended += totals.attended;
     overall.missed += totals.missed;
@@ -272,16 +305,21 @@ function renderOverview(playerGroups, teamStats, coachNames) {
   const overallAvgScore = overall.scoreCount > 0 ? (overall.scoreSum / overall.scoreCount).toFixed(1) : "-";
 
   overviewCardsEl.innerHTML =
-    statCard("จำนวนทีมทั้งหมด", playerGroups.size) +
+    statCard(isAgeGroupMode ? "จำนวนรุ่นทั้งหมด" : "จำนวนทีมทั้งหมด", groups.size) +
     statCard("จำนวนนักกีฬาทั้งหมด", overall.players) +
     statCard("% เข้าร่วมฝึกซ้อมรวม", `${overallPercent}%`) +
     statCard("คะแนนเฉลี่ยรวม", overallAvgScore);
 
-  renderPlayersPie(playerGroups);
+  playersPieTitleEl.textContent = isAgeGroupMode ? "สัดส่วนนักกีฬาต่อรุ่น" : "สัดส่วนนักกีฬาต่อทีม";
+  attendanceBarsTitleEl.textContent = isAgeGroupMode ? "% เข้าร่วมฝึกซ้อมแต่ละรุ่น" : "% เข้าร่วมฝึกซ้อมแต่ละทีม";
+  scoreBarsTitleEl.textContent = isAgeGroupMode ? "คะแนนเฉลี่ยแต่ละรุ่น (เต็ม 4)" : "คะแนนเฉลี่ยแต่ละทีม (เต็ม 4)";
+  teamSummaryColGroupEl.textContent = isAgeGroupMode ? "รุ่นอายุ" : "ทีม";
+
+  renderPlayersPie(groups);
   renderBarChart(
     "attendance-bars",
-    Array.from(teamStats.entries()).map(([team, { totals }]) => ({
-      label: team,
+    Array.from(groupStats.entries()).map(([key, { totals }]) => ({
+      label: key,
       value: totals.total > 0 ? Math.round((totals.attended / totals.total) * 100) : 0
     })),
     (v) => `${v}%`,
@@ -289,27 +327,27 @@ function renderOverview(playerGroups, teamStats, coachNames) {
   );
   renderBarChart(
     "score-bars",
-    Array.from(teamStats.entries()).map(([team, { totals }]) => ({
-      label: team,
+    Array.from(groupStats.entries()).map(([key, { totals }]) => ({
+      label: key,
       value: totals.scoreCount > 0 ? totals.scoreSum / totals.scoreCount : 0
     })),
     (v) => v.toFixed(1),
     4
   );
 
-  if (teamStats.size === 0) {
+  if (groupStats.size === 0) {
     teamSummaryBodyEl.innerHTML =
       '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">ยังไม่มีข้อมูล</td></tr>';
     return;
   }
-  teamSummaryBodyEl.innerHTML = Array.from(teamStats.entries())
-    .map(([team, { totals, playerCount }]) => {
+  teamSummaryBodyEl.innerHTML = Array.from(groupStats.entries())
+    .map(([key, { totals, playerCount }]) => {
       const percent = totals.total > 0 ? Math.round((totals.attended / totals.total) * 100) : 0;
       const avgScore = totals.scoreCount > 0 ? (totals.scoreSum / totals.scoreCount).toFixed(1) : "-";
-      const coachName = coachNames.get(team) || "-";
+      const coachName = isAgeGroupMode ? coachNamesOrSingleName || "-" : coachNamesOrSingleName.get(key) || "-";
       return `
         <tr>
-          <td class="emphasis">${team}</td>
+          <td class="emphasis">${key}</td>
           <td>${coachName}</td>
           <td>${playerCount}</td>
           <td>${percent}%</td>
@@ -610,7 +648,16 @@ async function loadDashboard(scopeTeam) {
     const teamLabels = buildTeamLabels(coachNames);
     const playerGroups = groupByTeam(players);
     const teamStats = computeTeamStats(playerGroups, attendanceRecords);
-    renderOverview(playerGroups, teamStats, coachNames);
+
+    if (scopeTeam) {
+      // ดูข้อมูลทีมเดียวอยู่แล้ว (โค้ช/ผู้บริหารทีม/ผู้ดูแลระบบที่เลือกทีมเดียว) — ภาพรวมด้านบนแบ่งตาม
+      // รุ่นอายุแทนทีม เพื่อให้เห็นข้อมูลที่ใช้ได้จริงมากกว่าการแยกตามทีมซึ่งมีทีมเดียวอยู่แล้ว
+      const ageGroupGroups = groupByAgeGroup(players);
+      const ageGroupStats = computeAgeGroupStats(ageGroupGroups, attendanceRecords);
+      renderOverview(ageGroupGroups, ageGroupStats, "ageGroup", coachNames.get(scopeTeam));
+    } else {
+      renderOverview(playerGroups, teamStats, "team", coachNames);
+    }
     renderPlayersGroups(playerGroups, teamLabels);
     renderAttendanceGroups(playerGroups, teamStats, teamLabels);
     setStatus(`โหลดข้อมูลสำเร็จ • ผู้เล่น ${players.length} คน • ${playerGroups.size} ทีม`);
@@ -633,26 +680,13 @@ async function loadDashboard(scopeTeam) {
   }
 }
 
-adminTeamSelectDashboard.innerHTML += TEAMS.map((t) => `<option value="${t}">${t}</option>`).join("");
-
-adminViewTeamBtn.addEventListener("click", () => {
-  const selected = adminTeamSelectDashboard.value;
-  if (!selected) {
-    adminTeamBarStatus.textContent = "กรุณาเลือกทีมก่อน";
-    adminTeamBarStatus.className = "text-sm text-red-600 w-full";
-    return;
-  }
-  adminTeamBarStatus.textContent = "";
-  dashboardContent.classList.remove("hidden");
-  loadDashboard(selected === "__ALL__" ? null : selected);
-});
-
 // ต้องล็อกอินด้วยบัญชีโค้ช/ผู้ดูแลระบบที่ได้รับอนุมัติแล้วเท่านั้น จึงจะเห็นข้อมูล Dashboard
-// ผู้ดูแลระบบต้องเลือกทีมก่อนถึงจะเห็นข้อมูล (หรือเลือก "ทุกทีม") ส่วนโค้ชเห็นเฉพาะทีมของตัวเองอัตโนมัติ
+// ผู้ดูแลระบบเลือกทีมจากหน้าเช็คชื่อเท่านั้น (ผ่านลิงก์ที่แนบ ?team= มา) ไม่มีตัวเลือกซ้ำในหน้านี้อีก
+// ส่วนโค้ช/ผู้บริหารทีมเห็นเฉพาะทีมของตัวเองอัตโนมัติ
 onAuthStateChanged(auth, async (user) => {
   const isCoachSession = !!user && !user.isAnonymous;
   if (!isCoachSession) {
-    adminTeamBar.classList.add("hidden");
+    adminPickTeamPrompt.classList.add("hidden");
     showLoginGate("ต้องเข้าสู่ระบบด้วยบัญชีโค้ชหรือผู้ดูแลระบบก่อน จึงจะดูข้อมูล Dashboard ได้");
     return;
   }
@@ -662,7 +696,7 @@ onAuthStateChanged(auth, async (user) => {
     const data = coachDoc.exists() ? coachDoc.data() : null;
 
     if (!data || data.status !== "approved") {
-      adminTeamBar.classList.add("hidden");
+      adminPickTeamPrompt.classList.add("hidden");
       showLoginGate("บัญชีนี้ยังไม่ได้รับการอนุมัติจากผู้ดูแลระบบ กรุณารอหรือติดต่อผู้ดูแลระบบ");
       return;
     }
@@ -673,12 +707,24 @@ onAuthStateChanged(auth, async (user) => {
 
     const isAdmin = data.role === "admin";
     if (isAdmin) {
-      // ผู้ดูแลระบบต้องกดเลือกทีมก่อน ถึงจะแสดงข้อมูล (ค้างไว้ที่แถบเลือกทีมจนกว่าจะกดปุ่ม)
-      adminTeamBar.classList.remove("hidden");
-      dashboardContent.classList.add("hidden");
-      setStatus("");
+      // ต้องมาจากลิงก์ "ดู Dashboard ทีมนี้" ในหน้าเช็คชื่อ (มี ?team= แนบมา) เท่านั้น ถึงจะเห็นข้อมูล
+      // ถ้าเข้าหน้านี้ตรงๆ โดยไม่มีพารามิเตอร์ จะแสดงข้อความให้กลับไปเลือกทีมที่หน้าเช็คชื่อแทน
+      const teamFromUrl = new URLSearchParams(window.location.search).get("team");
+      if (teamFromUrl === "__ALL__") {
+        adminPickTeamPrompt.classList.add("hidden");
+        dashboardContent.classList.remove("hidden");
+        loadDashboard(null);
+      } else if (teamFromUrl && TEAMS.includes(teamFromUrl)) {
+        adminPickTeamPrompt.classList.add("hidden");
+        dashboardContent.classList.remove("hidden");
+        loadDashboard(teamFromUrl);
+      } else {
+        dashboardContent.classList.add("hidden");
+        adminPickTeamPrompt.classList.remove("hidden");
+        setStatus("");
+      }
     } else {
-      adminTeamBar.classList.add("hidden");
+      adminPickTeamPrompt.classList.add("hidden");
       dashboardContent.classList.remove("hidden");
       loadDashboard(data.team);
     }
