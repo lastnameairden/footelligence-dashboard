@@ -350,9 +350,9 @@ adminGeneratePrintBtn.addEventListener("click", () => {
   }
   const ageGroup = adminPrintAgeGroupSelect.value;
   adminPrintStatus.textContent = "";
-  // ใช้ "/print" (ไม่ใช่ "/print.html") ตรงๆ เหมือนหน้า Dashboard เพราะเซิร์ฟเวอร์แบบ clean-url
-  // จะ redirect ไฟล์ .html ไปที่ path ไม่มีนามสกุล และอาจตัด query string ทิ้งระหว่างทาง
-  window.location.href = `${window.location.origin}/print?team=${encodeURIComponent(team)}&ageGroup=${encodeURIComponent(ageGroup)}`;
+  // ใช้ path เต็ม "/print.html" (มีนามสกุลไฟล์) เพราะ Vercel (โฮสต์จริง) ไม่รองรับ path
+  // แบบไม่มีนามสกุลอัตโนมัติเหมือนเซิร์ฟเวอร์ทดสอบในเครื่อง (จะขึ้น 404) — ไฟล์ .html ยิงตรงได้ทุกที่
+  window.location.href = `${window.location.origin}/print.html?team=${encodeURIComponent(team)}&ageGroup=${encodeURIComponent(ageGroup)}`;
 });
 
 for (const btn of adminBackButtons) {
