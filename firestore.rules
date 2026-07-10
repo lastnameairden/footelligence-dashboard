@@ -25,27 +25,16 @@ service cloud.firestore {
       // ผู้ลงทะเบียนใหม่สร้างโปรไฟล์ของตัวเองได้ (สถานะ pending) เลือกบทบาทได้แค่ coach/executive
       // (กำหนด admin หรือ team เองไม่ได้) ผู้ดูแลระบบเป็นผู้กำหนด team ให้ตอนอนุมัติ (หรือเปลี่ยนภายหลังได้)
       // โค้ชต้องระบุ ageGroup (รุ่นอายุที่รับผิดชอบ) ตั้งแต่ตอนลงทะเบียน — ผู้บริหารทีมไม่ต้องระบุ
+      // (ตัดการใช้เบอร์โทรศัพท์ออกจากระบบเข้าสู่ระบบ/ลงทะเบียนแล้ว)
       allow create: if isSignedIn()
                      && request.auth.uid == coachId
-                     && request.resource.data.keys().hasOnly(['name', 'email', 'phone', 'role', 'status', 'createdAt', 'ageGroup'])
+                     && request.resource.data.keys().hasOnly(['name', 'email', 'role', 'status', 'createdAt', 'ageGroup'])
                      && request.resource.data.email == request.auth.token.email
                      && request.resource.data.role in ['coach', 'executive']
                      && request.resource.data.status == 'pending'
                      && (request.resource.data.role != 'coach'
                          || ('ageGroup' in request.resource.data && request.resource.data.ageGroup is string && request.resource.data.ageGroup.size() > 0));
       // ผู้ดูแลระบบเท่านั้นที่อนุมัติ/กำหนด team หรือแก้ไข/ลบบัญชีได้
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
-    }
-
-    // ดัชนีเบอร์โทร -> อีเมล เพื่อให้ล็อกอินด้วยเบอร์โทรได้ (ไม่ใช่ระบบยืนยัน OTP จริง)
-    // เอกสารมีแค่ฟิลด์ email เท่านั้น อ่านได้เฉพาะกรณีรู้เบอร์ที่แน่นอนอยู่แล้ว (get ไม่ใช่ list)
-    match /phoneIndex/{phone} {
-      allow get: if true;
-      allow list: if false;
-      allow create: if isSignedIn()
-                     && request.resource.data.keys().hasOnly(['email'])
-                     && request.resource.data.email == request.auth.token.email;
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
@@ -78,6 +67,22 @@ service cloud.firestore {
       allow create: if isAdmin() || (canManageTeam() && request.resource.data.team == myTeam());
       allow update: if isAdmin() || (canManageTeam() && ownsTeam() && request.resource.data.team == myTeam());
       allow delete: if isAdmin();
+    }
+
+    // รายงานผลการแข่งขัน — โค้ชจัดการได้เฉพาะรายการของทีมตัวเอง ผู้บริหารทีมดูได้อย่างเดียว
+    match /matchReports/{id} {
+      allow read: if isAdmin() || (canViewTeam() && ownsTeam());
+      allow create: if isAdmin() || (canManageTeam() && request.resource.data.team == myTeam());
+      allow update: if isAdmin() || (canManageTeam() && ownsTeam() && request.resource.data.team == myTeam());
+      allow delete: if isAdmin() || (canManageTeam() && ownsTeam());
+    }
+
+    // รายงานอาการบาดเจ็บ — โค้ชจัดการได้เฉพาะรายการของทีมตัวเอง ผู้บริหารทีมดูได้อย่างเดียว
+    match /injuryReports/{id} {
+      allow read: if isAdmin() || (canViewTeam() && ownsTeam());
+      allow create: if isAdmin() || (canManageTeam() && request.resource.data.team == myTeam());
+      allow update: if isAdmin() || (canManageTeam() && ownsTeam() && request.resource.data.team == myTeam());
+      allow delete: if isAdmin() || (canManageTeam() && ownsTeam());
     }
   }
 }

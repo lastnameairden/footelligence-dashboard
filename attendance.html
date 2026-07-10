@@ -36,8 +36,8 @@
 
       <form id="login-form" class="space-y-4">
         <div>
-          <label class="field-label">อีเมล หรือ เบอร์โทรศัพท์</label>
-          <input id="login-identifier" type="text" required class="field-input" placeholder="เช่น coach@email.com หรือ 0812345678" />
+          <label class="field-label">อีเมล</label>
+          <input id="login-identifier" type="email" required class="field-input" placeholder="เช่น coach@email.com" />
         </div>
         <div>
           <label class="field-label">รหัสผ่าน</label>
@@ -83,10 +83,6 @@
         <div>
           <label class="field-label">อีเมล</label>
           <input id="register-email" type="email" required class="field-input" />
-        </div>
-        <div>
-          <label class="field-label">เบอร์โทรศัพท์ (ถ้ามี ใช้ล็อกอินแทนอีเมลได้)</label>
-          <input id="register-phone" type="tel" class="field-input" placeholder="เช่น 0812345678" />
         </div>
         <div>
           <label class="field-label">รหัสผ่าน (อย่างน้อย 6 ตัวอักษร)</label>
@@ -141,10 +137,6 @@
         <div class="min-w-[9rem]">
           <p class="text-xs text-slate-400 uppercase tracking-wide">ทีมที่รับผิดชอบ</p>
           <p id="coach-team" class="font-medium text-slate-700 mt-0.5">-</p>
-        </div>
-        <div id="coach-phone-wrap" class="min-w-[9rem]">
-          <p class="text-xs text-slate-400 uppercase tracking-wide">เบอร์โทรศัพท์</p>
-          <p id="coach-phone" class="font-medium text-slate-700 mt-0.5">-</p>
         </div>
         <div class="min-w-[9rem]">
           <p class="text-xs text-slate-400 uppercase tracking-wide">สถานะบัญชี</p>
@@ -385,7 +377,7 @@
 
     <!-- เมนูหลัก: เลือกว่าจะเพิ่มข้อมูล หรือ เช็คชื่อฝึกซ้อม -->
     <section id="menu-section" class="hidden">
-      <button id="menu-back-btn" data-back class="hidden btn btn-ghost px-0 mb-4">← กลับเมนูผู้ดูแล</button>
+      <button id="menu-back-btn" class="hidden btn btn-ghost px-0 mb-4">← กลับเมนูผู้ดูแล</button>
       <div class="page-heading">
         <div class="icon-badge icon-badge-lg">📋</div>
         <div>
@@ -393,7 +385,7 @@
           <p>จัดการข้อมูลนักกีฬาและบันทึกการฝึกซ้อมของทีมคุณ</p>
         </div>
       </div>
-      <div id="menu-cards-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div id="menu-cards-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <button id="menu-add-player" type="button"
           class="text-left card card-pad hover:shadow-md hover:ring-2 hover:ring-slate-900 transition">
           <div class="icon-badge icon-badge-lg mb-3">➕</div>
@@ -411,6 +403,24 @@
           <div class="icon-badge icon-badge-lg mb-3">📝</div>
           <div class="text-lg font-semibold mb-1">รายงานการฝึกซ้อม</div>
           <p class="text-sm text-slate-500">แจ้งช่วงเวลาและสถานะการฝึกซ้อมของทีมประจำวัน</p>
+        </button>
+        <button id="menu-match-report" type="button"
+          class="text-left card card-pad hover:shadow-md hover:ring-2 hover:ring-slate-900 transition">
+          <div class="icon-badge icon-badge-lg mb-3">🏆</div>
+          <div class="text-lg font-semibold mb-1">รายงานผลการแข่งขัน</div>
+          <p class="text-sm text-slate-500">บันทึกผลการแข่งขัน คู่แข่ง และรายการแข่งขันของทีม</p>
+        </button>
+        <button id="menu-injury-report" type="button"
+          class="text-left card card-pad hover:shadow-md hover:ring-2 hover:ring-slate-900 transition">
+          <div class="icon-badge icon-badge-lg mb-3">🩹</div>
+          <div class="text-lg font-semibold mb-1">รายงานอาการบาดเจ็บ</div>
+          <p class="text-sm text-slate-500">บันทึกอาการบาดเจ็บของนักกีฬา ความรุนแรง และสถานะการพักฟื้น</p>
+        </button>
+        <button id="menu-daily" type="button"
+          class="text-left card card-pad hover:shadow-md hover:ring-2 hover:ring-slate-900 transition">
+          <div class="icon-badge icon-badge-lg mb-3">📅</div>
+          <div class="text-lg font-semibold mb-1">สรุปประจำวัน (Daily)</div>
+          <p class="text-sm text-slate-500">ดูข้อมูลทั้งหมดที่กรอกไว้ในวันที่เลือกในหน้าเดียว</p>
         </button>
         <a id="menu-dashboard-card" href="./index.html"
           class="text-left card card-pad hover:shadow-md hover:ring-2 hover:ring-slate-900 transition">
@@ -591,6 +601,311 @@
           <p id="report-status" class="text-sm text-slate-500"></p>
         </div>
       </form>
+    </section>
+
+    <!-- หน้าจอรายงานผลการแข่งขัน -->
+    <section id="match-report-section" class="hidden space-y-6">
+      <button data-back class="btn btn-ghost px-0">← กลับเมนู</button>
+
+      <div class="page-heading">
+        <div class="icon-badge icon-badge-lg">🏆</div>
+        <div>
+          <h2>รายงานผลการแข่งขัน</h2>
+          <p>บันทึกผลการแข่งขัน คู่แข่ง และรายการแข่งขันของทีม</p>
+        </div>
+      </div>
+
+      <div class="card card-pad">
+        <form id="match-report-form" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="field-label">วันที่แข่งขัน</label>
+            <input id="match-date" type="date" required class="field-input" />
+          </div>
+          <div>
+            <label class="field-label">คู่แข่ง</label>
+            <input id="match-opponent" type="text" required class="field-input" placeholder="ชื่อทีมคู่แข่ง" />
+          </div>
+          <div>
+            <label class="field-label">ประเภทการแข่งขัน</label>
+            <select id="match-competition-type" class="field-input">
+              <option value="ทัวร์นาเมนต์">ทัวร์นาเมนต์</option>
+              <option value="ลีก">ลีก</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label">รายการแข่งขัน (ถ้ามี)</label>
+            <input id="match-competition" type="text" class="field-input" placeholder="เช่น รายการเยาวชนชิงถ้วย..." />
+          </div>
+          <div class="sm:col-span-2">
+            <label class="field-label">รุ่นอายุที่แข่งขัน</label>
+            <select id="match-age-group" required class="field-input">
+              <option value="">-- เลือกรุ่นอายุ --</option>
+              <option value="U9">U9</option>
+              <option value="U10">U10</option>
+              <option value="U11">U11</option>
+              <option value="U12">U12</option>
+              <option value="U13">U13</option>
+              <option value="U14">U14</option>
+              <option value="U15">U15</option>
+              <option value="U16">U16</option>
+              <option value="U17">U17</option>
+              <option value="U18">U18</option>
+            </select>
+          </div>
+
+          <div class="sm:col-span-2 card card-pad bg-slate-50">
+            <label class="field-label mb-2">ผลการแข่งขัน</label>
+            <div class="flex flex-wrap items-end gap-4">
+              <div id="match-result-segmented" class="segmented"></div>
+              <div>
+                <label class="field-label">สกอร์ทีมเรา</label>
+                <input id="match-score-us" type="number" min="0" required class="field-input w-24" />
+              </div>
+              <div>
+                <label class="field-label">สกอร์คู่แข่ง</label>
+                <input id="match-score-them" type="number" min="0" required class="field-input w-24" />
+              </div>
+            </div>
+          </div>
+
+          <div class="sm:col-span-2">
+            <label class="field-label">แผนการเล่น (ถ้ามี)</label>
+            <input id="match-formation" type="text" class="field-input" placeholder="เช่น 4-3-3, 4-4-2" />
+          </div>
+
+          <div class="sm:col-span-2">
+            <label class="field-label mb-2">11 ผู้เล่นตัวจริง <span id="match-lineup-count" class="text-slate-400 font-normal">(0/11 คน)</span></label>
+            <div class="relative">
+              <input id="match-lineup-search" type="text" class="field-input" placeholder="พิมพ์ชื่อเพื่อค้นหาและเลือกผู้เล่น..." autocomplete="off" />
+              <div id="match-lineup-dropdown" class="hidden absolute z-20 mt-1 w-full max-h-56 overflow-y-auto card"></div>
+            </div>
+            <div id="match-lineup-chips" class="flex flex-wrap gap-2 mt-3"></div>
+          </div>
+
+          <div class="sm:col-span-2">
+            <label class="field-label">หมายเหตุ (ถ้ามี)</label>
+            <textarea id="match-notes" rows="3" class="field-input" placeholder="เช่น ผู้ทำประตู, เหตุการณ์สำคัญระหว่างเกม"></textarea>
+          </div>
+          <div class="sm:col-span-2 flex items-center gap-4">
+            <button type="submit" id="match-report-submit-btn" class="btn btn-primary">บันทึกผลการแข่งขัน</button>
+            <button type="button" id="cancel-edit-match-btn" class="btn btn-secondary hidden">ยกเลิกการแก้ไข</button>
+            <p id="match-report-status" class="text-sm text-slate-500"></p>
+          </div>
+        </form>
+      </div>
+
+      <div>
+        <h2 class="section-title mb-3"><span class="icon-badge">📋</span> ประวัติผลการแข่งขัน</h2>
+        <div class="card table-wrap">
+          <table class="pro-table">
+            <thead>
+              <tr>
+                <th>วันที่</th>
+                <th>คู่แข่ง</th>
+                <th>ประเภท</th>
+                <th>รุ่นอายุ</th>
+                <th>ผลการแข่งขัน</th>
+                <th>สกอร์</th>
+                <th>รายการแข่งขัน</th>
+                <th>ดำเนินการ</th>
+              </tr>
+            </thead>
+            <tbody id="match-report-list-body">
+              <tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">ยังไม่มีรายการแข่งขัน</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- หน้าจอรายงานอาการบาดเจ็บ -->
+    <section id="injury-report-section" class="hidden space-y-6">
+      <button data-back class="btn btn-ghost px-0">← กลับเมนู</button>
+
+      <div class="page-heading">
+        <div class="icon-badge icon-badge-lg">🩹</div>
+        <div>
+          <h2>รายงานอาการบาดเจ็บ</h2>
+          <p>บันทึกอาการบาดเจ็บของนักกีฬา ความรุนแรง และสถานะการพักฟื้น</p>
+        </div>
+      </div>
+
+      <div class="card card-pad">
+        <form id="injury-report-form" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="field-label">รุ่นอายุ</label>
+            <select id="injury-age-group" required class="field-input">
+              <option value="">-- เลือกรุ่นอายุ --</option>
+              <option value="U9">U9</option>
+              <option value="U10">U10</option>
+              <option value="U11">U11</option>
+              <option value="U12">U12</option>
+              <option value="U13">U13</option>
+              <option value="U14">U14</option>
+              <option value="U15">U15</option>
+              <option value="U16">U16</option>
+              <option value="U17">U17</option>
+              <option value="U18">U18</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label">นักกีฬา</label>
+            <div class="relative">
+              <input id="injury-player-search" type="text" class="field-input" placeholder="พิมพ์ชื่อเพื่อค้นหาและเลือกนักกีฬา..." autocomplete="off" />
+              <div id="injury-player-dropdown" class="hidden absolute z-20 mt-1 w-full max-h-56 overflow-y-auto card"></div>
+            </div>
+          </div>
+          <div>
+            <label class="field-label">วันที่บาดเจ็บ</label>
+            <input id="injury-date" type="date" required class="field-input" />
+          </div>
+          <div class="sm:col-span-2">
+            <label class="field-label">ลักษณะอาการบาดเจ็บ</label>
+            <input id="injury-description" type="text" required class="field-input" placeholder="เช่น ข้อเท้าพลิก, กล้ามเนื้อต้นขาอักเสบ" />
+          </div>
+          <div>
+            <label class="field-label">ความรุนแรง</label>
+            <select id="injury-severity" class="field-input">
+              <option value="เล็กน้อย">เล็กน้อย</option>
+              <option value="ปานกลาง">ปานกลาง</option>
+              <option value="รุนแรง">รุนแรง</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label">สถานะ</label>
+            <select id="injury-status" class="field-input">
+              <option value="บาดเจ็บขณะแข่งขัน">บาดเจ็บขณะแข่งขัน</option>
+              <option value="บาดเจ็บขณะฝึกซ้อม">บาดเจ็บขณะฝึกซ้อม</option>
+              <option value="กำลังพักฟื้น">กำลังพักฟื้น</option>
+              <option value="หายแล้ว">หายแล้ว</option>
+            </select>
+          </div>
+          <div class="sm:col-span-2">
+            <label class="field-label">คาดว่าจะกลับมาซ้อมได้ (ถ้าทราบ)</label>
+            <input id="injury-expected-return" type="date" class="field-input" />
+          </div>
+          <div class="sm:col-span-2">
+            <label class="field-label">หมายเหตุ (ถ้ามี)</label>
+            <textarea id="injury-notes" rows="3" class="field-input" placeholder="รายละเอียดเพิ่มเติม เช่น การรักษา แพทย์ที่ดูแล"></textarea>
+          </div>
+          <div class="sm:col-span-2 flex items-center gap-4">
+            <button type="submit" id="injury-report-submit-btn" class="btn btn-primary">บันทึกอาการบาดเจ็บ</button>
+            <button type="button" id="cancel-edit-injury-btn" class="btn btn-secondary hidden">ยกเลิกการแก้ไข</button>
+            <p id="injury-report-status" class="text-sm text-slate-500"></p>
+          </div>
+        </form>
+      </div>
+
+      <div>
+        <h2 class="section-title mb-3"><span class="icon-badge">📋</span> รายชื่อนักกีฬาที่บาดเจ็บ</h2>
+        <div class="card table-wrap">
+          <table class="pro-table">
+            <thead>
+              <tr>
+                <th>วันที่</th>
+                <th>นักกีฬา</th>
+                <th>รุ่นอายุ</th>
+                <th>อาการ</th>
+                <th>ความรุนแรง</th>
+                <th>สถานะ</th>
+                <th>คาดว่าจะกลับมา</th>
+                <th>ดำเนินการ</th>
+              </tr>
+            </thead>
+            <tbody id="injury-report-list-body">
+              <tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">ยังไม่มีรายการบาดเจ็บ</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- หน้าจอสรุปประจำวัน (Daily) -->
+    <section id="daily-section" class="hidden space-y-6">
+      <button data-back class="btn btn-ghost px-0">← กลับเมนู</button>
+
+      <div class="page-heading">
+        <div class="icon-badge icon-badge-lg">📅</div>
+        <div>
+          <h2>สรุปประจำวัน</h2>
+          <p>ดูข้อมูลทั้งหมดที่กรอกไว้ในวันที่เลือก ครบในหน้าเดียว</p>
+        </div>
+      </div>
+
+      <div class="card card-pad flex flex-wrap items-end gap-4">
+        <div>
+          <label class="field-label">เลือกวันที่</label>
+          <input id="daily-date-input" type="date" class="field-input" />
+        </div>
+        <button id="daily-load-btn" class="btn btn-primary">โหลดข้อมูล</button>
+        <p id="daily-status" class="text-sm text-slate-500 w-full"></p>
+      </div>
+
+      <div id="daily-date-heading" class="hidden text-lg font-bold text-slate-900"></div>
+
+      <div>
+        <h2 class="section-title mb-3"><span class="icon-badge">✅</span> เช็คชื่อการฝึกซ้อม</h2>
+        <div class="card table-wrap">
+          <table class="pro-table">
+            <thead>
+              <tr>
+                <th>ผู้เล่น</th>
+                <th>สถานะ</th>
+                <th>คะแนนเฉลี่ย</th>
+              </tr>
+            </thead>
+            <tbody id="daily-attendance-body">
+              <tr><td colspan="3" class="px-4 py-6 text-center text-slate-400">เลือกวันที่แล้วกด "โหลดข้อมูล"</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div>
+        <h2 class="section-title mb-3"><span class="icon-badge">📝</span> รายงานการฝึกซ้อม</h2>
+        <div id="daily-training-report-card" class="card card-pad text-sm text-slate-400">เลือกวันที่แล้วกด "โหลดข้อมูล"</div>
+      </div>
+
+      <div>
+        <h2 class="section-title mb-3"><span class="icon-badge">🏆</span> รายงานผลการแข่งขัน</h2>
+        <div class="card table-wrap">
+          <table class="pro-table">
+            <thead>
+              <tr>
+                <th>คู่แข่ง</th>
+                <th>ประเภท</th>
+                <th>รุ่นอายุ</th>
+                <th>ผลการแข่งขัน</th>
+                <th>สกอร์</th>
+                <th>รายการแข่งขัน</th>
+              </tr>
+            </thead>
+            <tbody id="daily-match-body">
+              <tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">เลือกวันที่แล้วกด "โหลดข้อมูล"</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div>
+        <h2 class="section-title mb-3"><span class="icon-badge">🩹</span> รายงานอาการบาดเจ็บ</h2>
+        <div class="card table-wrap">
+          <table class="pro-table">
+            <thead>
+              <tr>
+                <th>นักกีฬา</th>
+                <th>รุ่นอายุ</th>
+                <th>อาการ</th>
+                <th>ความรุนแรง</th>
+                <th>สถานะ</th>
+              </tr>
+            </thead>
+            <tbody id="daily-injury-body">
+              <tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">เลือกวันที่แล้วกด "โหลดข้อมูล"</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </section>
   </main>
 
