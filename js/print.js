@@ -8,7 +8,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import { db, auth } from "./firebase-init.js";
-import { computeAvgScore } from "./ui-utils.js";
+import { computeAvgScore, teamLogoImg } from "./ui-utils.js";
 
 const UNASSIGNED_AGE_GROUP = "ไม่ระบุรุ่นอายุ";
 
@@ -91,7 +91,7 @@ async function loadPrintSummary(team, ageGroup) {
   const overallAvgScore = overall.scoreCount > 0 ? (overall.scoreSum / overall.scoreCount).toFixed(1) : "-";
 
   const scopeText = ageGroup === "__ALL__" ? `ทีม ${team} — ทุกรุ่นอายุ` : `ทีม ${team} — รุ่นอายุ ${ageGroup}`;
-  printScopeLabel.textContent = scopeText;
+  printScopeLabel.innerHTML = `${teamLogoImg(team, "w-5 h-5 object-contain inline-block align-middle rounded mr-1")}${scopeText}`;
   printGeneratedAt.textContent = `สร้างสรุปเมื่อ ${new Date().toLocaleString("th-TH", { dateStyle: "long", timeStyle: "short" })}`;
   document.title = `FOOTELLIGENCE DATA — สรุป ${scopeText}`;
 

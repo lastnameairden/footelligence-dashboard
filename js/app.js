@@ -6,9 +6,9 @@ import {
   query,
   where
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
-import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import { db, auth } from "./firebase-init.js";
-import { applyDataLabels, computeAvgScore, isPlayerFullyEvaluated } from "./ui-utils.js";
+import { applyDataLabels, computeAvgScore, isPlayerFullyEvaluated, teamIconBadge, teamLogoImg } from "./ui-utils.js";
 
 // สถานะที่นับว่า "มาซ้อม" ตาม legend ของ Logbook (A หรือค่าประเมิน 1-4)
 const ATTENDED_CODES = new Set(["A", "1", "2", "3", "4"]);
@@ -28,6 +28,7 @@ const loginGate = document.getElementById("login-gate");
 const loginGateMessage = document.getElementById("login-gate-message");
 const dashboardContent = document.getElementById("dashboard-content");
 const adminPickTeamPrompt = document.getElementById("admin-pick-team-prompt");
+const adminPickTeamGrid = document.getElementById("admin-pick-team-grid");
 const ageProgressSection = document.getElementById("age-group-progress-section");
 const ageProgressDateInput = document.getElementById("age-progress-date-input");
 const ageProgressRefreshBtn = document.getElementById("age-progress-refresh-btn");
@@ -38,6 +39,17 @@ const trainingReportsSection = document.getElementById("training-reports-section
 const trainingReportsBody = document.getElementById("training-reports-body");
 const trainingReportsLocationHeader = document.getElementById("training-reports-location-header");
 const headerAttendanceLink = document.getElementById("header-attendance-link");
+const dashboardBackLink = document.getElementById("dashboard-back-link");
+const hamburgerBtn = document.getElementById("hamburger-btn");
+const notificationBellBtn = document.getElementById("notification-bell-btn");
+const navDrawerOverlay = document.getElementById("nav-drawer-overlay");
+const navDrawer = document.getElementById("nav-drawer");
+const navDrawerCloseBtn = document.getElementById("nav-drawer-close-btn");
+const navDrawerItems = document.getElementById("nav-drawer-items");
+const navDrawerNameEl = document.getElementById("nav-drawer-name");
+const navDrawerEmailEl = document.getElementById("nav-drawer-email");
+const navDrawerRoleBadgeEl = document.getElementById("nav-drawer-role-badge");
+const drawerLogoutBtn = document.getElementById("drawer-logout-btn");
 
 let currentViewerRole = null; // "admin" | "coach" | "executive"
 
@@ -125,7 +137,7 @@ function renderPlayersGroups(playerGroups, teamLabels) {
 
     const wrapper = document.createElement("div");
     wrapper.innerHTML = `
-      <h3 class="section-title text-sm mb-2">${label}</h3>
+      <h3 class="section-title text-sm mb-2">${teamLogoImg(team)}${label}</h3>
       <div class="card table-wrap">
         <table class="pro-table">
           <thead>
@@ -143,7 +155,7 @@ function renderPlayersGroups(playerGroups, teamLabels) {
                 (p) => `
               <tr>
                 <td>${p.number ?? "-"}</td>
-                <td class="emphasis">${p.nickname ?? "-"}</td>
+                <td class="emphasis"><a href="./player.html#id=${p.id}" class="text-blue-600 hover:underline">${p.nickname ?? "-"}</a></td>
                 <td>${p.fullName ?? "-"}</td>
                 <td>${p.birthday ?? "-"}</td>
                 <td>${p.ageGroup ?? "-"}</td>
@@ -345,9 +357,10 @@ function renderOverview(groups, groupStats, mode, coachNamesOrSingleName) {
       const percent = totals.total > 0 ? Math.round((totals.attended / totals.total) * 100) : 0;
       const avgScore = totals.scoreCount > 0 ? (totals.scoreSum / totals.scoreCount).toFixed(1) : "-";
       const coachName = isAgeGroupMode ? coachNamesOrSingleName || "-" : coachNamesOrSingleName.get(key) || "-";
+      const keyLabel = isAgeGroupMode ? key : `${teamLogoImg(key)}${key}`;
       return `
         <tr>
-          <td class="emphasis">${key}</td>
+          <td class="emphasis">${keyLabel}</td>
           <td>${coachName}</td>
           <td>${playerCount}</td>
           <td>${percent}%</td>
@@ -370,7 +383,7 @@ function renderAttendanceGroups(playerGroups, teamStats, teamLabels) {
 
     const wrapper = document.createElement("div");
     wrapper.innerHTML = `
-      <h3 class="section-title text-sm mb-2">${label}</h3>
+      <h3 class="section-title text-sm mb-2">${teamLogoImg(team)}${label}</h3>
       <div class="card table-wrap">
         <table class="pro-table">
           <thead>
@@ -680,13 +693,117 @@ async function loadDashboard(scopeTeam) {
   }
 }
 
+// ---------- ผู้ดูแลระบบ: การ์ดเลือกทีม (สไตล์เดียวกับแผงควบคุมผู้ดูแลระบบในหน้าเช็คชื่อ) ----------
+function linkCard(iconHtml, title, description, href) {
+  const a = document.createElement("a");
+  a.href = href;
+  a.className = "text-left card card-pad hover:shadow-md hover:ring-2 hover:ring-slate-900 transition block";
+  a.innerHTML = `
+    ${iconHtml}
+    <div class="text-lg font-semibold mb-1">${title}</div>
+    <p class="text-sm text-slate-500">${description}</p>
+  `;
+  return a;
+}
+
+function emojiBadge(emoji) {
+  return `<div class="icon-badge icon-badge-lg mb-3">${emoji}</div>`;
+}
+
+// การ์ดของแต่ละทีมใช้โลโก้จริงแทนอิโมจิ 🛡️ (teamIconBadge จะ fallback เป็น 🛡️ เองถ้าไม่รู้จักชื่อทีมนี้)
+function teamPickCard(title, description, teamParam) {
+  return linkCard(teamIconBadge(teamParam, { extraClass: "mb-3" }), title, description, `/?team=${encodeURIComponent(teamParam)}`);
+}
+
+function renderAdminPickTeamGrid() {
+  adminPickTeamGrid.innerHTML = "";
+  adminPickTeamGrid.appendChild(
+    linkCard(emojiBadge("📊"), "ทุกทีม (ภาพรวม)", "ดูสรุปข้อมูลรวมทุกทีมในหน้าเดียว", `/?team=${encodeURIComponent("__ALL__")}`)
+  );
+  for (const team of TEAMS) {
+    adminPickTeamGrid.appendChild(teamPickCard(team, "ดูข้อมูล Dashboard เฉพาะทีมนี้", team));
+  }
+}
+
+// ---------- เมนูนำทางแบบเลื่อน (Hamburger Drawer) — เหมือนกับใน attendance.html ----------
+function openDrawer() {
+  navDrawerOverlay.classList.remove("hidden");
+  navDrawer.classList.remove("nav-drawer-hidden");
+}
+
+function closeDrawer() {
+  navDrawer.classList.add("nav-drawer-hidden");
+  navDrawerOverlay.classList.add("hidden");
+}
+
+hamburgerBtn.addEventListener("click", openDrawer);
+navDrawerCloseBtn.addEventListener("click", closeDrawer);
+navDrawerOverlay.addEventListener("click", closeDrawer);
+drawerLogoutBtn.addEventListener("click", () => {
+  closeDrawer();
+  signOut(auth);
+});
+
+function drawerItem(icon, label, href) {
+  const a = document.createElement("a");
+  a.href = href;
+  a.className = "drawer-item";
+  a.innerHTML = `<span class="drawer-item-icon">${icon}</span><span>${label}</span>`;
+  return a;
+}
+
+function drawerSectionLabel(text) {
+  const div = document.createElement("div");
+  div.className = "drawer-section-label";
+  div.textContent = text;
+  return div;
+}
+
+function drawerDivider() {
+  const div = document.createElement("div");
+  div.className = "drawer-divider";
+  return div;
+}
+
+// เนื้อหาเมนูปรับตามบทบาท — ผู้ดูแลระบบเห็นลิงก์ตรงไปยังเครื่องมือแต่ละอย่างในหน้าเช็คชื่อ (ผ่าน
+// ?admin=... deep link กันไม่ให้วน redirect กลับมาหน้านี้) โค้ช/ผู้บริหารทีมเห็นแค่ทางกลับไปหน้าหลักของตัวเอง
+function renderDrawerItems() {
+  navDrawerItems.innerHTML = "";
+
+  if (currentViewerRole === "admin") {
+    // ใช้ URL hash (#admin=...) แทน query string เพราะเซิร์ฟเวอร์ทดสอบในเครื่อง (serve, clean-url) จะ
+    // redirect "attendance.html" ไปเป็น "attendance" และตัด query string ทิ้งระหว่างทาง แต่ไม่ตัด hash
+    navDrawerItems.appendChild(drawerSectionLabel("ผู้ดูแลระบบ"));
+    navDrawerItems.appendChild(drawerItem("👥", "รายชื่อโค้ชในระบบ", "./attendance.html#admin=coaches"));
+    navDrawerItems.appendChild(drawerItem("📈", "ความคืบหน้าการประเมินรายวัน", "./attendance.html#admin=progress"));
+    navDrawerItems.appendChild(drawerItem("📝", "คำขอลงทะเบียนที่รอการอนุมัติ", "./attendance.html#admin=approvals"));
+    navDrawerItems.appendChild(drawerItem("⚽", "รายงานผลการแข่งขันทั้งหมด", "./attendance.html#admin=matches"));
+    navDrawerItems.appendChild(drawerItem("🩹", "รายงานอาการบาดเจ็บทั้งหมด", "./attendance.html#admin=injuries"));
+    navDrawerItems.appendChild(drawerItem("📁", "จัดการข้อมูลทีม", "./attendance.html#admin=manage-team"));
+    navDrawerItems.appendChild(drawerItem("🖨️", "พิมพ์สรุป Dashboard", "./attendance.html#admin=print"));
+    navDrawerItems.appendChild(drawerItem("📈", "พัฒนาการนักกีฬา", "./development.html"));
+    navDrawerItems.appendChild(drawerDivider());
+    navDrawerItems.appendChild(drawerItem("🔄", "เลือกทีมอื่น (Dashboard)", "/"));
+  } else if (currentViewerRole === "coach") {
+    navDrawerItems.appendChild(drawerSectionLabel("เมนู"));
+    navDrawerItems.appendChild(drawerItem("📅", "กลับหน้า Daily", "./attendance.html"));
+  } else {
+    navDrawerItems.appendChild(drawerSectionLabel("เมนู"));
+    navDrawerItems.appendChild(drawerItem("📋", "กลับหน้าหลัก", "./attendance.html"));
+  }
+}
+
 // ต้องล็อกอินด้วยบัญชีโค้ช/ผู้ดูแลระบบที่ได้รับอนุมัติแล้วเท่านั้น จึงจะเห็นข้อมูล Dashboard
 // ผู้ดูแลระบบเลือกทีมจากหน้าเช็คชื่อเท่านั้น (ผ่านลิงก์ที่แนบ ?team= มา) ไม่มีตัวเลือกซ้ำในหน้านี้อีก
 // ส่วนโค้ช/ผู้บริหารทีมเห็นเฉพาะทีมของตัวเองอัตโนมัติ
 onAuthStateChanged(auth, async (user) => {
   const isCoachSession = !!user && !user.isAnonymous;
+  hamburgerBtn.classList.add("hidden");
+  notificationBellBtn.classList.add("hidden");
   if (!isCoachSession) {
     adminPickTeamPrompt.classList.add("hidden");
+    dashboardBackLink.classList.add("hidden");
+    closeDrawer();
     showLoginGate("ต้องเข้าสู่ระบบด้วยบัญชีโค้ชหรือผู้ดูแลระบบก่อน จึงจะดูข้อมูล Dashboard ได้");
     return;
   }
@@ -697,15 +814,31 @@ onAuthStateChanged(auth, async (user) => {
 
     if (!data || data.status !== "approved") {
       adminPickTeamPrompt.classList.add("hidden");
+      dashboardBackLink.classList.add("hidden");
       showLoginGate("บัญชีนี้ยังไม่ได้รับการอนุมัติจากผู้ดูแลระบบ กรุณารอหรือติดต่อผู้ดูแลระบบ");
       return;
     }
 
     loginGate.classList.add("hidden");
-    headerAttendanceLink.classList.remove("hidden");
     currentViewerRole = data.role;
 
+    // เมนู ☰/🔔 แสดงให้ทุกบทบาทที่ได้รับอนุมัติแล้ว พร้อมสะท้อนชื่อ/อีเมล/บทบาทเข้าไปในลิ้นชัก
+    hamburgerBtn.classList.remove("hidden");
+    notificationBellBtn.classList.remove("hidden");
+    navDrawerNameEl.textContent = data.name || user.email;
+    navDrawerEmailEl.textContent = user.email;
+    navDrawerRoleBadgeEl.innerHTML =
+      data.role === "admin"
+        ? '<span class="badge badge-info">ผู้ดูแลระบบ</span>'
+        : data.role === "executive"
+          ? '<span class="badge badge-neutral">ผู้บริหารทีม</span>'
+          : '<span class="badge badge-success">โค้ช</span>';
+    renderDrawerItems();
+
     const isAdmin = data.role === "admin";
+    // ลิงก์ "← กลับเมนูหลัก" แบบเดิมไปหน้าเช็คชื่อตรงๆ ใช้ไม่ได้กับผู้ดูแลระบบอีกต่อไป (จะโดน redirect
+    // กลับมาหน้านี้ทันที) จึงซ่อนไว้เฉพาะผู้ดูแลระบบ ให้ใช้เมนู ☰ แทน — โค้ช/ผู้บริหารทีมยังใช้ได้ตามปกติ
+    headerAttendanceLink.classList.toggle("hidden", isAdmin);
     if (isAdmin) {
       // ต้องมาจากลิงก์ "ดู Dashboard ทีมนี้" ในหน้าเช็คชื่อ (มี ?team= แนบมา) เท่านั้น ถึงจะเห็นข้อมูล
       // ถ้าเข้าหน้านี้ตรงๆ โดยไม่มีพารามิเตอร์ จะแสดงข้อความให้กลับไปเลือกทีมที่หน้าเช็คชื่อแทน
@@ -713,18 +846,24 @@ onAuthStateChanged(auth, async (user) => {
       if (teamFromUrl === "__ALL__") {
         adminPickTeamPrompt.classList.add("hidden");
         dashboardContent.classList.remove("hidden");
+        dashboardBackLink.classList.remove("hidden");
         loadDashboard(null);
       } else if (teamFromUrl && TEAMS.includes(teamFromUrl)) {
         adminPickTeamPrompt.classList.add("hidden");
         dashboardContent.classList.remove("hidden");
+        dashboardBackLink.classList.remove("hidden");
         loadDashboard(teamFromUrl);
       } else {
+        // อยู่ที่หน้าเลือกทีมเอง (หน้าแรกของผู้ดูแลระบบ) ไม่มีหน้าก่อนหน้าให้ย้อนกลับแล้ว จึงไม่ต้องมีปุ่มนี้
         dashboardContent.classList.add("hidden");
+        dashboardBackLink.classList.add("hidden");
+        renderAdminPickTeamGrid();
         adminPickTeamPrompt.classList.remove("hidden");
         setStatus("");
       }
     } else {
       adminPickTeamPrompt.classList.add("hidden");
+      dashboardBackLink.classList.add("hidden");
       dashboardContent.classList.remove("hidden");
       loadDashboard(data.team);
     }

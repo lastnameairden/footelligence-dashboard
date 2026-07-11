@@ -10,17 +10,50 @@
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-900">
   <header class="app-header text-white sticky top-0 z-10 shadow-sm">
-    <div class="max-w-6xl mx-auto px-6 py-5 flex items-center gap-3">
-      <img src="./assets/logo.png" alt="Footelligence" class="w-9 h-9 object-contain" />
-      <div>
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-5 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <button id="hamburger-btn" class="hidden btn-icon" aria-label="เปิดเมนู" title="เมนู">
+          <span class="hamburger-lines"><span></span><span></span><span></span></span>
+        </button>
+        <img src="./assets/logo.png" alt="Footelligence" class="w-9 h-9 object-contain" />
         <h1 class="text-xl font-bold leading-tight tracking-tight">FOOTELLIGENCE DATA</h1>
       </div>
+      <button id="notification-bell-btn" class="hidden btn-icon" aria-label="การแจ้งเตือน" title="การแจ้งเตือน">
+        🔔
+      </button>
     </div>
   </header>
+
+  <!-- เมนูนำทางแบบเลื่อนออกจากด้านซ้าย (เปิดด้วยปุ่ม ☰) — เหมือนกับใน attendance.html เพื่อให้ผู้ดูแลระบบ
+       เข้าถึงเครื่องมือต่างๆ (รายชื่อโค้ช/ความคืบหน้า/คำขออนุมัติ/จัดการทีม/พิมพ์สรุป) ได้จากหน้านี้โดยตรง
+       โดยไม่ต้องผ่านหน้าแผงควบคุมแบบการ์ดอีกต่อไป -->
+  <div id="nav-drawer-overlay" class="hidden fixed inset-0 bg-slate-900/40 z-40"></div>
+  <nav id="nav-drawer" class="nav-drawer-hidden fixed top-0 left-0 h-full w-[280px] max-w-[85vw] bg-white z-50 shadow-2xl flex flex-col">
+    <div class="flex items-center justify-between px-4 py-4 border-b border-slate-100">
+      <div class="flex items-center gap-2">
+        <img src="./assets/logo.png" alt="Footelligence" class="w-8 h-8 object-contain" />
+        <span class="font-bold text-slate-900">FOOTELLIGENCE DATA</span>
+      </div>
+      <button id="nav-drawer-close-btn" class="btn-icon" aria-label="ปิดเมนู">✕</button>
+    </div>
+    <div class="px-4 py-3 border-b border-slate-100 bg-slate-50">
+      <p id="nav-drawer-name" class="text-sm font-semibold text-slate-900 truncate"></p>
+      <p id="nav-drawer-email" class="text-xs text-slate-500 truncate"></p>
+      <p id="nav-drawer-role-badge" class="mt-1.5"></p>
+    </div>
+    <div id="nav-drawer-items" class="flex-1 overflow-y-auto py-2"></div>
+    <div class="p-3 border-t border-slate-100">
+      <button id="drawer-logout-btn" class="btn btn-ghost-danger btn-block">ออกจากระบบ</button>
+    </div>
+  </nav>
 
   <main class="max-w-6xl mx-auto px-6 py-8 space-y-10">
     <a id="header-attendance-link" href="./attendance.html" class="hidden btn btn-ghost px-0">
       ← กลับเมนูหลัก
+    </a>
+    <!-- เฉพาะผู้ดูแลระบบตอนดูข้อมูลทีมใดทีมหนึ่งอยู่ (มี ?team= แนบมา) — ย้อนกลับไปหน้าเลือกทีมทีละสเต็ป -->
+    <a id="dashboard-back-link" href="/" class="hidden btn btn-ghost px-0">
+      ← เลือกทีมอื่น
     </a>
     <p id="status-message" class="text-sm text-slate-500">กำลังเชื่อมต่อ...</p>
 
@@ -35,11 +68,16 @@
     </section>
 
     <!-- แสดงเมื่อผู้ดูแลระบบเข้าหน้านี้โดยตรง โดยยังไม่ได้เลือกทีมมาจากหน้าเช็คชื่อ -->
-    <section id="admin-pick-team-prompt" class="hidden card card-pad max-w-md mx-auto text-center">
-      <div class="icon-badge icon-badge-lg mx-auto mb-3">🛡️</div>
-      <h2 class="text-lg font-semibold mb-2">เลือกทีมที่ต้องการดูข้อมูล</h2>
-      <p class="text-sm text-slate-500 mb-4">กรุณาเลือกทีม (หรือ "ทุกทีม") จากหน้าเช็คชื่อก่อน จึงจะดูข้อมูล Dashboard ได้</p>
-      <a href="./attendance.html" class="btn btn-primary">ไปที่หน้าเลือกทีม →</a>
+    <!-- ใช้รูปแบบการ์ดแบบเดียวกับหน้าแผงควบคุมผู้ดูแลระบบใน attendance.html ให้เลือกทีมได้ในหน้าเดียวเลย -->
+    <section id="admin-pick-team-prompt" class="hidden">
+      <div class="page-heading">
+        <div class="icon-badge icon-badge-lg">🛡️</div>
+        <div>
+          <h2>เลือกทีมที่ต้องการดูข้อมูล</h2>
+          <p>เลือกทีมใดทีมหนึ่ง หรือ "ทุกทีม" เพื่อดูภาพรวมทั้งหมด</p>
+        </div>
+      </div>
+      <div id="admin-pick-team-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
     </section>
 
     <!-- เนื้อหา Dashboard (แสดงหลังล็อกอินและได้รับอนุมัติแล้วเท่านั้น) -->

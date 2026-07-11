@@ -25,7 +25,9 @@
   </header>
 
   <main class="max-w-5xl mx-auto px-6 py-8 space-y-6">
-    <a href="./attendance.html" class="btn btn-ghost px-0 no-print">← กลับเมนูหลัก</a>
+    <!-- หน้านี้เข้าถึงได้เฉพาะผู้ดูแลระบบ ผ่านเครื่องมือ "พิมพ์สรุป Dashboard" เท่านั้น จึงย้อนกลับไปที่
+         เครื่องมือนั้นโดยตรงด้วย #admin=print (ใช้ attendance.html เฉยๆ จะโดน redirect ไปหน้า Dashboard แทน) -->
+    <a href="./attendance.html#admin=print" class="btn btn-ghost px-0 no-print">← กลับหน้าพิมพ์สรุป Dashboard</a>
     <p id="status-message" class="text-sm text-slate-500 no-print">กำลังเชื่อมต่อ...</p>
 
     <!-- แสดงเมื่อยังไม่ได้ล็อกอิน หรือไม่ใช่บัญชีผู้ดูแลระบบ -->

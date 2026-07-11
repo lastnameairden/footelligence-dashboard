@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FOOTELLIGENCE DATA — พัฒนาการนักกีฬา</title>
+  <link rel="icon" href="./assets/logo.png" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="./css/styles.css" />
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-900">
+  <header class="app-header text-white sticky top-0 z-10 shadow-sm">
+    <div class="max-w-5xl mx-auto px-6 py-5 flex items-center gap-3">
+      <img src="./assets/logo.png" alt="Footelligence" class="w-9 h-9 object-contain" />
+      <h1 class="text-xl font-bold leading-tight tracking-tight">FOOTELLIGENCE DATA</h1>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-6 py-8 space-y-8">
+    <a href="/" class="btn btn-ghost px-0">← กลับ Dashboard</a>
+    <p id="status-message" class="text-sm text-slate-500">กำลังเชื่อมต่อ...</p>
+
+    <!-- แสดงเมื่อยังไม่ได้ล็อกอิน / ไม่ใช่บัญชีผู้ดูแลระบบ -->
+    <section id="access-gate" class="hidden card card-pad max-w-md mx-auto text-center">
+      <div class="icon-badge icon-badge-lg mx-auto mb-3">🛡️</div>
+      <h2 class="text-lg font-semibold mb-2">เฉพาะผู้ดูแลระบบเท่านั้น</h2>
+      <p class="text-sm text-slate-500 mb-4" id="access-gate-message">
+        ต้องเข้าสู่ระบบด้วยบัญชีผู้ดูแลระบบก่อน จึงจะดูอันดับพัฒนาการนักกีฬาได้
+      </p>
+      <a href="./attendance.html" class="btn btn-primary">ไปที่หน้าเข้าสู่ระบบ →</a>
+    </section>
+
+    <div id="development-content" class="hidden space-y-8">
+      <div class="page-heading">
+        <div class="icon-badge icon-badge-lg">📈</div>
+        <div>
+          <h2>พัฒนาการนักกีฬา</h2>
+          <p>จัดอันดับนักกีฬาที่คะแนนเฉลี่ยเพิ่มขึ้นมากที่สุด เทียบช่วงแรกกับช่วงหลังของข้อมูลที่บันทึกไว้</p>
+        </div>
+      </div>
+
+      <!-- ตัวกรอง -->
+      <div class="card card-pad flex flex-wrap items-end gap-4">
+        <div>
+          <label class="field-label">ทีม</label>
+          <select id="dev-team-select" class="field-input w-56">
+            <option value="__ALL__">ทุกทีม</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-label">รุ่นอายุ</label>
+          <select id="dev-age-group-select" class="field-input w-40">
+            <option value="__ALL__">ทุกรุ่นอายุ</option>
+            <option value="U9">U9</option>
+            <option value="U10">U10</option>
+            <option value="U11">U11</option>
+            <option value="U12">U12</option>
+            <option value="U13">U13</option>
+            <option value="U14">U14</option>
+            <option value="U15">U15</option>
+            <option value="U16">U16</option>
+            <option value="U17">U17</option>
+            <option value="U18">U18</option>
+          </select>
+        </div>
+        <button id="dev-refresh-btn" class="btn btn-primary">โหลดอันดับ</button>
+        <p id="dev-filter-note" class="text-xs text-slate-400 w-full"></p>
+      </div>
+
+      <!-- แผนภูมิเปรียบเทียบส่วนต่างคะแนน -->
+      <section>
+        <h2 class="section-title mb-4"><span class="icon-badge">📊</span> ส่วนต่างคะแนนเฉลี่ย (ช่วงหลัง − ช่วงแรก)</h2>
+        <div class="card card-pad">
+          <div id="dev-delta-bars"></div>
+        </div>
+      </section>
+
+      <!-- ตารางอันดับ -->
+      <section>
+        <h2 class="section-title mb-4"><span class="icon-badge">🏆</span> อันดับพัฒนาการ (10 อันดับแรก)</h2>
+        <div class="card table-wrap">
+          <table class="pro-table">
+            <thead>
+              <tr>
+                <th>อันดับ</th>
+                <th>นักกีฬา</th>
+                <th>ทีม</th>
+                <th>รุ่นอายุ</th>
+                <th>คะแนนช่วงแรก</th>
+                <th>คะแนนช่วงหลัง</th>
+                <th>ส่วนต่าง</th>
+                <th>จำนวนครั้งที่บันทึก</th>
+                <th>แนวโน้ม</th>
+              </tr>
+            </thead>
+            <tbody id="dev-table-body">
+              <tr><td colspan="9" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="app-footer">FOOTELLIGENCE DATA © 2026 — ระบบจัดการข้อมูลนักกีฬาและการฝึกซ้อม</footer>
+
+  <script type="module" src="./js/development.js"></script>
+</body>
+</html>

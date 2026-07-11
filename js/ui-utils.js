@@ -1,3 +1,31 @@
+// ---------- โลโก้ทีม (ใช้แทนอิโมจิ 🛡️ ทุกจุดที่แสดงชื่อ/ไอคอนของแต่ละทีม) ----------
+export const TEAM_LOGOS = {
+  "KHAMPHEE FOOTBALL": "./assets/logo-khamphee-football.png",
+  "THAWEE SC": "./assets/logo-thawee-sc.jpg",
+  "THAMMASATHIT": "./assets/logo-thammasathit.jpg"
+};
+
+// กล่องไอคอนสี่เหลี่ยมมน (เหมือน .icon-badge/.icon-badge-lg เดิม) แต่ใส่โลโก้ทีมจริงแทนอิโมจิ
+// ใช้แทนที่ `<div class="icon-badge icon-badge-lg">🛡️</div>` ได้ทันที — ทีมที่ไม่รู้จัก (เช่นยังไม่ตั้งชื่อ)
+// จะ fallback กลับไปใช้อิโมจิ 🛡️ เดิมโดยอัตโนมัติ
+// ไฟล์โลโก้ที่ได้มามีพื้นหลังขาว/เทาอ่อนติดมาด้วย (ไม่ใช่พื้นหลังโปร่งใสจริง — โดยเฉพาะไฟล์ .jpg ที่ไม่รองรับ
+// ความโปร่งใสอยู่แล้ว) จึงใช้ mix-blend-multiply ผสมกับพื้นหลังสีขาวของกล่องที่ห่อไว้ ทำให้พื้นหลังของโลโก้
+// กลืนไปกับพื้นหลังการ์ด/ตารางโดยไม่ต้องแก้ไฟล์รูปเอง (ใช้ได้ผลดีเมื่อพื้นหลังโดยรอบเป็นสีขาว/อ่อนเช่นกัน)
+export function teamIconBadge(team, { large = true, extraClass = "" } = {}) {
+  const sizeClass = `icon-badge${large ? " icon-badge-lg" : ""}${extraClass ? " " + extraClass : ""}`;
+  const src = TEAM_LOGOS[team];
+  if (!src) return `<div class="${sizeClass}">🛡️</div>`;
+  return `<div class="${sizeClass} overflow-hidden p-0.5 bg-white"><img src="${src}" alt="${team}" class="w-full h-full object-contain rounded mix-blend-multiply" /></div>`;
+}
+
+// รูปโลโก้ทีมแบบเปล่าๆ (ไม่มีกล่องล้อม) สำหรับวางแทรกหน้าชื่อทีมในข้อความ/ตาราง — คืนสตริงว่างถ้าไม่รู้จักทีมนี้
+// เติม mix-blend-multiply ให้เสมอไม่ว่าจะส่ง className เองหรือไม่ เพื่อกลืนพื้นหลังขาวของไฟล์โลโก้เข้ากับพื้นหลังโดยรอบ
+export function teamLogoImg(team, className = "w-6 h-6 object-contain inline-block align-middle rounded mr-1.5") {
+  const src = TEAM_LOGOS[team];
+  if (!src) return "";
+  return `<img src="${src}" alt="${team}" class="${className} mix-blend-multiply" />`;
+}
+
 // ---------- ระบบให้คะแนนรายวัน 4 ด้าน ----------
 // ใช้ร่วมกันทั้งหน้าโค้ช (attendance.js) และ Dashboard (app.js) เพื่อให้คำนวณ
 // "ประเมินครบหรือยัง" และ "คะแนนเฉลี่ย" ตรงกันทุกจุด

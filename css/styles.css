@@ -212,6 +212,74 @@ table.pro-table td.emphasis { font-weight: 600; color: #0f172a; }
   color: #94a3b8;
 }
 
+/* ---------- ปุ่มไอคอนบน header เข้ม (☰ เปิดเมนู, 🔔 แจ้งเตือน) ---------- */
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.55rem;
+  background: transparent;
+  color: #e2e8f0;
+  font-size: 1.15rem;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  flex-shrink: 0;
+}
+.btn-icon:hover { background: rgba(255, 255, 255, 0.1); }
+.hamburger-lines {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  width: 1.15rem;
+}
+.hamburger-lines span {
+  display: block;
+  height: 2px;
+  width: 100%;
+  background: currentColor;
+  border-radius: 1px;
+}
+
+/* ---------- เมนูนำทางแบบเลื่อนออกจากด้านซ้าย (nav drawer) ---------- */
+#nav-drawer {
+  transition: transform 0.22s ease;
+}
+#nav-drawer.nav-drawer-hidden { transform: translateX(-100%); }
+#nav-drawer:not(.nav-drawer-hidden) { transform: translateX(0); }
+#nav-drawer-overlay { transition: opacity 0.22s ease; }
+
+.drawer-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.7rem 1.1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #334155;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.drawer-item:hover { background: #f1f5f9; }
+.drawer-item.active { background: #eef2ff; color: #3730a3; font-weight: 600; }
+.drawer-item .drawer-item-icon { font-size: 1.05rem; width: 1.5rem; text-align: center; flex-shrink: 0; }
+.drawer-section-label {
+  padding: 0.85rem 1.1rem 0.35rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+.drawer-divider { height: 1px; background: #f1f5f9; margin: 0.4rem 0; }
+
 /* ==========================================================================
    โหมดมือถือ (iOS / Android) — คงหน้าตาแบบ PC ไว้เหมือนเดิม ปรับเฉพาะจอแคบ
    ใช้ media query ตามความกว้างจอแทนการเช็ค user-agent (แนวทางมาตรฐาน

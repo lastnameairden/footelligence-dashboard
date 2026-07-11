@@ -10,13 +10,40 @@
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-900">
   <header class="app-header text-white sticky top-0 z-10 shadow-sm">
-    <div class="max-w-5xl mx-auto px-6 py-5 flex items-center gap-3">
-      <img src="./assets/logo.png" alt="Footelligence" class="w-9 h-9 object-contain" />
-      <div>
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 py-4 sm:py-5 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <button id="hamburger-btn" class="hidden btn-icon" aria-label="เปิดเมนู" title="เมนู">
+          <span class="hamburger-lines"><span></span><span></span><span></span></span>
+        </button>
+        <img src="./assets/logo.png" alt="Footelligence" class="w-9 h-9 object-contain" />
         <h1 class="text-xl font-bold leading-tight tracking-tight">FOOTELLIGENCE DATA</h1>
       </div>
+      <button id="notification-bell-btn" class="hidden btn-icon" aria-label="การแจ้งเตือน" title="การแจ้งเตือน">
+        🔔
+      </button>
     </div>
   </header>
+
+  <!-- เมนูนำทางแบบเลื่อนออกจากด้านซ้าย (เปิดด้วยปุ่ม ☰) -->
+  <div id="nav-drawer-overlay" class="hidden fixed inset-0 bg-slate-900/40 z-40"></div>
+  <nav id="nav-drawer" class="nav-drawer-hidden fixed top-0 left-0 h-full w-[280px] max-w-[85vw] bg-white z-50 shadow-2xl flex flex-col">
+    <div class="flex items-center justify-between px-4 py-4 border-b border-slate-100">
+      <div class="flex items-center gap-2">
+        <img src="./assets/logo.png" alt="Footelligence" class="w-8 h-8 object-contain" />
+        <span class="font-bold text-slate-900">FOOTELLIGENCE DATA</span>
+      </div>
+      <button id="nav-drawer-close-btn" class="btn-icon" aria-label="ปิดเมนู">✕</button>
+    </div>
+    <div class="px-4 py-3 border-b border-slate-100 bg-slate-50">
+      <p id="nav-drawer-name" class="text-sm font-semibold text-slate-900 truncate"></p>
+      <p id="nav-drawer-email" class="text-xs text-slate-500 truncate"></p>
+      <p id="nav-drawer-role-badge" class="mt-1.5"></p>
+    </div>
+    <div id="nav-drawer-items" class="flex-1 overflow-y-auto py-2"></div>
+    <div class="p-3 border-t border-slate-100">
+      <button id="drawer-logout-btn" class="btn btn-ghost-danger btn-block">ออกจากระบบ</button>
+    </div>
+  </nav>
 
   <main class="max-w-5xl mx-auto px-6 py-8 space-y-8">
 
@@ -128,10 +155,6 @@
             <p id="coach-email" class="text-sm text-slate-500 mt-0.5"></p>
           </div>
         </div>
-        <div class="flex items-center gap-2">
-          <button id="admin-panel-link" class="hidden btn btn-secondary btn-sm">🛡️ แผงควบคุมผู้ดูแล</button>
-          <button id="logout-btn" class="btn btn-ghost-danger btn-sm">ออกจากระบบ</button>
-        </div>
       </div>
       <div class="flex flex-wrap gap-x-10 gap-y-4 mt-5 pt-5 border-t border-slate-100">
         <div class="min-w-[9rem]">
@@ -150,58 +173,10 @@
     </div>
 
     <!-- แผงควบคุมผู้ดูแลระบบ -->
-    <!-- เมนูผู้ดูแลระบบ: เลือกรายการที่ต้องการดำเนินการ -->
-    <section id="admin-menu-section" class="hidden">
-      <div class="page-heading">
-        <div class="icon-badge icon-badge-lg">🛡️</div>
-        <div>
-          <h2>แผงควบคุมผู้ดูแลระบบ</h2>
-          <p>เลือกรายการที่ต้องการดำเนินการ</p>
-        </div>
-      </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <button id="admin-menu-coaches" type="button"
-          class="text-left card card-pad hover:shadow-md hover:ring-2 hover:ring-slate-900 transition">
-          <div class="icon-badge icon-badge-lg mb-3">👥</div>
-          <div class="text-lg font-semibold mb-1">รายชื่อโค้ชในระบบ</div>
-          <p class="text-sm text-slate-500">ดูโค้ชทั้งหมด สถานะ % ส่งข้อมูลตรงเวลา และเปลี่ยนทีมได้</p>
-        </button>
-        <button id="admin-menu-progress" type="button"
-          class="text-left card card-pad hover:shadow-md hover:ring-2 hover:ring-slate-900 transition">
-          <div class="icon-badge icon-badge-lg mb-3">📊</div>
-          <div class="text-lg font-semibold mb-1">ความคืบหน้าการประเมินรายวัน</div>
-          <p class="text-sm text-slate-500">ตรวจสอบว่าแต่ละทีมประเมินนักกีฬาครบแล้วหรือยัง</p>
-        </button>
-        <button id="admin-menu-approvals" type="button"
-          class="text-left card card-pad hover:shadow-md hover:ring-2 hover:ring-slate-900 transition">
-          <div class="icon-badge icon-badge-lg mb-3">📝</div>
-          <div class="text-lg font-semibold mb-1">คำขอลงทะเบียนที่รอการอนุมัติ</div>
-          <p class="text-sm text-slate-500">อนุมัติหรือปฏิเสธผู้ลงทะเบียนใหม่ พร้อมกำหนดทีม</p>
-        </button>
-        <button id="admin-menu-manage-team" type="button"
-          class="text-left card card-pad hover:shadow-md hover:ring-2 hover:ring-slate-900 transition">
-          <div class="icon-badge icon-badge-lg mb-3">🗂️</div>
-          <div class="text-lg font-semibold mb-1">จัดการข้อมูลทีม</div>
-          <p class="text-sm text-slate-500">เพิ่มนักกีฬา เช็คชื่อ และส่งรายงานแทนโค้ชของทีมที่เลือก</p>
-        </button>
-        <button id="admin-menu-dashboard" type="button"
-          class="text-left card card-pad hover:shadow-md hover:ring-2 hover:ring-slate-900 transition">
-          <div class="icon-badge icon-badge-lg mb-3">📈</div>
-          <div class="text-lg font-semibold mb-1">ดู Dashboard ทีม</div>
-          <p class="text-sm text-slate-500">ดูภาพรวมข้อมูลนักกีฬาและผลการประเมินของทีมที่เลือก</p>
-        </button>
-        <button id="admin-menu-print" type="button"
-          class="text-left card card-pad hover:shadow-md hover:ring-2 hover:ring-slate-900 transition">
-          <div class="icon-badge icon-badge-lg mb-3">🖨️</div>
-          <div class="text-lg font-semibold mb-1">พิมพ์สรุป Dashboard</div>
-          <p class="text-sm text-slate-500">เลือกทีมและรุ่นอายุ แล้วสร้างสรุปสำหรับพิมพ์หรือบันทึกเป็น PDF</p>
-        </button>
-      </div>
-    </section>
 
     <!-- รายชื่อโค้ชในระบบ -->
     <section id="admin-coaches-section" class="hidden space-y-6">
-      <button data-admin-back class="btn btn-ghost px-0">← กลับเมนูผู้ดูแล</button>
+      <button data-admin-back class="btn btn-ghost px-0">← กลับหน้า Dashboard</button>
       <div class="page-heading">
         <div class="icon-badge icon-badge-lg">👥</div>
         <div>
@@ -233,7 +208,7 @@
 
     <!-- ความคืบหน้าการประเมินรายวัน -->
     <section id="admin-progress-section" class="hidden space-y-6">
-      <button data-admin-back class="btn btn-ghost px-0">← กลับเมนูผู้ดูแล</button>
+      <button data-admin-back class="btn btn-ghost px-0">← กลับหน้า Dashboard</button>
       <div class="flex items-center justify-between mb-3 flex-wrap gap-3">
         <div class="page-heading mb-0">
           <div class="icon-badge icon-badge-lg">📊</div>
@@ -275,7 +250,7 @@
 
     <!-- คำขอลงทะเบียนที่รอการอนุมัติ -->
     <section id="admin-approvals-section" class="hidden space-y-6">
-      <button data-admin-back class="btn btn-ghost px-0">← กลับเมนูผู้ดูแล</button>
+      <button data-admin-back class="btn btn-ghost px-0">← กลับหน้า Dashboard</button>
       <div class="page-heading">
         <div class="icon-badge icon-badge-lg">📝</div>
         <div>
@@ -301,9 +276,71 @@
       </div>
     </section>
 
+    <!-- รายงานผลการแข่งขันทั้งหมด (ทุกทีม) -->
+    <section id="admin-matches-section" class="hidden space-y-6">
+      <button data-admin-back class="btn btn-ghost px-0">← กลับหน้า Dashboard</button>
+      <div class="page-heading">
+        <div class="icon-badge icon-badge-lg">⚽</div>
+        <div>
+          <h2>รายงานผลการแข่งขันทั้งหมด</h2>
+          <p>ดูผลการแข่งขันของทุกทีมในที่เดียว</p>
+        </div>
+      </div>
+      <div class="card table-wrap">
+        <table class="pro-table">
+          <thead>
+            <tr>
+              <th>ทีม</th>
+              <th>วันที่</th>
+              <th>คู่แข่ง</th>
+              <th>ประเภท</th>
+              <th>รุ่นอายุ</th>
+              <th>ผลการแข่งขัน</th>
+              <th>สกอร์</th>
+              <th>รายการแข่งขัน</th>
+            </tr>
+          </thead>
+          <tbody id="admin-match-list-body">
+            <tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- รายงานอาการบาดเจ็บทั้งหมด (ทุกทีม) -->
+    <section id="admin-injuries-section" class="hidden space-y-6">
+      <button data-admin-back class="btn btn-ghost px-0">← กลับหน้า Dashboard</button>
+      <div class="page-heading">
+        <div class="icon-badge icon-badge-lg">🩹</div>
+        <div>
+          <h2>รายงานอาการบาดเจ็บทั้งหมด</h2>
+          <p>ดูอาการบาดเจ็บของนักกีฬาทุกทีมในที่เดียว</p>
+        </div>
+      </div>
+      <div class="card table-wrap">
+        <table class="pro-table">
+          <thead>
+            <tr>
+              <th>ทีม</th>
+              <th>วันที่</th>
+              <th>นักกีฬา</th>
+              <th>รุ่นอายุ</th>
+              <th>อาการ</th>
+              <th>ความรุนแรง</th>
+              <th>สถานะ</th>
+              <th>คาดว่าจะกลับมา</th>
+            </tr>
+          </thead>
+          <tbody id="admin-injury-list-body">
+            <tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
     <!-- จัดการข้อมูลทีม -->
     <section id="admin-manage-team-section" class="hidden space-y-6">
-      <button data-admin-back class="btn btn-ghost px-0">← กลับเมนูผู้ดูแล</button>
+      <button data-admin-back class="btn btn-ghost px-0">← กลับหน้า Dashboard</button>
       <div class="page-heading">
         <div class="icon-badge icon-badge-lg">🗂️</div>
         <div>
@@ -322,7 +359,7 @@
 
     <!-- ดู Dashboard ทีม -->
     <section id="admin-dashboard-section" class="hidden space-y-6">
-      <button data-admin-back class="btn btn-ghost px-0">← กลับเมนูผู้ดูแล</button>
+      <button data-admin-back class="btn btn-ghost px-0">← กลับหน้า Dashboard</button>
       <div class="page-heading">
         <div class="icon-badge icon-badge-lg">📈</div>
         <div>
@@ -341,7 +378,7 @@
 
     <!-- พิมพ์สรุป Dashboard -->
     <section id="admin-print-section" class="hidden space-y-6">
-      <button data-admin-back class="btn btn-ghost px-0">← กลับเมนูผู้ดูแล</button>
+      <button data-admin-back class="btn btn-ghost px-0">← กลับหน้า Dashboard</button>
       <div class="page-heading">
         <div class="icon-badge icon-badge-lg">🖨️</div>
         <div>
@@ -375,65 +412,9 @@
       </div>
     </section>
 
-    <!-- เมนูหลัก: เลือกว่าจะเพิ่มข้อมูล หรือ เช็คชื่อฝึกซ้อม -->
-    <section id="menu-section" class="hidden">
-      <button id="menu-back-btn" class="hidden btn btn-ghost px-0 mb-4">← กลับเมนูผู้ดูแล</button>
-      <div class="page-heading">
-        <div class="icon-badge icon-badge-lg">📋</div>
-        <div>
-          <h2>เลือกรายการที่ต้องการดำเนินการ</h2>
-          <p>จัดการข้อมูลนักกีฬาและบันทึกการฝึกซ้อมของทีมคุณ</p>
-        </div>
-      </div>
-      <div id="menu-cards-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <button id="menu-add-player" type="button"
-          class="text-left card card-pad hover:shadow-md hover:ring-2 hover:ring-slate-900 transition">
-          <div class="icon-badge icon-badge-lg mb-3">➕</div>
-          <div class="text-lg font-semibold mb-1">เพิ่มข้อมูลนักกีฬา</div>
-          <p class="text-sm text-slate-500">เพิ่ม แก้ไข หรือลบข้อมูลนักกีฬาในทีมของคุณ</p>
-        </button>
-        <button id="menu-checkin" type="button"
-          class="text-left card card-pad hover:shadow-md hover:ring-2 hover:ring-slate-900 transition">
-          <div class="icon-badge icon-badge-lg mb-3">✅</div>
-          <div class="text-lg font-semibold mb-1">เช็คชื่อการฝึกซ้อม</div>
-          <p class="text-sm text-slate-500">บันทึกสถานะการเข้าร่วมและให้คะแนนนักกีฬารายบุคคลประจำวัน</p>
-        </button>
-        <button id="menu-report" type="button"
-          class="text-left card card-pad hover:shadow-md hover:ring-2 hover:ring-slate-900 transition">
-          <div class="icon-badge icon-badge-lg mb-3">📝</div>
-          <div class="text-lg font-semibold mb-1">รายงานการฝึกซ้อม</div>
-          <p class="text-sm text-slate-500">แจ้งช่วงเวลาและสถานะการฝึกซ้อมของทีมประจำวัน</p>
-        </button>
-        <button id="menu-match-report" type="button"
-          class="text-left card card-pad hover:shadow-md hover:ring-2 hover:ring-slate-900 transition">
-          <div class="icon-badge icon-badge-lg mb-3">🏆</div>
-          <div class="text-lg font-semibold mb-1">รายงานผลการแข่งขัน</div>
-          <p class="text-sm text-slate-500">บันทึกผลการแข่งขัน คู่แข่ง และรายการแข่งขันของทีม</p>
-        </button>
-        <button id="menu-injury-report" type="button"
-          class="text-left card card-pad hover:shadow-md hover:ring-2 hover:ring-slate-900 transition">
-          <div class="icon-badge icon-badge-lg mb-3">🩹</div>
-          <div class="text-lg font-semibold mb-1">รายงานอาการบาดเจ็บ</div>
-          <p class="text-sm text-slate-500">บันทึกอาการบาดเจ็บของนักกีฬา ความรุนแรง และสถานะการพักฟื้น</p>
-        </button>
-        <button id="menu-daily" type="button"
-          class="text-left card card-pad hover:shadow-md hover:ring-2 hover:ring-slate-900 transition">
-          <div class="icon-badge icon-badge-lg mb-3">📅</div>
-          <div class="text-lg font-semibold mb-1">สรุปประจำวัน (Daily)</div>
-          <p class="text-sm text-slate-500">ดูข้อมูลทั้งหมดที่กรอกไว้ในวันที่เลือกในหน้าเดียว</p>
-        </button>
-        <a id="menu-dashboard-card" href="./index.html"
-          class="text-left card card-pad hover:shadow-md hover:ring-2 hover:ring-slate-900 transition">
-          <div class="icon-badge icon-badge-lg mb-3">📈</div>
-          <div class="text-lg font-semibold mb-1">Dashboard</div>
-          <p class="text-sm text-slate-500">ดูภาพรวมข้อมูลนักกีฬาและผลการประเมินของทีมคุณ</p>
-        </a>
-      </div>
-    </section>
-
     <!-- หน้าจอเพิ่มนักกีฬา -->
     <section id="add-player-section" class="hidden space-y-6">
-      <button data-back class="btn btn-ghost px-0">← กลับเมนู</button>
+      <button data-back class="btn btn-ghost px-0">← กลับหน้า Daily</button>
       <div class="card card-pad">
         <h2 class="section-title mb-4"><span class="icon-badge">➕</span> เพิ่มข้อมูลนักกีฬา</h2>
         <form id="add-player-form" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -506,7 +487,7 @@
 
     <!-- หน้าจอเช็คชื่อ -->
     <section id="checkin-section" class="hidden space-y-6">
-      <button data-back class="btn btn-ghost px-0">← กลับเมนู</button>
+      <button data-back class="btn btn-ghost px-0">← กลับหน้า Daily</button>
 
       <div class="page-heading">
         <div class="icon-badge icon-badge-lg">✅</div>
@@ -560,7 +541,7 @@
 
     <!-- หน้าจอรายงานการฝึกซ้อม (รูปถ่าย + รายชื่อนักกีฬาที่ไม่ได้เข้าซ้อม + พิกัด GPS) -->
     <section id="report-section" class="hidden space-y-6">
-      <button data-back class="btn btn-ghost px-0">← กลับเมนู</button>
+      <button data-back class="btn btn-ghost px-0">← กลับหน้า Daily</button>
 
       <div class="page-heading">
         <div class="icon-badge icon-badge-lg">📝</div>
@@ -605,7 +586,7 @@
 
     <!-- หน้าจอรายงานผลการแข่งขัน -->
     <section id="match-report-section" class="hidden space-y-6">
-      <button data-back class="btn btn-ghost px-0">← กลับเมนู</button>
+      <button data-back class="btn btn-ghost px-0">← กลับหน้า Daily</button>
 
       <div class="page-heading">
         <div class="icon-badge icon-badge-lg">🏆</div>
@@ -720,7 +701,7 @@
 
     <!-- หน้าจอรายงานอาการบาดเจ็บ -->
     <section id="injury-report-section" class="hidden space-y-6">
-      <button data-back class="btn btn-ghost px-0">← กลับเมนู</button>
+      <button data-back class="btn btn-ghost px-0">← กลับหน้า Daily</button>
 
       <div class="page-heading">
         <div class="icon-badge icon-badge-lg">🩹</div>
@@ -822,8 +803,6 @@
 
     <!-- หน้าจอสรุปประจำวัน (Daily) -->
     <section id="daily-section" class="hidden space-y-6">
-      <button data-back class="btn btn-ghost px-0">← กลับเมนู</button>
-
       <div class="page-heading">
         <div class="icon-badge icon-badge-lg">📅</div>
         <div>
