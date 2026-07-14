@@ -33,12 +33,14 @@
     <div id="player-content" class="hidden space-y-8">
       <!-- ข้อมูลนักกีฬา -->
       <div class="card card-pad">
-        <div class="page-heading mb-0">
+        <div class="page-heading mb-0 flex-wrap">
           <div class="icon-badge icon-badge-lg">👤</div>
-          <div>
+          <div class="flex-1">
             <h2 id="player-name-heading">-</h2>
             <p id="player-subheading">-</p>
           </div>
+          <!-- แสดงเฉพาะผู้ดูแลระบบ ใช้ส่งข้อมูลนักกีฬาคนนี้ (เช่น พัฒนาการที่ดี) ไปแจ้งผู้บริหารทีมโดยตรง -->
+          <button id="send-to-executive-btn" class="hidden btn btn-secondary btn-sm">📤 ส่งไปยังผู้บริหารทีม</button>
         </div>
       </div>
 

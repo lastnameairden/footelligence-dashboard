@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FOOTELLIGENCE DATA — เช็คชื่อการฝึกซ้อม</title>
+  <title>FOOTELLIGENCE DATA</title>
   <link rel="icon" href="./assets/logo.png" />
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="./css/styles.css" />
@@ -70,7 +70,11 @@
           <label class="field-label">รหัสผ่าน</label>
           <input id="login-password" type="password" required class="field-input" />
         </div>
+        <button type="button" id="forgot-password-link" class="text-sm text-slate-500 underline hover:text-slate-700">
+          ลืมรหัสผ่าน?
+        </button>
         <p id="login-error" class="text-sm text-red-600"></p>
+        <p id="forgot-password-status" class="text-sm"></p>
         <button type="submit" class="btn btn-primary btn-block">เข้าสู่ระบบ</button>
       </form>
 
@@ -149,6 +153,14 @@
         <p class="text-sm text-red-600 mt-1">เกินเกณฑ์ที่กำหนด (เกิน 3 ครั้ง/เดือน) ควรพูดคุยกับโค้ชเพื่อปรับปรุงมาตรฐานการส่งแผน</p>
       </div>
 
+      <!-- ข้อความที่ผู้ดูแลระบบส่งถึงทีมนี้โดยตรง (เช่น แจ้งนักกีฬาที่มีพัฒนาการดี หรือแจ้งปัญหาของโค้ช) -->
+      <div id="executive-notes-section">
+        <h2 class="section-title mb-3"><span class="icon-badge">📬</span> ข้อความจากผู้ดูแลระบบ</h2>
+        <div id="executive-notes-list" class="space-y-3">
+          <p class="text-sm text-slate-400">กำลังโหลด...</p>
+        </div>
+      </div>
+
       <div class="card card-pad text-center">
         <p class="text-sm text-slate-500 mb-3">
           ดูข้อมูลนักกีฬารายคน ผลการแข่งขัน และรายละเอียดเพิ่มเติมทั้งหมดได้ที่หน้า Dashboard
@@ -196,7 +208,7 @@
         <div class="icon-badge icon-badge-lg">👥</div>
         <div>
           <h2>รายชื่อโค้ชในระบบ</h2>
-          <p>ดูโค้ชทั้งหมด สถานะ % ส่งข้อมูลตรงเวลา และเปลี่ยนทีมได้</p>
+          <p>ดูโค้ชทั้งหมด สถานะ % ส่งข้อมูลตรงเวลา และแก้ไขข้อมูลบัญชีได้</p>
         </div>
       </div>
       <div class="card table-wrap">
@@ -210,7 +222,7 @@
               <th>รุ่นอายุ</th>
               <th>สถานะ</th>
               <th title="เปอร์เซ็นต์ของวันที่ส่งข้อมูลก่อน 20:00 น. เทียบกับจำนวนวันที่บันทึกทั้งหมด">% ตรงเวลา</th>
-              <th>เปลี่ยนทีม</th>
+              <th>จัดการ</th>
             </tr>
           </thead>
           <tbody id="coach-directory-body">
@@ -220,6 +232,74 @@
       </div>
       <p id="admin-status" class="text-sm text-slate-500 w-full"></p>
     </section>
+
+    <!-- ป็อปอัปแก้ไขบัญชีผู้ใช้ (ชื่อ/บทบาท/ทีม/รุ่นอายุ/สถานะ) — เปิดจากปุ่ม "แก้ไขบัญชี" ในตารางรายชื่อโค้ช -->
+    <div id="edit-coach-overlay" class="hidden fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 space-y-4">
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-semibold">แก้ไขบัญชีผู้ใช้</h3>
+          <button id="edit-coach-close-btn" class="btn-icon" aria-label="ปิด">✕</button>
+        </div>
+        <div class="space-y-3">
+          <div>
+            <label class="field-label">ชื่อ</label>
+            <input id="edit-coach-name" type="text" class="field-input w-full" />
+          </div>
+          <div>
+            <label class="field-label">อีเมล (แก้ไขไม่ได้ ผูกกับบัญชีเข้าสู่ระบบจริง)</label>
+            <input id="edit-coach-email" type="text" class="field-input w-full" disabled />
+          </div>
+          <div>
+            <label class="field-label">บทบาท</label>
+            <select id="edit-coach-role" class="field-input w-full">
+              <option value="coach">โค้ช</option>
+              <option value="executive">ผู้บริหารทีม</option>
+              <option value="admin">ผู้ดูแลระบบ</option>
+            </select>
+          </div>
+          <div id="edit-coach-team-wrap">
+            <label class="field-label">ทีม</label>
+            <select id="edit-coach-team" class="field-input w-full"></select>
+          </div>
+          <div id="edit-coach-age-group-wrap">
+            <label class="field-label">รุ่นอายุที่รับผิดชอบ</label>
+            <select id="edit-coach-age-group" class="field-input w-full">
+              <option value="">-- ไม่ระบุ --</option>
+              <option value="U9">U9</option>
+              <option value="U10">U10</option>
+              <option value="U11">U11</option>
+              <option value="U12">U12</option>
+              <option value="U13">U13</option>
+              <option value="U14">U14</option>
+              <option value="U15">U15</option>
+              <option value="U16">U16</option>
+              <option value="U17">U17</option>
+              <option value="U18">U18</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label">สถานะบัญชี</label>
+            <select id="edit-coach-status" class="field-input w-full">
+              <option value="approved">อนุมัติแล้ว</option>
+              <option value="pending">รอการอนุมัติ</option>
+            </select>
+          </div>
+        </div>
+        <div class="pt-3 border-t border-slate-100">
+          <button id="edit-coach-reset-password-btn" type="button" class="btn btn-secondary btn-block">
+            ✉️ ส่งอีเมลรีเซ็ตรหัสผ่านให้บัญชีนี้
+          </button>
+          <p class="text-xs text-slate-400 mt-1">
+            ใช้เมื่อโค้ชลืมรหัสผ่าน — ระบบจะส่งลิงก์ตั้งรหัสผ่านใหม่ไปที่อีเมลของบัญชีนี้โดยตรง ปลอดภัยกว่าการตั้งรหัสผ่านให้เอง
+          </p>
+        </div>
+        <p id="edit-coach-modal-status" class="text-sm"></p>
+        <div class="flex gap-2">
+          <button id="edit-coach-save-btn" class="btn btn-primary flex-1">บันทึก</button>
+          <button id="edit-coach-cancel-btn" class="btn btn-ghost flex-1">ยกเลิก</button>
+        </div>
+      </div>
+    </div>
 
     <!-- ความคืบหน้าการประเมินรายวัน -->
     <section id="admin-progress-section" class="hidden space-y-6">
@@ -422,6 +502,10 @@
             <option value="U17">U17</option>
             <option value="U18">U18</option>
           </select>
+        </div>
+        <div>
+          <label class="field-label">เลือกเดือน</label>
+          <input id="admin-print-month-select" type="month" class="field-input w-full" />
         </div>
         <button id="admin-generate-print-btn" class="btn btn-primary btn-block">สร้างสรุปสำหรับพิมพ์ →</button>
         <p id="admin-print-status" class="text-sm text-red-600 w-full"></p>

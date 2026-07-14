@@ -92,5 +92,14 @@ service cloud.firestore {
       allow update: if isAdmin() || (canManageTeam() && ownsTeam() && request.resource.data.team == myTeam());
       allow delete: if isAdmin() || (canManageTeam() && ownsTeam());
     }
+
+    // ข้อความที่ผู้ดูแลระบบส่งถึงทีม (เช่น แจ้งนักกีฬาที่มีพัฒนาการดี หรือแจ้งปัญหาของโค้ช) — ส่งได้เฉพาะ
+    // ผู้ดูแลระบบเท่านั้น โค้ช/ผู้บริหารทีมของทีมนั้นอ่านได้และแก้ไขได้แค่ทำเครื่องหมายว่าอ่านแล้ว (read: true)
+    match /executiveNotes/{id} {
+      allow read: if isAdmin() || (canViewTeam() && ownsTeam());
+      allow create: if isAdmin();
+      allow update: if isAdmin() || (canViewTeam() && ownsTeam());
+      allow delete: if isAdmin();
+    }
   }
 }

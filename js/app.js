@@ -15,7 +15,12 @@ import {
   teamIconBadge,
   teamLogoImg,
   isTrainingPlanLate,
-  TRAINING_PLAN_LATE_WARNING_THRESHOLD
+  TRAINING_PLAN_LATE_WARNING_THRESHOLD,
+  statCard,
+  matchResultBadge,
+  injurySeverityBadge,
+  injuryStatusBadge,
+  sendExecutiveNote
 } from "./ui-utils.js";
 
 // สถานะที่นับว่า "มาซ้อม" ตาม legend ของ Logbook (A หรือค่าประเมิน 1-4)
@@ -47,6 +52,11 @@ const trainingReportsSection = document.getElementById("training-reports-section
 const trainingReportsBody = document.getElementById("training-reports-body");
 const trainingReportsLocationHeader = document.getElementById("training-reports-location-header");
 const trainingPlanSummaryBody = document.getElementById("training-plan-summary-body");
+const trainingPlanSummaryActionHeader = document.getElementById("training-plan-summary-action-header");
+const matchReportsStatCardsEl = document.getElementById("match-reports-stat-cards");
+const dashboardMatchBody = document.getElementById("dashboard-match-body");
+const injuryReportsStatCardsEl = document.getElementById("injury-reports-stat-cards");
+const dashboardInjuryBody = document.getElementById("dashboard-injury-body");
 const headerAttendanceLink = document.getElementById("header-attendance-link");
 const dashboardBackLink = document.getElementById("dashboard-back-link");
 const hamburgerBtn = document.getElementById("hamburger-btn");
@@ -61,6 +71,8 @@ const navDrawerRoleBadgeEl = document.getElementById("nav-drawer-role-badge");
 const drawerLogoutBtn = document.getElementById("drawer-logout-btn");
 
 let currentViewerRole = null; // "admin" | "coach" | "executive"
+let currentAdminName = null;
+let currentTrainingPlanRows = [];
 
 let currentScopeTeam = null;
 let currentTeamPlayers = [];
@@ -239,15 +251,6 @@ function computeAgeGroupStats(ageGroupGroups, attendanceRecords) {
     result.set(ageGroup, { stats, totals: sumStats(stats), playerCount: groupPlayers.length });
   }
   return result;
-}
-
-function statCard(label, value) {
-  return `
-    <div class="stat-card">
-      <p class="stat-label">${label}</p>
-      <p class="stat-value">${value}</p>
-    </div>
-  `;
 }
 
 const CHART_PALETTE = ["#0f172a", "#10b981", "#f59e0b", "#3b82f6", "#ef4444", "#8b5cf6", "#14b8a6", "#f97316"];
@@ -658,8 +661,12 @@ async function loadTrainingReports(team) {
 // scopeTeam: null = ผู้ดูแลระบบ เห็นทุกทีม / string = โค้ช เห็นเฉพาะทีมตัวเอง
 // ---------- สรุปการส่งแผนการฝึกซ้อมรายวัน (ภาพรวมทุกโค้ช เพื่อจับตาดูโค้ชที่ส่งสายบ่อย) ----------
 async function loadTrainingPlanSummary(scopeTeam) {
+  const isAdminViewer = currentViewerRole === "admin";
+  trainingPlanSummaryActionHeader.classList.toggle("hidden", !isAdminViewer);
+  const colCount = isAdminViewer ? 7 : 6;
+
   trainingPlanSummaryBody.innerHTML =
-    '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>';
+    `<tr><td colspan="${colCount}" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>`;
 
   const snap = scopeTeam
     ? await getDocs(query(collection(db, "trainingPlans"), where("team", "==", scopeTeam)))
@@ -683,21 +690,25 @@ async function loadTrainingPlanSummary(scopeTeam) {
   }
 
   const rows = Array.from(groups.values()).sort((a, b) => b.late - a.late);
+  currentTrainingPlanRows = rows;
 
   if (rows.length === 0) {
     trainingPlanSummaryBody.innerHTML =
-      '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">ยังไม่มีการส่งแผนการฝึกซ้อมในเดือนนี้</td></tr>';
+      `<tr><td colspan="${colCount}" class="px-4 py-6 text-center text-slate-400">ยังไม่มีการส่งแผนการฝึกซ้อมในเดือนนี้</td></tr>`;
     return;
   }
 
   trainingPlanSummaryBody.innerHTML = rows
-    .map((r) => {
+    .map((r, i) => {
       const onTime = r.total - r.late;
       // สายเกินเกณฑ์ (>3 ครั้ง/เดือน) = ต้องปรับปรุงมาตรฐานการส่งแผน
-      const statusBadge =
-        r.late > TRAINING_PLAN_LATE_WARNING_THRESHOLD
-          ? '<span class="badge badge-danger">⚠️ ต้องปรับปรุง</span>'
-          : '<span class="badge badge-success">ปกติ</span>';
+      const needsImprovement = r.late > TRAINING_PLAN_LATE_WARNING_THRESHOLD;
+      const statusBadge = needsImprovement
+        ? '<span class="badge badge-danger">⚠️ ต้องปรับปรุง</span>'
+        : '<span class="badge badge-success">ปกติ</span>';
+      const actionCell = isAdminViewer
+        ? `<td><button type="button" class="btn btn-secondary btn-sm" data-send-coach-index="${i}">📤 แจ้ง</button></td>`
+        : "";
       return `
         <tr>
           <td class="emphasis">${r.coachName}</td>
@@ -706,10 +717,129 @@ async function loadTrainingPlanSummary(scopeTeam) {
           <td class="text-emerald-600 font-medium">${onTime}</td>
           <td class="text-red-500 font-medium">${r.late}</td>
           <td>${statusBadge}</td>
+          ${actionCell}
         </tr>`;
     })
     .join("");
   applyDataLabels(trainingPlanSummaryBody);
+}
+
+// แจ้งผู้บริหารทีมว่าโค้ชคนนี้ส่งแผนสายเกินเกณฑ์ (ปุ่มนี้แสดงเฉพาะผู้ดูแลระบบ) — ใช้ event delegation
+// เพราะแถวถูกสร้างใหม่ทุกครั้งที่โหลดข้อมูล
+trainingPlanSummaryBody.addEventListener("click", async (e) => {
+  const btn = e.target.closest("[data-send-coach-index]");
+  if (!btn) return;
+  const r = currentTrainingPlanRows[Number(btn.dataset.sendCoachIndex)];
+  if (!r) return;
+  const onTime = r.total - r.late;
+  const defaultMessage = `โค้ช ${r.coachName} (ทีม ${r.team}) ส่งแผนการฝึกซ้อมสาย ${r.late} ครั้งจากทั้งหมด ${r.total} ครั้งในเดือนนี้ (ตรงเวลา ${onTime} ครั้ง) ควรพูดคุยเรื่องมาตรฐานการส่งแผน`;
+  const message = prompt("ข้อความที่จะส่งถึงผู้บริหารทีม:", defaultMessage);
+  if (message === null || !message.trim()) return;
+  try {
+    await sendExecutiveNote({
+      team: r.team,
+      type: "coach",
+      refId: null,
+      refLabel: r.coachName,
+      message: message.trim(),
+      createdBy: currentAdminName
+    });
+    alert("ส่งข้อความถึงผู้บริหารทีมแล้ว ✓");
+  } catch (err) {
+    console.error(err);
+    alert("ส่งไม่สำเร็จ: " + err.message);
+  }
+});
+
+// ---------- รายงานผลการแข่งขัน + รายงานอาการบาดเจ็บ (ภาพรวมทุกทีม หรือทีมที่เลือก) ----------
+async function loadMatchAndInjuryReports(scopeTeam) {
+  matchReportsStatCardsEl.innerHTML = "";
+  dashboardMatchBody.innerHTML =
+    '<tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>';
+  injuryReportsStatCardsEl.innerHTML = "";
+  dashboardInjuryBody.innerHTML =
+    '<tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>';
+
+  const [matchSnap, injurySnap] = await Promise.all([
+    scopeTeam
+      ? getDocs(query(collection(db, "matchReports"), where("team", "==", scopeTeam)))
+      : getDocs(collection(db, "matchReports")),
+    scopeTeam
+      ? getDocs(query(collection(db, "injuryReports"), where("team", "==", scopeTeam)))
+      : getDocs(collection(db, "injuryReports"))
+  ]);
+
+  const matches = [];
+  matchSnap.forEach((d) => matches.push(d.data()));
+  matches.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+
+  const winCount = matches.filter((m) => m.result === "ชนะ").length;
+  const loseCount = matches.filter((m) => m.result === "แพ้").length;
+  const drawCount = matches.filter((m) => m.result === "เสมอ").length;
+
+  matchReportsStatCardsEl.innerHTML =
+    statCard("แข่งทั้งหมด", matches.length) +
+    statCard("ชนะ", winCount) +
+    statCard("แพ้", loseCount) +
+    statCard("เสมอ", drawCount);
+
+  if (matches.length === 0) {
+    dashboardMatchBody.innerHTML =
+      '<tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">ยังไม่มีรายการแข่งขัน</td></tr>';
+  } else {
+    dashboardMatchBody.innerHTML = matches
+      .map(
+        (m) => `
+        <tr>
+          <td class="emphasis">${teamLogoImg(m.team)}${m.team ?? "-"}</td>
+          <td>${m.date ?? "-"}</td>
+          <td>${m.opponent ?? "-"}</td>
+          <td>${m.competitionType ?? "-"}</td>
+          <td>${m.ageGroup ?? "-"}</td>
+          <td>${matchResultBadge(m.result)}</td>
+          <td class="emphasis">${m.scoreUs} - ${m.scoreThem}</td>
+          <td>${m.competition ?? "-"}</td>
+        </tr>`
+      )
+      .join("");
+    applyDataLabels(dashboardMatchBody);
+  }
+
+  const injuries = [];
+  injurySnap.forEach((d) => injuries.push(d.data()));
+  injuries.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+
+  const activeCount = injuries.filter((i) => i.status !== "หายแล้ว").length;
+  const recoveredCount = injuries.filter((i) => i.status === "หายแล้ว").length;
+  const severeCount = injuries.filter((i) => i.severity === "รุนแรง").length;
+
+  injuryReportsStatCardsEl.innerHTML =
+    statCard("รายการทั้งหมด", injuries.length) +
+    statCard("ยังไม่หาย", activeCount) +
+    statCard("หายแล้ว", recoveredCount) +
+    statCard("รุนแรง", severeCount);
+
+  if (injuries.length === 0) {
+    dashboardInjuryBody.innerHTML =
+      '<tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">ไม่มีรายงานอาการบาดเจ็บ</td></tr>';
+  } else {
+    dashboardInjuryBody.innerHTML = injuries
+      .map(
+        (inj) => `
+        <tr>
+          <td class="emphasis">${teamLogoImg(inj.team)}${inj.team ?? "-"}</td>
+          <td>${inj.date ?? "-"}</td>
+          <td class="emphasis">${inj.playerName ?? "-"}</td>
+          <td>${inj.ageGroup ?? "-"}</td>
+          <td>${inj.description ?? "-"}</td>
+          <td>${injurySeverityBadge(inj.severity)}</td>
+          <td>${injuryStatusBadge(inj.status)}</td>
+          <td>${inj.expectedReturn ?? "-"}</td>
+        </tr>`
+      )
+      .join("");
+    applyDataLabels(dashboardInjuryBody);
+  }
 }
 
 async function loadDashboard(scopeTeam) {
@@ -741,6 +871,7 @@ async function loadDashboard(scopeTeam) {
     setStatus(`โหลดข้อมูลสำเร็จ • ผู้เล่น ${players.length} คน • ${playerGroups.size} ทีม`);
 
     loadTrainingPlanSummary(scopeTeam);
+    loadMatchAndInjuryReports(scopeTeam);
 
     ageProgressSection.classList.toggle("hidden", !scopeTeam);
     trainingReportsSection.classList.toggle("hidden", !scopeTeam);
@@ -888,6 +1019,7 @@ onAuthStateChanged(auth, async (user) => {
 
     loginGate.classList.add("hidden");
     currentViewerRole = data.role;
+    if (currentViewerRole === "admin") currentAdminName = data.name || user.email;
 
     // เมนู ☰/🔔 แสดงให้ทุกบทบาทที่ได้รับอนุมัติแล้ว พร้อมสะท้อนชื่อ/อีเมล/บทบาทเข้าไปในลิ้นชัก
     hamburgerBtn.classList.remove("hidden");

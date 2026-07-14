@@ -1,7 +1,7 @@
 import { collection, getDocs, getDoc, doc } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import { db, auth } from "./firebase-init.js";
-import { SCORE_CATEGORIES, computeAvgScore, applyDataLabels, teamLogoImg } from "./ui-utils.js";
+import { SCORE_CATEGORIES, computeAvgScore, applyDataLabels, teamLogoImg, sendExecutiveNote } from "./ui-utils.js";
 
 const TEAMS = ["KHAMPHEE FOOTBALL", "THAWEE SC", "THAMMASATHIT"];
 // ต้องมีข้อมูลคะแนนอย่างน้อยเท่านี้ครั้งจึงจะคำนวณแนวโน้ม "ช่วงแรก vs ช่วงหลัง" ได้อย่างมีความหมาย
@@ -22,6 +22,8 @@ const devTableBody = document.getElementById("dev-table-body");
 
 let allPlayers = [];
 let attendanceByPlayerId = new Map();
+let currentDevRows = [];
+let currentAdminName = null;
 
 function setStatus(message, isError = false) {
   statusEl.textContent = message;
@@ -128,9 +130,10 @@ function renderSparkline(trend) {
 }
 
 function renderTable(rows) {
+  currentDevRows = rows;
   if (rows.length === 0) {
     devTableBody.innerHTML =
-      `<tr><td colspan="9" class="px-4 py-6 text-center text-slate-400">ยังไม่มีนักกีฬาที่มีข้อมูลบันทึกอย่างน้อย ${MIN_RECORDS} ครั้งในเงื่อนไขที่เลือก</td></tr>`;
+      `<tr><td colspan="10" class="px-4 py-6 text-center text-slate-400">ยังไม่มีนักกีฬาที่มีข้อมูลบันทึกอย่างน้อย ${MIN_RECORDS} ครั้งในเงื่อนไขที่เลือก</td></tr>`;
     return;
   }
   devTableBody.innerHTML = rows
@@ -149,6 +152,9 @@ function renderTable(rows) {
           <td class="${deltaClass}">${sign}${r.delta.toFixed(2)}</td>
           <td>${r.count}</td>
           <td>${renderSparkline(r.trend)}</td>
+          <td>
+            <button type="button" class="btn btn-secondary btn-sm" data-send-player-id="${r.player.id}">📤</button>
+          </td>
         </tr>`;
     })
     .join("");
@@ -167,6 +173,33 @@ function refresh() {
 devRefreshBtn.addEventListener("click", refresh);
 devTeamSelect.addEventListener("change", refresh);
 devAgeGroupSelect.addEventListener("change", refresh);
+
+// ส่งข้อมูลนักกีฬาแถวนี้ไปแจ้งผู้บริหารทีมโดยตรง — ใช้ event delegation เพราะแถวถูกสร้างใหม่ทุกครั้งที่ refresh()
+devTableBody.addEventListener("click", async (e) => {
+  const btn = e.target.closest("[data-send-player-id]");
+  if (!btn) return;
+  const row = currentDevRows.find((r) => r.player.id === btn.dataset.sendPlayerId);
+  if (!row) return;
+  const label = row.player.nickname ?? row.player.fullName ?? "-";
+  const sign = row.delta >= 0 ? "+" : "";
+  const defaultMessage = `นักกีฬาที่มีพัฒนาการโดดเด่น: ${label} (ทีม ${row.player.team ?? "-"}) — คะแนนเฉลี่ยเปลี่ยนแปลง ${sign}${row.delta.toFixed(2)} จากช่วงแรกของข้อมูลที่มี`;
+  const message = prompt("ข้อความที่จะส่งถึงผู้บริหารทีม:", defaultMessage);
+  if (message === null || !message.trim()) return;
+  try {
+    await sendExecutiveNote({
+      team: row.player.team,
+      type: "player",
+      refId: row.player.id,
+      refLabel: label,
+      message: message.trim(),
+      createdBy: currentAdminName
+    });
+    alert("ส่งข้อความถึงผู้บริหารทีมแล้ว ✓");
+  } catch (err) {
+    console.error(err);
+    alert("ส่งไม่สำเร็จ: " + err.message);
+  }
+});
 
 async function loadAllData() {
   setStatus("กำลังโหลดข้อมูล...");
@@ -206,6 +239,7 @@ onAuthStateChanged(auth, async (user) => {
       return;
     }
 
+    currentAdminName = data.name || user.email;
     accessGate.classList.add("hidden");
     developmentContent.classList.remove("hidden");
     await loadAllData();

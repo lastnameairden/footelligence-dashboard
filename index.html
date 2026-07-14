@@ -198,10 +198,61 @@
               <th>ส่งตรงเวลา</th>
               <th>ส่งสาย</th>
               <th>สถานะ</th>
+              <th id="training-plan-summary-action-header" class="hidden">แจ้งผู้บริหารทีม</th>
             </tr>
           </thead>
           <tbody id="training-plan-summary-body">
-            <tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
+            <tr><td colspan="7" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- รายงานผลการแข่งขัน -->
+    <section>
+      <h2 class="section-title mb-4"><span class="icon-badge">🏆</span> รายงานผลการแข่งขัน</h2>
+      <div id="match-reports-stat-cards" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4"></div>
+      <div class="card table-wrap">
+        <table class="pro-table">
+          <thead>
+            <tr>
+              <th>ทีม</th>
+              <th>วันที่</th>
+              <th>คู่แข่ง</th>
+              <th>ประเภท</th>
+              <th>รุ่นอายุ</th>
+              <th>ผล</th>
+              <th>สกอร์</th>
+              <th>รายการแข่งขัน</th>
+            </tr>
+          </thead>
+          <tbody id="dashboard-match-body">
+            <tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- รายงานอาการบาดเจ็บ -->
+    <section>
+      <h2 class="section-title mb-4"><span class="icon-badge">🩹</span> รายงานอาการบาดเจ็บ</h2>
+      <div id="injury-reports-stat-cards" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4"></div>
+      <div class="card table-wrap">
+        <table class="pro-table">
+          <thead>
+            <tr>
+              <th>ทีม</th>
+              <th>วันที่</th>
+              <th>นักกีฬา</th>
+              <th>รุ่นอายุ</th>
+              <th>อาการ</th>
+              <th>ความรุนแรง</th>
+              <th>สถานะ</th>
+              <th>คาดว่าจะกลับมา</th>
+            </tr>
+          </thead>
+          <tbody id="dashboard-injury-body">
+            <tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
           </tbody>
         </table>
       </div>

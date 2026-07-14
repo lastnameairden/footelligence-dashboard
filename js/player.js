@@ -8,7 +8,17 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import { db, auth } from "./firebase-init.js";
-import { applyDataLabels, SCORE_CATEGORIES, computeAvgScore, teamLogoImg } from "./ui-utils.js";
+import {
+  applyDataLabels,
+  SCORE_CATEGORIES,
+  computeAvgScore,
+  teamLogoImg,
+  matchResultBadge,
+  injurySeverityBadge,
+  injuryStatusBadge,
+  statCard,
+  sendExecutiveNote
+} from "./ui-utils.js";
 
 const STATUS_LABELS = { A: "มา", I: "บาดเจ็บ", R: "พักฟื้น", P: "ลา" };
 const CHART_PALETTE = ["#0f172a", "#10b981", "#f59e0b", "#3b82f6"];
@@ -25,6 +35,10 @@ const categoryBars = document.getElementById("category-bars");
 const attendanceHistoryBody = document.getElementById("attendance-history-body");
 const matchHistoryBody = document.getElementById("match-history-body");
 const injuryHistoryBody = document.getElementById("injury-history-body");
+const sendToExecutiveBtn = document.getElementById("send-to-executive-btn");
+
+let currentPlayer = null;
+let currentAdminName = null;
 
 function setStatus(message, isError = false) {
   statusEl.textContent = message;
@@ -36,15 +50,6 @@ function showAccessGate(message) {
   accessGate.classList.remove("hidden");
   playerContent.classList.add("hidden");
   setStatus("");
-}
-
-function statCard(label, value) {
-  return `
-    <div class="stat-card">
-      <p class="stat-label">${label}</p>
-      <p class="stat-value">${value}</p>
-    </div>
-  `;
 }
 
 function calcAge(birthday) {
@@ -186,12 +191,6 @@ function renderAttendanceHistory(records) {
   applyDataLabels(attendanceHistoryBody);
 }
 
-function matchResultBadge(result) {
-  if (result === "ชนะ") return '<span class="badge badge-success">ชนะ</span>';
-  if (result === "แพ้") return '<span class="badge badge-danger">แพ้</span>';
-  return '<span class="badge badge-neutral">เสมอ</span>';
-}
-
 function renderMatchHistory(reports) {
   if (reports.length === 0) {
     matchHistoryBody.innerHTML =
@@ -214,20 +213,6 @@ function renderMatchHistory(reports) {
   applyDataLabels(matchHistoryBody);
 }
 
-function injurySeverityBadge(severity) {
-  if (severity === "รุนแรง") return `<span class="badge badge-danger">${severity}</span>`;
-  if (severity === "ปานกลาง") return `<span class="badge badge-warning">${severity}</span>`;
-  return `<span class="badge badge-neutral">${severity ?? "-"}</span>`;
-}
-
-function injuryStatusBadge(status) {
-  if (status === "หายแล้ว") return '<span class="badge badge-success">หายแล้ว</span>';
-  if (status === "กำลังพักฟื้น") return '<span class="badge badge-warning">กำลังพักฟื้น</span>';
-  if (status === "บาดเจ็บขณะแข่งขัน" || status === "บาดเจ็บขณะฝึกซ้อม") {
-    return `<span class="badge badge-danger">${status}</span>`;
-  }
-  return `<span class="badge badge-neutral">${status ?? "-"}</span>`;
-}
 
 function renderInjuryHistory(reports) {
   if (reports.length === 0) {
@@ -259,6 +244,7 @@ async function loadPlayerData(playerId) {
     return;
   }
   const player = { id: playerDoc.id, ...playerDoc.data() };
+  currentPlayer = player;
 
   renderPlayerInfo(player);
 
@@ -307,6 +293,30 @@ async function loadPlayerData(playerId) {
   setStatus(`โหลดข้อมูลสำเร็จ • บันทึกทั้งหมด ${totalCount} ครั้ง`);
 }
 
+// ผู้ดูแลระบบส่งข้อมูลนักกีฬาคนนี้ (เช่น พัฒนาการที่ดี) ไปแจ้งผู้บริหารทีมโดยตรง — ใช้ prompt() ธรรมดา
+// (ไม่สร้าง modal ใหม่) ให้แก้ข้อความเริ่มต้นได้ก่อนส่งจริง สอดคล้องกับ confirm() ที่ใช้อยู่แล้วทั่วแอป
+sendToExecutiveBtn.addEventListener("click", async () => {
+  if (!currentPlayer) return;
+  const label = currentPlayer.nickname || currentPlayer.fullName || "-";
+  const defaultMessage = `นักกีฬาที่น่าจับตามอง: ${label} (ทีม ${currentPlayer.team ?? "-"}) — ลองดูรายละเอียดเพิ่มเติมที่หน้าข้อมูลนักกีฬา`;
+  const message = prompt("ข้อความที่จะส่งถึงผู้บริหารทีม:", defaultMessage);
+  if (message === null || !message.trim()) return;
+  try {
+    await sendExecutiveNote({
+      team: currentPlayer.team,
+      type: "player",
+      refId: currentPlayer.id,
+      refLabel: label,
+      message: message.trim(),
+      createdBy: currentAdminName
+    });
+    alert("ส่งข้อความถึงผู้บริหารทีมแล้ว ✓");
+  } catch (err) {
+    console.error(err);
+    alert("ส่งไม่สำเร็จ: " + err.message);
+  }
+});
+
 // ใช้ URL hash (#id=...) แทน query string เพราะเซิร์ฟเวอร์ทดสอบในเครื่อง (serve, clean-url) จะ redirect
 // "player.html" ไปเป็น "player" และตัด query string ทิ้งระหว่างทาง แต่ไม่ตัด hash — ใช้ได้ทั้งในเครื่องและบน Vercel
 function getPlayerIdFromUrl() {
@@ -332,6 +342,11 @@ onAuthStateChanged(auth, async (user) => {
     if (!data || data.status !== "approved") {
       showAccessGate("บัญชีนี้ยังไม่ได้รับการอนุมัติจากผู้ดูแลระบบ กรุณารอหรือติดต่อผู้ดูแลระบบ");
       return;
+    }
+
+    if (data.role === "admin") {
+      currentAdminName = data.name || user.email;
+      sendToExecutiveBtn.classList.remove("hidden");
     }
 
     await loadPlayerData(playerId);

@@ -47,6 +47,15 @@
         <button id="print-btn" class="btn btn-primary">🖨️ พิมพ์ / บันทึกเป็น PDF</button>
       </div>
 
+      <!-- เรียกดูสรุปของเดือนอื่นได้โดยไม่ต้องย้อนกลับไปหน้าเช็คชื่อ — ทีม/รุ่นอายุยังคงเดิม เปลี่ยนแค่เดือน -->
+      <div class="card card-pad flex items-end gap-3 flex-wrap no-print">
+        <div>
+          <label class="field-label">เรียกดูเดือนอื่น (ทีม/รุ่นอายุเดิม)</label>
+          <input id="print-month-select" type="month" class="field-input w-auto" />
+        </div>
+        <button id="print-month-load-btn" class="btn btn-secondary">โหลดสรุปเดือนนี้</button>
+      </div>
+
       <div class="card card-pad text-center">
         <img src="./assets/logo.png" alt="Footelligence" class="w-14 h-14 object-contain mx-auto mb-2" />
         <h2 class="text-xl font-bold tracking-tight">FOOTELLIGENCE DATA — สรุปผลการฝึกซ้อม</h2>
@@ -75,6 +84,73 @@
             <tr><td colspan="9" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
           </tbody>
         </table>
+      </div>
+
+      <!-- สรุปการส่งแผนการฝึกซ้อมรายวัน -->
+      <div>
+        <h2 class="section-title mb-3"><span class="icon-badge">📋</span> สรุปการส่งแผนการฝึกซ้อมรายวัน</h2>
+        <div id="print-training-plan-cards" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-3"></div>
+        <div class="card table-wrap">
+          <table class="pro-table">
+            <thead>
+              <tr>
+                <th>วันที่</th>
+                <th>ประเภทการฝึก</th>
+                <th>หัวข้อหลัก (Main part)</th>
+                <th>สถานะการส่ง</th>
+              </tr>
+            </thead>
+            <tbody id="print-training-plan-body">
+              <tr><td colspan="4" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- รายงานผลการแข่งขัน -->
+      <div>
+        <h2 class="section-title mb-3"><span class="icon-badge">🏆</span> รายงานผลการแข่งขัน</h2>
+        <div id="print-match-cards" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-3"></div>
+        <div class="card table-wrap">
+          <table class="pro-table">
+            <thead>
+              <tr>
+                <th>วันที่</th>
+                <th>คู่แข่ง</th>
+                <th>ประเภท</th>
+                <th>ผล</th>
+                <th>สกอร์</th>
+                <th>รายการแข่งขัน</th>
+              </tr>
+            </thead>
+            <tbody id="print-match-body">
+              <tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- รายงานอาการบาดเจ็บ -->
+      <div>
+        <h2 class="section-title mb-3"><span class="icon-badge">🩹</span> รายงานอาการบาดเจ็บ</h2>
+        <div id="print-injury-cards" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-3"></div>
+        <div class="card table-wrap">
+          <table class="pro-table">
+            <thead>
+              <tr>
+                <th>วันที่</th>
+                <th>นักกีฬา</th>
+                <th>อาการ</th>
+                <th>ความรุนแรง</th>
+                <th>สถานะ</th>
+                <th>คาดว่าจะกลับมา</th>
+              </tr>
+            </thead>
+            <tbody id="print-injury-body">
+              <tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   </main>

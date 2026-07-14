@@ -15,7 +15,8 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  signOut
+  signOut,
+  sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import { db, auth } from "./firebase-init.js";
 import {
@@ -26,7 +27,10 @@ import {
   teamLogoImg,
   isTrainingPlanLate,
   TRAINING_PLAN_LATE_WARNING_THRESHOLD,
-  statCard
+  statCard,
+  matchResultBadge,
+  injurySeverityBadge,
+  injuryStatusBadge
 } from "./ui-utils.js";
 
 const STATUS_OPTIONS = ["A", "I", "R", "P"];
@@ -104,6 +108,8 @@ const reportStatus = document.getElementById("report-status");
 const backButtons = document.querySelectorAll("[data-back]");
 const loginForm = document.getElementById("login-form");
 const loginError = document.getElementById("login-error");
+const forgotPasswordLink = document.getElementById("forgot-password-link");
+const forgotPasswordStatus = document.getElementById("forgot-password-status");
 const tabLogin = document.getElementById("tab-login");
 const tabRegister = document.getElementById("tab-register");
 const registerForm = document.getElementById("register-form");
@@ -118,6 +124,7 @@ const executiveStatusEl = document.getElementById("executive-status");
 const executiveStatCards = document.getElementById("executive-stat-cards");
 const executiveLateWarning = document.getElementById("executive-late-warning");
 const executiveLateCountEl = document.getElementById("executive-late-count");
+const executiveNotesList = document.getElementById("executive-notes-list");
 const coachNameEl = document.getElementById("coach-name");
 const coachEmailEl = document.getElementById("coach-email");
 const coachTeamEl = document.getElementById("coach-team");
@@ -144,6 +151,7 @@ const adminDashboardTeamSelect = document.getElementById("admin-dashboard-team-s
 const adminViewDashboardBtn = document.getElementById("admin-view-dashboard-btn");
 const adminPrintTeamSelect = document.getElementById("admin-print-team-select");
 const adminPrintAgeGroupSelect = document.getElementById("admin-print-age-group-select");
+const adminPrintMonthSelect = document.getElementById("admin-print-month-select");
 const adminGeneratePrintBtn = document.getElementById("admin-generate-print-btn");
 const adminPrintStatus = document.getElementById("admin-print-status");
 const adminStatus = document.getElementById("admin-status");
@@ -172,6 +180,20 @@ const addPlayerSubmitBtn = document.getElementById("add-player-submit-btn");
 const cancelEditPlayerBtn = document.getElementById("cancel-edit-player-btn");
 const playerListBody = document.getElementById("player-list-body");
 const coachDirectoryBody = document.getElementById("coach-directory-body");
+const editCoachOverlay = document.getElementById("edit-coach-overlay");
+const editCoachCloseBtn = document.getElementById("edit-coach-close-btn");
+const editCoachNameInput = document.getElementById("edit-coach-name");
+const editCoachEmailInput = document.getElementById("edit-coach-email");
+const editCoachRoleSelect = document.getElementById("edit-coach-role");
+const editCoachTeamWrap = document.getElementById("edit-coach-team-wrap");
+const editCoachTeamSelect = document.getElementById("edit-coach-team");
+const editCoachAgeGroupWrap = document.getElementById("edit-coach-age-group-wrap");
+const editCoachAgeGroupSelect = document.getElementById("edit-coach-age-group");
+const editCoachStatusSelect = document.getElementById("edit-coach-status");
+const editCoachModalStatus = document.getElementById("edit-coach-modal-status");
+const editCoachSaveBtn = document.getElementById("edit-coach-save-btn");
+const editCoachResetPasswordBtn = document.getElementById("edit-coach-reset-password-btn");
+const editCoachCancelBtn = document.getElementById("edit-coach-cancel-btn");
 const progressDateInput = document.getElementById("progress-date-input");
 const progressRefreshBtn = document.getElementById("progress-refresh-btn");
 const progressTableBody = document.getElementById("progress-table-body");
@@ -184,6 +206,10 @@ let currentSessionId = null;
 let currentSessionData = null;
 let currentAttendanceMap = new Map();
 let myTeam = null;
+// ชื่อ/อีเมลของบัญชีผู้ดูแลระบบเอง เก็บไว้ตอนล็อกอิน เพื่อใช้คืนค่ากลับตอนออกจากโหมดสวมบทบาท (โค้ช/ผู้บริหารทีม)
+// เพราะระหว่างสวมบทบาทจะเขียนทับ coachNameEl/coachEmailEl ด้วยข้อมูลของโค้ช/ผู้บริหารทีมที่สวมบทบาทอยู่
+let adminOwnName = null;
+let adminOwnEmail = null;
 let myCoachName = null;
 let myAgeGroup = null; // รุ่นอายุที่โค้ชคนนี้รับผิดชอบ (ถ้ามี) — ล็อกช่องเลือกรุ่นอายุตอนเพิ่มนักกีฬาให้เหลือรุ่นเดียว
 // จำหน้าจอผู้ดูแลระบบที่พาเข้ามาจัดการทีม เพื่อให้รายการ "กลับแผงควบคุมผู้ดูแลระบบ" ใน nav drawer
@@ -227,6 +253,29 @@ loginForm.addEventListener("submit", async (e) => {
     await signInWithEmailAndPassword(auth, email, password);
   } catch (err) {
     loginError.textContent = "เข้าสู่ระบบไม่สำเร็จ: " + (err.code ? authErrorMessage(err) : err.message);
+  }
+});
+
+// ---------- ลืมรหัสผ่าน (โค้ชกดเองจากหน้าเข้าสู่ระบบ) ----------
+// ใช้ระบบส่งลิงก์รีเซ็ตรหัสผ่านทางอีเมลของ Firebase Auth เอง (ปลอดภัยกว่าให้ผู้ดูแลระบบตั้งรหัสผ่านแทน
+// เพราะไม่มีใครนอกจากเจ้าของอีเมลนั้นเห็นรหัสผ่านใหม่เลย) ใช้อีเมลจากช่องกรอกด้านบนของฟอร์มเข้าสู่ระบบ
+forgotPasswordLink.addEventListener("click", async () => {
+  const email = document.getElementById("login-identifier").value.trim();
+  forgotPasswordStatus.textContent = "";
+  if (!email) {
+    forgotPasswordStatus.textContent = 'กรุณากรอกอีเมลในช่องด้านบนก่อน แล้วกด "ลืมรหัสผ่าน?" อีกครั้ง';
+    forgotPasswordStatus.className = "text-sm text-red-600";
+    return;
+  }
+  try {
+    forgotPasswordStatus.textContent = "กำลังส่งอีเมล...";
+    forgotPasswordStatus.className = "text-sm text-slate-500";
+    await sendPasswordResetEmail(auth, email);
+    forgotPasswordStatus.textContent = `ส่งลิงก์ตั้งรหัสผ่านใหม่ไปที่ ${email} แล้ว กรุณาตรวจสอบกล่องจดหมาย (รวมถึงถังขยะ/สแปม)`;
+    forgotPasswordStatus.className = "text-sm text-emerald-600";
+  } catch (err) {
+    forgotPasswordStatus.textContent = "ส่งอีเมลไม่สำเร็จ: " + (err.code ? authErrorMessage(err) : err.message);
+    forgotPasswordStatus.className = "text-sm text-red-600";
   }
 });
 
@@ -379,10 +428,13 @@ function exitTeamManagementToAdminPanel() {
   myTeam = null;
   adminReturnSection = null;
   adminViewingAs = null;
-  // สลับป้ายบทบาทกลับเป็น "ผู้ดูแลระบบ" ตามเดิม (ตรงข้ามกับที่สลับเป็น "โค้ช"/"ผู้บริหารทีม" ไว้ตอนเข้าโหมด
-  // สวมบทบาท ผ่าน enterTeamManagementMode / enterExecutiveViewMode)
+  // สลับป้ายบทบาท + ชื่อ/อีเมลกลับเป็นของผู้ดูแลระบบเองตามเดิม (ตรงข้ามกับที่เขียนทับด้วยข้อมูลของโค้ช/
+  // ผู้บริหารทีมที่สวมบทบาทไว้ตอนเข้า enterTeamManagementMode / enterExecutiveViewMode)
   coachRoleBadgeEl.textContent = "ผู้ดูแลระบบ";
   coachRoleBadgeEl.className = "badge badge-info";
+  coachNameEl.textContent = adminOwnName;
+  coachEmailEl.textContent = adminOwnEmail;
+  coachStatusBadgeEl.innerHTML = '<span class="badge badge-success">อนุมัติแล้ว</span>';
   coachTeamEl.textContent = "เข้าถึงได้ทุกทีม";
   coachAgeGroupsWrap.classList.add("hidden");
   renderDrawerItems();
@@ -579,6 +631,9 @@ function openAdminPrintSection() {
   adminPrintSection.classList.remove("hidden");
   populateTeamSelect(adminPrintTeamSelect, null);
   adminPrintAgeGroupSelect.value = "__ALL__";
+  if (!adminPrintMonthSelect.value) {
+    adminPrintMonthSelect.value = new Date().toISOString().slice(0, 7); // "YYYY-MM" — ค่าเริ่มต้นเป็นเดือนนี้
+  }
   adminPrintStatus.textContent = "";
 }
 
@@ -588,11 +643,20 @@ adminGeneratePrintBtn.addEventListener("click", () => {
     adminPrintStatus.textContent = "กรุณาเลือกทีมก่อน";
     return;
   }
+  const month = adminPrintMonthSelect.value;
+  if (!month) {
+    adminPrintStatus.textContent = "กรุณาเลือกเดือนก่อน";
+    return;
+  }
   const ageGroup = adminPrintAgeGroupSelect.value;
   adminPrintStatus.textContent = "";
-  // ใช้ path เต็ม "/print.html" (มีนามสกุลไฟล์) เพราะ Vercel (โฮสต์จริง) ไม่รองรับ path
-  // แบบไม่มีนามสกุลอัตโนมัติเหมือนเซิร์ฟเวอร์ทดสอบในเครื่อง (จะขึ้น 404) — ไฟล์ .html ยิงตรงได้ทุกที่
-  window.location.href = `${window.location.origin}/print.html?team=${encodeURIComponent(team)}&ageGroup=${encodeURIComponent(ageGroup)}`;
+  // ใช้ path เต็ม "/print.html" (มีนามสกุลไฟล์) เพราะ Vercel (โฮสต์จริง) ไม่รองรับ path แบบไม่มีนามสกุล
+  // อัตโนมัติเหมือนเซิร์ฟเวอร์ทดสอบในเครื่อง (จะขึ้น 404) — ไฟล์ .html ยิงตรงได้ทุกที่ ส่วนพารามิเตอร์ใช้ URL
+  // hash (#) แทน query string (?) เพราะเซิร์ฟเวอร์ทดสอบในเครื่อง (serve, clean-url) จะ redirect
+  // "print.html" ไปเป็น "print" และตัด query string ทิ้งระหว่างทาง แต่ไม่ตัด hash — ใช้ได้ทั้งในเครื่องและบน Vercel
+  window.location.href =
+    `${window.location.origin}/print.html#team=${encodeURIComponent(team)}` +
+    `&ageGroup=${encodeURIComponent(ageGroup)}&month=${encodeURIComponent(month)}`;
 });
 
 // หน้าแผงควบคุมแบบการ์ด (admin-menu-section) ถูกยกเลิกไปแล้ว — ปุ่ม "← กลับหน้า Dashboard" ในแต่ละ
@@ -849,41 +913,112 @@ async function loadCoachDirectory() {
       `<td>${c.role === "coach" ? c.ageGroup ?? "-" : "-"}</td><td>${statusBadge}</td><td>${c.role === "admin" ? "-" : percentText}</td>`
     );
 
-    const reassignTd = document.createElement("td");
-    reassignTd.className = "space-x-2";
-    if (c.role !== "admin") {
-      const teamSelect = document.createElement("select");
-      teamSelect.className = "field-input w-40 inline-block";
-      populateTeamSelect(teamSelect, null);
-      if (c.team) teamSelect.value = c.team;
-      const saveBtn = document.createElement("button");
-      saveBtn.textContent = "บันทึก";
-      saveBtn.className = "btn btn-secondary btn-sm";
-      saveBtn.addEventListener("click", () => reassignCoachTeam(c.id, teamSelect.value));
-      reassignTd.appendChild(teamSelect);
-      reassignTd.appendChild(saveBtn);
-    } else {
-      reassignTd.textContent = "-";
-    }
-    tr.appendChild(reassignTd);
+    const actionTd = document.createElement("td");
+    const editBtn = document.createElement("button");
+    editBtn.textContent = "แก้ไขบัญชี";
+    editBtn.className = "btn btn-secondary btn-sm";
+    editBtn.addEventListener("click", () => openEditCoachModal(c));
+    actionTd.appendChild(editBtn);
+    tr.appendChild(actionTd);
 
     coachDirectoryBody.appendChild(tr);
   }
   applyDataLabels(coachDirectoryBody);
 }
 
-async function reassignCoachTeam(coachId, team) {
+// ---------- ผู้ดูแลระบบ: แก้ไขบัญชีผู้ใช้คนอื่น (ชื่อ/บทบาท/ทีม/รุ่นอายุ/สถานะ) ----------
+// Firestore rules อนุญาต isAdmin() ให้ update เอกสาร coaches ได้ทุกฟิลด์อยู่แล้ว (allow update: if isAdmin();)
+// จึงไม่ต้องแก้ rules เพิ่ม — อีเมลปิดแก้ไขไว้เพราะเป็นบัญชี Firebase Auth จริง แก้แค่ฟิลด์ใน Firestore
+// จะทำให้ข้อมูลไม่ตรงกับอีเมลที่ใช้ล็อกอินจริง
+let editingCoachAccountId = null;
+
+function updateEditCoachFieldVisibility() {
+  const role = editCoachRoleSelect.value;
+  editCoachTeamWrap.classList.toggle("hidden", role === "admin");
+  editCoachAgeGroupWrap.classList.toggle("hidden", role !== "coach");
+}
+
+function openEditCoachModal(c) {
+  editingCoachAccountId = c.id;
+  editCoachNameInput.value = c.name || "";
+  editCoachEmailInput.value = c.email || "";
+  editCoachRoleSelect.value = c.role || "coach";
+  populateTeamSelect(editCoachTeamSelect, "-- ไม่ระบุทีม --");
+  editCoachTeamSelect.value = c.team || "";
+  editCoachAgeGroupSelect.value = c.ageGroup || "";
+  editCoachStatusSelect.value = c.status || "pending";
+  updateEditCoachFieldVisibility();
+  editCoachModalStatus.textContent = "";
+  editCoachOverlay.classList.remove("hidden");
+}
+
+function closeEditCoachModal() {
+  editCoachOverlay.classList.add("hidden");
+  editingCoachAccountId = null;
+}
+
+editCoachRoleSelect.addEventListener("change", updateEditCoachFieldVisibility);
+editCoachCloseBtn.addEventListener("click", closeEditCoachModal);
+editCoachCancelBtn.addEventListener("click", closeEditCoachModal);
+editCoachOverlay.addEventListener("click", (e) => {
+  if (e.target === editCoachOverlay) closeEditCoachModal();
+});
+
+editCoachSaveBtn.addEventListener("click", async () => {
+  if (!editingCoachAccountId) return;
+  const role = editCoachRoleSelect.value;
+  const name = editCoachNameInput.value.trim();
+  if (!name) {
+    editCoachModalStatus.textContent = "กรุณากรอกชื่อ";
+    editCoachModalStatus.className = "text-sm text-red-600";
+    return;
+  }
+  // เลื่อนขั้นเป็นผู้ดูแลระบบเป็นการกระทำที่มีผลกระทบสูง (ให้สิทธิ์เข้าถึงข้อมูลทุกทีมทันที) จึงขอยืนยันซ้ำ
+  if (role === "admin") {
+    const ok = confirm(`ยืนยันปรับบัญชี "${name}" เป็นผู้ดูแลระบบ? บัญชีนี้จะเข้าถึงข้อมูลของทุกทีมได้ทันที`);
+    if (!ok) return;
+  }
+  const payload = {
+    name,
+    role,
+    status: editCoachStatusSelect.value,
+    team: role === "admin" ? null : editCoachTeamSelect.value || null,
+    ageGroup: role === "coach" ? editCoachAgeGroupSelect.value || null : null
+  };
   try {
-    await updateDoc(doc(db, "coaches", coachId), { team });
-    adminStatus.textContent = "เปลี่ยนทีมเรียบร้อย ✓";
-    adminStatus.className = "text-sm text-emerald-600 w-full";
+    editCoachModalStatus.textContent = "กำลังบันทึก...";
+    editCoachModalStatus.className = "text-sm text-slate-500";
+    await updateDoc(doc(db, "coaches", editingCoachAccountId), payload);
+    editCoachModalStatus.textContent = "บันทึกสำเร็จ ✓";
+    editCoachModalStatus.className = "text-sm text-emerald-600";
     await loadCoachDirectory();
+    setTimeout(closeEditCoachModal, 500);
   } catch (err) {
     console.error(err);
-    adminStatus.textContent = "เปลี่ยนทีมไม่สำเร็จ: " + err.message;
-    adminStatus.className = "text-sm text-red-600 w-full";
+    editCoachModalStatus.textContent = "บันทึกไม่สำเร็จ: " + err.message;
+    editCoachModalStatus.className = "text-sm text-red-600";
   }
-}
+});
+
+// ผู้ดูแลระบบช่วยโค้ชที่ลืมรหัสผ่าน โดยส่งลิงก์รีเซ็ตไปที่อีเมลของบัญชีนั้นโดยตรง (ผู้ดูแลระบบไม่มีทาง
+// เห็นหรือตั้งรหัสผ่านแทนได้เลย เพราะ Firebase Auth ไม่อนุญาตให้เปลี่ยนรหัสผ่านของบัญชีอื่นจากฝั่ง client)
+editCoachResetPasswordBtn.addEventListener("click", async () => {
+  const email = editCoachEmailInput.value.trim();
+  if (!email) return;
+  const ok = confirm(`ส่งอีเมลลิงก์ตั้งรหัสผ่านใหม่ไปที่ ${email} ใช่หรือไม่?`);
+  if (!ok) return;
+  try {
+    editCoachModalStatus.textContent = "กำลังส่งอีเมล...";
+    editCoachModalStatus.className = "text-sm text-slate-500";
+    await sendPasswordResetEmail(auth, email);
+    editCoachModalStatus.textContent = `ส่งลิงก์ตั้งรหัสผ่านใหม่ไปที่ ${email} แล้ว ✓`;
+    editCoachModalStatus.className = "text-sm text-emerald-600";
+  } catch (err) {
+    console.error(err);
+    editCoachModalStatus.textContent = "ส่งอีเมลไม่สำเร็จ: " + (err.code ? authErrorMessage(err) : err.message);
+    editCoachModalStatus.className = "text-sm text-red-600";
+  }
+});
 
 // ---------- ผู้ดูแลระบบ: ความคืบหน้าการประเมินรายวัน ----------
 const PROGRESS_COLORS = {
@@ -1036,17 +1171,38 @@ progressRefreshBtn.addEventListener("click", () => {
   loadDailyProgress(progressDateInput.value);
 });
 
+// หาบัญชีโค้ช/ผู้บริหารทีมตัวจริงของทีมนี้ (ถ้ามี) เพื่อเอาชื่อ/อีเมล/สถานะจริงมาแสดง แทนที่จะค้างเป็น
+// ข้อมูลของผู้ดูแลระบบเอง — ให้หน้าจอตอนสวมบทบาทตรงกับที่เจ้าของบัญชีจริงเห็น 100% ไม่มีร่องรอยของผู้ดูแลระบบ
+// หลงเหลือให้สับสน จนกว่าจะกดกลับแผงควบคุมผู้ดูแลระบบ
+async function findCoachRecordForTeam(team, role) {
+  const snap = await getDocs(
+    query(
+      collection(db, "coaches"),
+      where("team", "==", team),
+      where("role", "==", role),
+      where("status", "==", "approved")
+    )
+  );
+  return snap.empty ? null : snap.docs[0].data();
+}
+
 async function enterTeamManagementMode(team, returnSection) {
   myTeam = team;
-  myCoachName = myCoachName || auth.currentUser?.email;
-  myAgeGroup = null; // ผู้ดูแลระบบจัดการทีมแทนโค้ช เลือกรุ่นอายุของนักกีฬาได้อิสระทุกรุ่น
+  myAgeGroup = null; // ผู้ดูแลระบบจัดการทีมแทนโค้ช เลือกรุ่นอายุของนักกีฬาได้อิสระทุกรุ่น (สิทธิ์การแก้ไขข้อมูล
+  // จุดนี้ตั้งใจให้กว้างกว่าโค้ชจริงคนเดียว เผื่อทีมมีหลายรุ่นอายุ — ต่างจากข้อมูลที่แสดงผลด้านล่างซึ่งต้อง
+  // ตรงกับโค้ชจริง 100%)
   adminViewingAs = "coach";
-  // แสดงป้ายบทบาทเป็น "โค้ช" เหมือนจริง (แทนที่จะขึ้น "ผู้ดูแลระบบ" ตลอด) เพื่อให้ผู้ดูแลระบบเห็นหน้าจอ
-  // ตรงกับที่โค้ชจริงเห็นทุกประการเวลาสวมบทบาทเข้ามาทดสอบ/ตรวจสอบระบบ — สลับกลับตอนออกจากโหมดนี้ที่
-  // exitTeamManagementToAdminPanel()
+  const coachRecord = await findCoachRecordForTeam(team, "coach");
+  myCoachName = coachRecord?.name || auth.currentUser?.email;
+  // แสดงชื่อ/อีเมล/สถานะของโค้ชตัวจริง (ถ้าหาเจอ) แทนข้อมูลของผู้ดูแลระบบเอง เพื่อให้หน้าจอเหมือนที่โค้ช
+  // จริงเห็นทุกประการเวลาสวมบทบาทเข้ามาทดสอบ/ตรวจสอบระบบ — สลับกลับตอนออกจากโหมดนี้ที่ exitTeamManagementToAdminPanel()
+  coachNameEl.textContent = coachRecord?.name || team;
+  coachEmailEl.textContent = coachRecord?.email || "-";
+  coachStatusBadgeEl.innerHTML = '<span class="badge badge-success">อนุมัติแล้ว</span>';
   coachRoleBadgeEl.textContent = "โค้ช";
   coachRoleBadgeEl.className = "badge badge-success";
   coachTeamEl.innerHTML = `${teamLogoImg(team)}${team}`;
+  coachAgeGroupsWrap.classList.remove("hidden");
   if (!dateInput.value) {
     dateInput.value = new Date().toISOString().slice(0, 10);
   }
@@ -1054,16 +1210,22 @@ async function enterTeamManagementMode(team, returnSection) {
   // ใน nav drawer ที่ย้อนกลับไปจุดที่พามาที่นี่ทีละสเต็ป (ดู exitTeamManagementToAdminPanel)
   adminReturnSection = returnSection || adminManageTeamSection;
   await loadPlayers();
+  renderAgeGroupsFromPlayers();
   renderDrawerItems();
   showDaily();
 }
 
 // ผู้ดูแลระบบสวมบทบาทเป็น "ผู้บริหารทีม" (ดูอย่างเดียว) แทนที่จะเป็นโค้ชเต็มรูปแบบ — ใช้ตรวจสอบว่าหน้าจอ
 // ที่ผู้บริหารทีมจริงเห็นถูกต้องหรือไม่ โดยไม่ต้องขอให้ผู้บริหารทีมจริงล็อกอินทดสอบให้
-function enterExecutiveViewMode(team, returnSection) {
+async function enterExecutiveViewMode(team, returnSection) {
   myTeam = team;
   myAgeGroup = null;
   adminViewingAs = "executive";
+  const execRecord = await findCoachRecordForTeam(team, "executive");
+  // แสดงชื่อ/อีเมล/สถานะของผู้บริหารทีมตัวจริง (ถ้าหาเจอ) แทนข้อมูลของผู้ดูแลระบบเอง เหมือนกับโหมดโค้ช
+  coachNameEl.textContent = execRecord?.name || team;
+  coachEmailEl.textContent = execRecord?.email || "-";
+  coachStatusBadgeEl.innerHTML = '<span class="badge badge-success">อนุมัติแล้ว</span>';
   coachRoleBadgeEl.textContent = "ผู้บริหารทีม";
   coachRoleBadgeEl.className = "badge badge-neutral";
   coachTeamEl.innerHTML = `${teamLogoImg(team)}${team}`;
@@ -1076,6 +1238,7 @@ function enterExecutiveViewMode(team, returnSection) {
   executiveSection.classList.remove("hidden");
   renderDrawerItems();
   loadExecutiveSummary(team);
+  loadExecutiveNotes(team);
 }
 
 // สรุปภาพรวมทีมสั้นๆ ที่ผู้บริหารทีมควรเห็นทันทีที่เข้าระบบ (ไม่ต้องคลิกไปหน้า Dashboard ก่อนถึงจะเห็นอะไร)
@@ -1125,6 +1288,69 @@ async function loadExecutiveSummary(team) {
     executiveStatusEl.textContent = "โหลดข้อมูลไม่สำเร็จ: " + err.message;
   }
 }
+
+// ข้อความที่ผู้ดูแลระบบส่งถึงทีมนี้โดยตรง (เช่น แจ้งนักกีฬาที่มีพัฒนาการดี หรือแจ้งปัญหาของโค้ช) — ใช้ร่วมกัน
+// ทั้งบัญชีผู้บริหารทีมจริง และผู้ดูแลระบบที่สวมบทบาทผ่าน enterExecutiveViewMode
+let currentExecutiveNotesTeam = null;
+
+async function loadExecutiveNotes(team) {
+  currentExecutiveNotesTeam = team;
+  executiveNotesList.innerHTML = '<p class="text-sm text-slate-400">กำลังโหลด...</p>';
+  try {
+    const snap = await getDocs(query(collection(db, "executiveNotes"), where("team", "==", team)));
+    const notes = [];
+    snap.forEach((d) => notes.push({ id: d.id, ...d.data() }));
+    notes.sort((a, b) => {
+      const ta = a.createdAt && typeof a.createdAt.toDate === "function" ? a.createdAt.toDate().getTime() : 0;
+      const tb = b.createdAt && typeof b.createdAt.toDate === "function" ? b.createdAt.toDate().getTime() : 0;
+      return tb - ta;
+    });
+
+    if (notes.length === 0) {
+      executiveNotesList.innerHTML = '<p class="text-sm text-slate-400">ยังไม่มีข้อความจากผู้ดูแลระบบ</p>';
+      return;
+    }
+
+    executiveNotesList.innerHTML = notes
+      .map((n) => {
+        const typeIcon = n.type === "player" ? "⭐" : n.type === "coach" ? "⚠️" : "📌";
+        const postedAt =
+          n.createdAt && typeof n.createdAt.toDate === "function"
+            ? n.createdAt.toDate().toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" })
+            : "-";
+        const unreadBadge = n.read ? "" : '<span class="badge badge-info">ใหม่</span>';
+        const readBtn = n.read
+          ? ""
+          : `<button type="button" class="btn btn-ghost btn-sm mt-2" data-mark-read-id="${n.id}">✓ ทำเครื่องหมายว่าอ่านแล้ว</button>`;
+        return `
+          <div class="card card-pad${n.read ? "" : " border-2 border-blue-200"}">
+            <div class="flex items-center justify-between gap-2 flex-wrap">
+              <p class="font-semibold">${typeIcon} ${n.refLabel ?? "-"}</p>
+              ${unreadBadge}
+            </div>
+            <p class="text-sm text-slate-600 mt-1">${n.message ?? "-"}</p>
+            <p class="text-xs text-slate-400 mt-2">จาก ${n.createdBy ?? "ผู้ดูแลระบบ"} • ${postedAt}</p>
+            ${readBtn}
+          </div>`;
+      })
+      .join("");
+  } catch (err) {
+    console.error(err);
+    executiveNotesList.innerHTML = `<p class="text-sm text-red-600">โหลดข้อความไม่สำเร็จ: ${err.message}</p>`;
+  }
+}
+
+executiveNotesList.addEventListener("click", async (e) => {
+  const btn = e.target.closest("[data-mark-read-id]");
+  if (!btn || !currentExecutiveNotesTeam) return;
+  try {
+    await updateDoc(doc(db, "executiveNotes", btn.dataset.markReadId), { read: true });
+    await loadExecutiveNotes(currentExecutiveNotesTeam);
+  } catch (err) {
+    console.error(err);
+    alert("อัปเดตไม่สำเร็จ: " + err.message);
+  }
+});
 
 adminViewDashboardBtn.addEventListener("click", () => {
   const team = adminDashboardTeamSelect.value;
@@ -1229,6 +1455,9 @@ onAuthStateChanged(auth, async (user) => {
       coachRoleBadgeEl.className = "badge badge-info";
       renderCoachProfile(user, data, "เข้าถึงได้ทุกทีม");
       coachAgeGroupsWrap.classList.add("hidden");
+      // เก็บชื่อ/อีเมลของผู้ดูแลระบบเองไว้ใช้คืนค่ากลับตอนออกจากโหมดสวมบทบาท (ดู exitTeamManagementToAdminPanel)
+      adminOwnName = coachNameEl.textContent;
+      adminOwnEmail = coachEmailEl.textContent;
       myTeam = null;
       adminReturnSection = null;
       renderDrawerItems();
@@ -1272,6 +1501,7 @@ onAuthStateChanged(auth, async (user) => {
       hideAllScreens();
       executiveSection.classList.remove("hidden");
       loadExecutiveSummary(data.team);
+      loadExecutiveNotes(data.team);
       return;
     }
 
@@ -1408,9 +1638,23 @@ addPlayerForm.addEventListener("submit", async (e) => {
   const birthday = document.getElementById("player-birthday").value;
   const ageGroup = document.getElementById("player-age-group").value;
   const position = document.getElementById("player-position").value.trim();
+  const numberNum = numberVal ? Number(numberVal) : null;
+
+  // เบอร์/ลำดับห้ามซ้ำกันภายในรุ่นอายุเดียวกัน (ต่างรุ่นอายุใช้เบอร์เดียวกันได้ปกติ) — เช็คจากรายชื่อนักกีฬา
+  // ของทีมนี้ที่โหลดไว้แล้ว ไม่รวมนักกีฬาที่กำลังแก้ไขอยู่เอง (ถ้ามี)
+  if (numberNum !== null && ageGroup) {
+    const duplicate = players.find(
+      (p) => p.id !== editingPlayerId && p.ageGroup === ageGroup && p.number === numberNum
+    );
+    if (duplicate) {
+      addPlayerStatus.textContent = `เบอร์/ลำดับ ${numberNum} ถูกใช้แล้วในรุ่นอายุ ${ageGroup} โดย "${duplicate.nickname ?? duplicate.fullName ?? "-"}" กรุณาเปลี่ยนเบอร์`;
+      addPlayerStatus.className = "text-sm text-red-600";
+      return;
+    }
+  }
 
   const payload = {
-    number: numberVal ? Number(numberVal) : null,
+    number: numberNum,
     nickname,
     fullName,
     birthday: birthday || null,
@@ -2071,12 +2315,6 @@ const matchLineupDropdown = document.getElementById("match-lineup-dropdown");
 const matchLineupChips = document.getElementById("match-lineup-chips");
 const matchLineupCountEl = document.getElementById("match-lineup-count");
 
-function matchResultBadge(result) {
-  if (result === "ชนะ") return '<span class="badge badge-success">ชนะ</span>';
-  if (result === "แพ้") return '<span class="badge badge-danger">แพ้</span>';
-  return '<span class="badge badge-neutral">เสมอ</span>';
-}
-
 function renderMatchResultSegmented() {
   matchResultSegmentedWrap.innerHTML = "";
   matchResultSegmentedWrap.appendChild(
@@ -2435,21 +2673,6 @@ injuryAgeGroupSelect.addEventListener("change", () => {
   injuryPlayerSearchInput.value = "";
   injuryPlayerDropdown.classList.add("hidden");
 });
-
-function injurySeverityBadge(severity) {
-  if (severity === "รุนแรง") return `<span class="badge badge-danger">${severity}</span>`;
-  if (severity === "ปานกลาง") return `<span class="badge badge-warning">${severity}</span>`;
-  return `<span class="badge badge-neutral">${severity ?? "-"}</span>`;
-}
-
-function injuryStatusBadge(status) {
-  if (status === "หายแล้ว") return '<span class="badge badge-success">หายแล้ว</span>';
-  if (status === "กำลังพักฟื้น") return '<span class="badge badge-warning">กำลังพักฟื้น</span>';
-  if (status === "บาดเจ็บขณะแข่งขัน" || status === "บาดเจ็บขณะฝึกซ้อม") {
-    return `<span class="badge badge-danger">${status}</span>`;
-  }
-  return `<span class="badge badge-neutral">${status ?? "-"}</span>`;
-}
 
 async function renderInjuryReportList() {
   injuryReportListBody.innerHTML =

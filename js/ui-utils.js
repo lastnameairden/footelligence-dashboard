@@ -1,3 +1,23 @@
+import { addDoc, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+import { db } from "./firebase-init.js";
+
+// ---------- ข้อความจากผู้ดูแลระบบถึงทีม (แจ้งนักกีฬาที่มีพัฒนาการดี หรือแจ้งปัญหาของโค้ช) ----------
+// ใช้ร่วมกันทุกจุดที่ผู้ดูแลระบบกดส่งข้อความ (หน้าข้อมูลนักกีฬา, หน้าพัฒนาการนักกีฬา, Dashboard) เพื่อให้
+// เขียนลง Firestore ด้วยรูปแบบเดียวกันเสมอ — Firestore rules อนุญาตให้ isAdmin() สร้างเอกสารนี้เท่านั้น
+// ส่วนโค้ช/ผู้บริหารทีมของทีมนั้นอ่านได้และแก้ไขได้แค่ทำเครื่องหมายว่าอ่านแล้ว
+export async function sendExecutiveNote({ team, type, refId, refLabel, message, createdBy }) {
+  await addDoc(collection(db, "executiveNotes"), {
+    team,
+    type,
+    refId: refId || null,
+    refLabel: refLabel || null,
+    message,
+    createdBy: createdBy || null,
+    read: false,
+    createdAt: serverTimestamp()
+  });
+}
+
 // ---------- โลโก้ทีม (ใช้แทนอิโมจิ 🛡️ ทุกจุดที่แสดงชื่อ/ไอคอนของแต่ละทีม) ----------
 export const TEAM_LOGOS = {
   "KHAMPHEE FOOTBALL": "./assets/logo-khamphee-football.png",
@@ -76,6 +96,29 @@ export function isTrainingPlanLate(plan) {
   if (!ts || !plan.date) return false;
   const deadline = new Date(`${plan.date}T${String(TRAINING_PLAN_DEADLINE_HOUR).padStart(2, "0")}:00:00`);
   return ts > deadline;
+}
+
+// ---------- ป้ายสถานะผลการแข่งขัน/อาการบาดเจ็บ ----------
+// ใช้ร่วมกันทั้งหน้าโค้ช (attendance.js), Dashboard (app.js), และหน้าข้อมูลนักกีฬา (player.js)
+export function matchResultBadge(result) {
+  if (result === "ชนะ") return '<span class="badge badge-success">ชนะ</span>';
+  if (result === "แพ้") return '<span class="badge badge-danger">แพ้</span>';
+  return '<span class="badge badge-neutral">เสมอ</span>';
+}
+
+export function injurySeverityBadge(severity) {
+  if (severity === "รุนแรง") return `<span class="badge badge-danger">${severity}</span>`;
+  if (severity === "ปานกลาง") return `<span class="badge badge-warning">${severity}</span>`;
+  return `<span class="badge badge-neutral">${severity ?? "-"}</span>`;
+}
+
+export function injuryStatusBadge(status) {
+  if (status === "หายแล้ว") return '<span class="badge badge-success">หายแล้ว</span>';
+  if (status === "กำลังพักฟื้น") return '<span class="badge badge-warning">กำลังพักฟื้น</span>';
+  if (status === "บาดเจ็บขณะแข่งขัน" || status === "บาดเจ็บขณะฝึกซ้อม") {
+    return `<span class="badge badge-danger">${status}</span>`;
+  }
+  return `<span class="badge badge-neutral">${status ?? "-"}</span>`;
 }
 
 // เติม data-label ให้แต่ละ <td> อัตโนมัติจากหัวตาราง (thead th) ของ <table> เดียวกัน
