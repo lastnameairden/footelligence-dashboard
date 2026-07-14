@@ -18,7 +18,16 @@ import {
   signOut
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import { db, auth } from "./firebase-init.js";
-import { applyDataLabels, SCORE_CATEGORIES, computeAvgScore, isPlayerFullyEvaluated, teamLogoImg } from "./ui-utils.js";
+import {
+  applyDataLabels,
+  SCORE_CATEGORIES,
+  computeAvgScore,
+  isPlayerFullyEvaluated,
+  teamLogoImg,
+  isTrainingPlanLate,
+  TRAINING_PLAN_LATE_WARNING_THRESHOLD,
+  statCard
+} from "./ui-utils.js";
 
 const STATUS_OPTIONS = ["A", "I", "R", "P"];
 const SCORE_OPTIONS = [1, 2, 3, 4];
@@ -53,6 +62,24 @@ const injuryReportListBody = document.getElementById("injury-report-list-body");
 const injuryAgeGroupSelect = document.getElementById("injury-age-group");
 const injuryPlayerSearchInput = document.getElementById("injury-player-search");
 const injuryPlayerDropdown = document.getElementById("injury-player-dropdown");
+const trainingPlanSection = document.getElementById("training-plan-section");
+const trainingPlanForm = document.getElementById("training-plan-form");
+const trainingPlanStatus = document.getElementById("training-plan-status");
+const trainingPlanSubmitBtn = document.getElementById("training-plan-submit-btn");
+const cancelEditTrainingPlanBtn = document.getElementById("cancel-edit-training-plan-btn");
+const trainingPlanListBody = document.getElementById("training-plan-list-body");
+const trainingPlanDateInput = document.getElementById("training-plan-date");
+const trainingPlanPlayerGroupSegmentedWrap = document.getElementById("training-plan-player-group-segmented");
+const trainingPlanAgeGroupToggleWrap = document.getElementById("training-plan-age-group-toggle");
+const trainingPlanTypeSegmentedWrap = document.getElementById("training-plan-type-segmented");
+const trainingPlanPhaseSegmentedWrap = document.getElementById("training-plan-phase-segmented");
+const trainingPlanCompetitionTopicWrap = document.getElementById("training-plan-competition-topic-wrap");
+const trainingPlanCompetitionTopicInput = document.getElementById("training-plan-competition-topic");
+const trainingPlanMainPartSelect = document.getElementById("training-plan-main-part");
+const trainingPlanPhysicalToggleWrap = document.getElementById("training-plan-physical-toggle");
+const trainingPlanNotesInput = document.getElementById("training-plan-notes");
+const trainingPlanLateWarning = document.getElementById("training-plan-late-warning");
+const trainingPlanLateCountEl = document.getElementById("training-plan-late-count");
 const dailySection = document.getElementById("daily-section");
 const dailyDateInput = document.getElementById("daily-date-input");
 const dailyLoadBtn = document.getElementById("daily-load-btn");
@@ -60,6 +87,7 @@ const dailyStatus = document.getElementById("daily-status");
 const dailyDateHeading = document.getElementById("daily-date-heading");
 const dailyAttendanceBody = document.getElementById("daily-attendance-body");
 const dailyTrainingReportCard = document.getElementById("daily-training-report-card");
+const dailyTrainingPlanCard = document.getElementById("daily-training-plan-card");
 const dailyMatchBody = document.getElementById("daily-match-body");
 const dailyInjuryBody = document.getElementById("daily-injury-body");
 const reportDateInput = document.getElementById("report-date");
@@ -85,6 +113,11 @@ const registerAgeGroupSelect = document.getElementById("register-age-group");
 const pendingSection = document.getElementById("pending-section");
 const pendingLogoutBtn = document.getElementById("pending-logout-btn");
 const executiveSection = document.getElementById("executive-section");
+const executiveDashboardLink = document.getElementById("executive-dashboard-link");
+const executiveStatusEl = document.getElementById("executive-status");
+const executiveStatCards = document.getElementById("executive-stat-cards");
+const executiveLateWarning = document.getElementById("executive-late-warning");
+const executiveLateCountEl = document.getElementById("executive-late-count");
 const coachNameEl = document.getElementById("coach-name");
 const coachEmailEl = document.getElementById("coach-email");
 const coachTeamEl = document.getElementById("coach-team");
@@ -106,6 +139,7 @@ const adminBackButtons = document.querySelectorAll("[data-admin-back]");
 const pendingApprovalsBody = document.getElementById("pending-approvals-body");
 const adminTeamSelect = document.getElementById("admin-team-select");
 const adminSelectTeamBtn = document.getElementById("admin-select-team-btn");
+const adminSelectTeamExecutiveBtn = document.getElementById("admin-select-team-executive-btn");
 const adminDashboardTeamSelect = document.getElementById("admin-dashboard-team-select");
 const adminViewDashboardBtn = document.getElementById("admin-view-dashboard-btn");
 const adminPrintTeamSelect = document.getElementById("admin-print-team-select");
@@ -155,6 +189,10 @@ let myAgeGroup = null; // รุ่นอายุที่โค้ชคนน
 // จำหน้าจอผู้ดูแลระบบที่พาเข้ามาจัดการทีม เพื่อให้รายการ "กลับแผงควบคุมผู้ดูแลระบบ" ใน nav drawer
 // ย้อนกลับไปจุดเดิมที่ละสเต็ป (มีได้ทั้งจาก "จัดการข้อมูลทีม" หรือคลิกชื่อทีมในตาราง "รายชื่อโค้ชในระบบ")
 let adminReturnSection = null;
+// เมื่อผู้ดูแลระบบสวมบทบาทเข้าไปดูข้อมูลทีมใดทีมหนึ่ง (myTeam ถูกตั้งค่า) ตัวแปรนี้บอกว่ากำลังสวมบทบาท
+// เป็น "coach" (จัดการข้อมูลทีมได้เต็มรูปแบบ) หรือ "executive" (ดูอย่างเดียวเหมือนผู้บริหารทีมจริง)
+// ใช้กำหนดว่า nav drawer ควรแสดงเมนูแบบไหน — เป็น null เมื่อไม่ได้อยู่ในโหมดสวมบทบาทใดๆ
+let adminViewingAs = null;
 let players = [];
 let editingPlayerId = null;
 let currentIsAdmin = false;
@@ -273,6 +311,7 @@ function hideAllScreens() {
   reportSection.classList.add("hidden");
   matchReportSection.classList.add("hidden");
   injuryReportSection.classList.add("hidden");
+  trainingPlanSection.classList.add("hidden");
   dailySection.classList.add("hidden");
 }
 
@@ -339,6 +378,13 @@ function exitTeamManagementToAdminPanel() {
   (adminReturnSection || adminManageTeamSection).classList.remove("hidden");
   myTeam = null;
   adminReturnSection = null;
+  adminViewingAs = null;
+  // สลับป้ายบทบาทกลับเป็น "ผู้ดูแลระบบ" ตามเดิม (ตรงข้ามกับที่สลับเป็น "โค้ช"/"ผู้บริหารทีม" ไว้ตอนเข้าโหมด
+  // สวมบทบาท ผ่าน enterTeamManagementMode / enterExecutiveViewMode)
+  coachRoleBadgeEl.textContent = "ผู้ดูแลระบบ";
+  coachRoleBadgeEl.className = "badge badge-info";
+  coachTeamEl.textContent = "เข้าถึงได้ทุกทีม";
+  coachAgeGroupsWrap.classList.add("hidden");
   renderDrawerItems();
 }
 
@@ -350,7 +396,14 @@ function renderDrawerItems() {
   navDrawerItems.innerHTML = "";
 
   if (currentIsAdmin) {
-    if (myTeam) {
+    if (myTeam && adminViewingAs === "executive") {
+      // สวมบทบาทเป็นผู้บริหารทีม (ดูอย่างเดียว) — เมนูเหมือนที่ผู้บริหารทีมจริงเห็นทุกประการ (มีแค่ทาง
+      // ไป Dashboard) บวกทางกลับแผงควบคุมผู้ดูแลระบบเพิ่มมาให้ (ผู้บริหารทีมจริงไม่มีปุ่มนี้)
+      navDrawerItems.appendChild(drawerSectionLabel(`ผู้บริหารทีม: ${teamLogoImg(myTeam)}${myTeam}`));
+      navDrawerItems.appendChild(drawerItem("📊", "Dashboard", goToDashboard));
+      navDrawerItems.appendChild(drawerDivider());
+      navDrawerItems.appendChild(drawerItem("🛡️", "กลับแผงควบคุมผู้ดูแลระบบ", exitTeamManagementToAdminPanel));
+    } else if (myTeam) {
       navDrawerItems.appendChild(drawerSectionLabel(`จัดการทีม: ${teamLogoImg(myTeam)}${myTeam}`));
       navDrawerItems.appendChild(drawerItem("📅", "Daily", showDaily));
       navDrawerItems.appendChild(drawerItem("👤", "เพิ่ม/แก้ไขนักกีฬา", openAddPlayerSection));
@@ -358,6 +411,7 @@ function renderDrawerItems() {
       navDrawerItems.appendChild(drawerItem("📝", "รายงานการฝึกซ้อม", openReportSection));
       navDrawerItems.appendChild(drawerItem("⚽", "รายงานผลการแข่งขัน", openMatchReportSection));
       navDrawerItems.appendChild(drawerItem("🩹", "รายงานอาการบาดเจ็บ", openInjuryReportSection));
+      navDrawerItems.appendChild(drawerItem("📋", "แผนการฝึกซ้อมรายวัน", openTrainingPlanSection));
       navDrawerItems.appendChild(drawerDivider());
       navDrawerItems.appendChild(drawerItem("🛡️", "กลับแผงควบคุมผู้ดูแลระบบ", exitTeamManagementToAdminPanel));
     } else {
@@ -385,6 +439,7 @@ function renderDrawerItems() {
     navDrawerItems.appendChild(drawerItem("📝", "รายงานการฝึกซ้อม", openReportSection));
     navDrawerItems.appendChild(drawerItem("⚽", "รายงานผลการแข่งขัน", openMatchReportSection));
     navDrawerItems.appendChild(drawerItem("🩹", "รายงานอาการบาดเจ็บ", openInjuryReportSection));
+    navDrawerItems.appendChild(drawerItem("📋", "แผนการฝึกซ้อมรายวัน", openTrainingPlanSection));
     navDrawerItems.appendChild(drawerDivider());
     navDrawerItems.appendChild(drawerItem("📊", "Dashboard", goToDashboard));
     return;
@@ -985,7 +1040,13 @@ async function enterTeamManagementMode(team, returnSection) {
   myTeam = team;
   myCoachName = myCoachName || auth.currentUser?.email;
   myAgeGroup = null; // ผู้ดูแลระบบจัดการทีมแทนโค้ช เลือกรุ่นอายุของนักกีฬาได้อิสระทุกรุ่น
-  coachTeamEl.innerHTML = `${teamLogoImg(team)}${team} (จัดการโดยผู้ดูแลระบบ)`;
+  adminViewingAs = "coach";
+  // แสดงป้ายบทบาทเป็น "โค้ช" เหมือนจริง (แทนที่จะขึ้น "ผู้ดูแลระบบ" ตลอด) เพื่อให้ผู้ดูแลระบบเห็นหน้าจอ
+  // ตรงกับที่โค้ชจริงเห็นทุกประการเวลาสวมบทบาทเข้ามาทดสอบ/ตรวจสอบระบบ — สลับกลับตอนออกจากโหมดนี้ที่
+  // exitTeamManagementToAdminPanel()
+  coachRoleBadgeEl.textContent = "โค้ช";
+  coachRoleBadgeEl.className = "badge badge-success";
+  coachTeamEl.innerHTML = `${teamLogoImg(team)}${team}`;
   if (!dateInput.value) {
     dateInput.value = new Date().toISOString().slice(0, 10);
   }
@@ -995,6 +1056,74 @@ async function enterTeamManagementMode(team, returnSection) {
   await loadPlayers();
   renderDrawerItems();
   showDaily();
+}
+
+// ผู้ดูแลระบบสวมบทบาทเป็น "ผู้บริหารทีม" (ดูอย่างเดียว) แทนที่จะเป็นโค้ชเต็มรูปแบบ — ใช้ตรวจสอบว่าหน้าจอ
+// ที่ผู้บริหารทีมจริงเห็นถูกต้องหรือไม่ โดยไม่ต้องขอให้ผู้บริหารทีมจริงล็อกอินทดสอบให้
+function enterExecutiveViewMode(team, returnSection) {
+  myTeam = team;
+  myAgeGroup = null;
+  adminViewingAs = "executive";
+  coachRoleBadgeEl.textContent = "ผู้บริหารทีม";
+  coachRoleBadgeEl.className = "badge badge-neutral";
+  coachTeamEl.innerHTML = `${teamLogoImg(team)}${team}`;
+  coachAgeGroupsWrap.classList.add("hidden");
+  // ผู้บริหารทีมจริงไปหน้า Dashboard โดยไม่ต้องแนบ ?team= เพราะระบบรู้ทีมจากบัญชีอยู่แล้ว แต่ผู้ดูแลระบบที่
+  // สวมบทบาทไม่มีทีมผูกกับบัญชีจริง จึงต้องแนบทีมที่เลือกไว้ไปกับลิงก์ด้วย ไม่งั้น Dashboard จะไม่รู้ว่าจะโชว์ทีมไหน
+  executiveDashboardLink.href = `/?team=${encodeURIComponent(team)}`;
+  adminReturnSection = returnSection || adminManageTeamSection;
+  hideAllScreens();
+  executiveSection.classList.remove("hidden");
+  renderDrawerItems();
+  loadExecutiveSummary(team);
+}
+
+// สรุปภาพรวมทีมสั้นๆ ที่ผู้บริหารทีมควรเห็นทันทีที่เข้าระบบ (ไม่ต้องคลิกไปหน้า Dashboard ก่อนถึงจะเห็นอะไร)
+// ใช้ร่วมกันทั้งบัญชีผู้บริหารทีมจริง และผู้ดูแลระบบที่สวมบทบาทผ่าน enterExecutiveViewMode
+async function loadExecutiveSummary(team) {
+  executiveStatusEl.textContent = "กำลังโหลดข้อมูล...";
+  executiveStatCards.innerHTML = "";
+  executiveLateWarning.classList.add("hidden");
+  try {
+    const thisMonth = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+    const [playersSnap, attendanceSnap, trainingPlansSnap] = await Promise.all([
+      getDocs(query(collection(db, "players"), where("team", "==", team))),
+      getDocs(query(collection(db, "attendance"), where("team", "==", team))),
+      getDocs(query(collection(db, "trainingPlans"), where("team", "==", team)))
+    ]);
+
+    const totalPlayers = playersSnap.size;
+
+    const attendanceRecords = [];
+    attendanceSnap.forEach((d) => attendanceRecords.push(d.data()));
+    const monthAttendance = attendanceRecords.filter((r) => (r.date || "").startsWith(thisMonth));
+    const attendedCount = monthAttendance.filter((r) => r.status === "A").length;
+    const attendPercent = monthAttendance.length > 0 ? Math.round((attendedCount / monthAttendance.length) * 100) : 0;
+    const scoredRecords = monthAttendance.filter((r) => computeAvgScore(r.scores) !== null);
+    const avgScore =
+      scoredRecords.length > 0
+        ? (scoredRecords.reduce((sum, r) => sum + computeAvgScore(r.scores), 0) / scoredRecords.length).toFixed(2)
+        : "-";
+
+    const trainingPlans = [];
+    trainingPlansSnap.forEach((d) => trainingPlans.push(d.data()));
+    const monthPlans = trainingPlans.filter((p) => (p.date || "").startsWith(thisMonth));
+    const lateCount = monthPlans.filter((p) => isTrainingPlanLate(p)).length;
+
+    executiveStatCards.innerHTML =
+      statCard("นักกีฬาทั้งหมด", totalPlayers) +
+      statCard("% เข้าร่วมฝึกซ้อมเดือนนี้", `${attendPercent}%`) +
+      statCard("คะแนนประเมินเฉลี่ยเดือนนี้", avgScore) +
+      statCard("แผนฝึกซ้อมที่ส่งเดือนนี้", monthPlans.length);
+
+    executiveLateWarning.classList.toggle("hidden", lateCount <= TRAINING_PLAN_LATE_WARNING_THRESHOLD);
+    executiveLateCountEl.textContent = lateCount;
+
+    executiveStatusEl.textContent = `อัปเดตข้อมูลล่าสุด • ทีม ${team}`;
+  } catch (err) {
+    console.error(err);
+    executiveStatusEl.textContent = "โหลดข้อมูลไม่สำเร็จ: " + err.message;
+  }
 }
 
 adminViewDashboardBtn.addEventListener("click", () => {
@@ -1017,6 +1146,16 @@ adminSelectTeamBtn.addEventListener("click", () => {
     return;
   }
   enterTeamManagementMode(team, adminManageTeamSection);
+});
+
+adminSelectTeamExecutiveBtn.addEventListener("click", () => {
+  const team = adminTeamSelect.value;
+  if (!team) {
+    adminStatus.textContent = "กรุณาระบุทีมที่ต้องการดู";
+    adminStatus.className = "text-sm text-red-600 w-full";
+    return;
+  }
+  enterExecutiveViewMode(team, adminManageTeamSection);
 });
 
 // แสดงโปรไฟล์ผู้ใช้งานที่มีในระบบให้ครบทุกส่วน (ชื่อ, อีเมล, ทีม, สถานะบัญชี, รุ่นอายุที่รับผิดชอบ)
@@ -1124,9 +1263,15 @@ onAuthStateChanged(auth, async (user) => {
       coachRoleBadgeEl.className = "badge badge-neutral";
       renderCoachProfile(user, data, data.team);
       coachAgeGroupsWrap.classList.add("hidden");
+      myTeam = null;
+      adminViewingAs = null;
+      // บัญชีผู้บริหารทีมจริงไม่ต้องแนบ ?team= เพราะ Dashboard รู้ทีมจากบัญชีอยู่แล้ว (ต่างจากตอนผู้ดูแล
+      // ระบบสวมบทบาทที่ enterExecutiveViewMode ซึ่งต้องแนบทีมไปกับลิงก์ด้วย)
+      executiveDashboardLink.href = "./index.html";
       renderDrawerItems();
       hideAllScreens();
       executiveSection.classList.remove("hidden");
+      loadExecutiveSummary(data.team);
       return;
     }
 
@@ -1351,6 +1496,22 @@ function createSegmentedGroup(options, activeValue, onSelect) {
     btn.textContent = String(opt);
     btn.className = "segmented-btn" + (activeValue === opt ? " active" : "");
     btn.addEventListener("click", () => onSelect(opt));
+    group.appendChild(btn);
+  }
+  return group;
+}
+
+// กลุ่มปุ่มแบบเลือกได้หลายค่าพร้อมกัน (ต่างจาก segmented ที่เลือกได้ค่าเดียว) ใช้กับตัวเลือกที่มีจำนวนมาก
+// จนต้องขึ้นบรรทัดใหม่ได้ เช่น รุ่นอายุหลายรุ่น หรือจุดเน้นด้านฟิสิคอลหลายข้อ
+function createChipToggleGroup(options, activeSet, onToggle) {
+  const group = document.createElement("div");
+  group.className = "chip-toggle-group";
+  for (const opt of options) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = String(opt);
+    btn.className = "chip-toggle" + (activeSet.has(opt) ? " active" : "");
+    btn.addEventListener("click", () => onToggle(opt));
     group.appendChild(btn);
   }
   return group;
@@ -2450,6 +2611,373 @@ injuryReportForm.addEventListener("submit", async (e) => {
   }
 });
 
+// ---------- แผนการฝึกซ้อมรายวัน ----------
+// อ้างอิงรูปแบบจากตาราง "Training plan แผนรายวัน" ใน Airtable (Thawee SC Football 2026/2027)
+const TRAINING_PLAN_AGE_GROUPS = ["U9", "U10", "U11", "U12", "U13", "U14", "U15", "U16", "U17", "U18"];
+const TRAINING_PLAN_PLAYER_GROUP_OPTIONS = ["A", "B", "ไม่ระบุ"];
+const TRAINING_PLAN_TYPE_OPTIONS = ["Player", "Goalkeeper", "Circuit training"];
+const TRAINING_PLAN_PHASE_OPTIONS = ["Learning Phase (ช่วงเรียนรู้)", "Competition Phase (ช่วงแข่งขัน)", "Rest"];
+// หัวข้อหลักการฝึก (Main part) แยกตามช่วงอายุจริงเหมือนใน Airtable — ระบบนี้รองรับ U9-U18 เท่านั้น
+// (ไม่มีรุ่น U6-U8 ในระบบ) จึงตัดชุดตัวเลือกของ U6-U8 ออก เหลือ 3 ช่วงอายุ
+const TRAINING_PLAN_MAIN_PART_BY_BRACKET = {
+  "U9-12": [
+    "Passing",
+    "Directional first touch",
+    "Support",
+    "Dribbling & Driving",
+    "Pressing",
+    "Covering & Marking",
+    "Positioning (Width&Depth)",
+    "Switching play",
+    "Finishing"
+  ],
+  "U13-14": [
+    "Structure & Switching play",
+    "Build up vs Mid block",
+    "Build up vs High pressing",
+    "Playing between the line",
+    "Zonal defense",
+    "Pressing (Trap & Trigger)",
+    "Forcing wide & Box defending",
+    "Offensive transition",
+    "Defensive transition",
+    "Attacking movement & Final third"
+  ],
+  "U15-18": [
+    "Structure & Switching play",
+    "Pressing (Trap & Trigger & Intensity)",
+    "Build up (Playing through high press)",
+    "Mid block compactness & Shifting",
+    "Defensive transition",
+    "Offensive transition",
+    "Adapting Build-up to Opponent's Shape",
+    "Verticality & Direct Penetration",
+    "Low block & Box defending",
+    "Line breaking & Third man run",
+    "Attacking in movement & Final third"
+  ]
+};
+const TRAINING_PLAN_PHYSICAL_OPTIONS = [
+  "Strength Endurance", "Explosive Strength", "Maximal Strength", "Core Strength",
+  "Aerobic Capacity", "Aerobic Power", "Anaerobic Lactic", "Anaerobic Alactic",
+  "Reaction", "Acceleration", "Maximal Speed", "Speed Endurance", "Acyclic Speed",
+  "Flexibility & Mobility", "Coordination & Balance", "Agility", "Basic motor skill",
+  "Perception & Awareness", "Rondo / IDP", "Active recovery", "Tension (strength)",
+  "Duration (speed endurance)", "Velocity (max speed)", "Complexity", "Activation",
+  "Match prepare", "Coordination & ball mastery", "Agility & Dribbling",
+  "Speed & reaction", "Balance & basic skills", "Scrimmage / Game day"
+];
+
+let editingTrainingPlanId = null;
+let trainingPlanAgeGroupsSelected = new Set();
+let trainingPlanPlayerGroup = null;
+let trainingPlanType = null;
+let trainingPlanPhase = null;
+let trainingPlanPhysicalSelected = new Set();
+
+// รุ่นอายุที่เลือกอาจคาบเกี่ยวหลายช่วง (bracket) — ใช้ช่วงอายุของรุ่นที่เด็กที่สุดที่เลือกไว้เป็นตัวกำหนด
+// ชุดตัวเลือก Main part ที่จะแสดง (ลดความซับซ้อนจาก Airtable ที่มีฟิลด์แยกต่อ bracket)
+function bracketForAgeGroups(ageGroupsSet) {
+  if (ageGroupsSet.size === 0) return null;
+  const nums = Array.from(ageGroupsSet).map((g) => Number(g.replace("U", "")));
+  const youngest = Math.min(...nums);
+  if (youngest <= 12) return "U9-12";
+  if (youngest <= 14) return "U13-14";
+  return "U15-18";
+}
+
+function renderTrainingPlanAgeGroupToggle() {
+  trainingPlanAgeGroupToggleWrap.innerHTML = "";
+  trainingPlanAgeGroupToggleWrap.appendChild(
+    createChipToggleGroup(TRAINING_PLAN_AGE_GROUPS, trainingPlanAgeGroupsSelected, (ageGroup) => {
+      if (trainingPlanAgeGroupsSelected.has(ageGroup)) {
+        trainingPlanAgeGroupsSelected.delete(ageGroup);
+      } else {
+        trainingPlanAgeGroupsSelected.add(ageGroup);
+      }
+      renderTrainingPlanAgeGroupToggle();
+      renderTrainingPlanMainPartOptions();
+    })
+  );
+}
+
+// อัปเดตตัวเลือกในช่อง Main part ให้ตรงกับ bracket ของรุ่นอายุที่เลือกไว้ ถ้าเปลี่ยนรุ่นอายุจนตัวเลือกเดิม
+// ไม่อยู่ในชุดใหม่แล้ว จะล้างค่าที่เลือกไว้ก่อนหน้าทิ้ง (กันไม่ให้ค่าที่บันทึกไม่ตรงกับรุ่นอายุจริง)
+function renderTrainingPlanMainPartOptions() {
+  const bracket = bracketForAgeGroups(trainingPlanAgeGroupsSelected);
+  const currentValue = trainingPlanMainPartSelect.value;
+  if (!bracket) {
+    trainingPlanMainPartSelect.innerHTML = '<option value="">-- เลือกรุ่นอายุก่อน --</option>';
+    trainingPlanMainPartSelect.disabled = true;
+    return;
+  }
+  const options = TRAINING_PLAN_MAIN_PART_BY_BRACKET[bracket];
+  trainingPlanMainPartSelect.disabled = false;
+  trainingPlanMainPartSelect.innerHTML =
+    `<option value="">-- เลือกหัวข้อหลัก (${bracket}) --</option>` +
+    options.map((o) => `<option value="${o}">${o}</option>`).join("");
+  if (options.includes(currentValue)) {
+    trainingPlanMainPartSelect.value = currentValue;
+  }
+}
+
+function renderTrainingPlanPhysicalToggle() {
+  trainingPlanPhysicalToggleWrap.innerHTML = "";
+  trainingPlanPhysicalToggleWrap.appendChild(
+    createChipToggleGroup(TRAINING_PLAN_PHYSICAL_OPTIONS, trainingPlanPhysicalSelected, (opt) => {
+      if (trainingPlanPhysicalSelected.has(opt)) {
+        trainingPlanPhysicalSelected.delete(opt);
+      } else {
+        trainingPlanPhysicalSelected.add(opt);
+      }
+      renderTrainingPlanPhysicalToggle();
+    })
+  );
+}
+
+function renderTrainingPlanPlayerGroupSegmented() {
+  trainingPlanPlayerGroupSegmentedWrap.innerHTML = "";
+  trainingPlanPlayerGroupSegmentedWrap.appendChild(
+    createSegmentedGroup(TRAINING_PLAN_PLAYER_GROUP_OPTIONS, trainingPlanPlayerGroup, (val) => {
+      trainingPlanPlayerGroup = val;
+      renderTrainingPlanPlayerGroupSegmented();
+    })
+  );
+}
+
+function renderTrainingPlanTypeSegmented() {
+  trainingPlanTypeSegmentedWrap.innerHTML = "";
+  trainingPlanTypeSegmentedWrap.appendChild(
+    createSegmentedGroup(TRAINING_PLAN_TYPE_OPTIONS, trainingPlanType, (val) => {
+      trainingPlanType = val;
+      renderTrainingPlanTypeSegmented();
+    })
+  );
+}
+
+// แสดงช่อง "หัวข้อ (สำหรับช่วงแข่งขัน)" เฉพาะตอนเลือก Phase เป็นช่วงแข่งขันเท่านั้น
+function updateTrainingPlanCompetitionTopicVisibility() {
+  trainingPlanCompetitionTopicWrap.classList.toggle("hidden", trainingPlanPhase !== "Competition Phase (ช่วงแข่งขัน)");
+}
+
+function renderTrainingPlanPhaseSegmented() {
+  trainingPlanPhaseSegmentedWrap.innerHTML = "";
+  trainingPlanPhaseSegmentedWrap.appendChild(
+    createSegmentedGroup(TRAINING_PLAN_PHASE_OPTIONS, trainingPlanPhase, (val) => {
+      trainingPlanPhase = val;
+      renderTrainingPlanPhaseSegmented();
+      updateTrainingPlanCompetitionTopicVisibility();
+    })
+  );
+  updateTrainingPlanCompetitionTopicVisibility();
+}
+
+function stopEditTrainingPlan() {
+  editingTrainingPlanId = null;
+  trainingPlanForm.reset();
+  trainingPlanAgeGroupsSelected = new Set();
+  trainingPlanPlayerGroup = null;
+  trainingPlanType = null;
+  trainingPlanPhase = null;
+  trainingPlanPhysicalSelected = new Set();
+  renderTrainingPlanAgeGroupToggle();
+  renderTrainingPlanMainPartOptions();
+  renderTrainingPlanPhysicalToggle();
+  renderTrainingPlanPlayerGroupSegmented();
+  renderTrainingPlanTypeSegmented();
+  renderTrainingPlanPhaseSegmented();
+  trainingPlanSubmitBtn.textContent = "ส่งแผนการฝึกซ้อม";
+  cancelEditTrainingPlanBtn.classList.add("hidden");
+}
+
+cancelEditTrainingPlanBtn.addEventListener("click", () => {
+  stopEditTrainingPlan();
+  trainingPlanStatus.textContent = "";
+});
+
+function startEditTrainingPlan(plan) {
+  editingTrainingPlanId = plan.id;
+  trainingPlanDateInput.value = plan.date ?? "";
+  trainingPlanAgeGroupsSelected = new Set(plan.ageGroups || []);
+  trainingPlanPlayerGroup = plan.playerGroup ?? null;
+  trainingPlanType = plan.trainingType ?? null;
+  trainingPlanPhase = plan.phase ?? null;
+  trainingPlanPhysicalSelected = new Set(plan.physicalFocus || []);
+  trainingPlanCompetitionTopicInput.value = plan.competitionTopic ?? "";
+  trainingPlanNotesInput.value = plan.notes ?? "";
+  renderTrainingPlanAgeGroupToggle();
+  renderTrainingPlanMainPartOptions();
+  trainingPlanMainPartSelect.value = plan.mainPart ?? "";
+  renderTrainingPlanPhysicalToggle();
+  renderTrainingPlanPlayerGroupSegmented();
+  renderTrainingPlanTypeSegmented();
+  renderTrainingPlanPhaseSegmented();
+  trainingPlanSubmitBtn.textContent = "บันทึกการแก้ไข";
+  cancelEditTrainingPlanBtn.classList.remove("hidden");
+  trainingPlanStatus.textContent = `กำลังแก้ไขแผนการฝึกซ้อมวันที่ ${plan.date}`;
+  trainingPlanStatus.className = "text-sm text-slate-500";
+  trainingPlanForm.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function deleteTrainingPlan(plan) {
+  const ok = confirm(`ยืนยันลบแผนการฝึกซ้อมวันที่ ${plan.date}? การลบนี้ไม่สามารถย้อนกลับได้`);
+  if (!ok) return;
+  try {
+    await deleteDoc(doc(db, "trainingPlans", plan.id));
+    if (editingTrainingPlanId === plan.id) stopEditTrainingPlan();
+    trainingPlanStatus.textContent = "ลบแผนการฝึกซ้อมแล้ว";
+    trainingPlanStatus.className = "text-sm text-slate-500";
+    await renderTrainingPlanList();
+  } catch (err) {
+    console.error(err);
+    trainingPlanStatus.textContent = "ลบไม่สำเร็จ: " + err.message;
+    trainingPlanStatus.className = "text-sm text-red-600";
+  }
+}
+
+// สถานะการส่ง เทียบวันที่บันทึกล่าสุดกับวันที่ของแผน (แบบเดียวกับสูตรใน Airtable) — ส่งภายในหรือก่อนวันที่
+// ของแผนถือว่า "ตรงเวลา" ถ้าส่ง/แก้ไขหลังวันที่ของแผนไปแล้วถือว่า "เลท"
+function trainingPlanSubmissionStatus(plan) {
+  if (!plan.updatedAt || !plan.date) return "-";
+  return isTrainingPlanLate(plan)
+    ? '<span class="badge badge-warning">⏱ เลท</span>'
+    : '<span class="badge badge-success">✅ ตรงเวลา</span>';
+}
+
+// นับจำนวนครั้งที่ส่งสายในเดือนปัจจุบัน (ตามวันที่ในแผน ไม่ใช่วันที่ส่งจริง) ใช้เตือนโค้ชเมื่อเกินเกณฑ์
+function countLateTrainingPlansThisMonth(plans) {
+  const thisMonth = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+  return plans.filter((p) => (p.date || "").startsWith(thisMonth) && isTrainingPlanLate(p)).length;
+}
+
+async function renderTrainingPlanList() {
+  trainingPlanListBody.innerHTML =
+    '<tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>';
+  const snap = await getDocs(query(collection(db, "trainingPlans"), where("team", "==", myTeam)));
+  const plans = [];
+  snap.forEach((d) => plans.push({ id: d.id, ...d.data() }));
+  plans.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+
+  // แจ้งเตือนถ้าเดือนนี้ส่งสายเกินเกณฑ์ (นับรวมทั้งทีม เพราะผู้ดูแลระบบที่สวมบทบาทจัดการทีมแทนโค้ชก็ควร
+  // เห็นสถิติเดียวกับที่โค้ชจริงเห็น)
+  const lateCountThisMonth = countLateTrainingPlansThisMonth(plans);
+  trainingPlanLateWarning.classList.toggle("hidden", lateCountThisMonth <= TRAINING_PLAN_LATE_WARNING_THRESHOLD);
+  trainingPlanLateCountEl.textContent = lateCountThisMonth;
+
+  if (plans.length === 0) {
+    trainingPlanListBody.innerHTML =
+      '<tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">ยังไม่มีแผนการฝึกซ้อม</td></tr>';
+    return;
+  }
+
+  trainingPlanListBody.innerHTML = "";
+  for (const plan of plans) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="emphasis">${plan.date ?? "-"}</td>
+      <td>${(plan.ageGroups || []).join(", ") || "-"}</td>
+      <td>${plan.trainingType ?? "-"}</td>
+      <td>${plan.phase ?? "-"}</td>
+      <td>${plan.mainPart ?? "-"}</td>
+      <td>${(plan.physicalFocus || []).join(", ") || "-"}</td>
+      <td>${trainingPlanSubmissionStatus(plan)}</td>
+    `;
+    const actionTd = document.createElement("td");
+    actionTd.className = "space-x-2";
+    const editBtn = document.createElement("button");
+    editBtn.textContent = "แก้ไข";
+    editBtn.className = "btn btn-secondary btn-sm";
+    editBtn.addEventListener("click", () => startEditTrainingPlan(plan));
+    const deleteBtn = document.createElement("button");
+    deleteBtn.textContent = "ลบ";
+    deleteBtn.className = "btn btn-danger-soft btn-sm";
+    deleteBtn.addEventListener("click", () => deleteTrainingPlan(plan));
+    actionTd.appendChild(editBtn);
+    actionTd.appendChild(deleteBtn);
+    tr.appendChild(actionTd);
+    trainingPlanListBody.appendChild(tr);
+  }
+  applyDataLabels(trainingPlanListBody);
+}
+
+function openTrainingPlanSection() {
+  hideAllScreens();
+  trainingPlanSection.classList.remove("hidden");
+  stopEditTrainingPlan();
+  trainingPlanDateInput.value = new Date().toISOString().slice(0, 10);
+  renderTrainingPlanList();
+}
+
+trainingPlanForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!myTeam) {
+    trainingPlanStatus.textContent = "ยังไม่ทราบทีมที่รับผิดชอบ";
+    trainingPlanStatus.className = "text-sm text-red-600";
+    return;
+  }
+  const dateStr = trainingPlanDateInput.value;
+  if (!dateStr) {
+    trainingPlanStatus.textContent = "กรุณาเลือกวันที่";
+    trainingPlanStatus.className = "text-sm text-red-600";
+    return;
+  }
+  if (trainingPlanAgeGroupsSelected.size === 0) {
+    trainingPlanStatus.textContent = "กรุณาเลือกรุ่นอายุอย่างน้อย 1 รุ่น";
+    trainingPlanStatus.className = "text-sm text-red-600";
+    return;
+  }
+  if (!trainingPlanType) {
+    trainingPlanStatus.textContent = "กรุณาเลือกประเภทการฝึก";
+    trainingPlanStatus.className = "text-sm text-red-600";
+    return;
+  }
+  if (!trainingPlanPhase) {
+    trainingPlanStatus.textContent = "กรุณาเลือก Phase (ช่วงการซ้อม)";
+    trainingPlanStatus.className = "text-sm text-red-600";
+    return;
+  }
+
+  const payload = {
+    team: myTeam,
+    date: dateStr,
+    ageGroups: Array.from(trainingPlanAgeGroupsSelected),
+    playerGroup: trainingPlanPlayerGroup && trainingPlanPlayerGroup !== "ไม่ระบุ" ? trainingPlanPlayerGroup : null,
+    trainingType: trainingPlanType,
+    phase: trainingPlanPhase,
+    competitionTopic:
+      trainingPlanPhase === "Competition Phase (ช่วงแข่งขัน)" ? trainingPlanCompetitionTopicInput.value.trim() || null : null,
+    mainPart: trainingPlanMainPartSelect.value || null,
+    physicalFocus: Array.from(trainingPlanPhysicalSelected),
+    notes: trainingPlanNotesInput.value.trim() || null,
+    coachId: auth.currentUser.uid,
+    coachName: myCoachName || auth.currentUser.email,
+    updatedAt: serverTimestamp()
+  };
+
+  try {
+    trainingPlanStatus.textContent = "กำลังบันทึก...";
+    trainingPlanStatus.className = "text-sm text-slate-500";
+
+    if (editingTrainingPlanId) {
+      await updateDoc(doc(db, "trainingPlans", editingTrainingPlanId), payload);
+      trainingPlanStatus.textContent = "บันทึกการแก้ไขสำเร็จ ✓";
+      trainingPlanStatus.className = "text-sm text-emerald-600";
+      stopEditTrainingPlan();
+    } else {
+      await addDoc(collection(db, "trainingPlans"), { ...payload, createdAt: serverTimestamp() });
+      stopEditTrainingPlan();
+      trainingPlanDateInput.value = dateStr;
+      trainingPlanStatus.textContent = "ส่งแผนการฝึกซ้อมสำเร็จ ✓";
+      trainingPlanStatus.className = "text-sm text-emerald-600";
+    }
+    await renderTrainingPlanList();
+  } catch (err) {
+    console.error(err);
+    trainingPlanStatus.textContent = "บันทึกไม่สำเร็จ: " + err.message;
+    trainingPlanStatus.className = "text-sm text-red-600";
+  }
+});
+
 // ---------- สรุปประจำวัน (Daily) ----------
 function formatThaiDate(dateStr) {
   const d = new Date(`${dateStr}T00:00:00`);
@@ -2506,6 +3034,25 @@ function renderDailyTrainingReport(snap) {
       <p><span class="text-slate-400">สถานะ:</span> ${attendedText}</p>
       <p><span class="text-slate-400">ช่วงเวลา:</span> ${formatReportPeriodForDaily(r)}</p>
       <p><span class="text-slate-400">หมายเหตุ:</span> ${r.notes ?? "-"}</p>
+    </div>
+  `;
+}
+
+function renderDailyTrainingPlan(snap) {
+  if (snap.empty) {
+    dailyTrainingPlanCard.innerHTML = '<p class="text-sm text-slate-400">ยังไม่มีการส่งแผนการฝึกซ้อมในวันนี้</p>';
+    return;
+  }
+  const p = snap.docs[0].data();
+  dailyTrainingPlanCard.innerHTML = `
+    <div class="space-y-2">
+      <p><span class="text-slate-400">รุ่นอายุ:</span> ${(p.ageGroups || []).join(", ") || "-"}</p>
+      <p><span class="text-slate-400">กรุ้ปผู้เล่น:</span> ${p.playerGroup ?? "-"}</p>
+      <p><span class="text-slate-400">ประเภทการฝึก:</span> ${p.trainingType ?? "-"}</p>
+      <p><span class="text-slate-400">Phase:</span> ${p.phase ?? "-"}</p>
+      <p><span class="text-slate-400">หัวข้อหลัก (Main part):</span> ${p.mainPart ?? "-"}</p>
+      <p><span class="text-slate-400">Physical:</span> ${(p.physicalFocus || []).join(", ") || "-"}</p>
+      <p><span class="text-slate-400">สถานะการส่ง:</span> ${trainingPlanSubmissionStatus(p)}</p>
     </div>
   `;
 }
@@ -2569,15 +3116,17 @@ async function loadDailyData(dateStr) {
   dailyDateHeading.classList.remove("hidden");
 
   try {
-    const [attendanceSnap, trainingSnap, matchSnap, injurySnap] = await Promise.all([
+    const [attendanceSnap, trainingSnap, trainingPlanSnap, matchSnap, injurySnap] = await Promise.all([
       getDocs(query(collection(db, "attendance"), where("team", "==", myTeam), where("date", "==", dateStr))),
       getDocs(query(collection(db, "trainingReports"), where("team", "==", myTeam), where("date", "==", dateStr))),
+      getDocs(query(collection(db, "trainingPlans"), where("team", "==", myTeam), where("date", "==", dateStr))),
       getDocs(query(collection(db, "matchReports"), where("team", "==", myTeam), where("date", "==", dateStr))),
       getDocs(query(collection(db, "injuryReports"), where("team", "==", myTeam), where("date", "==", dateStr)))
     ]);
 
     renderDailyAttendance(attendanceSnap);
     renderDailyTrainingReport(trainingSnap);
+    renderDailyTrainingPlan(trainingPlanSnap);
     renderDailyMatchReports(matchSnap);
     renderDailyInjuryReports(injurySnap);
 

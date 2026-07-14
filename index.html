@@ -184,6 +184,29 @@
       </div>
     </section>
 
+    <!-- สรุปการส่งแผนการฝึกซ้อมรายวัน ใช้ตรวจสอบว่าโค้ชคนไหนส่งสายเกินเกณฑ์ในเดือนนี้ (แสดงทั้งมุมมองทุกทีม
+         และทีมใดทีมหนึ่ง เพราะเป็นตัวเลขที่ต้องเห็นภาพรวมได้เสมอ ไม่ได้ผูกกับ scopeTeam เหมือน section อื่น) -->
+    <section>
+      <h2 class="section-title mb-4"><span class="icon-badge">📋</span> สรุปการส่งแผนการฝึกซ้อมรายวัน (เดือนนี้)</h2>
+      <div class="card table-wrap">
+        <table class="pro-table">
+          <thead>
+            <tr>
+              <th>โค้ช</th>
+              <th>ทีม</th>
+              <th>จำนวนแผนที่ส่งเดือนนี้</th>
+              <th>ส่งตรงเวลา</th>
+              <th>ส่งสาย</th>
+              <th>สถานะ</th>
+            </tr>
+          </thead>
+          <tbody id="training-plan-summary-body">
+            <tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
     <!-- รายชื่อผู้เล่น แยกตามทีม/โค้ชผู้รับผิดชอบ -->
     <section>
       <h2 class="section-title mb-4"><span class="icon-badge">👤</span> รายชื่อผู้เล่น</h2>

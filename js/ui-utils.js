@@ -26,6 +26,16 @@ export function teamLogoImg(team, className = "w-6 h-6 object-contain inline-blo
   return `<img src="${src}" alt="${team}" class="${className} mix-blend-multiply" />`;
 }
 
+// การ์ดตัวเลขสรุปแบบสั้นๆ (label + value) ใช้ในหน้าสรุปภาพรวมต่างๆ
+export function statCard(label, value) {
+  return `
+    <div class="stat-card">
+      <p class="stat-label">${label}</p>
+      <p class="stat-value">${value}</p>
+    </div>
+  `;
+}
+
 // ---------- ระบบให้คะแนนรายวัน 4 ด้าน ----------
 // ใช้ร่วมกันทั้งหน้าโค้ช (attendance.js) และ Dashboard (app.js) เพื่อให้คำนวณ
 // "ประเมินครบหรือยัง" และ "คะแนนเฉลี่ย" ตรงกันทุกจุด
@@ -51,6 +61,21 @@ export function isPlayerFullyEvaluated(record) {
   if (record.status !== "A") return true;
   const scores = record.scores || {};
   return SCORE_CATEGORIES.every((c) => typeof scores[c.key] === "number");
+}
+
+// ---------- แผนการฝึกซ้อมรายวัน: กฎ "ส่งสาย" ----------
+// ใช้ร่วมกันทั้งหน้าโค้ช (attendance.js — เตือนโค้ชเจ้าของแผนเอง) และ Dashboard (app.js — สรุปให้ผู้ดูแล
+// ระบบเห็นภาพรวมทุกโค้ช) เพื่อให้กฎ "สาย" ตรงกันทุกจุด ไม่มีจุดไหนคำนวณเพี้ยนจากอีกจุด
+// ต้องส่งแผนภายใน 14:00 น. ของวันที่ระบุในแผนนั้น ถ้าส่ง/แก้ไขหลังจากนี้ (หรือส่งข้ามวันไปแล้ว) ถือว่า "เลท"
+export const TRAINING_PLAN_DEADLINE_HOUR = 14;
+// สายเกินกี่ครั้งต่อเดือนถึงต้องแจ้งเตือนให้โค้ชปรับปรุงมาตรฐานการส่งแผน
+export const TRAINING_PLAN_LATE_WARNING_THRESHOLD = 3;
+
+export function isTrainingPlanLate(plan) {
+  const ts = plan.updatedAt && typeof plan.updatedAt.toDate === "function" ? plan.updatedAt.toDate() : null;
+  if (!ts || !plan.date) return false;
+  const deadline = new Date(`${plan.date}T${String(TRAINING_PLAN_DEADLINE_HOUR).padStart(2, "0")}:00:00`);
+  return ts > deadline;
 }
 
 // เติม data-label ให้แต่ละ <td> อัตโนมัติจากหัวตาราง (thead th) ของ <table> เดียวกัน

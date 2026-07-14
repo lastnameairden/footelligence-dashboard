@@ -84,5 +84,13 @@ service cloud.firestore {
       allow update: if isAdmin() || (canManageTeam() && ownsTeam() && request.resource.data.team == myTeam());
       allow delete: if isAdmin() || (canManageTeam() && ownsTeam());
     }
+
+    // แผนการฝึกซ้อมรายวัน — โค้ชจัดการได้เฉพาะแผนของทีมตัวเอง ผู้บริหารทีมดูได้อย่างเดียว
+    match /trainingPlans/{id} {
+      allow read: if isAdmin() || (canViewTeam() && ownsTeam());
+      allow create: if isAdmin() || (canManageTeam() && request.resource.data.team == myTeam());
+      allow update: if isAdmin() || (canManageTeam() && ownsTeam() && request.resource.data.team == myTeam());
+      allow delete: if isAdmin() || (canManageTeam() && ownsTeam());
+    }
   }
 }

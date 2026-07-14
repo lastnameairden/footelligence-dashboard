@@ -144,6 +144,23 @@ table.pro-table td.emphasis { font-weight: 600; color: #0f172a; }
   color: #475569;
 }
 
+/* ---------- Chip toggle (เลือกได้หลายค่าพร้อมกัน แบบตัวเลือกจำนวนมากที่ต้องขึ้นบรรทัดใหม่ได้) ---------- */
+.chip-toggle-group { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.chip-toggle {
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.chip-toggle:hover { background: #f1f5f9; }
+.chip-toggle.active { background: #0f172a; border-color: #0f172a; color: #fff; }
+.chip-toggle.active:hover { background: #0f172a; }
+
 /* ---------- Badges ---------- */
 .badge {
   display: inline-flex;

@@ -133,13 +133,28 @@
     </section>
 
     <!-- ข้อความสำหรับผู้บริหารทีม: ให้ดูข้อมูลที่หน้า Dashboard เท่านั้น -->
-    <section id="executive-section" class="hidden card card-pad max-w-md mx-auto text-center">
-      <div class="icon-badge icon-badge-lg mx-auto mb-3">📊</div>
-      <h2 class="text-lg font-semibold mb-2">บัญชีผู้บริหารทีม</h2>
-      <p class="text-sm text-slate-500 mb-4">
-        บัญชีนี้เป็นผู้บริหารทีม สามารถดูข้อมูลการประเมินนักกีฬาของทีมได้ที่หน้า Dashboard
-      </p>
-      <a href="./index.html" class="btn btn-primary">ไปที่หน้า Dashboard →</a>
+    <section id="executive-section" class="hidden space-y-6">
+      <div class="page-heading">
+        <div class="icon-badge icon-badge-lg">📊</div>
+        <div>
+          <h2>สรุปภาพรวมทีมประจำเดือนนี้</h2>
+          <p id="executive-status" class="text-sm text-slate-500">กำลังโหลดข้อมูล...</p>
+        </div>
+      </div>
+
+      <div id="executive-stat-cards" class="grid grid-cols-2 sm:grid-cols-4 gap-4"></div>
+
+      <div id="executive-late-warning" class="hidden card card-pad border-2 border-red-200 bg-red-50">
+        <p class="font-semibold text-red-700">⚠️ เดือนนี้ทีมส่งแผนการฝึกซ้อมสายแล้ว <span id="executive-late-count">0</span> ครั้ง</p>
+        <p class="text-sm text-red-600 mt-1">เกินเกณฑ์ที่กำหนด (เกิน 3 ครั้ง/เดือน) ควรพูดคุยกับโค้ชเพื่อปรับปรุงมาตรฐานการส่งแผน</p>
+      </div>
+
+      <div class="card card-pad text-center">
+        <p class="text-sm text-slate-500 mb-3">
+          ดูข้อมูลนักกีฬารายคน ผลการแข่งขัน และรายละเอียดเพิ่มเติมทั้งหมดได้ที่หน้า Dashboard
+        </p>
+        <a id="executive-dashboard-link" href="./index.html" class="btn btn-primary">ไปที่หน้า Dashboard แบบเต็ม →</a>
+      </div>
     </section>
 
     <!-- แถบโปรไฟล์ผู้ใช้งาน (แสดงหลังล็อกอินสำเร็จ ทุกหน้าจอย่อย) -->
@@ -345,15 +360,16 @@
         <div class="icon-badge icon-badge-lg">🗂️</div>
         <div>
           <h2>จัดการข้อมูลทีม</h2>
-          <p>เลือกทีมที่ต้องการเพิ่มนักกีฬา เช็คชื่อ หรือส่งรายงานแทนโค้ช</p>
+          <p>เลือกทีมที่ต้องการจัดการ แล้วเลือกว่าจะเข้าดูในโหมดโค้ชหรือโหมดผู้บริหารทีม</p>
         </div>
       </div>
       <div class="card card-pad space-y-3 max-w-sm">
         <div>
-          <label class="field-label">เลือกทีมที่จะจัดการข้อมูล</label>
+          <label class="field-label">เลือกทีมที่จะจัดการ/ดูข้อมูล</label>
           <select id="admin-team-select" class="field-input w-full"></select>
         </div>
-        <button id="admin-select-team-btn" class="btn btn-primary btn-block">จัดการข้อมูลทีมนี้ →</button>
+        <button id="admin-select-team-btn" class="btn btn-primary btn-block">จัดการข้อมูลทีมนี้ (โหมดโค้ช) →</button>
+        <button id="admin-select-team-executive-btn" class="btn btn-secondary btn-block">👔 ดูในโหมดผู้บริหารทีม →</button>
       </div>
     </section>
 
@@ -801,6 +817,109 @@
       </div>
     </section>
 
+    <!-- หน้าจอส่งแผนการฝึกซ้อมรายวัน -->
+    <section id="training-plan-section" class="hidden space-y-6">
+      <button data-back class="btn btn-ghost px-0">← กลับหน้า Daily</button>
+
+      <div class="page-heading">
+        <div class="icon-badge icon-badge-lg">📋</div>
+        <div>
+          <h2>แผนการฝึกซ้อมรายวัน</h2>
+          <p>ส่งแผนการฝึกซ้อมของวันนั้นๆ พร้อมหัวข้อหลักและจุดเน้นด้านฟิสิคอล (ต้องส่งภายใน 14:00 น. ของวันนั้น)</p>
+        </div>
+      </div>
+
+      <!-- แจ้งเตือนเมื่อส่งสายเกินเกณฑ์ในเดือนนี้ -->
+      <div id="training-plan-late-warning" class="hidden card card-pad border-2 border-red-200 bg-red-50">
+        <p class="font-semibold text-red-700">⚠️ เดือนนี้ส่งแผนการฝึกซ้อมสายแล้ว <span id="training-plan-late-count">0</span> ครั้ง</p>
+        <p class="text-sm text-red-600 mt-1">กรุณาส่งแผนการฝึกซ้อมภายในเวลา 14:00 น. ของวันนั้นๆ เพื่อให้เป็นไปตามมาตรฐานของทีม หากยังส่งสายต่อเนื่องอาจต้องมีการพูดคุยกับผู้ดูแลระบบ</p>
+      </div>
+
+      <div class="card card-pad">
+        <form id="training-plan-form" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="field-label">แบบฝึกประจำวันที่</label>
+            <input id="training-plan-date" type="date" required class="field-input" />
+          </div>
+          <div>
+            <label class="field-label">กรุ้ปผู้เล่น (A/B)</label>
+            <div id="training-plan-player-group-segmented" class="segmented"></div>
+          </div>
+
+          <div class="sm:col-span-2">
+            <label class="field-label mb-2">รุ่นอายุ (เลือกได้หลายรุ่น)</label>
+            <div id="training-plan-age-group-toggle" class="chip-toggle-group"></div>
+          </div>
+
+          <div>
+            <label class="field-label">ประเภทการฝึก</label>
+            <div id="training-plan-type-segmented" class="segmented"></div>
+          </div>
+          <div>
+            <label class="field-label">Phase (ช่วงการซ้อม)</label>
+            <div id="training-plan-phase-segmented" class="segmented"></div>
+          </div>
+
+          <div id="training-plan-competition-topic-wrap" class="hidden sm:col-span-2">
+            <label class="field-label">หัวข้อ (สำหรับช่วงแข่งขัน)</label>
+            <input id="training-plan-competition-topic" type="text" class="field-input" placeholder="เช่น เตรียมทีมพบ ทีม A" />
+          </div>
+
+          <div class="sm:col-span-2">
+            <label class="field-label">หัวข้อหลักการฝึก (Main part)</label>
+            <select id="training-plan-main-part" class="field-input">
+              <option value="">-- เลือกรุ่นอายุก่อน --</option>
+            </select>
+          </div>
+
+          <div class="sm:col-span-2">
+            <label class="field-label mb-2">Physical (จุดเน้นด้านฟิสิคอล — เลือกได้หลายข้อ)</label>
+            <div id="training-plan-physical-toggle" class="chip-toggle-group"></div>
+          </div>
+
+          <div class="sm:col-span-2">
+            <label class="field-label">แผนการฝึก (รูป/PDF)</label>
+            <input type="file" disabled class="field-input opacity-60 cursor-not-allowed" />
+            <p class="text-xs text-slate-400 mt-1">ฟีเจอร์แนบไฟล์แผนการฝึกจะเปิดใช้งานเร็วๆ นี้</p>
+          </div>
+
+          <div class="sm:col-span-2">
+            <label class="field-label">หมายเหตุ (ถ้ามี)</label>
+            <textarea id="training-plan-notes" rows="3" class="field-input" placeholder="เช่น เหตุผลที่ส่งแผนช้า หรือรายละเอียดเพิ่มเติม"></textarea>
+          </div>
+
+          <div class="sm:col-span-2 flex items-center gap-4">
+            <button type="submit" id="training-plan-submit-btn" class="btn btn-primary">ส่งแผนการฝึกซ้อม</button>
+            <button type="button" id="cancel-edit-training-plan-btn" class="btn btn-secondary hidden">ยกเลิกการแก้ไข</button>
+            <p id="training-plan-status" class="text-sm text-slate-500"></p>
+          </div>
+        </form>
+      </div>
+
+      <div>
+        <h2 class="section-title mb-3"><span class="icon-badge">📋</span> ประวัติแผนการฝึกซ้อม</h2>
+        <div class="card table-wrap">
+          <table class="pro-table">
+            <thead>
+              <tr>
+                <th>วันที่</th>
+                <th>รุ่นอายุ</th>
+                <th>ประเภท</th>
+                <th>Phase</th>
+                <th>หัวข้อหลัก</th>
+                <th>Physical</th>
+                <th>สถานะการส่ง</th>
+                <th>ดำเนินการ</th>
+              </tr>
+            </thead>
+            <tbody id="training-plan-list-body">
+              <tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">ยังไม่มีแผนการฝึกซ้อม</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
     <!-- หน้าจอสรุปประจำวัน (Daily) -->
     <section id="daily-section" class="hidden space-y-6">
       <div class="page-heading">
@@ -843,6 +962,11 @@
       <div>
         <h2 class="section-title mb-3"><span class="icon-badge">📝</span> รายงานการฝึกซ้อม</h2>
         <div id="daily-training-report-card" class="card card-pad text-sm text-slate-400">เลือกวันที่แล้วกด "โหลดข้อมูล"</div>
+      </div>
+
+      <div>
+        <h2 class="section-title mb-3"><span class="icon-badge">📋</span> แผนการฝึกซ้อมรายวัน</h2>
+        <div id="daily-training-plan-card" class="card card-pad text-sm text-slate-400">เลือกวันที่แล้วกด "โหลดข้อมูล"</div>
       </div>
 
       <div>

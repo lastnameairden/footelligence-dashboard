@@ -8,7 +8,15 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import { db, auth } from "./firebase-init.js";
-import { applyDataLabels, computeAvgScore, isPlayerFullyEvaluated, teamIconBadge, teamLogoImg } from "./ui-utils.js";
+import {
+  applyDataLabels,
+  computeAvgScore,
+  isPlayerFullyEvaluated,
+  teamIconBadge,
+  teamLogoImg,
+  isTrainingPlanLate,
+  TRAINING_PLAN_LATE_WARNING_THRESHOLD
+} from "./ui-utils.js";
 
 // สถานะที่นับว่า "มาซ้อม" ตาม legend ของ Logbook (A หรือค่าประเมิน 1-4)
 const ATTENDED_CODES = new Set(["A", "1", "2", "3", "4"]);
@@ -38,6 +46,7 @@ const ageProgressLegend = document.getElementById("age-progress-legend");
 const trainingReportsSection = document.getElementById("training-reports-section");
 const trainingReportsBody = document.getElementById("training-reports-body");
 const trainingReportsLocationHeader = document.getElementById("training-reports-location-header");
+const trainingPlanSummaryBody = document.getElementById("training-plan-summary-body");
 const headerAttendanceLink = document.getElementById("header-attendance-link");
 const dashboardBackLink = document.getElementById("dashboard-back-link");
 const hamburgerBtn = document.getElementById("hamburger-btn");
@@ -647,6 +656,62 @@ async function loadTrainingReports(team) {
 }
 
 // scopeTeam: null = ผู้ดูแลระบบ เห็นทุกทีม / string = โค้ช เห็นเฉพาะทีมตัวเอง
+// ---------- สรุปการส่งแผนการฝึกซ้อมรายวัน (ภาพรวมทุกโค้ช เพื่อจับตาดูโค้ชที่ส่งสายบ่อย) ----------
+async function loadTrainingPlanSummary(scopeTeam) {
+  trainingPlanSummaryBody.innerHTML =
+    '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>';
+
+  const snap = scopeTeam
+    ? await getDocs(query(collection(db, "trainingPlans"), where("team", "==", scopeTeam)))
+    : await getDocs(collection(db, "trainingPlans"));
+  const plans = [];
+  snap.forEach((d) => plans.push(d.data()));
+
+  const thisMonth = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+  const monthPlans = plans.filter((p) => (p.date || "").startsWith(thisMonth));
+
+  // จัดกลุ่มตามโค้ช+ทีม (กันชื่อโค้ชซ้ำกันคนละทีม) เพราะเป้าหมายคือดูมาตรฐานการส่งของโค้ชแต่ละคน ไม่ใช่ทีม
+  const groups = new Map();
+  for (const p of monthPlans) {
+    const key = `${p.coachName ?? "-"}__${p.team ?? "-"}`;
+    if (!groups.has(key)) {
+      groups.set(key, { coachName: p.coachName ?? "-", team: p.team ?? "-", total: 0, late: 0 });
+    }
+    const g = groups.get(key);
+    g.total += 1;
+    if (isTrainingPlanLate(p)) g.late += 1;
+  }
+
+  const rows = Array.from(groups.values()).sort((a, b) => b.late - a.late);
+
+  if (rows.length === 0) {
+    trainingPlanSummaryBody.innerHTML =
+      '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">ยังไม่มีการส่งแผนการฝึกซ้อมในเดือนนี้</td></tr>';
+    return;
+  }
+
+  trainingPlanSummaryBody.innerHTML = rows
+    .map((r) => {
+      const onTime = r.total - r.late;
+      // สายเกินเกณฑ์ (>3 ครั้ง/เดือน) = ต้องปรับปรุงมาตรฐานการส่งแผน
+      const statusBadge =
+        r.late > TRAINING_PLAN_LATE_WARNING_THRESHOLD
+          ? '<span class="badge badge-danger">⚠️ ต้องปรับปรุง</span>'
+          : '<span class="badge badge-success">ปกติ</span>';
+      return `
+        <tr>
+          <td class="emphasis">${r.coachName}</td>
+          <td>${teamLogoImg(r.team)}${r.team}</td>
+          <td>${r.total}</td>
+          <td class="text-emerald-600 font-medium">${onTime}</td>
+          <td class="text-red-500 font-medium">${r.late}</td>
+          <td>${statusBadge}</td>
+        </tr>`;
+    })
+    .join("");
+  applyDataLabels(trainingPlanSummaryBody);
+}
+
 async function loadDashboard(scopeTeam) {
   try {
     setStatus("กำลังโหลดข้อมูล...");
@@ -674,6 +739,8 @@ async function loadDashboard(scopeTeam) {
     renderPlayersGroups(playerGroups, teamLabels);
     renderAttendanceGroups(playerGroups, teamStats, teamLabels);
     setStatus(`โหลดข้อมูลสำเร็จ • ผู้เล่น ${players.length} คน • ${playerGroups.size} ทีม`);
+
+    loadTrainingPlanSummary(scopeTeam);
 
     ageProgressSection.classList.toggle("hidden", !scopeTeam);
     trainingReportsSection.classList.toggle("hidden", !scopeTeam);
