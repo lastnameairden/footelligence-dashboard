@@ -881,8 +881,9 @@ async function loadDashboard(scopeTeam) {
       loadCollection("coaches")
     ]);
     currentTeamPlayers = scopeTeam ? players : [];
-    const coachNames = buildCoachNames(coaches);
-    const teamLabels = buildTeamLabels(coachNames);
+    const teamCoachSummary = buildTeamCoachSummary(coaches);
+    const coachNameByAgeGroup = buildCoachNameByAgeGroup(coaches);
+    const teamLabels = buildTeamLabels(teamCoachSummary);
     const playerGroups = groupByTeam(players);
     const teamStats = computeTeamStats(playerGroups, attendanceRecords);
 
@@ -891,9 +892,9 @@ async function loadDashboard(scopeTeam) {
       // รุ่นอายุแทนทีม เพื่อให้เห็นข้อมูลที่ใช้ได้จริงมากกว่าการแยกตามทีมซึ่งมีทีมเดียวอยู่แล้ว
       const ageGroupGroups = groupByAgeGroup(players);
       const ageGroupStats = computeAgeGroupStats(ageGroupGroups, attendanceRecords);
-      renderOverview(ageGroupGroups, ageGroupStats, "ageGroup", coachNames.get(scopeTeam));
+      renderOverview(ageGroupGroups, ageGroupStats, "ageGroup", (ageGroup) => coachNameByAgeGroup.get(`${scopeTeam}||${ageGroup}`));
     } else {
-      renderOverview(playerGroups, teamStats, "team", coachNames);
+      renderOverview(playerGroups, teamStats, "team", teamCoachSummary);
     }
     renderPlayersGroups(playerGroups, teamLabels);
     renderAttendanceGroups(playerGroups, teamStats, teamLabels);
