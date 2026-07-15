@@ -221,6 +221,7 @@ const progressRefreshBtn = document.getElementById("progress-refresh-btn");
 const progressTableBody = document.getElementById("progress-table-body");
 const progressPie = document.getElementById("progress-pie");
 const progressLegend = document.getElementById("progress-legend");
+const progressTeamTabs = document.getElementById("progress-team-tabs");
 
 const SUBMISSION_DEADLINE_HOUR = 20; // ต้องส่งข้อมูล/ประเมินภายใน 20:00 น. ของวันนั้น
 
@@ -1211,62 +1212,14 @@ const PROGRESS_LABELS = {
   no_training: "ไม่มีฝึกซ้อม"
 };
 
-async function loadDailyProgress(dateStr) {
-  progressTableBody.innerHTML =
-    '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>';
-
-  const coachSnap = await getDocs(collection(db, "coaches"));
-  const coaches = [];
-  coachSnap.forEach((d) => {
-    const data = d.data();
-    if (data.status === "approved" && data.role === "coach" && data.team) {
-      coaches.push({ id: d.id, ...data });
-    }
-  });
-
-  if (coaches.length === 0) {
+// วาดตารางความคืบหน้าของแถวที่ส่งมา (ใช้ซ้ำได้ทั้งตอนโหลดครั้งแรกและตอนสลับปุ่มเลือกทีม)
+function renderProgressTable(rows) {
+  progressTableBody.innerHTML = "";
+  if (rows.length === 0) {
     progressTableBody.innerHTML =
-      '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">ยังไม่มีโค้ชที่ได้รับอนุมัติ</td></tr>';
-    renderProgressPie([]);
+      '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">ยังไม่มีข้อมูล</td></tr>';
     return;
   }
-
-  const rows = await Promise.all(
-    coaches.map(async (c) => {
-      const [playersSnap, sessionSnap] = await Promise.all([
-        getDocs(query(collection(db, "players"), where("team", "==", c.team))),
-        getDocs(query(collection(db, "sessions"), where("date", "==", dateStr), where("team", "==", c.team)))
-      ]);
-      const totalPlayers = playersSnap.size;
-
-      if (sessionSnap.empty) {
-        return { coach: c, totalPlayers, evaluated: 0, noTraining: false, completedAt: null };
-      }
-      const sessionDoc = sessionSnap.docs[0];
-      const sessionData = sessionDoc.data();
-      if (sessionData.noTraining) {
-        return { coach: c, totalPlayers, evaluated: 0, noTraining: true, completedAt: null };
-      }
-      const attendanceSnap = await getDocs(
-        query(collection(db, "attendance"), where("sessionId", "==", sessionDoc.id))
-      );
-      const evaluatedRecords = attendanceSnap.docs
-        .map((d) => d.data())
-        .filter((a) => isPlayerFullyEvaluated(a));
-      let completedAt = null;
-      if (totalPlayers > 0 && evaluatedRecords.length >= totalPlayers) {
-        for (const a of evaluatedRecords) {
-          if (a.updatedAt && typeof a.updatedAt.toDate === "function") {
-            const t = a.updatedAt.toDate();
-            if (!completedAt || t > completedAt) completedAt = t;
-          }
-        }
-      }
-      return { coach: c, totalPlayers, evaluated: evaluatedRecords.length, noTraining: false, completedAt };
-    })
-  );
-
-  progressTableBody.innerHTML = "";
   for (const r of rows) {
     const notEvaluated = Math.max(r.totalPlayers - r.evaluated, 0);
     const completedAtText = r.completedAt
@@ -1294,13 +1247,116 @@ async function loadDailyProgress(dateStr) {
     progressTableBody.appendChild(tr);
   }
   applyDataLabels(progressTableBody);
+}
 
-  renderProgressPie(rows);
+async function loadDailyProgress(dateStr) {
+  progressTableBody.innerHTML =
+    '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>';
+
+  const coachSnap = await getDocs(collection(db, "coaches"));
+  const coaches = [];
+  coachSnap.forEach((d) => {
+    const data = d.data();
+    if (data.status === "approved" && data.role === "coach" && data.team) {
+      coaches.push({ id: d.id, ...data });
+    }
+  });
+
+  if (coaches.length === 0) {
+    progressTeamTabs.classList.add("hidden");
+    progressTeamTabs.innerHTML = "";
+    progressTableBody.innerHTML =
+      '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">ยังไม่มีโค้ชที่ได้รับอนุมัติ</td></tr>';
+    renderProgressPie([]);
+    return;
+  }
+
+  const rows = await Promise.all(
+    coaches.map(async (c) => {
+      const ageGroups = c.ageGroups || [];
+      const [playersSnap, sessionSnap] = await Promise.all([
+        getDocs(query(collection(db, "players"), where("team", "==", c.team))),
+        getDocs(query(collection(db, "sessions"), where("date", "==", dateStr), where("team", "==", c.team)))
+      ]);
+      // นับเฉพาะนักกีฬาในรุ่นอายุที่โค้ชคนนี้รับผิดชอบจริง ไม่ใช่นักกีฬาทั้งทีม (ทีมหนึ่งมีหลายรุ่นอายุ/หลาย
+      // โค้ชดูแลคนละรุ่น — sessions/attendance ยังผูกกับ "ทีม" ทั้งก้อนต่อวัน ไม่ได้แยกต่อรุ่นอายุ) และถ้าเป็น
+      // GK Coach นับเฉพาะตำแหน่ง GK ส่วน Head/Assistant Coach ไม่นับตำแหน่ง GK เลย (เหมือนหน้ารายชื่อนักกีฬา
+      // ของโค้ชเอง — กันไม่ให้ต้องเช็คชื่อ/ให้คะแนนซ้ำซ้อนกัน)
+      const myPlayerIds = new Set(
+        playersSnap.docs
+          .filter((d) => {
+            const p = d.data();
+            if (!ageGroups.includes(p.ageGroup)) return false;
+            if (c.coachPosition === "gk_coach") return p.position === "GK";
+            if (c.coachPosition === "head_coach" || c.coachPosition === "assistant_coach") return p.position !== "GK";
+            return true;
+          })
+          .map((d) => d.id)
+      );
+      const totalPlayers = myPlayerIds.size;
+
+      if (sessionSnap.empty) {
+        return { coach: c, totalPlayers, evaluated: 0, noTraining: false, completedAt: null };
+      }
+      const sessionDoc = sessionSnap.docs[0];
+      const sessionData = sessionDoc.data();
+      if (sessionData.noTraining) {
+        return { coach: c, totalPlayers, evaluated: 0, noTraining: true, completedAt: null };
+      }
+      const attendanceSnap = await getDocs(
+        query(collection(db, "attendance"), where("sessionId", "==", sessionDoc.id))
+      );
+      const evaluatedRecords = attendanceSnap.docs
+        .map((d) => d.data())
+        .filter((a) => myPlayerIds.has(a.playerId) && isPlayerFullyEvaluated(a));
+      let completedAt = null;
+      if (totalPlayers > 0 && evaluatedRecords.length >= totalPlayers) {
+        for (const a of evaluatedRecords) {
+          if (a.updatedAt && typeof a.updatedAt.toDate === "function") {
+            const t = a.updatedAt.toDate();
+            if (!completedAt || t > completedAt) completedAt = t;
+          }
+        }
+      }
+      return { coach: c, totalPlayers, evaluated: evaluatedRecords.length, noTraining: false, completedAt };
+    })
+  );
+
+  // เรียงตามลำดับทีม (TEAMS) แล้วตามรุ่นอายุน้อยไปมากภายในทีมเดียวกัน
+  rows.sort((a, b) => {
+    const teamDiff = TEAMS.indexOf(a.coach.team) - TEAMS.indexOf(b.coach.team);
+    return teamDiff !== 0 ? teamDiff : ageGroupSortKey(a.coach.ageGroups) - ageGroupSortKey(b.coach.ageGroups);
+  });
+
+  // เลือกดูทีละทีมผ่านปุ่มแทนการแสดงทุกทีมพร้อมกัน โดย default เลือกทีมแรกให้อัตโนมัติ
+  const teamsPresent = Array.from(new Set(rows.map((r) => r.coach.team)));
+  progressTeamTabs.classList.remove("hidden");
+  progressTeamTabs.innerHTML = "";
+
+  function showTeam(team, btn) {
+    for (const tabBtn of progressTeamTabs.children) {
+      tabBtn.classList.toggle("btn-primary", tabBtn === btn);
+      tabBtn.classList.toggle("btn-secondary", tabBtn !== btn);
+    }
+    const teamRows = rows.filter((r) => r.coach.team === team);
+    renderProgressTable(teamRows);
+    renderProgressPie(teamRows);
+  }
+
+  for (const team of teamsPresent) {
+    const tabBtn = document.createElement("button");
+    tabBtn.type = "button";
+    tabBtn.className = "btn btn-secondary btn-sm";
+    tabBtn.innerHTML = `${teamLogoImg(team)}${team}`;
+    tabBtn.addEventListener("click", () => showTeam(team, tabBtn));
+    progressTeamTabs.appendChild(tabBtn);
+  }
+  showTeam(teamsPresent[0], progressTeamTabs.children[0]);
 }
 
 function categorizeProgress(r) {
   if (r.noTraining) return "no_training";
-  if (r.totalPlayers === 0) return null; // ยังไม่มีนักกีฬาในทีม ไม่นับในภาพรวม
+  if (r.totalPlayers === 0) return null; // ยังไม่มีนักกีฬาในรุ่นที่ดูแล ไม่นับในภาพรวม
   if (r.evaluated >= r.totalPlayers) return "complete";
   if (r.evaluated > 0) return "partial";
   return "not_started";

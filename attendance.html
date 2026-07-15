@@ -362,6 +362,7 @@
           <button id="progress-refresh-btn" class="btn btn-primary">โหลด</button>
         </div>
       </div>
+      <div id="progress-team-tabs" class="hidden flex flex-wrap gap-2 mb-1"></div>
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div class="lg:col-span-2 card table-wrap">
           <table class="pro-table">
@@ -747,6 +748,13 @@
         <div>
           <label class="field-label">หมายเหตุเพิ่มเติม</label>
           <textarea id="report-notes" rows="3" class="field-input" placeholder="หากไม่มีการซ้อม กรุณาระบุเหตุผลที่นี่ หรือบันทึกเหตุการณ์สำคัญอื่นๆ"></textarea>
+        </div>
+
+        <!-- เตรียมช่องแนบรูปไว้ล่วงหน้า (ยังไม่เปิดใช้งาน) — ซ่อนด้วย hidden จนกว่าจะตั้งค่า Firebase Storage
+        และเขียน storage.rules เสร็จ จึงค่อยเอา class="hidden" ออกและต่อ logic อัปโหลดจริง -->
+        <div id="report-photo-wrap" class="hidden">
+          <label class="field-label">แนบรูปภาพ</label>
+          <input id="report-photo-input" type="file" accept="image/*" multiple class="field-input" />
         </div>
 
         <div class="flex items-center gap-4">
