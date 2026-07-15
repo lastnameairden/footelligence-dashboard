@@ -938,15 +938,24 @@ function buildCoachRow(c, sessions, attendanceRecords) {
 
   const tr = document.createElement("tr");
 
-  // ชื่อโค้ชคลิกได้ ใช้เปิดป็อปอัป "แก้ไขบัญชีผู้ใช้" เพื่อดู/แก้ไขข้อมูล (ทางลัดเดียวกับปุ่ม "แก้ไขบัญชี")
+  // ชื่อโค้ชคลิกได้ ใช้สวมบทบาทเข้าไปดูหน้าจอจริงของบัญชีนั้น (เหมือนกดปุ่ม "จัดการทีมนี้" แต่เจาะจงคนเดียว
+  // ไม่ใช่คนแรกที่เจอในทีม) ส่วนการแก้ไขข้อมูลบัญชียังใช้ปุ่ม "แก้ไขบัญชี" แยกต่างหากในคอลัมน์ "จัดการ"
   const nameTd = document.createElement("td");
   nameTd.className = "emphasis";
   const nameBtn = document.createElement("button");
   nameBtn.type = "button";
   nameBtn.textContent = c.name ?? "-";
   nameBtn.className = "text-blue-600 hover:underline text-left";
-  nameBtn.title = "คลิกเพื่อดู/แก้ไขข้อมูลบัญชีนี้";
-  nameBtn.addEventListener("click", () => openEditCoachModal(c));
+  nameBtn.title = "คลิกเพื่อดูข้อมูล/หน้าจอของบัญชีนี้";
+  nameBtn.addEventListener("click", () => {
+    if (c.team && c.role === "coach") {
+      enterTeamManagementMode(c.team, adminCoachesSection, c);
+    } else if (c.team && c.role === "executive") {
+      enterExecutiveViewMode(c.team, adminCoachesSection, c);
+    } else {
+      openEditCoachModal(c);
+    }
+  });
   nameTd.appendChild(nameBtn);
 
   const roleTd = document.createElement("td");
@@ -1348,15 +1357,18 @@ async function findCoachRecordForTeam(team, role) {
   return snap.empty ? null : snap.docs[0].data();
 }
 
-async function enterTeamManagementMode(team, returnSection) {
+// coachRecordOverride: ระบุได้เมื่อรู้ตัวโค้ชที่ต้องการสวมบทบาทแน่ชัดอยู่แล้ว (เช่น คลิกชื่อโค้ชคนใดคนหนึ่งใน
+// รายชื่อโค้ช) เพื่อไม่ให้ไปหลงเอาโค้ชคนแรกที่เจอในทีมมาแสดงผิดคน (ทีมหนึ่งมีโค้ชได้หลายคนคนละรุ่นอายุ) ถ้าไม่ระบุ
+// จะ fallback ไปหาโค้ชคนแรกของทีมเหมือนเดิม (ใช้ตอนกดจากปุ่ม "จัดการทีมนี้ →" ซึ่งไม่ได้เจาะจงคนใดคนหนึ่ง)
+async function enterTeamManagementMode(team, returnSection, coachRecordOverride) {
   myTeam = team;
   myAgeGroups = []; // ผู้ดูแลระบบจัดการทีมแทนโค้ช เลือกรุ่นอายุของนักกีฬาได้อิสระทุกรุ่น (สิทธิ์การแก้ไขข้อมูล
   // จุดนี้ตั้งใจให้กว้างกว่าโค้ชจริงคนเดียว เผื่อทีมมีหลายรุ่นอายุ — ต่างจากข้อมูลที่แสดงผลด้านล่างซึ่งต้อง
   // ตรงกับโค้ชจริง 100%)
   adminViewingAs = "coach";
-  const coachRecord = await findCoachRecordForTeam(team, "coach");
+  const coachRecord = coachRecordOverride || (await findCoachRecordForTeam(team, "coach"));
   myCoachName = coachRecord?.name || auth.currentUser?.email;
-  // แสดงชื่อ/อีเมล/สถานะของโค้ชตัวจริง (ถ้าหาเจอ) แทนข้อมูลของผู้ดูแลระบบเอง เพื่อให้หน้าจอเหมือนที่โค้ช
+  // แสดงชื่อ/อีเมล/สถานะ/รุ่นอายุของโค้ชตัวจริง (ถ้าหาเจอ) แทนข้อมูลของผู้ดูแลระบบเอง เพื่อให้หน้าจอเหมือนที่โค้ช
   // จริงเห็นทุกประการเวลาสวมบทบาทเข้ามาทดสอบ/ตรวจสอบระบบ — สลับกลับตอนออกจากโหมดนี้ที่ exitTeamManagementToAdminPanel()
   coachNameEl.textContent = coachRecord?.name || team;
   coachEmailEl.textContent = coachRecord?.email || "-";
@@ -1365,6 +1377,9 @@ async function enterTeamManagementMode(team, returnSection) {
   coachRoleBadgeEl.className = "badge badge-success";
   coachTeamEl.innerHTML = `${teamLogoImg(team)}${team}`;
   coachAgeGroupsWrap.classList.remove("hidden");
+  // ใช้ ageGroups ของโค้ชคนนั้นโดยตรงจาก Firestore (ไม่ใช้รุ่นอายุที่ปรากฏในรายชื่อนักกีฬาของทั้งทีม เพราะ
+  // ทีมหนึ่งมีนักกีฬาหลายรุ่น อาจไม่ตรงกับรุ่นที่โค้ชคนนี้รับผิดชอบจริง)
+  coachAgeGroupsEl.textContent = coachRecord?.ageGroups?.length ? coachRecord.ageGroups.join(", ") : "-";
   if (!dateInput.value) {
     dateInput.value = new Date().toISOString().slice(0, 10);
   }
@@ -1372,18 +1387,17 @@ async function enterTeamManagementMode(team, returnSection) {
   // ใน nav drawer ที่ย้อนกลับไปจุดที่พามาที่นี่ทีละสเต็ป (ดู exitTeamManagementToAdminPanel)
   adminReturnSection = returnSection || adminManageTeamSection;
   await loadPlayers();
-  renderAgeGroupsFromPlayers();
   renderDrawerItems();
   showDaily();
 }
 
 // ผู้ดูแลระบบสวมบทบาทเป็น "ผู้บริหารทีม" (ดูอย่างเดียว) แทนที่จะเป็นโค้ชเต็มรูปแบบ — ใช้ตรวจสอบว่าหน้าจอ
 // ที่ผู้บริหารทีมจริงเห็นถูกต้องหรือไม่ โดยไม่ต้องขอให้ผู้บริหารทีมจริงล็อกอินทดสอบให้
-async function enterExecutiveViewMode(team, returnSection) {
+async function enterExecutiveViewMode(team, returnSection, execRecordOverride) {
   myTeam = team;
   myAgeGroups = [];
   adminViewingAs = "executive";
-  const execRecord = await findCoachRecordForTeam(team, "executive");
+  const execRecord = execRecordOverride || (await findCoachRecordForTeam(team, "executive"));
   // แสดงชื่อ/อีเมล/สถานะของผู้บริหารทีมตัวจริง (ถ้าหาเจอ) แทนข้อมูลของผู้ดูแลระบบเอง เหมือนกับโหมดโค้ช
   coachNameEl.textContent = execRecord?.name || team;
   coachEmailEl.textContent = execRecord?.email || "-";
@@ -1548,7 +1562,8 @@ adminSelectTeamExecutiveBtn.addEventListener("click", () => {
 
 // แสดงโปรไฟล์ผู้ใช้งานที่มีในระบบให้ครบทุกส่วน (ชื่อ, อีเมล, ทีม, สถานะบัญชี, รุ่นอายุที่รับผิดชอบ)
 // ฟิลด์ "รุ่นอายุที่รับผิดชอบ" แสดงเฉพาะบทบาทโค้ชเท่านั้น (ผู้ดูแลระบบ/ผู้บริหารทีมไม่ต้องแสดง — ซ่อนด้วย
-// coachAgeGroupsWrap) และอัปเดตแยกหลังโหลดรายชื่อนักกีฬาของทีมเสร็จ (ดู renderAgeGroupsFromPlayers)
+// coachAgeGroupsWrap) ผู้เรียกต้องตั้งค่า coachAgeGroupsEl.textContent เองจากฟิลด์ ageGroups ของโค้ชคนนั้น
+// โดยตรง (ไม่ใช้ข้อมูลจากรายชื่อนักกีฬาของทีม เพราะทีมหนึ่งมีนักกีฬาหลายรุ่น อาจไม่ตรงกับรุ่นที่โค้ชคนนี้ดูแลจริง)
 function renderCoachProfile(user, data, teamText) {
   coachNameEl.textContent = (data && data.name) || user.email;
   coachEmailEl.textContent = user.email;
@@ -1564,19 +1579,6 @@ function renderCoachProfile(user, data, teamText) {
   // ไม่ว่าจะเลื่อนดูหน้าไหนอยู่ (ป้ายบทบาทซิงก์แยกใน renderDrawerItems เพราะกำหนดค่าทีหลังจุดนี้)
   navDrawerNameEl.textContent = coachNameEl.textContent;
   navDrawerEmailEl.textContent = coachEmailEl.textContent;
-}
-
-function formatAgeGroups(playerList) {
-  const groups = new Set();
-  for (const p of playerList) {
-    if (p.ageGroup) groups.add(p.ageGroup);
-  }
-  return groups.size > 0 ? Array.from(groups).sort().join(", ") : "-";
-}
-
-// ใช้ตอนมีรายชื่อนักกีฬาของทีมโหลดไว้แล้วในตัวแปร players (เฉพาะบทบาทโค้ช)
-function renderAgeGroupsFromPlayers() {
-  coachAgeGroupsEl.textContent = formatAgeGroups(players);
 }
 
 // ---------- ล็อกอิน: แยกเส้นทางตามบทบาท (ผู้ดูแลระบบ / โค้ชที่อนุมัติแล้ว / รอการอนุมัติ) ----------
@@ -1674,12 +1676,12 @@ onAuthStateChanged(auth, async (user) => {
     myAgeGroups = data.ageGroups || [];
     renderCoachProfile(user, data, myTeam);
     coachAgeGroupsWrap.classList.remove("hidden");
+    coachAgeGroupsEl.textContent = myAgeGroups.length ? myAgeGroups.join(", ") : "-";
     adminReturnSection = null;
     if (!dateInput.value) {
       dateInput.value = new Date().toISOString().slice(0, 10);
     }
     await loadPlayers();
-    renderAgeGroupsFromPlayers();
     renderDrawerItems();
     showDaily();
   } catch (err) {
