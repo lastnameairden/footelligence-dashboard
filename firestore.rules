@@ -110,5 +110,11 @@ service cloud.firestore {
       allow update: if isAdmin() || (canViewTeam() && ownsTeam());
       allow delete: if isAdmin();
     }
+
+    // สถานะ "อ่านแล้ว" ของการแจ้งเตือนแต่ละหมวดสำหรับผู้ดูแลระบบ (1 เอกสารต่อหมวด เช่น pending_accounts,
+    // severe_injuries) — เฉพาะผู้ดูแลระบบเท่านั้นที่เข้าถึงได้ เพราะระบบแจ้งเตือนนี้มีไว้สำหรับผู้ดูแลระบบเท่านั้น
+    match /adminNotificationReads/{key} {
+      allow read, write: if isAdmin();
+    }
   }
 }

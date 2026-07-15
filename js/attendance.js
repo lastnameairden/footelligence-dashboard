@@ -30,31 +30,20 @@ import {
   statCard,
   matchResultBadge,
   injurySeverityBadge,
-  injuryStatusBadge
+  injuryStatusBadge,
+  loadAdminNotifications,
+  renderAdminNotifications,
+  markNotificationRead,
+  getCoachPlayerIds,
+  ageGroupSortKey,
+  COACH_POSITIONS,
+  coachPositionLabel,
+  coachPositionAllowsMultipleAgeGroups
 } from "./ui-utils.js";
 
 const STATUS_OPTIONS = ["A", "I", "R", "P"];
 const SCORE_OPTIONS = [1, 2, 3, 4];
 const TEAMS = ["KHAMPHEE FOOTBALL", "THAWEE SC", "THAMMASATHIT"];
-
-// ---------- ตำแหน่งโค้ช ----------
-// Head Coach / Assistant Coach ดูแลได้รุ่นอายุเดียว (ทำงานคู่กันในรุ่นเดียวกัน) — Assistant Coach จึงใช้
-// เงื่อนไขเดียวกับ Head Coach ทุกประการ ส่วน GK Coach / Fitness Coach ดูแลได้หลายรุ่นพร้อมกัน เพราะเป็น
-// ตำแหน่งเฉพาะทางที่มักดูแลนักกีฬา/ฟิตเนสของหลายรุ่นอายุในทีมเดียวกัน
-const COACH_POSITIONS = {
-  head_coach: { label: "Head Coach", multiAgeGroup: false },
-  assistant_coach: { label: "Assistant Coach", multiAgeGroup: false },
-  gk_coach: { label: "GK Coach", multiAgeGroup: true },
-  fitness_coach: { label: "Fitness Coach", multiAgeGroup: true }
-};
-
-function coachPositionLabel(coachPosition) {
-  return COACH_POSITIONS[coachPosition]?.label || "-";
-}
-
-function coachPositionAllowsMultipleAgeGroups(coachPosition) {
-  return COACH_POSITIONS[coachPosition]?.multiAgeGroup ?? true;
-}
 
 for (let i = 0; i < SCORE_CATEGORIES.length; i++) {
   const th = document.getElementById(`score-header-${i}`);
@@ -178,6 +167,10 @@ const adminPrintStatus = document.getElementById("admin-print-status");
 const adminStatus = document.getElementById("admin-status");
 const hamburgerBtn = document.getElementById("hamburger-btn");
 const notificationBellBtn = document.getElementById("notification-bell-btn");
+const notificationBadge = document.getElementById("notification-badge");
+const notificationPanel = document.getElementById("notification-panel");
+const notificationList = document.getElementById("notification-list");
+const notificationRefreshBtn = document.getElementById("notification-refresh-btn");
 const navDrawerOverlay = document.getElementById("nav-drawer-overlay");
 const navDrawer = document.getElementById("nav-drawer");
 const navDrawerCloseBtn = document.getElementById("nav-drawer-close-btn");
@@ -449,6 +442,52 @@ function closeDrawer() {
 hamburgerBtn.addEventListener("click", openDrawer);
 navDrawerCloseBtn.addEventListener("click", closeDrawer);
 navDrawerOverlay.addEventListener("click", closeDrawer);
+
+// ---------- การแจ้งเตือน (เฉพาะผู้ดูแลระบบ — โค้ช/ผู้บริหารทีมมีปุ่มกระดิ่งแต่ยังไม่เปิดใช้งาน) ----------
+let currentNotifications = [];
+
+async function refreshNotifications() {
+  if (!currentIsAdmin) return;
+  notificationList.innerHTML = '<p class="text-slate-400 text-sm text-center py-6">กำลังโหลด...</p>';
+  try {
+    currentNotifications = await loadAdminNotifications();
+    renderAdminNotifications(notificationList, currentNotifications);
+    const unreadCount = currentNotifications.filter((n) => !n.read).length;
+    notificationBadge.classList.toggle("hidden", unreadCount === 0);
+  } catch (err) {
+    console.error(err);
+    notificationList.innerHTML = `<p class="text-red-600 text-sm text-center py-6">โหลดการแจ้งเตือนไม่สำเร็จ: ${err.message}</p>`;
+  }
+}
+
+notificationBellBtn.addEventListener("click", () => {
+  const opening = notificationPanel.classList.contains("hidden");
+  notificationPanel.classList.toggle("hidden", !opening);
+  if (opening) refreshNotifications();
+});
+notificationRefreshBtn.addEventListener("click", refreshNotifications);
+// คลิกปุ่ม "✓" ในรายการเพื่อทำเครื่องหมายว่าอ่านแล้วทีละรายการ (event delegation เพราะรายการถูกสร้างใหม่
+// ทุกครั้งที่โหลดข้อมูล) กันไม่ให้คลิกไปโดนลิงก์ที่ห่ออยู่ด้วย (preventDefault + stopPropagation)
+notificationList.addEventListener("click", async (e) => {
+  const btn = e.target.closest("[data-mark-read-index]");
+  if (!btn) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const n = currentNotifications[Number(btn.dataset.markReadIndex)];
+  if (!n) return;
+  try {
+    await markNotificationRead(n.key, n.detail);
+    refreshNotifications();
+  } catch (err) {
+    console.error(err);
+    alert("ทำเครื่องหมายว่าอ่านแล้วไม่สำเร็จ: " + err.message);
+  }
+});
+document.addEventListener("click", (e) => {
+  if (notificationPanel.classList.contains("hidden")) return;
+  if (notificationPanel.contains(e.target) || notificationBellBtn.contains(e.target)) return;
+  notificationPanel.classList.add("hidden");
+});
 
 function drawerItem(icon, label, onClick) {
   const btn = document.createElement("button");
@@ -897,45 +936,36 @@ async function rejectCoach(coachId) {
 }
 
 // ---------- ผู้ดูแลระบบ: รายชื่อโค้ช + % ส่งข้อมูลตรงเวลา ----------
-// เกณฑ์: แต่ละ session (วัน) ถือว่า "ตรงเวลา" ถ้าเวลาบันทึกล่าสุด (สร้าง session หรือให้คะแนนผู้เล่นคนสุดท้าย
-// หรือทำเครื่องหมาย "ไม่มีฝึกซ้อม") อยู่ก่อน 20:00 น. ของวันที่ระบุไว้ใน session นั้น
-function sessionLatestActivity(session, attendanceForSession) {
+// เกณฑ์: แต่ละ session (วัน) ที่โค้ชคนนี้มีนักกีฬาของตัวเองบันทึกไว้ ถือว่า "ตรงเวลา" ถ้าเวลาแก้ไขล่าสุดของ
+// บันทึกนักกีฬาที่ตัวเองดูแล (ไม่รวมของโค้ชอื่นในเซสชันเดียวกัน) อยู่ก่อน 20:00 น. ของวันนั้น — คำนวณแยกรายคน
+// เพราะ 1 เซสชันใช้ร่วมกันได้หลายโค้ช (คนละรุ่นอายุ) การแก้ไขของโค้ชอื่นไม่ควรกระทบผลของโค้ชคนนี้
+function isCoachSubmissionOnTime(session, myAttendanceForSession) {
+  if (!session.date) return false;
   let latest = null;
-  const consider = (ts) => {
-    if (!ts || typeof ts.toDate !== "function") return;
-    const d = ts.toDate();
-    if (!latest || d > latest) latest = d;
-  };
-  consider(session.createdAt);
-  consider(session.updatedAt);
-  for (const a of attendanceForSession) consider(a.updatedAt);
-  return latest;
-}
-
-function isSessionOnTime(session, attendanceForSession) {
-  const latest = sessionLatestActivity(session, attendanceForSession);
-  if (!latest || !session.date) return false;
+  for (const a of myAttendanceForSession) {
+    if (a.updatedAt && typeof a.updatedAt.toDate === "function") {
+      const t = a.updatedAt.toDate();
+      if (!latest || t > latest) latest = t;
+    }
+  }
+  if (!latest) return false;
   const deadline = new Date(`${session.date}T${String(SUBMISSION_DEADLINE_HOUR).padStart(2, "0")}:00:00`);
   return latest <= deadline;
 }
 
-// เรียงรุ่นอายุจากน้อยไปมาก (ตัวเลขในชื่อ เช่น "U9" < "U10") — โค้ช GK ที่ดูแลหลายรุ่นใช้รุ่นที่น้อยที่สุด
-// เป็นตัวจัดลำดับ ไม่มีรุ่นอายุเลย (เช่น ผู้บริหารทีม) ถือว่าอยู่ท้ายสุดของกลุ่ม
-function ageGroupSortKey(ageGroups) {
-  if (!ageGroups || ageGroups.length === 0) return Infinity;
-  const nums = ageGroups.map((ag) => parseInt(String(ag).replace(/\D/g, ""), 10)).filter((n) => !isNaN(n));
-  return nums.length > 0 ? Math.min(...nums) : Infinity;
-}
-
-function buildCoachRow(c, sessions, attendanceRecords) {
+function buildCoachRow(c, sessions, attendanceRecords, players) {
   const teamSessions = sessions.filter((s) => s.team === c.team);
+  const myPlayerIds = getCoachPlayerIds(c, players);
   let onTimeCount = 0;
+  let relevantSessions = 0;
   for (const s of teamSessions) {
-    const attendanceForSession = attendanceRecords.filter((a) => a.sessionId === s.id);
-    if (isSessionOnTime(s, attendanceForSession)) onTimeCount += 1;
+    const myAttendanceForSession = attendanceRecords.filter((a) => a.sessionId === s.id && myPlayerIds.has(a.playerId));
+    if (myAttendanceForSession.length === 0) continue; // ยังไม่มีบันทึกของนักกีฬาที่ตัวเองดูแลในวันนั้น ไม่นับ
+    relevantSessions += 1;
+    if (isCoachSubmissionOnTime(s, myAttendanceForSession)) onTimeCount += 1;
   }
   const percentText =
-    teamSessions.length > 0 ? `${Math.round((onTimeCount / teamSessions.length) * 100)}% (${onTimeCount}/${teamSessions.length} วัน)` : "-";
+    relevantSessions > 0 ? `${Math.round((onTimeCount / relevantSessions) * 100)}% (${onTimeCount}/${relevantSessions} วัน)` : "-";
   const statusBadge =
     c.role === "admin"
       ? '<span class="badge badge-info">ผู้ดูแลระบบ</span>'
@@ -990,7 +1020,7 @@ function buildCoachRow(c, sessions, attendanceRecords) {
   return tr;
 }
 
-function buildCoachGroupTable(coaches, sessions, attendanceRecords) {
+function buildCoachGroupTable(coaches, sessions, attendanceRecords, players) {
   const wrapper = document.createElement("div");
   wrapper.innerHTML = `
     <div class="card table-wrap">
@@ -1013,7 +1043,7 @@ function buildCoachGroupTable(coaches, sessions, attendanceRecords) {
   `;
   const tbody = wrapper.querySelector("tbody");
   for (const c of coaches) {
-    tbody.appendChild(buildCoachRow(c, sessions, attendanceRecords));
+    tbody.appendChild(buildCoachRow(c, sessions, attendanceRecords, players));
   }
   applyDataLabels(tbody);
   return wrapper;
@@ -1023,10 +1053,11 @@ function buildCoachGroupTable(coaches, sessions, attendanceRecords) {
 // ดูง่ายกว่าตารางรวมทุกทีมแบบเดิม — บัญชีที่ยังไม่มีทีม (ผู้ดูแลระบบ/รอกำหนดทีม) แยกไว้เป็นกลุ่มท้ายสุด
 async function loadCoachDirectory() {
   coachDirectoryGroups.innerHTML = '<p class="text-slate-400 text-sm">กำลังโหลด...</p>';
-  const [coachSnap, sessionSnap, attendanceSnap] = await Promise.all([
+  const [coachSnap, sessionSnap, attendanceSnap, playerSnap] = await Promise.all([
     getDocs(collection(db, "coaches")),
     getDocs(collection(db, "sessions")),
-    getDocs(collection(db, "attendance"))
+    getDocs(collection(db, "attendance")),
+    getDocs(collection(db, "players"))
   ]);
 
   const coaches = [];
@@ -1035,6 +1066,8 @@ async function loadCoachDirectory() {
   sessionSnap.forEach((d) => sessions.push({ id: d.id, ...d.data() }));
   const attendanceRecords = [];
   attendanceSnap.forEach((d) => attendanceRecords.push(d.data()));
+  const players = [];
+  playerSnap.forEach((d) => players.push({ id: d.id, ...d.data() }));
 
   if (coaches.length === 0) {
     coachDirectoryGroups.innerHTML = '<p class="text-slate-400 text-sm">ยังไม่มีโค้ชในระบบ</p>';
@@ -1083,7 +1116,7 @@ async function loadCoachDirectory() {
     groupWrap.appendChild(viewTeamBtn);
 
     coachDirectoryGroups.appendChild(groupWrap);
-    coachDirectoryGroups.appendChild(buildCoachGroupTable(teamCoaches, sessions, attendanceRecords));
+    coachDirectoryGroups.appendChild(buildCoachGroupTable(teamCoaches, sessions, attendanceRecords, players));
   }
 
   if (unassignedGroup.length > 0) {
@@ -1092,7 +1125,7 @@ async function loadCoachDirectory() {
     heading.className = "section-title text-sm mb-2";
     heading.textContent = `🛡️ ยังไม่มีทีม (ผู้ดูแลระบบ/รอกำหนดทีม) (${unassignedGroup.length} คน)`;
     coachDirectoryGroups.appendChild(heading);
-    coachDirectoryGroups.appendChild(buildCoachGroupTable(unassignedGroup, sessions, attendanceRecords));
+    coachDirectoryGroups.appendChild(buildCoachGroupTable(unassignedGroup, sessions, attendanceRecords, players));
   }
 }
 
@@ -1273,26 +1306,14 @@ async function loadDailyProgress(dateStr) {
 
   const rows = await Promise.all(
     coaches.map(async (c) => {
-      const ageGroups = c.ageGroups || [];
       const [playersSnap, sessionSnap] = await Promise.all([
         getDocs(query(collection(db, "players"), where("team", "==", c.team))),
         getDocs(query(collection(db, "sessions"), where("date", "==", dateStr), where("team", "==", c.team)))
       ]);
-      // นับเฉพาะนักกีฬาในรุ่นอายุที่โค้ชคนนี้รับผิดชอบจริง ไม่ใช่นักกีฬาทั้งทีม (ทีมหนึ่งมีหลายรุ่นอายุ/หลาย
-      // โค้ชดูแลคนละรุ่น — sessions/attendance ยังผูกกับ "ทีม" ทั้งก้อนต่อวัน ไม่ได้แยกต่อรุ่นอายุ) และถ้าเป็น
-      // GK Coach นับเฉพาะตำแหน่ง GK ส่วน Head/Assistant Coach ไม่นับตำแหน่ง GK เลย (เหมือนหน้ารายชื่อนักกีฬา
-      // ของโค้ชเอง — กันไม่ให้ต้องเช็คชื่อ/ให้คะแนนซ้ำซ้อนกัน)
-      const myPlayerIds = new Set(
-        playersSnap.docs
-          .filter((d) => {
-            const p = d.data();
-            if (!ageGroups.includes(p.ageGroup)) return false;
-            if (c.coachPosition === "gk_coach") return p.position === "GK";
-            if (c.coachPosition === "head_coach" || c.coachPosition === "assistant_coach") return p.position !== "GK";
-            return true;
-          })
-          .map((d) => d.id)
-      );
+      // นับเฉพาะนักกีฬาในรุ่นอายุ (และตำแหน่งถ้าเป็น GK Coach) ที่โค้ชคนนี้รับผิดชอบจริง ไม่ใช่นักกีฬาทั้งทีม
+      // (ทีมหนึ่งมีหลายรุ่นอายุ/หลายโค้ชดูแลคนละรุ่น — sessions/attendance ยังผูกกับ "ทีม" ทั้งก้อนต่อวัน)
+      const players = playersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const myPlayerIds = getCoachPlayerIds(c, players);
       const totalPlayers = myPlayerIds.size;
 
       if (sessionSnap.empty) {
@@ -1407,6 +1428,10 @@ progressRefreshBtn.addEventListener("click", () => {
 // หาบัญชีโค้ช/ผู้บริหารทีมตัวจริงของทีมนี้ (ถ้ามี) เพื่อเอาชื่อ/อีเมล/สถานะจริงมาแสดง แทนที่จะค้างเป็น
 // ข้อมูลของผู้ดูแลระบบเอง — ให้หน้าจอตอนสวมบทบาทตรงกับที่เจ้าของบัญชีจริงเห็น 100% ไม่มีร่องรอยของผู้ดูแลระบบ
 // หลงเหลือให้สับสน จนกว่าจะกดกลับแผงควบคุมผู้ดูแลระบบ
+// ถ้ามีโค้ชหลายคนตรงเงื่อนไข (role="coach") ให้เลือก Head Coach ก่อน Assistant Coach ก่อนตำแหน่งอื่น (แทนที่จะ
+// เอาคนแรกที่เจอแบบสุ่มตามลำดับ query) เพื่อให้ "โค้ชตัวแทนทีม" ที่แสดงตอนสวมบทบาทแบบกว้าง (ไม่เจาะจงคน — ดู
+// coachRecordOverride ใน enterTeamManagementMode) สอดคล้องกับหลักการเดียวกับ buildCoachNameByAgeGroup ใน
+// app.js ที่ให้สิทธิ์ Head Coach เหนือกว่า Assistant Coach เสมอ
 async function findCoachRecordForTeam(team, role) {
   const snap = await getDocs(
     query(
@@ -1416,7 +1441,12 @@ async function findCoachRecordForTeam(team, role) {
       where("status", "==", "approved")
     )
   );
-  return snap.empty ? null : snap.docs[0].data();
+  if (snap.empty) return null;
+  const docs = snap.docs.map((d) => d.data());
+  if (role !== "coach") return docs[0];
+  const priority = { head_coach: 0, assistant_coach: 1 };
+  docs.sort((a, b) => (priority[a.coachPosition] ?? 2) - (priority[b.coachPosition] ?? 2));
+  return docs[0];
 }
 
 // coachRecordOverride: ระบุได้เมื่อรู้ตัวโค้ชที่ต้องการสวมบทบาทแน่ชัดอยู่แล้ว (เช่น คลิกชื่อโค้ชคนใดคนหนึ่งใน
@@ -1690,6 +1720,7 @@ onAuthStateChanged(auth, async (user) => {
       myTeam = null;
       adminReturnSection = null;
       renderDrawerItems();
+      refreshNotifications();
 
       // หน้าแรกของผู้ดูแลระบบคือ Dashboard เสมอ — หน้านี้ (attendance.html) จะไม่แสดงแผงควบคุมเองโดย
       // อัตโนมัติอีกต่อไป เข้าถึงเครื่องมือแต่ละอย่างได้ผ่าน deep link #admin=... เท่านั้น (ลิงก์จากเมนู ☰

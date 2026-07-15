@@ -20,7 +20,14 @@ import {
   matchResultBadge,
   injurySeverityBadge,
   injuryStatusBadge,
-  sendExecutiveNote
+  sendExecutiveNote,
+  loadAdminNotifications,
+  renderAdminNotifications,
+  markNotificationRead,
+  getCoachPlayerIds,
+  ageGroupSortKey,
+  ageGroupNumber,
+  coachPositionLabel
 } from "./ui-utils.js";
 
 // สถานะที่นับว่า "มาซ้อม" ตาม legend ของ Logbook (A หรือค่าประเมิน 1-4)
@@ -31,6 +38,9 @@ const TEAMS = ["KHAMPHEE FOOTBALL", "THAWEE SC", "THAMMASATHIT"];
 const playersGroupsEl = document.getElementById("players-groups");
 const attendanceGroupsEl = document.getElementById("attendance-groups");
 const overviewCardsEl = document.getElementById("overview-cards");
+const positionToggleWrap = document.getElementById("position-toggle-wrap");
+const playerPositionToggleBtn = document.getElementById("player-position-toggle-btn");
+const gkPositionToggleBtn = document.getElementById("gk-position-toggle-btn");
 const playersPieTitleEl = document.getElementById("players-pie-title");
 const attendanceBarsTitleEl = document.getElementById("attendance-bars-title");
 const scoreBarsTitleEl = document.getElementById("score-bars-title");
@@ -62,6 +72,10 @@ const headerAttendanceLink = document.getElementById("header-attendance-link");
 const dashboardBackLink = document.getElementById("dashboard-back-link");
 const hamburgerBtn = document.getElementById("hamburger-btn");
 const notificationBellBtn = document.getElementById("notification-bell-btn");
+const notificationBadge = document.getElementById("notification-badge");
+const notificationPanel = document.getElementById("notification-panel");
+const notificationList = document.getElementById("notification-list");
+const notificationRefreshBtn = document.getElementById("notification-refresh-btn");
 const navDrawerOverlay = document.getElementById("nav-drawer-overlay");
 const navDrawer = document.getElementById("nav-drawer");
 const navDrawerCloseBtn = document.getElementById("nav-drawer-close-btn");
@@ -77,6 +91,10 @@ let currentTrainingPlanRows = [];
 
 let currentScopeTeam = null;
 let currentTeamPlayers = [];
+// สลับดู "ผู้เล่น" กับ "GK" ในภาพรวมของทีมที่เลือกอยู่ (ปุ่ม position-toggle) — เก็บพารามิเตอร์ล่าสุดไว้ใน
+// scopedOverviewData เพื่อให้สลับปุ่มได้ทันทีโดยไม่ต้องโหลดข้อมูลจาก Firestore ใหม่
+let currentDashboardPosition = "player";
+let scopedOverviewData = null;
 
 function setStatus(message, isError = false) {
   if (!statusEl) return;
@@ -126,29 +144,44 @@ function buildCoachNameByAgeGroup(coaches) {
   return map;
 }
 
-// สร้างแถวสถิติแยกเป็นรายคนของ Head Coach/Assistant Coach ทุกคน (ทีม + รุ่นอายุที่ดูแล + จำนวนนักกีฬา/
-// % เข้าร่วม/คะแนนเฉลี่ยเฉพาะรุ่นที่ตัวเองดูแลเท่านั้น ไม่ใช่รวมทั้งทีม) ใช้แสดงในตารางภาพรวม "ทุกทีม" แทนการ
-// รวมทุกคนของทีมเป็นแถวเดียว — เรียงตามลำดับทีม (TEAMS) แล้วตามรุ่นอายุน้อยไปมากภายในทีมเดียวกัน
+// "team||ageGroup" -> ชื่อ GK Coach ที่ดูแลรุ่นนั้น (คู่กับ buildCoachNameByAgeGroup ด้านบนที่ดูแลเฉพาะ
+// Head/Assistant Coach) ใช้แสดงโค้ชผู้รับผิดชอบของแถว GK แยกจากแถวผู้เล่นตำแหน่งอื่น
+function buildGkCoachNameByAgeGroup(coaches) {
+  const map = new Map();
+  for (const c of coaches) {
+    if (!c.team || c.role !== "coach" || c.coachPosition !== "gk_coach" || !Array.isArray(c.ageGroups)) continue;
+    for (const ag of c.ageGroups) {
+      map.set(`${c.team}||${ag}`, c.name || c.email || "ไม่ระบุโค้ช");
+    }
+  }
+  return map;
+}
+
+// สร้างแถวสถิติแยกเป็นรายคนของโค้ชทุกคนทุกตำแหน่ง (ทีม + ตำแหน่ง + รุ่นอายุที่ดูแล + จำนวนนักกีฬา/% เข้าร่วม/
+// คะแนนเฉลี่ยเฉพาะนักกีฬาที่ตัวเองดูแลจริงเท่านั้น ไม่ใช่รวมทั้งทีม) ใช้แสดงในตารางภาพรวม "ทุกทีม" แทนการรวม
+// ทุกคนของทีมเป็นแถวเดียว — ใช้ getCoachPlayerIds (ตัวเดียวกับที่หน้ารายชื่อโค้ช/ความคืบหน้าการประเมินใช้) เพื่อ
+// แยกผู้เล่นตำแหน่ง GK ออกจาก Head/Assistant Coach อย่างถูกต้อง (ไม่งั้น GK จะถูกนับซ้ำเป็นของ Head Coach
+// และ GK Coach เองจะไม่มีแถวเลย) เรียงตามลำดับทีม (TEAMS) แล้วตามรุ่นอายุน้อยไปมากภายในทีมเดียวกัน
 function buildCoachOverviewRows(coaches, playerGroups, attendanceRecords) {
   const rows = [];
   for (const c of coaches) {
     if (!c.team || c.role !== "coach") continue;
-    if (c.coachPosition !== "head_coach" && c.coachPosition !== "assistant_coach") continue;
-    const ageGroups = c.ageGroups || [];
     const teamPlayers = playerGroups.get(c.team) || [];
-    const coachPlayers = teamPlayers.filter((p) => ageGroups.includes(p.ageGroup));
+    const myPlayerIds = getCoachPlayerIds(c, teamPlayers);
+    const coachPlayers = teamPlayers.filter((p) => myPlayerIds.has(p.id));
     const totals = sumStats(computeAttendanceStats(coachPlayers, attendanceRecords));
     rows.push({
       team: c.team,
       coachName: c.name || c.email || "ไม่ระบุโค้ช",
-      ageGroups,
+      coachPosition: c.coachPosition,
+      ageGroups: c.ageGroups || [],
       playerCount: coachPlayers.length,
       totals
     });
   }
   rows.sort((a, b) => {
     const teamDiff = TEAMS.indexOf(a.team) - TEAMS.indexOf(b.team);
-    return teamDiff !== 0 ? teamDiff : ageGroupNumber(a.ageGroups[0]) - ageGroupNumber(b.ageGroups[0]);
+    return teamDiff !== 0 ? teamDiff : ageGroupSortKey(a.ageGroups) - ageGroupSortKey(b.ageGroups);
   });
   return rows;
 }
@@ -161,13 +194,6 @@ function groupByTeam(items) {
     groups.get(team).push(item);
   }
   return groups;
-}
-
-// เรียงรุ่นอายุจากน้อยไปมากตามตัวเลขในชื่อ (เช่น "U9" < "U10") ไม่ใช่เรียงตามตัวอักษร (ซึ่งจะเอา "U10"
-// ไว้ก่อน "U9" ผิดลำดับ) ไม่มีตัวเลขเลย (เช่น "ไม่ระบุรุ่นอายุ") ถือว่าอยู่ท้ายสุด
-function ageGroupNumber(ageGroup) {
-  const n = parseInt(String(ageGroup).replace(/\D/g, ""), 10);
-  return isNaN(n) ? Infinity : n;
 }
 
 function groupByAgeGroup(items) {
@@ -471,7 +497,7 @@ function renderOverview(groups, groupStats, mode, coachLookup) {
           return `
         <tr>
           <td class="emphasis">${teamLogoImg(row.team)}${row.team}</td>
-          <td>${row.coachName} (${row.ageGroups.join(", ") || "-"})</td>
+          <td>${row.coachName} — ${coachPositionLabel(row.coachPosition)} (${row.ageGroups.join(", ") || "-"})</td>
           <td>${row.playerCount}</td>
           <td>${percent}%</td>
           <td>${avgScore}</td>
@@ -977,6 +1003,27 @@ async function loadMatchAndInjuryReports(scopeTeam) {
   }
 }
 
+// วาดภาพรวมของทีมที่เลือกอยู่ (การ์ดสรุป/พาย/กราฟแท่ง/ตาราง) เฉพาะตำแหน่งที่เลือก ("player" = ทุกตำแหน่ง
+// ยกเว้น GK, "gk" = เฉพาะผู้รักษาประตู) เรียกซ้ำได้ทันทีตอนคลิกปุ่มสลับโดยไม่ต้องโหลดข้อมูลจาก Firestore ใหม่
+function renderScopedTeamOverviewForPosition(position) {
+  if (!scopedOverviewData) return;
+  currentDashboardPosition = position;
+  const { scopeTeam, players, attendanceRecords, coachNameByAgeGroup, gkCoachNameByAgeGroup } = scopedOverviewData;
+  const filteredPlayers = players.filter((p) => (p.position === "GK") === (position === "gk"));
+  const ageGroupGroups = groupByAgeGroup(filteredPlayers);
+  const ageGroupStats = computeAgeGroupStats(ageGroupGroups, attendanceRecords);
+  const lookup = position === "gk" ? gkCoachNameByAgeGroup : coachNameByAgeGroup;
+  renderOverview(ageGroupGroups, ageGroupStats, "ageGroup", (ageGroup) => lookup.get(`${scopeTeam}||${ageGroup}`));
+
+  playerPositionToggleBtn.classList.toggle("btn-primary", position === "player");
+  playerPositionToggleBtn.classList.toggle("btn-secondary", position !== "player");
+  gkPositionToggleBtn.classList.toggle("btn-primary", position === "gk");
+  gkPositionToggleBtn.classList.toggle("btn-secondary", position !== "gk");
+}
+
+playerPositionToggleBtn.addEventListener("click", () => renderScopedTeamOverviewForPosition("player"));
+gkPositionToggleBtn.addEventListener("click", () => renderScopedTeamOverviewForPosition("gk"));
+
 async function loadDashboard(scopeTeam) {
   try {
     setStatus("กำลังโหลดข้อมูล...");
@@ -993,11 +1040,15 @@ async function loadDashboard(scopeTeam) {
 
     if (scopeTeam) {
       // ดูข้อมูลทีมเดียวอยู่แล้ว (โค้ช/ผู้บริหารทีม/ผู้ดูแลระบบที่เลือกทีมเดียว) — ภาพรวมด้านบนแบ่งตาม
-      // รุ่นอายุแทนทีม เพื่อให้เห็นข้อมูลที่ใช้ได้จริงมากกว่าการแยกตามทีมซึ่งมีทีมเดียวอยู่แล้ว
-      const ageGroupGroups = groupByAgeGroup(players);
-      const ageGroupStats = computeAgeGroupStats(ageGroupGroups, attendanceRecords);
-      renderOverview(ageGroupGroups, ageGroupStats, "ageGroup", (ageGroup) => coachNameByAgeGroup.get(`${scopeTeam}||${ageGroup}`));
+      // รุ่นอายุแทนทีม เพื่อให้เห็นข้อมูลที่ใช้ได้จริงมากกว่าการแยกตามทีมซึ่งมีทีมเดียวอยู่แล้ว พร้อมปุ่มสลับดู
+      // "ผู้เล่น" กับ "GK" เพราะมีโค้ชดูแลคนละคน (GK Coach ดูแลผู้รักษาประตูแยกจาก Head/Assistant Coach)
+      const gkCoachNameByAgeGroup = buildGkCoachNameByAgeGroup(coaches);
+      positionToggleWrap.classList.remove("hidden");
+      scopedOverviewData = { scopeTeam, players, attendanceRecords, coachNameByAgeGroup, gkCoachNameByAgeGroup };
+      renderScopedTeamOverviewForPosition(currentDashboardPosition);
     } else {
+      positionToggleWrap.classList.add("hidden");
+      scopedOverviewData = null;
       const coachOverviewRows = buildCoachOverviewRows(coaches, playerGroups, attendanceRecords);
       renderOverview(playerGroups, teamStats, "team", coachOverviewRows);
     }
@@ -1072,6 +1123,52 @@ function closeDrawer() {
 hamburgerBtn.addEventListener("click", openDrawer);
 navDrawerCloseBtn.addEventListener("click", closeDrawer);
 navDrawerOverlay.addEventListener("click", closeDrawer);
+
+// ---------- การแจ้งเตือน (เฉพาะผู้ดูแลระบบ — โค้ช/ผู้บริหารทีมมีปุ่มกระดิ่งแต่ยังไม่เปิดใช้งาน) ----------
+let currentNotifications = [];
+
+async function refreshNotifications() {
+  if (currentViewerRole !== "admin") return;
+  notificationList.innerHTML = '<p class="text-slate-400 text-sm text-center py-6">กำลังโหลด...</p>';
+  try {
+    currentNotifications = await loadAdminNotifications();
+    renderAdminNotifications(notificationList, currentNotifications);
+    const unreadCount = currentNotifications.filter((n) => !n.read).length;
+    notificationBadge.classList.toggle("hidden", unreadCount === 0);
+  } catch (err) {
+    console.error(err);
+    notificationList.innerHTML = `<p class="text-red-600 text-sm text-center py-6">โหลดการแจ้งเตือนไม่สำเร็จ: ${err.message}</p>`;
+  }
+}
+
+notificationBellBtn.addEventListener("click", () => {
+  const opening = notificationPanel.classList.contains("hidden");
+  notificationPanel.classList.toggle("hidden", !opening);
+  if (opening) refreshNotifications();
+});
+notificationRefreshBtn.addEventListener("click", refreshNotifications);
+// คลิกปุ่ม "✓" ในรายการเพื่อทำเครื่องหมายว่าอ่านแล้วทีละรายการ (event delegation เพราะรายการถูกสร้างใหม่
+// ทุกครั้งที่โหลดข้อมูล) กันไม่ให้คลิกไปโดนลิงก์ที่ห่ออยู่ด้วย (preventDefault + stopPropagation)
+notificationList.addEventListener("click", async (e) => {
+  const btn = e.target.closest("[data-mark-read-index]");
+  if (!btn) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const n = currentNotifications[Number(btn.dataset.markReadIndex)];
+  if (!n) return;
+  try {
+    await markNotificationRead(n.key, n.detail);
+    refreshNotifications();
+  } catch (err) {
+    console.error(err);
+    alert("ทำเครื่องหมายว่าอ่านแล้วไม่สำเร็จ: " + err.message);
+  }
+});
+document.addEventListener("click", (e) => {
+  if (notificationPanel.classList.contains("hidden")) return;
+  if (notificationPanel.contains(e.target) || notificationBellBtn.contains(e.target)) return;
+  notificationPanel.classList.add("hidden");
+});
 drawerLogoutBtn.addEventListener("click", () => {
   closeDrawer();
   signOut(auth);
@@ -1154,7 +1251,10 @@ onAuthStateChanged(auth, async (user) => {
 
     loginGate.classList.add("hidden");
     currentViewerRole = data.role;
-    if (currentViewerRole === "admin") currentAdminName = data.name || user.email;
+    if (currentViewerRole === "admin") {
+      currentAdminName = data.name || user.email;
+      refreshNotifications();
+    }
 
     // เมนู ☰/🔔 แสดงให้ทุกบทบาทที่ได้รับอนุมัติแล้ว พร้อมสะท้อนชื่อ/อีเมล/บทบาทเข้าไปในลิ้นชัก
     hamburgerBtn.classList.remove("hidden");

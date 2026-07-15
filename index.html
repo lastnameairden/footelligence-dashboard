@@ -18,9 +18,21 @@
         <img src="./assets/logo.png" alt="Footelligence" class="w-9 h-9 object-contain" />
         <h1 class="text-xl font-bold leading-tight tracking-tight">FOOTELLIGENCE DATA</h1>
       </div>
-      <button id="notification-bell-btn" class="hidden btn-icon" aria-label="การแจ้งเตือน" title="การแจ้งเตือน">
-        🔔
-      </button>
+      <div class="relative">
+        <button id="notification-bell-btn" class="hidden btn-icon" aria-label="การแจ้งเตือน" title="การแจ้งเตือน">
+          🔔
+          <span id="notification-badge" class="hidden absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-red-500 border-2 border-slate-900"></span>
+        </button>
+        <div id="notification-panel" class="hidden absolute right-0 mt-2 w-80 max-w-[90vw] bg-white rounded-xl shadow-2xl border border-slate-100 z-50 max-h-[70vh] overflow-y-auto text-slate-900">
+          <div class="p-3 border-b border-slate-100 flex items-center justify-between">
+            <h3 class="font-semibold text-sm">การแจ้งเตือน</h3>
+            <button id="notification-refresh-btn" type="button" class="btn-icon" aria-label="รีเฟรช" title="รีเฟรช">🔄</button>
+          </div>
+          <div id="notification-list" class="p-2">
+            <p class="text-slate-400 text-sm text-center py-6">กำลังโหลด...</p>
+          </div>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -86,6 +98,12 @@
     <!-- ภาพรวมทั้งหมด -->
     <section>
       <h2 class="section-title mb-4"><span class="icon-badge">📈</span> ภาพรวมทั้งหมด</h2>
+      <!-- แสดงเฉพาะตอนดูทีมเดียว (ไม่ใช่ "ทุกทีม") ให้เลือกดูสถิติของผู้เล่นตำแหน่งอื่นหรือ GK แยกกัน เพราะมี
+      โค้ชดูแลคนละคน -->
+      <div id="position-toggle-wrap" class="hidden flex gap-2 mb-4">
+        <button id="player-position-toggle-btn" type="button" class="btn btn-primary btn-sm">ผู้เล่น</button>
+        <button id="gk-position-toggle-btn" type="button" class="btn btn-secondary btn-sm">GK</button>
+      </div>
       <div id="overview-cards" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         <p class="text-slate-400 text-sm col-span-full">กำลังโหลด...</p>
       </div>
