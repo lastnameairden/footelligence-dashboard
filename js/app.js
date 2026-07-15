@@ -107,21 +107,49 @@ async function loadCollectionForTeam(name, team) {
   return docs;
 }
 
-// team -> ชื่อโค้ชผู้รับผิดชอบ
-function buildCoachNames(coaches) {
+// "team||ageGroup" -> ชื่อโค้ชหลักของรุ่นนั้น (เฉพาะ Head Coach / Assistant Coach เพราะเป็นตำแหน่งที่ผูกกับ
+// รุ่นอายุเดียว ต่างจาก GK Coach/Fitness Coach ที่ดูแลหลายรุ่นพร้อมกันจึงไม่ถือเป็น "โค้ชประจำรุ่น" คนเดียว)
+// Head Coach มีสิทธิ์เหนือกว่า Assistant Coach หากรุ่นเดียวกันมีทั้งคู่
+function buildCoachNameByAgeGroup(coaches) {
   const map = new Map();
   for (const c of coaches) {
-    if (!c.team) continue;
-    map.set(c.team, c.name || c.email || "ไม่ระบุโค้ช");
+    if (!c.team || c.role !== "coach" || !Array.isArray(c.ageGroups)) continue;
+    if (c.coachPosition !== "head_coach" && c.coachPosition !== "assistant_coach") continue;
+    for (const ag of c.ageGroups) {
+      const key = `${c.team}||${ag}`;
+      if (c.coachPosition === "head_coach" || !map.has(key)) {
+        map.set(key, c.name || c.email || "ไม่ระบุโค้ช");
+      }
+    }
   }
   return map;
 }
 
-// team -> ป้ายกำกับที่จะแสดง (ชื่อทีม + ชื่อ/อีเมลโค้ชผู้รับผิดชอบ)
-function buildTeamLabels(coachNames) {
+// team -> รายชื่อโค้ชหลักของทีม (Head Coach/Assistant Coach ทุกคน) พร้อมกำกับรุ่นอายุที่ดูแล เช่น
+// "โค้ชเอก (U17), โค้ชติ่ง (U15)" — ทีมหนึ่งอาจมีหลายคนเพราะแต่ละคนดูแลคนละรุ่นอายุ
+function buildTeamCoachSummary(coaches) {
+  const byTeam = new Map();
+  for (const c of coaches) {
+    if (!c.team || c.role !== "coach") continue;
+    if (c.coachPosition !== "head_coach" && c.coachPosition !== "assistant_coach") continue;
+    if (!byTeam.has(c.team)) byTeam.set(c.team, []);
+    byTeam.get(c.team).push(c);
+  }
   const map = new Map();
-  for (const [team, name] of coachNames) {
-    map.set(team, `${team} (โค้ช: ${name})`);
+  for (const [team, teamCoaches] of byTeam) {
+    const label = teamCoaches
+      .map((c) => `${c.name || c.email || "ไม่ระบุโค้ช"} (${(c.ageGroups || []).join(", ") || "-"})`)
+      .join(", ");
+    map.set(team, label || "ไม่ระบุโค้ช");
+  }
+  return map;
+}
+
+// team -> ป้ายกำกับที่จะแสดง (ชื่อทีม + รายชื่อโค้ชหลักของทีม)
+function buildTeamLabels(teamCoachSummary) {
+  const map = new Map();
+  for (const [team, label] of teamCoachSummary) {
+    map.set(team, `${team} (โค้ช: ${label})`);
   }
   return map;
 }
@@ -309,11 +337,12 @@ function renderBarChart(containerId, entries, valueFormatter, maxValue) {
     .join("");
 }
 
-// mode "team": ดูภาพรวมทุกทีม (ผู้ดูแลระบบเลือก "ทุกทีม") — แบ่งกลุ่มตามทีม, coachNamesOrSingleName เป็น
-//   Map<team, coachName>
+// mode "team": ดูภาพรวมทุกทีม (ผู้ดูแลระบบเลือก "ทุกทีม") — แบ่งกลุ่มตามทีม, coachLookup เป็น
+//   Map<team, coachSummaryLabel>
 // mode "ageGroup": ดูข้อมูลทีมใดทีมหนึ่งโดยเฉพาะ (โค้ช/ผู้บริหารทีม/ผู้ดูแลระบบที่เลือกทีมเดียว) — แบ่งกลุ่ม
-//   ตามรุ่นอายุแทน เพราะดูทีมเดียวอยู่แล้ว แบ่งตามทีมซ้ำไม่มีประโยชน์ coachNamesOrSingleName เป็นชื่อโค้ชคนเดียว (string)
-function renderOverview(groups, groupStats, mode, coachNamesOrSingleName) {
+//   ตามรุ่นอายุแทน เพราะดูทีมเดียวอยู่แล้ว แบ่งตามทีมซ้ำไม่มีประโยชน์ coachLookup เป็นฟังก์ชัน (ageGroup) => coachName
+//   เพื่อให้แต่ละแถวแสดงโค้ชประจำรุ่นนั้น ๆ ถูกต้อง (แต่ละรุ่นอาจมีโค้ชคนละคน)
+function renderOverview(groups, groupStats, mode, coachLookup) {
   const isAgeGroupMode = mode === "ageGroup";
 
   const overall = { players: 0, attended: 0, missed: 0, total: 0, scoreSum: 0, scoreCount: 0 };
@@ -368,7 +397,7 @@ function renderOverview(groups, groupStats, mode, coachNamesOrSingleName) {
     .map(([key, { totals, playerCount }]) => {
       const percent = totals.total > 0 ? Math.round((totals.attended / totals.total) * 100) : 0;
       const avgScore = totals.scoreCount > 0 ? (totals.scoreSum / totals.scoreCount).toFixed(1) : "-";
-      const coachName = isAgeGroupMode ? coachNamesOrSingleName || "-" : coachNamesOrSingleName.get(key) || "-";
+      const coachName = isAgeGroupMode ? coachLookup(key) || "-" : coachLookup.get(key) || "-";
       const keyLabel = isAgeGroupMode ? key : `${teamLogoImg(key)}${key}`;
       return `
         <tr>

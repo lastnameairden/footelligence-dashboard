@@ -24,17 +24,26 @@ service cloud.firestore {
       allow read: if isSignedIn();
       // ผู้ลงทะเบียนใหม่สร้างโปรไฟล์ของตัวเองได้ (สถานะ pending) เลือกบทบาทได้แค่ coach/executive
       // (กำหนด admin หรือ team เองไม่ได้) ผู้ดูแลระบบเป็นผู้กำหนด team ให้ตอนอนุมัติ (หรือเปลี่ยนภายหลังได้)
-      // โค้ชต้องระบุ ageGroup (รุ่นอายุที่รับผิดชอบ) ตั้งแต่ตอนลงทะเบียน — ผู้บริหารทีมไม่ต้องระบุ
-      // (ตัดการใช้เบอร์โทรศัพท์ออกจากระบบเข้าสู่ระบบ/ลงทะเบียนแล้ว)
+      // โค้ชต้องระบุ coachPosition (Head Coach / Assistant Coach / GK Coach / Fitness Coach) และ ageGroups
+      // (รุ่นอายุที่รับผิดชอบ อย่างน้อย 1 รุ่น) ตั้งแต่ตอนลงทะเบียน — Head Coach และ Assistant Coach ลงทะเบียน
+      // เองได้แค่รุ่นเดียว (ทำงานคู่กันในรุ่นเดียวกัน ถ้าต้องดูแลมากกว่า 1 รุ่น ต้องให้ผู้ดูแลระบบแก้ไขเพิ่มให้
+      // ภายหลังผ่าน allow update ซึ่งไม่ถูกจำกัดจำนวนแบบนี้) ส่วน GK Coach และ Fitness Coach ดูแลได้หลายรุ่น
+      // ตั้งแต่ตอนลงทะเบียนเลย เพราะมักดูแลนักกีฬา/ฟิตเนสของหลายรุ่นอายุในทีมเดียวกัน
+      // ผู้บริหารทีมไม่ต้องระบุทั้งสองฟิลด์นี้ — (ตัดการใช้เบอร์โทรศัพท์ออกจากระบบเข้าสู่ระบบ/ลงทะเบียนแล้ว)
       allow create: if isSignedIn()
                      && request.auth.uid == coachId
-                     && request.resource.data.keys().hasOnly(['name', 'email', 'role', 'status', 'createdAt', 'ageGroup'])
+                     && request.resource.data.keys().hasOnly(['name', 'email', 'role', 'status', 'createdAt', 'ageGroups', 'coachPosition'])
                      && request.resource.data.email == request.auth.token.email
                      && request.resource.data.role in ['coach', 'executive']
                      && request.resource.data.status == 'pending'
                      && (request.resource.data.role != 'coach'
-                         || ('ageGroup' in request.resource.data && request.resource.data.ageGroup is string && request.resource.data.ageGroup.size() > 0));
-      // ผู้ดูแลระบบเท่านั้นที่อนุมัติ/กำหนด team หรือแก้ไข/ลบบัญชีได้
+                         || ('ageGroups' in request.resource.data
+                             && request.resource.data.ageGroups is list
+                             && request.resource.data.ageGroups.size() > 0
+                             && request.resource.data.coachPosition in ['head_coach', 'assistant_coach', 'gk_coach', 'fitness_coach']
+                             && (!(request.resource.data.coachPosition in ['head_coach', 'assistant_coach']) || request.resource.data.ageGroups.size() == 1)));
+      // ผู้ดูแลระบบเท่านั้นที่อนุมัติ/กำหนด team หรือแก้ไข/ลบบัญชีได้ (ไม่จำกัดจำนวนรุ่นอายุแบบตอนลงทะเบียนเอง
+      // ผู้ดูแลระบบจึงเป็นคนเดียวที่เพิ่มรุ่นอายุที่ 2 ให้ Head Coach ได้)
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }

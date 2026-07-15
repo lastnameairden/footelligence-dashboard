@@ -91,21 +91,49 @@
           </div>
         </div>
         <div id="register-age-group-wrap">
-          <label class="field-label">รุ่นอายุที่รับผิดชอบ</label>
-          <select id="register-age-group" class="field-input">
-            <option value="">-- เลือกรุ่นอายุ --</option>
-            <option value="U9">U9</option>
-            <option value="U10">U10</option>
-            <option value="U11">U11</option>
-            <option value="U12">U12</option>
-            <option value="U13">U13</option>
-            <option value="U14">U14</option>
-            <option value="U15">U15</option>
-            <option value="U16">U16</option>
-            <option value="U17">U17</option>
-            <option value="U18">U18</option>
+          <label class="field-label">ตำแหน่งโค้ช</label>
+          <select id="register-coach-position" class="field-input mb-3">
+            <option value="head_coach">Head Coach — หัวหน้าผู้ฝึกสอน</option>
+            <option value="assistant_coach">Assistant Coach — ผู้ช่วยผู้ฝึกสอน</option>
+            <option value="gk_coach">GK Coach — โค้ชผู้รักษาประตู</option>
+            <option value="fitness_coach">Fitness Coach — โค้ชฟิตเนส</option>
           </select>
-          <p class="text-xs text-slate-400 mt-1">โค้ชแต่ละคนดูแลได้เพียงรุ่นอายุเดียว เมื่อเลือกแล้วจะเพิ่มนักกีฬาได้เฉพาะรุ่นนี้</p>
+          <label class="field-label">รุ่นอายุที่รับผิดชอบ</label>
+          <div id="register-age-group-checkboxes" class="grid grid-cols-3 sm:grid-cols-5 gap-2">
+            <label class="flex items-center gap-1.5 text-sm text-slate-700">
+              <input type="checkbox" class="register-age-group-checkbox" value="U9" /> U9
+            </label>
+            <label class="flex items-center gap-1.5 text-sm text-slate-700">
+              <input type="checkbox" class="register-age-group-checkbox" value="U10" /> U10
+            </label>
+            <label class="flex items-center gap-1.5 text-sm text-slate-700">
+              <input type="checkbox" class="register-age-group-checkbox" value="U11" /> U11
+            </label>
+            <label class="flex items-center gap-1.5 text-sm text-slate-700">
+              <input type="checkbox" class="register-age-group-checkbox" value="U12" /> U12
+            </label>
+            <label class="flex items-center gap-1.5 text-sm text-slate-700">
+              <input type="checkbox" class="register-age-group-checkbox" value="U13" /> U13
+            </label>
+            <label class="flex items-center gap-1.5 text-sm text-slate-700">
+              <input type="checkbox" class="register-age-group-checkbox" value="U14" /> U14
+            </label>
+            <label class="flex items-center gap-1.5 text-sm text-slate-700">
+              <input type="checkbox" class="register-age-group-checkbox" value="U15" /> U15
+            </label>
+            <label class="flex items-center gap-1.5 text-sm text-slate-700">
+              <input type="checkbox" class="register-age-group-checkbox" value="U16" /> U16
+            </label>
+            <label class="flex items-center gap-1.5 text-sm text-slate-700">
+              <input type="checkbox" class="register-age-group-checkbox" value="U17" /> U17
+            </label>
+            <label class="flex items-center gap-1.5 text-sm text-slate-700">
+              <input type="checkbox" class="register-age-group-checkbox" value="U18" /> U18
+            </label>
+          </div>
+          <p id="register-age-group-hint" class="text-xs text-slate-400 mt-1">
+            Head Coach ดูแลได้เพียงรุ่นอายุเดียว — เลือกรุ่นอายุที่รับผิดชอบ (ถ้าต้องดูแลมากกว่า 1 รุ่น ต้องให้ผู้ดูแลระบบเป็นผู้เพิ่มให้)
+          </p>
         </div>
         <div>
           <label class="field-label">ชื่อเล่น</label>
@@ -211,36 +239,21 @@
           <p>ดูโค้ชทั้งหมด สถานะ % ส่งข้อมูลตรงเวลา และแก้ไขข้อมูลบัญชีได้</p>
         </div>
       </div>
-      <div class="card table-wrap">
-        <table class="pro-table">
-          <thead>
-            <tr>
-              <th>ชื่อ</th>
-              <th>อีเมล</th>
-              <th>บทบาท</th>
-              <th>ทีม</th>
-              <th>รุ่นอายุ</th>
-              <th>สถานะ</th>
-              <th title="เปอร์เซ็นต์ของวันที่ส่งข้อมูลก่อน 20:00 น. เทียบกับจำนวนวันที่บันทึกทั้งหมด">% ตรงเวลา</th>
-              <th>จัดการ</th>
-            </tr>
-          </thead>
-          <tbody id="coach-directory-body">
-            <tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
-          </tbody>
-        </table>
+      <!-- จัดกลุ่มรายชื่อโค้ชตามทีม เรียงตามรุ่นอายุภายในแต่ละทีม (สร้างเนื้อหาทั้งหมดด้วย JS) -->
+      <div id="coach-directory-groups" class="space-y-8">
+        <p class="text-slate-400 text-sm">กำลังโหลด...</p>
       </div>
       <p id="admin-status" class="text-sm text-slate-500 w-full"></p>
     </section>
 
     <!-- ป็อปอัปแก้ไขบัญชีผู้ใช้ (ชื่อ/บทบาท/ทีม/รุ่นอายุ/สถานะ) — เปิดจากปุ่ม "แก้ไขบัญชี" ในตารางรายชื่อโค้ช -->
     <div id="edit-coach-overlay" class="hidden fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4">
-      <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 space-y-4">
-        <div class="flex items-center justify-between">
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col">
+        <div class="flex items-center justify-between p-6 pb-4 border-b border-slate-100 flex-shrink-0">
           <h3 class="text-lg font-semibold">แก้ไขบัญชีผู้ใช้</h3>
           <button id="edit-coach-close-btn" class="btn-icon" aria-label="ปิด">✕</button>
         </div>
-        <div class="space-y-3">
+        <div class="p-6 overflow-y-auto flex-1 space-y-3">
           <div>
             <label class="field-label">ชื่อ</label>
             <input id="edit-coach-name" type="text" class="field-input w-full" />
@@ -262,20 +275,49 @@
             <select id="edit-coach-team" class="field-input w-full"></select>
           </div>
           <div id="edit-coach-age-group-wrap">
-            <label class="field-label">รุ่นอายุที่รับผิดชอบ</label>
-            <select id="edit-coach-age-group" class="field-input w-full">
-              <option value="">-- ไม่ระบุ --</option>
-              <option value="U9">U9</option>
-              <option value="U10">U10</option>
-              <option value="U11">U11</option>
-              <option value="U12">U12</option>
-              <option value="U13">U13</option>
-              <option value="U14">U14</option>
-              <option value="U15">U15</option>
-              <option value="U16">U16</option>
-              <option value="U17">U17</option>
-              <option value="U18">U18</option>
+            <label class="field-label">ตำแหน่งโค้ช</label>
+            <select id="edit-coach-position" class="field-input w-full mb-3">
+              <option value="head_coach">Head Coach — หัวหน้าผู้ฝึกสอน</option>
+              <option value="assistant_coach">Assistant Coach — ผู้ช่วยผู้ฝึกสอน</option>
+              <option value="gk_coach">GK Coach — โค้ชผู้รักษาประตู</option>
+              <option value="fitness_coach">Fitness Coach — โค้ชฟิตเนส</option>
             </select>
+            <label class="field-label">รุ่นอายุที่รับผิดชอบ</label>
+            <div id="edit-coach-age-group-checkboxes" class="grid grid-cols-3 sm:grid-cols-5 gap-2">
+              <label class="flex items-center gap-1.5 text-sm text-slate-700">
+                <input type="checkbox" class="edit-coach-age-group-checkbox" value="U9" /> U9
+              </label>
+              <label class="flex items-center gap-1.5 text-sm text-slate-700">
+                <input type="checkbox" class="edit-coach-age-group-checkbox" value="U10" /> U10
+              </label>
+              <label class="flex items-center gap-1.5 text-sm text-slate-700">
+                <input type="checkbox" class="edit-coach-age-group-checkbox" value="U11" /> U11
+              </label>
+              <label class="flex items-center gap-1.5 text-sm text-slate-700">
+                <input type="checkbox" class="edit-coach-age-group-checkbox" value="U12" /> U12
+              </label>
+              <label class="flex items-center gap-1.5 text-sm text-slate-700">
+                <input type="checkbox" class="edit-coach-age-group-checkbox" value="U13" /> U13
+              </label>
+              <label class="flex items-center gap-1.5 text-sm text-slate-700">
+                <input type="checkbox" class="edit-coach-age-group-checkbox" value="U14" /> U14
+              </label>
+              <label class="flex items-center gap-1.5 text-sm text-slate-700">
+                <input type="checkbox" class="edit-coach-age-group-checkbox" value="U15" /> U15
+              </label>
+              <label class="flex items-center gap-1.5 text-sm text-slate-700">
+                <input type="checkbox" class="edit-coach-age-group-checkbox" value="U16" /> U16
+              </label>
+              <label class="flex items-center gap-1.5 text-sm text-slate-700">
+                <input type="checkbox" class="edit-coach-age-group-checkbox" value="U17" /> U17
+              </label>
+              <label class="flex items-center gap-1.5 text-sm text-slate-700">
+                <input type="checkbox" class="edit-coach-age-group-checkbox" value="U18" /> U18
+              </label>
+            </div>
+            <p class="text-xs text-slate-400 mt-1">
+              ผู้ดูแลระบบเลือกได้หลายรุ่นแม้เป็น Head Coach (ข้อยกเว้นที่โค้ชลงทะเบียนเองไม่ได้)
+            </p>
           </div>
           <div>
             <label class="field-label">สถานะบัญชี</label>
@@ -284,19 +326,22 @@
               <option value="pending">รอการอนุมัติ</option>
             </select>
           </div>
+          <div class="pt-3 border-t border-slate-100">
+            <button id="edit-coach-reset-password-btn" type="button" class="btn btn-secondary btn-block">
+              ✉️ ส่งอีเมลรีเซ็ตรหัสผ่านให้บัญชีนี้
+            </button>
+            <p class="text-xs text-slate-400 mt-1">
+              ใช้เมื่อโค้ชลืมรหัสผ่าน — ระบบจะส่งลิงก์ตั้งรหัสผ่านใหม่ไปที่อีเมลของบัญชีนี้โดยตรง ปลอดภัยกว่าการตั้งรหัสผ่านให้เอง
+            </p>
+          </div>
         </div>
-        <div class="pt-3 border-t border-slate-100">
-          <button id="edit-coach-reset-password-btn" type="button" class="btn btn-secondary btn-block">
-            ✉️ ส่งอีเมลรีเซ็ตรหัสผ่านให้บัญชีนี้
-          </button>
-          <p class="text-xs text-slate-400 mt-1">
-            ใช้เมื่อโค้ชลืมรหัสผ่าน — ระบบจะส่งลิงก์ตั้งรหัสผ่านใหม่ไปที่อีเมลของบัญชีนี้โดยตรง ปลอดภัยกว่าการตั้งรหัสผ่านให้เอง
-          </p>
-        </div>
-        <p id="edit-coach-modal-status" class="text-sm"></p>
-        <div class="flex gap-2">
-          <button id="edit-coach-save-btn" class="btn btn-primary flex-1">บันทึก</button>
-          <button id="edit-coach-cancel-btn" class="btn btn-ghost flex-1">ยกเลิก</button>
+        <!-- ส่วนล่างคงอยู่กับที่เสมอ (ไม่เลื่อนตามเนื้อหา) ปุ่มบันทึก/ยกเลิกจึงกดได้ตลอดแม้ฟอร์มด้านบนจะยาวเกินจอ -->
+        <div class="p-6 pt-4 border-t border-slate-100 flex-shrink-0 space-y-2">
+          <p id="edit-coach-modal-status" class="text-sm"></p>
+          <div class="flex gap-2">
+            <button id="edit-coach-save-btn" class="btn btn-primary flex-1">บันทึก</button>
+            <button id="edit-coach-cancel-btn" class="btn btn-ghost flex-1">ยกเลิก</button>
+          </div>
         </div>
       </div>
     </div>
@@ -552,7 +597,34 @@
           </div>
           <div>
             <label class="field-label">ตำแหน่ง (ถ้ามี)</label>
-            <input id="player-position" type="text" class="field-input" />
+            <select id="player-position" class="field-input">
+              <option value="">-- เลือกตำแหน่ง --</option>
+              <optgroup label="ผู้รักษาประตู">
+                <option value="GK">GK — ผู้รักษาประตู (Goalkeeper)</option>
+              </optgroup>
+              <optgroup label="กองหลัง">
+                <option value="CB">CB — เซ็นเตอร์แบ็ก (Centre Back)</option>
+                <option value="RB">RB — แบ็กขวา (Right Back)</option>
+                <option value="LB">LB — แบ็กซ้าย (Left Back)</option>
+                <option value="RWB">RWB — วิงแบ็กขวา (Right Wing Back)</option>
+                <option value="LWB">LWB — วิงแบ็กซ้าย (Left Wing Back)</option>
+                <option value="SW">SW — สวีปเปอร์ (Sweeper)</option>
+              </optgroup>
+              <optgroup label="กองกลาง">
+                <option value="CDM">CDM — กองกลางตัวรับ (Defensive Midfielder)</option>
+                <option value="CM">CM — กองกลางตัวกลาง (Central Midfielder)</option>
+                <option value="CAM">CAM — กองกลางตัวรุก (Attacking Midfielder)</option>
+                <option value="RM">RM — กองกลางฝั่งขวา (Right Midfielder)</option>
+                <option value="LM">LM — กองกลางฝั่งซ้าย (Left Midfielder)</option>
+              </optgroup>
+              <optgroup label="กองหน้า">
+                <option value="RW">RW — ปีกขวา (Right Winger)</option>
+                <option value="LW">LW — ปีกซ้าย (Left Winger)</option>
+                <option value="SS">SS — กองหน้าตัวสอง (Second Striker)</option>
+                <option value="CF">CF — กองหน้าตัวกลาง (Centre Forward)</option>
+                <option value="ST">ST — กองหน้าตัวเป้า (Striker)</option>
+              </optgroup>
+            </select>
           </div>
           <div class="sm:col-span-2 flex items-center gap-4">
             <button type="submit" id="add-player-submit-btn" class="btn btn-primary">เพิ่มนักกีฬา</button>

@@ -37,6 +37,25 @@ const STATUS_OPTIONS = ["A", "I", "R", "P"];
 const SCORE_OPTIONS = [1, 2, 3, 4];
 const TEAMS = ["KHAMPHEE FOOTBALL", "THAWEE SC", "THAMMASATHIT"];
 
+// ---------- ตำแหน่งโค้ช ----------
+// Head Coach / Assistant Coach ดูแลได้รุ่นอายุเดียว (ทำงานคู่กันในรุ่นเดียวกัน) — Assistant Coach จึงใช้
+// เงื่อนไขเดียวกับ Head Coach ทุกประการ ส่วน GK Coach / Fitness Coach ดูแลได้หลายรุ่นพร้อมกัน เพราะเป็น
+// ตำแหน่งเฉพาะทางที่มักดูแลนักกีฬา/ฟิตเนสของหลายรุ่นอายุในทีมเดียวกัน
+const COACH_POSITIONS = {
+  head_coach: { label: "Head Coach", multiAgeGroup: false },
+  assistant_coach: { label: "Assistant Coach", multiAgeGroup: false },
+  gk_coach: { label: "GK Coach", multiAgeGroup: true },
+  fitness_coach: { label: "Fitness Coach", multiAgeGroup: true }
+};
+
+function coachPositionLabel(coachPosition) {
+  return COACH_POSITIONS[coachPosition]?.label || "-";
+}
+
+function coachPositionAllowsMultipleAgeGroups(coachPosition) {
+  return COACH_POSITIONS[coachPosition]?.multiAgeGroup ?? true;
+}
+
 for (let i = 0; i < SCORE_CATEGORIES.length; i++) {
   const th = document.getElementById(`score-header-${i}`);
   if (th) {
@@ -115,7 +134,9 @@ const tabRegister = document.getElementById("tab-register");
 const registerForm = document.getElementById("register-form");
 const registerError = document.getElementById("register-error");
 const registerAgeGroupWrap = document.getElementById("register-age-group-wrap");
-const registerAgeGroupSelect = document.getElementById("register-age-group");
+const registerCoachPositionSelect = document.getElementById("register-coach-position");
+const registerAgeGroupCheckboxes = document.querySelectorAll(".register-age-group-checkbox");
+const registerAgeGroupHint = document.getElementById("register-age-group-hint");
 const pendingSection = document.getElementById("pending-section");
 const pendingLogoutBtn = document.getElementById("pending-logout-btn");
 const executiveSection = document.getElementById("executive-section");
@@ -179,7 +200,7 @@ const addPlayerStatus = document.getElementById("add-player-status");
 const addPlayerSubmitBtn = document.getElementById("add-player-submit-btn");
 const cancelEditPlayerBtn = document.getElementById("cancel-edit-player-btn");
 const playerListBody = document.getElementById("player-list-body");
-const coachDirectoryBody = document.getElementById("coach-directory-body");
+const coachDirectoryGroups = document.getElementById("coach-directory-groups");
 const editCoachOverlay = document.getElementById("edit-coach-overlay");
 const editCoachCloseBtn = document.getElementById("edit-coach-close-btn");
 const editCoachNameInput = document.getElementById("edit-coach-name");
@@ -188,7 +209,8 @@ const editCoachRoleSelect = document.getElementById("edit-coach-role");
 const editCoachTeamWrap = document.getElementById("edit-coach-team-wrap");
 const editCoachTeamSelect = document.getElementById("edit-coach-team");
 const editCoachAgeGroupWrap = document.getElementById("edit-coach-age-group-wrap");
-const editCoachAgeGroupSelect = document.getElementById("edit-coach-age-group");
+const editCoachPositionSelect = document.getElementById("edit-coach-position");
+const editCoachAgeGroupCheckboxes = document.querySelectorAll(".edit-coach-age-group-checkbox");
 const editCoachStatusSelect = document.getElementById("edit-coach-status");
 const editCoachModalStatus = document.getElementById("edit-coach-modal-status");
 const editCoachSaveBtn = document.getElementById("edit-coach-save-btn");
@@ -211,7 +233,9 @@ let myTeam = null;
 let adminOwnName = null;
 let adminOwnEmail = null;
 let myCoachName = null;
-let myAgeGroup = null; // รุ่นอายุที่โค้ชคนนี้รับผิดชอบ (ถ้ามี) — ล็อกช่องเลือกรุ่นอายุตอนเพิ่มนักกีฬาให้เหลือรุ่นเดียว
+// รุ่นอายุที่โค้ชคนนี้รับผิดชอบ (array — Head Coach ปกติมี 1 รุ่น, GK Coach มีได้หลายรุ่น) ใช้จำกัด/ล็อก
+// ช่องเลือกรุ่นอายุตอนเพิ่มนักกีฬา (ดู applyAgeGroupLock)
+let myAgeGroups = [];
 // จำหน้าจอผู้ดูแลระบบที่พาเข้ามาจัดการทีม เพื่อให้รายการ "กลับแผงควบคุมผู้ดูแลระบบ" ใน nav drawer
 // ย้อนกลับไปจุดเดิมที่ละสเต็ป (มีได้ทั้งจาก "จัดการข้อมูลทีม" หรือคลิกชื่อทีมในตาราง "รายชื่อโค้ชในระบบ")
 let adminReturnSection = null;
@@ -312,6 +336,27 @@ for (const radio of document.querySelectorAll('input[name="register-role"]')) {
 }
 updateRegisterAgeGroupVisibility();
 
+// Head Coach ดูแลได้รุ่นเดียวเท่านั้น (บังคับแบบ radio ผ่านกลุ่ม checkbox) ส่วน GK Coach เลือกได้หลายรุ่น
+// เพราะดูแลนักกีฬาตำแหน่งผู้รักษาประตูของหลายรุ่นอายุพร้อมกันในทีมเดียว
+function enforceRegisterAgeGroupLimit() {
+  const position = registerCoachPositionSelect.value;
+  const allowsMultiple = coachPositionAllowsMultipleAgeGroups(position);
+  const label = coachPositionLabel(position);
+  registerAgeGroupHint.textContent = allowsMultiple
+    ? `${label} เลือกได้หลายรุ่นอายุ (ดูแลนักกีฬาของหลายรุ่นในทีมเดียวกันได้)`
+    : `${label} ดูแลได้เพียงรุ่นอายุเดียว — เลือกรุ่นอายุที่รับผิดชอบ (ถ้าต้องดูแลมากกว่า 1 รุ่น ต้องให้ผู้ดูแลระบบเป็นผู้เพิ่มให้)`;
+  if (allowsMultiple) return;
+  const checked = Array.from(registerAgeGroupCheckboxes).filter((cb) => cb.checked);
+  if (checked.length > 1) {
+    // เก็บไว้แค่ตัวล่าสุดที่เพิ่งกด ปลดตัวที่เลือกไว้ก่อนหน้าออกทั้งหมด
+    for (const cb of checked.slice(0, -1)) cb.checked = false;
+  }
+}
+registerCoachPositionSelect.addEventListener("change", enforceRegisterAgeGroupLimit);
+for (const cb of registerAgeGroupCheckboxes) {
+  cb.addEventListener("change", enforceRegisterAgeGroupLimit);
+}
+
 registerForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   registerError.textContent = "";
@@ -320,22 +365,32 @@ registerForm.addEventListener("submit", async (e) => {
   const email = document.getElementById("register-email").value.trim();
   const password = document.getElementById("register-password").value;
   const passwordConfirm = document.getElementById("register-password-confirm").value;
-  const ageGroup = registerAgeGroupSelect.value;
+  const coachPosition = registerCoachPositionSelect.value;
+  const ageGroups = Array.from(registerAgeGroupCheckboxes)
+    .filter((cb) => cb.checked)
+    .map((cb) => cb.value);
 
   if (password !== passwordConfirm) {
     registerError.textContent = "รหัสผ่านทั้งสองช่องไม่ตรงกัน";
     return;
   }
 
-  if (role === "coach" && !ageGroup) {
-    registerError.textContent = "กรุณาเลือกรุ่นอายุที่รับผิดชอบ";
+  if (role === "coach" && ageGroups.length === 0) {
+    registerError.textContent = "กรุณาเลือกรุ่นอายุที่รับผิดชอบอย่างน้อย 1 รุ่น";
+    return;
+  }
+  if (role === "coach" && !coachPositionAllowsMultipleAgeGroups(coachPosition) && ageGroups.length > 1) {
+    registerError.textContent = `${coachPositionLabel(coachPosition)} เลือกได้เพียงรุ่นอายุเดียว (ถ้าต้องดูแลมากกว่า 1 รุ่น ต้องให้ผู้ดูแลระบบเป็นผู้เพิ่มให้)`;
     return;
   }
 
   try {
     const cred = await createUserWithEmailAndPassword(auth, email, password);
     const payload = { name, email, role, status: "pending", createdAt: serverTimestamp() };
-    if (role === "coach") payload.ageGroup = ageGroup;
+    if (role === "coach") {
+      payload.ageGroups = ageGroups;
+      payload.coachPosition = coachPosition;
+    }
     await setDoc(doc(db, "coaches", cred.user.uid), payload);
     registerForm.reset();
     // onAuthStateChanged จะทำงานต่อเองและแสดงหน้า "รอผู้ดูแลระบบอนุมัติ"
@@ -665,15 +720,26 @@ for (const btn of adminBackButtons) {
   btn.addEventListener("click", goToDashboard);
 }
 
-// ล็อกช่องเลือกรุ่นอายุของนักกีฬาให้เหลือเฉพาะรุ่นที่โค้ชคนนี้รับผิดชอบ (ถ้ามีการระบุไว้ตอนลงทะเบียน)
-// ผู้ดูแลระบบที่จัดการแทนโค้ช หรือโค้ชเก่าที่ลงทะเบียนก่อนมีฟีเจอร์นี้ (myAgeGroup ว่าง) เลือกได้อิสระตามเดิม
+// ล็อก/จำกัดช่องเลือกรุ่นอายุของนักกีฬาตามรุ่นที่โค้ชคนนี้รับผิดชอบ (ถ้ามีการระบุไว้ตอนลงทะเบียน)
+// รุ่นเดียว (Head Coach ปกติ) = ล็อกค่าและปิดไม่ให้แก้ / หลายรุ่น (GK Coach) = ซ่อนตัวเลือกอื่นเหลือแค่รุ่นที่
+// ดูแล แต่ยังเลือกได้เอง / ไม่มีข้อมูล (ผู้ดูแลระบบจัดการแทน หรือโค้ชเก่าก่อนมีฟีเจอร์นี้ — myAgeGroups ว่าง)
+// เลือกได้อิสระตามเดิม
 function applyAgeGroupLock() {
   const select = document.getElementById("player-age-group");
-  if (myAgeGroup) {
-    select.value = myAgeGroup;
+  if (myAgeGroups && myAgeGroups.length === 1) {
+    select.value = myAgeGroups[0];
     select.disabled = true;
+    for (const opt of select.options) opt.hidden = false;
+  } else if (myAgeGroups && myAgeGroups.length > 1) {
+    select.disabled = false;
+    for (const opt of select.options) {
+      if (opt.value === "") continue;
+      opt.hidden = !myAgeGroups.includes(opt.value);
+    }
+    if (select.value && !myAgeGroups.includes(select.value)) select.value = "";
   } else {
     select.disabled = false;
+    for (const opt of select.options) opt.hidden = false;
   }
 }
 
@@ -846,9 +912,101 @@ function isSessionOnTime(session, attendanceForSession) {
   return latest <= deadline;
 }
 
+// เรียงรุ่นอายุจากน้อยไปมาก (ตัวเลขในชื่อ เช่น "U9" < "U10") — โค้ช GK ที่ดูแลหลายรุ่นใช้รุ่นที่น้อยที่สุด
+// เป็นตัวจัดลำดับ ไม่มีรุ่นอายุเลย (เช่น ผู้บริหารทีม) ถือว่าอยู่ท้ายสุดของกลุ่ม
+function ageGroupSortKey(ageGroups) {
+  if (!ageGroups || ageGroups.length === 0) return Infinity;
+  const nums = ageGroups.map((ag) => parseInt(String(ag).replace(/\D/g, ""), 10)).filter((n) => !isNaN(n));
+  return nums.length > 0 ? Math.min(...nums) : Infinity;
+}
+
+function buildCoachRow(c, sessions, attendanceRecords) {
+  const teamSessions = sessions.filter((s) => s.team === c.team);
+  let onTimeCount = 0;
+  for (const s of teamSessions) {
+    const attendanceForSession = attendanceRecords.filter((a) => a.sessionId === s.id);
+    if (isSessionOnTime(s, attendanceForSession)) onTimeCount += 1;
+  }
+  const percentText =
+    teamSessions.length > 0 ? `${Math.round((onTimeCount / teamSessions.length) * 100)}% (${onTimeCount}/${teamSessions.length} วัน)` : "-";
+  const statusBadge =
+    c.role === "admin"
+      ? '<span class="badge badge-info">ผู้ดูแลระบบ</span>'
+      : c.status === "approved"
+        ? '<span class="badge badge-success">อนุมัติแล้ว</span>'
+        : '<span class="badge badge-warning">รอการอนุมัติ</span>';
+
+  const tr = document.createElement("tr");
+
+  // ชื่อโค้ชคลิกได้ ใช้เปิดป็อปอัป "แก้ไขบัญชีผู้ใช้" เพื่อดู/แก้ไขข้อมูล (ทางลัดเดียวกับปุ่ม "แก้ไขบัญชี")
+  const nameTd = document.createElement("td");
+  nameTd.className = "emphasis";
+  const nameBtn = document.createElement("button");
+  nameBtn.type = "button";
+  nameBtn.textContent = c.name ?? "-";
+  nameBtn.className = "text-blue-600 hover:underline text-left";
+  nameBtn.title = "คลิกเพื่อดู/แก้ไขข้อมูลบัญชีนี้";
+  nameBtn.addEventListener("click", () => openEditCoachModal(c));
+  nameTd.appendChild(nameBtn);
+
+  const roleTd = document.createElement("td");
+  roleTd.innerHTML = roleLabel(c.role);
+
+  tr.appendChild(nameTd);
+  tr.insertAdjacentHTML("beforeend", `<td>${c.email ?? "-"}</td>`);
+  tr.appendChild(roleTd);
+  tr.insertAdjacentHTML(
+    "beforeend",
+    `<td>${c.role === "coach" ? coachPositionLabel(c.coachPosition) : "-"}</td>` +
+      `<td>${c.role === "coach" ? (c.ageGroups || []).join(", ") || "-" : "-"}</td>` +
+      `<td>${statusBadge}</td>` +
+      `<td>${c.role === "admin" ? "-" : percentText}</td>`
+  );
+
+  const actionTd = document.createElement("td");
+  const editBtn = document.createElement("button");
+  editBtn.textContent = "แก้ไขบัญชี";
+  editBtn.className = "btn btn-secondary btn-sm";
+  editBtn.addEventListener("click", () => openEditCoachModal(c));
+  actionTd.appendChild(editBtn);
+  tr.appendChild(actionTd);
+
+  return tr;
+}
+
+function buildCoachGroupTable(coaches, sessions, attendanceRecords) {
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = `
+    <div class="card table-wrap">
+      <table class="pro-table">
+        <thead>
+          <tr>
+            <th>ชื่อ</th>
+            <th>อีเมล</th>
+            <th>บทบาท</th>
+            <th>ตำแหน่งโค้ช</th>
+            <th>รุ่นอายุ</th>
+            <th>สถานะ</th>
+            <th title="เปอร์เซ็นต์ของวันที่ส่งข้อมูลก่อน 20:00 น. เทียบกับจำนวนวันที่บันทึกทั้งหมด">% ตรงเวลา</th>
+            <th>จัดการ</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  `;
+  const tbody = wrapper.querySelector("tbody");
+  for (const c of coaches) {
+    tbody.appendChild(buildCoachRow(c, sessions, attendanceRecords));
+  }
+  applyDataLabels(tbody);
+  return wrapper;
+}
+
+// จัดกลุ่มรายชื่อโค้ชตามทีม (เรียงตามลำดับ TEAMS คงที่) แล้วเรียงภายในแต่ละทีมตามรุ่นอายุน้อยไปมาก เพื่อให้
+// ดูง่ายกว่าตารางรวมทุกทีมแบบเดิม — บัญชีที่ยังไม่มีทีม (ผู้ดูแลระบบ/รอกำหนดทีม) แยกไว้เป็นกลุ่มท้ายสุด
 async function loadCoachDirectory() {
-  coachDirectoryBody.innerHTML =
-    '<tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>';
+  coachDirectoryGroups.innerHTML = '<p class="text-slate-400 text-sm">กำลังโหลด...</p>';
   const [coachSnap, sessionSnap, attendanceSnap] = await Promise.all([
     getDocs(collection(db, "coaches")),
     getDocs(collection(db, "sessions")),
@@ -863,67 +1021,63 @@ async function loadCoachDirectory() {
   attendanceSnap.forEach((d) => attendanceRecords.push(d.data()));
 
   if (coaches.length === 0) {
-    coachDirectoryBody.innerHTML =
-      '<tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">ยังไม่มีโค้ชในระบบ</td></tr>';
+    coachDirectoryGroups.innerHTML = '<p class="text-slate-400 text-sm">ยังไม่มีโค้ชในระบบ</p>';
     return;
   }
 
-  coachDirectoryBody.innerHTML = "";
+  const teamGroups = new Map();
+  for (const team of TEAMS) teamGroups.set(team, []);
+  const unassignedGroup = [];
   for (const c of coaches) {
-    const teamSessions = sessions.filter((s) => s.team === c.team);
-    let onTimeCount = 0;
-    for (const s of teamSessions) {
-      const attendanceForSession = attendanceRecords.filter((a) => a.sessionId === s.id);
-      if (isSessionOnTime(s, attendanceForSession)) onTimeCount += 1;
-    }
-    const percentText =
-      teamSessions.length > 0 ? `${Math.round((onTimeCount / teamSessions.length) * 100)}% (${onTimeCount}/${teamSessions.length} วัน)` : "-";
-    const statusBadge =
-      c.role === "admin"
-        ? '<span class="badge badge-info">ผู้ดูแลระบบ</span>'
-        : c.status === "approved"
-          ? '<span class="badge badge-success">อนุมัติแล้ว</span>'
-          : '<span class="badge badge-warning">รอการอนุมัติ</span>';
-
-    const tr = document.createElement("tr");
-
-    const roleTd = document.createElement("td");
-    roleTd.innerHTML = roleLabel(c.role);
-
-    const teamTd = document.createElement("td");
-    if (c.role !== "admin" && c.team) {
-      const viewBtn = document.createElement("button");
-      viewBtn.innerHTML = `${teamLogoImg(c.team, "w-5 h-5 object-contain inline-block align-middle mr-1 rounded")}${c.team}`;
-      viewBtn.title = "คลิกเพื่อดู/จัดการข้อมูลทีมนี้";
-      viewBtn.className = "btn btn-secondary btn-sm";
-      viewBtn.addEventListener("click", () => enterTeamManagementMode(c.team, adminCoachesSection));
-      teamTd.appendChild(viewBtn);
+    if (c.team && teamGroups.has(c.team)) {
+      teamGroups.get(c.team).push(c);
     } else {
-      teamTd.textContent = c.team ?? "-";
+      unassignedGroup.push(c);
     }
-
-    tr.innerHTML = `
-      <td class="emphasis">${c.name ?? "-"}</td>
-      <td>${c.email ?? "-"}</td>
-    `;
-    tr.appendChild(roleTd);
-    tr.appendChild(teamTd);
-    tr.insertAdjacentHTML(
-      "beforeend",
-      `<td>${c.role === "coach" ? c.ageGroup ?? "-" : "-"}</td><td>${statusBadge}</td><td>${c.role === "admin" ? "-" : percentText}</td>`
-    );
-
-    const actionTd = document.createElement("td");
-    const editBtn = document.createElement("button");
-    editBtn.textContent = "แก้ไขบัญชี";
-    editBtn.className = "btn btn-secondary btn-sm";
-    editBtn.addEventListener("click", () => openEditCoachModal(c));
-    actionTd.appendChild(editBtn);
-    tr.appendChild(actionTd);
-
-    coachDirectoryBody.appendChild(tr);
   }
-  applyDataLabels(coachDirectoryBody);
+
+  const sortWithinTeam = (list) =>
+    list.sort((a, b) => {
+      // ผู้บริหารทีมไว้บนสุด (ไม่ผูกกับรุ่นอายุใดรุ่นหนึ่ง) แล้วค่อยเรียงโค้ชตามรุ่นอายุน้อยไปมาก
+      if (a.role === "executive" && b.role !== "executive") return -1;
+      if (b.role === "executive" && a.role !== "executive") return 1;
+      const keyDiff = ageGroupSortKey(a.ageGroups) - ageGroupSortKey(b.ageGroups);
+      return keyDiff !== 0 ? keyDiff : (a.name ?? "").localeCompare(b.name ?? "");
+    });
+
+  coachDirectoryGroups.innerHTML = "";
+  for (const team of TEAMS) {
+    const teamCoaches = teamGroups.get(team);
+    if (teamCoaches.length === 0) continue;
+    sortWithinTeam(teamCoaches);
+
+    const heading = document.createElement("h3");
+    heading.className = "section-title text-sm mb-2";
+    heading.innerHTML = `${teamLogoImg(team)}${team} (${teamCoaches.length} คน)`;
+
+    const viewTeamBtn = document.createElement("button");
+    viewTeamBtn.type = "button";
+    viewTeamBtn.textContent = "จัดการทีมนี้ →";
+    viewTeamBtn.className = "btn btn-secondary btn-sm mb-3";
+    viewTeamBtn.addEventListener("click", () => enterTeamManagementMode(team, adminCoachesSection));
+
+    const groupWrap = document.createElement("div");
+    groupWrap.className = "mb-2 flex items-center justify-between flex-wrap gap-2";
+    groupWrap.appendChild(heading);
+    groupWrap.appendChild(viewTeamBtn);
+
+    coachDirectoryGroups.appendChild(groupWrap);
+    coachDirectoryGroups.appendChild(buildCoachGroupTable(teamCoaches, sessions, attendanceRecords));
+  }
+
+  if (unassignedGroup.length > 0) {
+    unassignedGroup.sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
+    const heading = document.createElement("h3");
+    heading.className = "section-title text-sm mb-2";
+    heading.textContent = `🛡️ ยังไม่มีทีม (ผู้ดูแลระบบ/รอกำหนดทีม) (${unassignedGroup.length} คน)`;
+    coachDirectoryGroups.appendChild(heading);
+    coachDirectoryGroups.appendChild(buildCoachGroupTable(unassignedGroup, sessions, attendanceRecords));
+  }
 }
 
 // ---------- ผู้ดูแลระบบ: แก้ไขบัญชีผู้ใช้คนอื่น (ชื่อ/บทบาท/ทีม/รุ่นอายุ/สถานะ) ----------
@@ -945,7 +1099,11 @@ function openEditCoachModal(c) {
   editCoachRoleSelect.value = c.role || "coach";
   populateTeamSelect(editCoachTeamSelect, "-- ไม่ระบุทีม --");
   editCoachTeamSelect.value = c.team || "";
-  editCoachAgeGroupSelect.value = c.ageGroup || "";
+  editCoachPositionSelect.value = c.coachPosition || "head_coach";
+  const ageGroups = c.ageGroups || [];
+  for (const cb of editCoachAgeGroupCheckboxes) {
+    cb.checked = ageGroups.includes(cb.value);
+  }
   editCoachStatusSelect.value = c.status || "pending";
   updateEditCoachFieldVisibility();
   editCoachModalStatus.textContent = "";
@@ -978,12 +1136,16 @@ editCoachSaveBtn.addEventListener("click", async () => {
     const ok = confirm(`ยืนยันปรับบัญชี "${name}" เป็นผู้ดูแลระบบ? บัญชีนี้จะเข้าถึงข้อมูลของทุกทีมได้ทันที`);
     if (!ok) return;
   }
+  // ผู้ดูแลระบบเลือกได้หลายรุ่นแม้เป็น Head Coach — ไม่บังคับจำกัดจำนวนแบบตอนโค้ชลงทะเบียนเอง
+  const ageGroups =
+    role === "coach" ? Array.from(editCoachAgeGroupCheckboxes).filter((cb) => cb.checked).map((cb) => cb.value) : [];
   const payload = {
     name,
     role,
     status: editCoachStatusSelect.value,
     team: role === "admin" ? null : editCoachTeamSelect.value || null,
-    ageGroup: role === "coach" ? editCoachAgeGroupSelect.value || null : null
+    ageGroups: role === "coach" ? ageGroups : null,
+    coachPosition: role === "coach" ? editCoachPositionSelect.value : null
   };
   try {
     editCoachModalStatus.textContent = "กำลังบันทึก...";
@@ -1188,7 +1350,7 @@ async function findCoachRecordForTeam(team, role) {
 
 async function enterTeamManagementMode(team, returnSection) {
   myTeam = team;
-  myAgeGroup = null; // ผู้ดูแลระบบจัดการทีมแทนโค้ช เลือกรุ่นอายุของนักกีฬาได้อิสระทุกรุ่น (สิทธิ์การแก้ไขข้อมูล
+  myAgeGroups = []; // ผู้ดูแลระบบจัดการทีมแทนโค้ช เลือกรุ่นอายุของนักกีฬาได้อิสระทุกรุ่น (สิทธิ์การแก้ไขข้อมูล
   // จุดนี้ตั้งใจให้กว้างกว่าโค้ชจริงคนเดียว เผื่อทีมมีหลายรุ่นอายุ — ต่างจากข้อมูลที่แสดงผลด้านล่างซึ่งต้อง
   // ตรงกับโค้ชจริง 100%)
   adminViewingAs = "coach";
@@ -1219,7 +1381,7 @@ async function enterTeamManagementMode(team, returnSection) {
 // ที่ผู้บริหารทีมจริงเห็นถูกต้องหรือไม่ โดยไม่ต้องขอให้ผู้บริหารทีมจริงล็อกอินทดสอบให้
 async function enterExecutiveViewMode(team, returnSection) {
   myTeam = team;
-  myAgeGroup = null;
+  myAgeGroups = [];
   adminViewingAs = "executive";
   const execRecord = await findCoachRecordForTeam(team, "executive");
   // แสดงชื่อ/อีเมล/สถานะของผู้บริหารทีมตัวจริง (ถ้าหาเจอ) แทนข้อมูลของผู้ดูแลระบบเอง เหมือนกับโหมดโค้ช
@@ -1509,7 +1671,7 @@ onAuthStateChanged(auth, async (user) => {
     coachRoleBadgeEl.className = "badge badge-success";
     myTeam = data.team;
     myCoachName = data.name || user.email;
-    myAgeGroup = data.ageGroup || null;
+    myAgeGroups = data.ageGroups || [];
     renderCoachProfile(user, data, myTeam);
     coachAgeGroupsWrap.classList.remove("hidden");
     adminReturnSection = null;
