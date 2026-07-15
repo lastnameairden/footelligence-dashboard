@@ -236,6 +236,10 @@ let myCoachName = null;
 // รุ่นอายุที่โค้ชคนนี้รับผิดชอบ (array — Head Coach ปกติมี 1 รุ่น, GK Coach มีได้หลายรุ่น) ใช้จำกัด/ล็อก
 // ช่องเลือกรุ่นอายุตอนเพิ่มนักกีฬา (ดู applyAgeGroupLock)
 let myAgeGroups = [];
+// ตำแหน่งโค้ชคนนี้ (head_coach/assistant_coach/gk_coach/fitness_coach) ใช้กรองรายชื่อนักกีฬาใน loadPlayers():
+// GK Coach เห็นเฉพาะผู้เล่นตำแหน่ง GK ส่วน Head Coach/Assistant Coach ไม่เห็นผู้เล่นตำแหน่ง GK เลย (กันไม่ให้
+// ต้องเช็คชื่อ/ให้คะแนนซ้ำซ้อนกัน เพราะ GK Coach ดูแลผู้รักษาประตูแยกต่างหากอยู่แล้ว)
+let myCoachPosition = null;
 // จำหน้าจอผู้ดูแลระบบที่พาเข้ามาจัดการทีม เพื่อให้รายการ "กลับแผงควบคุมผู้ดูแลระบบ" ใน nav drawer
 // ย้อนกลับไปจุดเดิมที่ละสเต็ป (มีได้ทั้งจาก "จัดการข้อมูลทีม" หรือคลิกชื่อทีมในตาราง "รายชื่อโค้ชในระบบ")
 let adminReturnSection = null;
@@ -481,6 +485,8 @@ function exitTeamManagementToAdminPanel() {
   hideAllScreens();
   (adminReturnSection || adminManageTeamSection).classList.remove("hidden");
   myTeam = null;
+  myAgeGroups = [];
+  myCoachPosition = null;
   adminReturnSection = null;
   adminViewingAs = null;
   // สลับป้ายบทบาท + ชื่อ/อีเมลกลับเป็นของผู้ดูแลระบบเองตามเดิม (ตรงข้ามกับที่เขียนทับด้วยข้อมูลของโค้ช/
@@ -1362,11 +1368,13 @@ async function findCoachRecordForTeam(team, role) {
 // จะ fallback ไปหาโค้ชคนแรกของทีมเหมือนเดิม (ใช้ตอนกดจากปุ่ม "จัดการทีมนี้ →" ซึ่งไม่ได้เจาะจงคนใดคนหนึ่ง)
 async function enterTeamManagementMode(team, returnSection, coachRecordOverride) {
   myTeam = team;
-  myAgeGroups = []; // ผู้ดูแลระบบจัดการทีมแทนโค้ช เลือกรุ่นอายุของนักกีฬาได้อิสระทุกรุ่น (สิทธิ์การแก้ไขข้อมูล
-  // จุดนี้ตั้งใจให้กว้างกว่าโค้ชจริงคนเดียว เผื่อทีมมีหลายรุ่นอายุ — ต่างจากข้อมูลที่แสดงผลด้านล่างซึ่งต้อง
-  // ตรงกับโค้ชจริง 100%)
   adminViewingAs = "coach";
   const coachRecord = coachRecordOverride || (await findCoachRecordForTeam(team, "coach"));
+  // ถ้าเจาะจงโค้ชคนใดคนหนึ่ง (coachRecordOverride — คลิกชื่อโค้ชคนนั้นมาโดยตรง) จำกัด myAgeGroups ตามรุ่นอายุ
+  // ที่โค้ชคนนั้นรับผิดชอบจริง เพื่อให้เห็นเฉพาะนักกีฬารุ่นที่ดูแล ตรงกับหน้าจอที่โค้ชคนนั้นเห็นจริง 100% แต่ถ้าเป็น
+  // การจัดการทีมแบบกว้างผ่านปุ่ม "จัดการทีมนี้ →" (ไม่ได้เจาะจงคนใดคนหนึ่ง) ให้เข้าถึงได้ทุกรุ่นอายุของทีมเหมือนเดิม
+  myAgeGroups = coachRecordOverride ? coachRecord?.ageGroups || [] : [];
+  myCoachPosition = coachRecordOverride ? coachRecord?.coachPosition || null : null;
   myCoachName = coachRecord?.name || auth.currentUser?.email;
   // แสดงชื่อ/อีเมล/สถานะ/รุ่นอายุของโค้ชตัวจริง (ถ้าหาเจอ) แทนข้อมูลของผู้ดูแลระบบเอง เพื่อให้หน้าจอเหมือนที่โค้ช
   // จริงเห็นทุกประการเวลาสวมบทบาทเข้ามาทดสอบ/ตรวจสอบระบบ — สลับกลับตอนออกจากโหมดนี้ที่ exitTeamManagementToAdminPanel()
@@ -1396,6 +1404,7 @@ async function enterTeamManagementMode(team, returnSection, coachRecordOverride)
 async function enterExecutiveViewMode(team, returnSection, execRecordOverride) {
   myTeam = team;
   myAgeGroups = [];
+  myCoachPosition = null;
   adminViewingAs = "executive";
   const execRecord = execRecordOverride || (await findCoachRecordForTeam(team, "executive"));
   // แสดงชื่อ/อีเมล/สถานะของผู้บริหารทีมตัวจริง (ถ้าหาเจอ) แทนข้อมูลของผู้ดูแลระบบเอง เหมือนกับโหมดโค้ช
@@ -1674,6 +1683,7 @@ onAuthStateChanged(auth, async (user) => {
     myTeam = data.team;
     myCoachName = data.name || user.email;
     myAgeGroups = data.ageGroups || [];
+    myCoachPosition = data.coachPosition || null;
     renderCoachProfile(user, data, myTeam);
     coachAgeGroupsWrap.classList.remove("hidden");
     coachAgeGroupsEl.textContent = myAgeGroups.length ? myAgeGroups.join(", ") : "-";
@@ -1691,11 +1701,25 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 // ---------- Players (เฉพาะทีมของโค้ชคนนี้) ----------
+// ถ้ารู้รุ่นอายุที่รับผิดชอบแน่ชัด (myAgeGroups ไม่ว่าง — โค้ชจริงล็อกอินเอง หรือผู้ดูแลระบบสวมบทบาทเป็นโค้ช
+// คนใดคนหนึ่งเจาะจง) กรองให้เห็นเฉพาะนักกีฬารุ่นที่ดูแลจริงเท่านั้น ส่วนโหมด "จัดการทีมนี้" แบบกว้าง (ไม่ผูกกับ
+// โค้ชคนใดคนหนึ่ง) myAgeGroups จะว่างเปล่า จึงยังเห็นนักกีฬาทุกรุ่นของทีมเหมือนเดิม
 async function loadPlayers() {
-  const q = query(collection(db, "players"), where("team", "==", myTeam));
+  const clauses = [where("team", "==", myTeam)];
+  if (myAgeGroups.length > 0) {
+    clauses.push(where("ageGroup", "in", myAgeGroups));
+  }
+  const q = query(collection(db, "players"), ...clauses);
   const snapshot = await getDocs(q);
   players = [];
   snapshot.forEach((docSnap) => players.push({ id: docSnap.id, ...docSnap.data() }));
+  // GK Coach ดูแลเฉพาะผู้เล่นตำแหน่งผู้รักษาประตู (GK) ส่วน Head Coach/Assistant Coach จะไม่เห็นผู้เล่น
+  // ตำแหน่ง GK เลย เพื่อไม่ให้ต้องเช็คชื่อ/ให้คะแนนซ้ำซ้อนกับ GK Coach
+  if (myCoachPosition === "gk_coach") {
+    players = players.filter((p) => p.position === "GK");
+  } else if (myCoachPosition === "head_coach" || myCoachPosition === "assistant_coach") {
+    players = players.filter((p) => p.position !== "GK");
+  }
   players.sort((a, b) => (a.number ?? 0) - (b.number ?? 0));
 }
 
