@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FOOTELLIGENCE DATA — การประเมิน MASC</title>
+  <link rel="icon" href="./assets/logo.png" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="./css/styles.css" />
+  <style>
+    @media print {
+      .no-print { display: none !important; }
+      body { background: #fff; }
+      .card { box-shadow: none; border-color: #cbd5e1; }
+    }
+    @page { size: A4 landscape; margin: 1cm; }
+    .bub { width: 2.1rem; height: 2.1rem; border-radius: 9999px; border: 1.5px solid #9aa0a8; background: #fff;
+      color: #555b63; font-size: 0.8125rem; font-weight: 600; cursor: pointer; display: flex; align-items: center;
+      justify-content: center; transition: 0.08s; }
+    .bub:hover { border-color: #0f172a; }
+    .bub.on { background: #0f172a; border-color: #0f172a; color: #fff; }
+    .masc-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.4rem 0.5rem; border-radius: 0.4rem; }
+    .masc-row.core { background: #fef2f2; }
+    .masc-row:not(.core):nth-child(odd) { background: #f8fafc; }
+  </style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-900">
+  <header class="app-header text-white sticky top-0 z-10 shadow-sm no-print">
+    <div class="max-w-6xl mx-auto px-6 py-5 flex items-center gap-3">
+      <img src="./assets/logo.png" alt="Footelligence" class="w-9 h-9 object-contain" />
+      <h1 class="text-xl font-bold leading-tight tracking-tight">FOOTELLIGENCE DATA</h1>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-6 py-8 space-y-8">
+    <a href="./attendance.html" class="btn btn-ghost px-0 no-print">← กลับหน้าโค้ช</a>
+    <p id="status-message" class="text-sm text-slate-500 no-print">กำลังเชื่อมต่อ...</p>
+
+    <!-- แสดงเมื่อยังไม่ได้ล็อกอิน / บัญชีไม่มีสิทธิ์ (ต้องเป็นโค้ช/ผู้บริหารทีม/ผู้ดูแลระบบที่มีทีม) -->
+    <section id="access-gate" class="hidden card card-pad max-w-md mx-auto text-center no-print">
+      <div class="icon-badge icon-badge-lg mx-auto mb-3">🛡️</div>
+      <h2 class="text-lg font-semibold mb-2">เฉพาะโค้ช/ผู้บริหารทีม/ผู้ดูแลระบบ</h2>
+      <p class="text-sm text-slate-500 mb-4" id="access-gate-message">
+        ต้องเข้าสู่ระบบด้วยบัญชีที่มีทีมก่อน จึงจะสร้างการประเมิน MASC ได้
+      </p>
+      <a href="./attendance.html" class="btn btn-primary">ไปที่หน้าเข้าสู่ระบบ →</a>
+    </section>
+
+    <div id="masc-content" class="hidden space-y-8">
+      <div class="page-heading no-print">
+        <div class="icon-badge icon-badge-lg">🧬</div>
+        <div>
+          <h2>การประเมิน MASC</h2>
+          <p>โปรไฟล์สรุปนักกีฬาเชิงลึกแยกตามตำแหน่ง/ช่วงวัย · Motricity · Availability · Smart · Commitment</p>
+        </div>
+      </div>
+
+      <!-- เลือกนักกีฬา + ประวัติการประเมิน -->
+      <div class="card card-pad space-y-4 no-print">
+        <div class="flex flex-wrap items-end gap-4">
+          <div>
+            <label class="field-label">รุ่นอายุ</label>
+            <select id="masc-age-filter-select" class="field-input w-32"></select>
+          </div>
+          <div class="flex-1 min-w-[220px]">
+            <label class="field-label">นักกีฬา</label>
+            <select id="masc-player-select" class="field-input w-full">
+              <option value="">-- เลือกนักกีฬา --</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label">ช่วงที่ประเมิน</label>
+            <select id="masc-period-select" class="field-input w-40" disabled>
+              <option value="">— เลือก —</option>
+              <option>ช่วงที่ 1</option>
+              <option>ช่วงที่ 2</option>
+              <option>ช่วงที่ 3</option>
+              <option>ช่วงที่ 4</option>
+            </select>
+          </div>
+          <button id="masc-new-btn" type="button" class="btn btn-secondary" disabled>+ ประเมินรอบใหม่</button>
+        </div>
+        <div id="masc-history-wrap" class="hidden">
+          <label class="field-label">ประวัติการประเมินของนักกีฬาคนนี้ (คลิกเพื่อเปิดดู/แก้ไข)</label>
+          <div id="masc-history-list" class="flex flex-wrap gap-2"></div>
+        </div>
+        <p id="masc-status" class="text-sm text-slate-500"></p>
+      </div>
+
+      <!-- ฟอร์มประเมิน -->
+      <div id="masc-form-wrap" class="hidden space-y-6">
+        <div class="card card-pad" id="masc-sheet">
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-5 pb-4 border-b border-slate-100">
+            <div class="flex items-center gap-3">
+              <div id="masc-pos-badge" class="flex items-center justify-center w-14 h-14 rounded-xl bg-slate-900 text-white font-extrabold text-lg flex-shrink-0">-</div>
+              <div>
+                <p class="font-bold text-lg leading-tight" id="masc-player-title">-</p>
+                <p class="text-xs text-slate-500" id="masc-sub-title">-</p>
+              </div>
+            </div>
+            <div class="text-right">
+              <p class="text-xs text-slate-400 uppercase tracking-wide">รวม MASC (ถ่วงน้ำหนัก)</p>
+              <p class="text-xl font-bold text-slate-900" id="masc-overall">–</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
+            <!-- LEFT column -->
+            <div class="space-y-4">
+              <div class="grid grid-cols-2 gap-3 no-print">
+                <div>
+                  <label class="field-label">ตำแหน่งที่ประเมิน</label>
+                  <select id="masc-position-select" class="field-input w-full"></select>
+                </div>
+                <div>
+                  <label class="field-label">ช่วงวัย</label>
+                  <select id="masc-age-select" class="field-input w-full"></select>
+                </div>
+              </div>
+              <div class="no-print">
+                <label class="field-label">ตำแหน่งรอง (ถ้ามี)</label>
+                <select id="masc-secondary-select" class="field-input w-full">
+                  <option value="">— ไม่ระบุ —</option>
+                </select>
+              </div>
+
+              <svg id="masc-pitch" viewBox="0 0 200 150" class="w-full border border-slate-200 rounded-lg bg-white"></svg>
+
+              <div>
+                <label class="field-label">เท้าถนัด (FOOT)</label>
+                <div id="masc-foot-toggle" class="segmented"></div>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="field-label">ส่วนสูง (ซม.)</label>
+                  <input id="masc-height" type="number" inputmode="decimal" class="field-input w-full" />
+                </div>
+                <div>
+                  <label class="field-label">น้ำหนัก (กก.)</label>
+                  <input id="masc-weight" type="number" inputmode="decimal" class="field-input w-full" />
+                </div>
+              </div>
+              <div>
+                <label class="field-label">การเจริญเติบโตของร่างกาย <span class="text-slate-400 font-normal">(Maturation)</span></label>
+                <div id="masc-maturation-toggle" class="segmented"></div>
+              </div>
+              <div class="border border-slate-200 rounded-lg p-3">
+                <p class="section-title text-sm mb-2">พฤติกรรมในโรงเรียน <span class="text-xs text-slate-400 font-normal">(School Behavior)</span></p>
+                <div id="masc-school-behavior" class="space-y-2"></div>
+              </div>
+            </div>
+
+            <!-- RIGHT column -->
+            <div class="space-y-4 min-w-0">
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label class="field-label">TALENT <span class="text-slate-400 font-normal">(จุดเด่น)</span></label>
+                  <textarea id="masc-talent" rows="3" class="field-input w-full"></textarea>
+                </div>
+                <div>
+                  <label class="field-label">LIMITATIONS <span class="text-slate-400 font-normal">(จุดที่ต้องพัฒนา)</span></label>
+                  <textarea id="masc-limitations" rows="3" class="field-input w-full"></textarea>
+                </div>
+                <div>
+                  <label class="field-label">OBSERVATIONS <span class="text-slate-400 font-normal">(ข้อสังเกต)</span></label>
+                  <textarea id="masc-observations" rows="3" class="field-input w-full"></textarea>
+                </div>
+              </div>
+
+              <div class="border border-slate-200 rounded-lg p-3">
+                <p class="field-label mb-2">บทบาทในทีม</p>
+                <div class="flex flex-wrap gap-4 text-sm">
+                  <label class="flex items-center gap-1.5"><input type="checkbox" id="masc-role-important" /> ตัวหลัก <span class="text-slate-400">(Important)</span></label>
+                  <label class="flex items-center gap-1.5"><input type="checkbox" id="masc-role-rotation" /> ตัวหมุนเวียน <span class="text-slate-400">(Rotation)</span></label>
+                  <label class="flex items-center gap-1.5"><input type="checkbox" id="masc-role-reserve" /> ตัวสำรอง <span class="text-slate-400">(Reserve)</span></label>
+                </div>
+              </div>
+
+              <div id="masc-grid" class="grid grid-cols-1 xl:grid-cols-2 gap-4"></div>
+
+              <p class="text-xs text-slate-500 leading-relaxed border-t border-slate-100 pt-3">
+                <b>การให้คะแนน:</b> 1 = แย่ · 3 = พอใช้ · 7 = ดี · 9 = ดีมาก (เลือก 1 ค่าต่อข้อ) &nbsp;|&nbsp;
+                <b>น้ำหนัก:</b> Core = 40% · Support = 20% ต่อข้อ &nbsp;|&nbsp;
+                <b>MASC</b> = Motricity · Availability · Smart · Commitment<br />
+                <b>เกรดหมวด</b> (จากคะแนนถ่วงน้ำหนัก): 1.00–2.00 → <b>1</b> · 2.01–5.00 → <b>3</b> · 5.01–8.00 → <b>7</b> · 8.01–9.00 → <b>9</b>
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3 no-print">
+          <button id="masc-save-btn" type="button" class="btn btn-primary">บันทึกการประเมิน</button>
+          <button id="masc-print-btn" type="button" class="btn btn-secondary">🖨️ พิมพ์ / บันทึก PDF</button>
+          <button id="masc-delete-btn" type="button" class="hidden btn btn-danger-soft">ลบการประเมินนี้</button>
+          <p id="masc-save-status" class="text-sm text-slate-500"></p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="app-footer no-print">FOOTELLIGENCE DATA © 2026 — ระบบจัดการข้อมูลนักกีฬาและการฝึกซ้อม</footer>
+
+  <script type="module" src="./js/masc.js"></script>
+</body>
+</html>

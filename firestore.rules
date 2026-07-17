@@ -116,5 +116,15 @@ service cloud.firestore {
     match /adminNotificationReads/{key} {
       allow read, write: if isAdmin();
     }
+
+    // การประเมิน MASC (Motricity/Availability/Smart/Commitment) — โปรไฟล์สรุปนักกีฬาเชิงลึกแยกตามตำแหน่ง/
+    // ช่วงวัย เป็นระยะ (คนละระบบกับการประเมินรายวันใน attendance) โค้ชจัดการได้เฉพาะของทีมตัวเอง ผู้บริหารทีม
+    // ดูได้อย่างเดียว
+    match /playerEvaluations/{id} {
+      allow read: if isAdmin() || (canViewTeam() && ownsTeam());
+      allow create: if isAdmin() || (canManageTeam() && request.resource.data.team == myTeam());
+      allow update: if isAdmin() || (canManageTeam() && ownsTeam() && request.resource.data.team == myTeam());
+      allow delete: if isAdmin() || (canManageTeam() && ownsTeam());
+    }
   }
 }

@@ -16,7 +16,8 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  deleteUser
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import { db, auth } from "./firebase-init.js";
 import {
@@ -360,7 +361,10 @@ registerForm.addEventListener("submit", async (e) => {
   registerError.textContent = "";
   const role = document.querySelector('input[name="register-role"]:checked').value;
   const name = document.getElementById("register-name").value.trim();
-  const email = document.getElementById("register-email").value.trim();
+  // ต้องแปลงเป็นตัวพิมพ์เล็กก่อนเสมอ เพราะ Firebase Auth จะทำให้อีเมลใน request.auth.token.email เป็นตัวพิมพ์
+  // เล็กเสมอไม่ว่าผู้ใช้จะพิมพ์ตัวใหญ่ปนมาแค่ไหน — ถ้าค่าที่บันทึกลง Firestore (request.resource.data.email)
+  // ไม่ตรงกับตัวพิมพ์เล็กเป๊ะๆ กฎ allow create จะปฏิเสธด้วย "Missing or insufficient permissions" ทันที
+  const email = document.getElementById("register-email").value.trim().toLowerCase();
   const password = document.getElementById("register-password").value;
   const passwordConfirm = document.getElementById("register-password-confirm").value;
   const coachPosition = registerCoachPositionSelect.value;
@@ -382,17 +386,29 @@ registerForm.addEventListener("submit", async (e) => {
     return;
   }
 
+  let createdCred = null;
   try {
-    const cred = await createUserWithEmailAndPassword(auth, email, password);
+    createdCred = await createUserWithEmailAndPassword(auth, email, password);
     const payload = { name, email, role, status: "pending", createdAt: serverTimestamp() };
     if (role === "coach") {
       payload.ageGroups = ageGroups;
       payload.coachPosition = coachPosition;
     }
-    await setDoc(doc(db, "coaches", cred.user.uid), payload);
+    await setDoc(doc(db, "coaches", createdCred.user.uid), payload);
     registerForm.reset();
     // onAuthStateChanged จะทำงานต่อเองและแสดงหน้า "รอผู้ดูแลระบบอนุมัติ"
   } catch (err) {
+    // ถ้าสร้างบัญชี Firebase Auth สำเร็จแล้วแต่บันทึกโปรไฟล์ลง Firestore ไม่สำเร็จ (เช่น เน็ตหลุดกลางทาง)
+    // ต้องลบบัญชี Auth ที่เพิ่งสร้างทิ้งด้วย ไม่งั้นจะเหลือ "บัญชีผี" ที่ล็อกอินได้แต่ไม่มีโปรไฟล์ใน Firestore
+    // เลย — ผู้ดูแลระบบจะมองไม่เห็นในหน้าอนุมัติ/รายชื่อโค้ชเลยแม้แต่รายการเดียว (ค้นหาไม่เจอเพราะไม่มีเอกสาร
+    // ให้ค้นตั้งแต่ต้น) และอีเมลนั้นก็ลงทะเบียนซ้ำไม่ได้อีกเพราะ Firebase Auth มองว่าอีเมลถูกใช้ไปแล้ว
+    if (createdCred) {
+      try {
+        await deleteUser(createdCred.user);
+      } catch (cleanupErr) {
+        console.error("ลบบัญชีที่สร้างไม่สมบูรณ์ไม่สำเร็จ:", cleanupErr);
+      }
+    }
     registerError.textContent = "ลงทะเบียนไม่สำเร็จ: " + authErrorMessage(err);
   }
 });
@@ -565,6 +581,7 @@ function renderDrawerItems() {
       navDrawerItems.appendChild(drawerItem("⚽", "รายงานผลการแข่งขัน", openMatchReportSection));
       navDrawerItems.appendChild(drawerItem("🩹", "รายงานอาการบาดเจ็บ", openInjuryReportSection));
       navDrawerItems.appendChild(drawerItem("📋", "แผนการฝึกซ้อมรายวัน", openTrainingPlanSection));
+      navDrawerItems.appendChild(drawerItem("🧬", "การประเมิน MASC", () => (window.location.href = `./masc.html#team=${encodeURIComponent(myTeam)}`)));
       navDrawerItems.appendChild(drawerDivider());
       navDrawerItems.appendChild(drawerItem("🛡️", "กลับแผงควบคุมผู้ดูแลระบบ", exitTeamManagementToAdminPanel));
     } else {
@@ -593,6 +610,7 @@ function renderDrawerItems() {
     navDrawerItems.appendChild(drawerItem("⚽", "รายงานผลการแข่งขัน", openMatchReportSection));
     navDrawerItems.appendChild(drawerItem("🩹", "รายงานอาการบาดเจ็บ", openInjuryReportSection));
     navDrawerItems.appendChild(drawerItem("📋", "แผนการฝึกซ้อมรายวัน", openTrainingPlanSection));
+    navDrawerItems.appendChild(drawerItem("🧬", "การประเมิน MASC", () => (window.location.href = "./masc.html")));
     navDrawerItems.appendChild(drawerDivider());
     navDrawerItems.appendChild(drawerItem("📊", "Dashboard", goToDashboard));
     return;
