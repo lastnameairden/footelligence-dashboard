@@ -1024,9 +1024,20 @@ function renderScopedTeamOverviewForPosition(position) {
 playerPositionToggleBtn.addEventListener("click", () => renderScopedTeamOverviewForPosition("player"));
 gkPositionToggleBtn.addEventListener("click", () => renderScopedTeamOverviewForPosition("gk"));
 
+// เลื่อนไปยัง section ที่ระบุใน URL hash โดยตรง (เช่น มาจากลิงก์แจ้งเตือน index.html?team=__ALL__#training-plan-summary-section)
+// เพื่อให้ผู้ดูแลระบบดำเนินการต่อจากที่คลิกแจ้งเตือนได้เลย ไม่ต้องไล่หา section เอง — เรียกตอน dashboardContent
+// ถูกเอา class hidden ออกแล้วเสมอ (ผู้เรียกทุกจุดเปิดให้เห็นก่อนค่อยเรียก loadDashboard) จึงเลื่อนได้ทันที
+function scrollToHashTarget() {
+  const targetId = window.location.hash.replace(/^#/, "");
+  if (!targetId) return;
+  const el = document.getElementById(targetId);
+  if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 async function loadDashboard(scopeTeam) {
   try {
     setStatus("กำลังโหลดข้อมูล...");
+    scrollToHashTarget();
     currentScopeTeam = scopeTeam;
     const [players, attendanceRecords, coaches] = await Promise.all([
       scopeTeam ? loadCollectionForTeam("players", scopeTeam) : loadCollection("players"),

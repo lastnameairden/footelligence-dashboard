@@ -1,0 +1,218 @@
+[debug] [2026-07-19T06:49:24.183Z] ----------------------------------------------------------------------
+[debug] [2026-07-19T06:49:24.190Z] Command:       D:\node.exe C:\Users\Dell\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js firestore:delete sessions --recursive --force --debug
+[debug] [2026-07-19T06:49:24.192Z] CLI Version:   15.22.4
+[debug] [2026-07-19T06:49:24.192Z] Platform:      win32
+[debug] [2026-07-19T06:49:24.193Z] Node Version:  v24.18.0
+[debug] [2026-07-19T06:49:24.193Z] Detected Agent: claude-code_2-1-209_agent
+[debug] [2026-07-19T06:49:24.193Z] Time:          Sun Jul 19 2026 13:49:24 GMT+0700 (Indochina Time)
+[debug] [2026-07-19T06:49:24.194Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-07-19T06:49:30.323Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-07-19T06:49:30.326Z] > authorizing via signed-in user (lastnameairden@gmail.com)
+[debug] [2026-07-19T06:49:30.327Z] [iam] checking project footelligence-b1ca9 for permissions ["datastore.entities.delete","datastore.entities.list","firebase.projects.get"]
+[debug] [2026-07-19T06:49:30.333Z] Checked if tokens are valid: true, expires at: 1784446976186
+[debug] [2026-07-19T06:49:30.333Z] Checked if tokens are valid: true, expires at: 1784446976186
+[debug] [2026-07-19T06:49:30.336Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions [none]
+[debug] [2026-07-19T06:49:30.336Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions  x-goog-user-project=footelligence-b1ca9
+[debug] [2026-07-19T06:49:30.337Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions {"permissions":["datastore.entities.delete","datastore.entities.list","firebase.projects.get"]}
+[debug] [2026-07-19T06:49:32.031Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions 200
+[debug] [2026-07-19T06:49:32.031Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions {"permissions":["datastore.entities.delete","datastore.entities.list","firebase.projects.get"]}
+[debug] [2026-07-19T06:49:32.034Z] Checked if tokens are valid: true, expires at: 1784446976186
+[debug] [2026-07-19T06:49:32.035Z] Checked if tokens are valid: true, expires at: 1784446976186
+[debug] [2026-07-19T06:49:32.035Z] >>> [apiv2][query] POST https://firestore.googleapis.com/v1/projects/footelligence-b1ca9/databases/(default)/documents:runQuery [none]
+[debug] [2026-07-19T06:49:32.035Z] >>> [apiv2][body] POST https://firestore.googleapis.com/v1/projects/footelligence-b1ca9/databases/(default)/documents:runQuery {"structuredQuery":{"where":{"compositeFilter":{"op":"AND","filters":[{"fieldFilter":{"field":{"fieldPath":"__name__"},"op":"GREATER_THAN_OR_EQUAL","value":{"referenceValue":"projects/footelligence-b1ca9/databases/(default)/documents/sessions/__id-9223372036854775808__"}}},{"fieldFilter":{"field":{"fieldPath":"__name__"},"op":"LESS_THAN","value":{"referenceValue":"projects/footelligence-b1ca9/databases/(default)/documents/sessions\u0000/__id-9223372036854775808__"}}}]}},"limit":7500,"from":[{"allDescendants":true}],"select":{"fields":[{"fieldPath":"__name__"}]},"orderBy":[{"field":{"fieldPath":"__name__"}}]}}
+[debug] [2026-07-19T06:49:32.403Z] <<< [apiv2][status] POST https://firestore.googleapis.com/v1/projects/footelligence-b1ca9/databases/(default)/documents:runQuery 200
+[debug] [2026-07-19T06:49:42.714Z] ----------------------------------------------------------------------
+[debug] [2026-07-19T06:49:42.721Z] Command:       D:\node.exe C:\Users\Dell\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js firestore:delete attendance --recursive --force --debug
+[debug] [2026-07-19T06:49:42.722Z] CLI Version:   15.22.4
+[debug] [2026-07-19T06:49:42.722Z] Platform:      win32
+[debug] [2026-07-19T06:49:42.723Z] Node Version:  v24.18.0
+[debug] [2026-07-19T06:49:42.724Z] Detected Agent: claude-code_2-1-209_agent
+[debug] [2026-07-19T06:49:42.724Z] Time:          Sun Jul 19 2026 13:49:42 GMT+0700 (Indochina Time)
+[debug] [2026-07-19T06:49:42.725Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-07-19T06:49:49.822Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-07-19T06:49:49.826Z] > authorizing via signed-in user (lastnameairden@gmail.com)
+[debug] [2026-07-19T06:49:49.826Z] [iam] checking project footelligence-b1ca9 for permissions ["datastore.entities.delete","datastore.entities.list","firebase.projects.get"]
+[debug] [2026-07-19T06:49:49.829Z] Checked if tokens are valid: true, expires at: 1784446976186
+[debug] [2026-07-19T06:49:49.830Z] Checked if tokens are valid: true, expires at: 1784446976186
+[debug] [2026-07-19T06:49:49.833Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions [none]
+[debug] [2026-07-19T06:49:49.834Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions  x-goog-user-project=footelligence-b1ca9
+[debug] [2026-07-19T06:49:49.834Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions {"permissions":["datastore.entities.delete","datastore.entities.list","firebase.projects.get"]}
+[debug] [2026-07-19T06:49:51.370Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions 200
+[debug] [2026-07-19T06:49:51.371Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions {"permissions":["datastore.entities.delete","datastore.entities.list","firebase.projects.get"]}
+[debug] [2026-07-19T06:49:51.375Z] Checked if tokens are valid: true, expires at: 1784446976186
+[debug] [2026-07-19T06:49:51.376Z] Checked if tokens are valid: true, expires at: 1784446976186
+[debug] [2026-07-19T06:49:51.376Z] >>> [apiv2][query] POST https://firestore.googleapis.com/v1/projects/footelligence-b1ca9/databases/(default)/documents:runQuery [none]
+[debug] [2026-07-19T06:49:51.376Z] >>> [apiv2][body] POST https://firestore.googleapis.com/v1/projects/footelligence-b1ca9/databases/(default)/documents:runQuery {"structuredQuery":{"where":{"compositeFilter":{"op":"AND","filters":[{"fieldFilter":{"field":{"fieldPath":"__name__"},"op":"GREATER_THAN_OR_EQUAL","value":{"referenceValue":"projects/footelligence-b1ca9/databases/(default)/documents/attendance/__id-9223372036854775808__"}}},{"fieldFilter":{"field":{"fieldPath":"__name__"},"op":"LESS_THAN","value":{"referenceValue":"projects/footelligence-b1ca9/databases/(default)/documents/attendance\u0000/__id-9223372036854775808__"}}}]}},"limit":7500,"from":[{"allDescendants":true}],"select":{"fields":[{"fieldPath":"__name__"}]},"orderBy":[{"field":{"fieldPath":"__name__"}}]}}
+[debug] [2026-07-19T06:49:51.607Z] <<< [apiv2][status] POST https://firestore.googleapis.com/v1/projects/footelligence-b1ca9/databases/(default)/documents:runQuery 200
+[debug] [2026-07-19T06:50:01.214Z] ----------------------------------------------------------------------
+[debug] [2026-07-19T06:50:01.220Z] Command:       D:\node.exe C:\Users\Dell\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js firestore:delete matchReports --recursive --force --debug
+[debug] [2026-07-19T06:50:01.221Z] CLI Version:   15.22.4
+[debug] [2026-07-19T06:50:01.221Z] Platform:      win32
+[debug] [2026-07-19T06:50:01.221Z] Node Version:  v24.18.0
+[debug] [2026-07-19T06:50:01.222Z] Detected Agent: claude-code_2-1-209_agent
+[debug] [2026-07-19T06:50:01.222Z] Time:          Sun Jul 19 2026 13:50:01 GMT+0700 (Indochina Time)
+[debug] [2026-07-19T06:50:01.223Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-07-19T06:50:06.730Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-07-19T06:50:06.731Z] > authorizing via signed-in user (lastnameairden@gmail.com)
+[debug] [2026-07-19T06:50:06.732Z] [iam] checking project footelligence-b1ca9 for permissions ["datastore.entities.delete","datastore.entities.list","firebase.projects.get"]
+[debug] [2026-07-19T06:50:06.734Z] Checked if tokens are valid: true, expires at: 1784446976186
+[debug] [2026-07-19T06:50:06.735Z] Checked if tokens are valid: true, expires at: 1784446976186
+[debug] [2026-07-19T06:50:06.737Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions [none]
+[debug] [2026-07-19T06:50:06.738Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions  x-goog-user-project=footelligence-b1ca9
+[debug] [2026-07-19T06:50:06.738Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions {"permissions":["datastore.entities.delete","datastore.entities.list","firebase.projects.get"]}
+[debug] [2026-07-19T06:50:08.388Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions 200
+[debug] [2026-07-19T06:50:08.388Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions {"permissions":["datastore.entities.delete","datastore.entities.list","firebase.projects.get"]}
+[debug] [2026-07-19T06:50:08.392Z] Checked if tokens are valid: true, expires at: 1784446976186
+[debug] [2026-07-19T06:50:08.392Z] Checked if tokens are valid: true, expires at: 1784446976186
+[debug] [2026-07-19T06:50:08.393Z] >>> [apiv2][query] POST https://firestore.googleapis.com/v1/projects/footelligence-b1ca9/databases/(default)/documents:runQuery [none]
+[debug] [2026-07-19T06:50:08.393Z] >>> [apiv2][body] POST https://firestore.googleapis.com/v1/projects/footelligence-b1ca9/databases/(default)/documents:runQuery {"structuredQuery":{"where":{"compositeFilter":{"op":"AND","filters":[{"fieldFilter":{"field":{"fieldPath":"__name__"},"op":"GREATER_THAN_OR_EQUAL","value":{"referenceValue":"projects/footelligence-b1ca9/databases/(default)/documents/matchReports/__id-9223372036854775808__"}}},{"fieldFilter":{"field":{"fieldPath":"__name__"},"op":"LESS_THAN","value":{"referenceValue":"projects/footelligence-b1ca9/databases/(default)/documents/matchReports\u0000/__id-9223372036854775808__"}}}]}},"limit":7500,"from":[{"allDescendants":true}],"select":{"fields":[{"fieldPath":"__name__"}]},"orderBy":[{"field":{"fieldPath":"__name__"}}]}}
+[debug] [2026-07-19T06:50:08.814Z] <<< [apiv2][status] POST https://firestore.googleapis.com/v1/projects/footelligence-b1ca9/databases/(default)/documents:runQuery 200
+[debug] [2026-07-19T06:50:18.403Z] ----------------------------------------------------------------------
+[debug] [2026-07-19T06:50:18.413Z] Command:       D:\node.exe C:\Users\Dell\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js firestore:delete trainingReports --recursive --force --debug
+[debug] [2026-07-19T06:50:18.414Z] CLI Version:   15.22.4
+[debug] [2026-07-19T06:50:18.415Z] Platform:      win32
+[debug] [2026-07-19T06:50:18.415Z] Node Version:  v24.18.0
+[debug] [2026-07-19T06:50:18.415Z] Detected Agent: claude-code_2-1-209_agent
+[debug] [2026-07-19T06:50:18.416Z] Time:          Sun Jul 19 2026 13:50:18 GMT+0700 (Indochina Time)
+[debug] [2026-07-19T06:50:18.416Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-07-19T06:50:24.109Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-07-19T06:50:24.111Z] > authorizing via signed-in user (lastnameairden@gmail.com)
+[debug] [2026-07-19T06:50:24.111Z] [iam] checking project footelligence-b1ca9 for permissions ["datastore.entities.delete","datastore.entities.list","firebase.projects.get"]
+[debug] [2026-07-19T06:50:24.114Z] Checked if tokens are valid: true, expires at: 1784446976186
+[debug] [2026-07-19T06:50:24.114Z] Checked if tokens are valid: true, expires at: 1784446976186
+[debug] [2026-07-19T06:50:24.116Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions [none]
+[debug] [2026-07-19T06:50:24.116Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions  x-goog-user-project=footelligence-b1ca9
+[debug] [2026-07-19T06:50:24.117Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions {"permissions":["datastore.entities.delete","datastore.entities.list","firebase.projects.get"]}
+[debug] [2026-07-19T06:50:25.517Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions 200
+[debug] [2026-07-19T06:50:25.517Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions {"permissions":["datastore.entities.delete","datastore.entities.list","firebase.projects.get"]}
+[debug] [2026-07-19T06:50:25.528Z] Checked if tokens are valid: true, expires at: 1784446976186
+[debug] [2026-07-19T06:50:25.528Z] Checked if tokens are valid: true, expires at: 1784446976186
+[debug] [2026-07-19T06:50:25.529Z] >>> [apiv2][query] POST https://firestore.googleapis.com/v1/projects/footelligence-b1ca9/databases/(default)/documents:runQuery [none]
+[debug] [2026-07-19T06:50:25.529Z] >>> [apiv2][body] POST https://firestore.googleapis.com/v1/projects/footelligence-b1ca9/databases/(default)/documents:runQuery {"structuredQuery":{"where":{"compositeFilter":{"op":"AND","filters":[{"fieldFilter":{"field":{"fieldPath":"__name__"},"op":"GREATER_THAN_OR_EQUAL","value":{"referenceValue":"projects/footelligence-b1ca9/databases/(default)/documents/trainingReports/__id-9223372036854775808__"}}},{"fieldFilter":{"field":{"fieldPath":"__name__"},"op":"LESS_THAN","value":{"referenceValue":"projects/footelligence-b1ca9/databases/(default)/documents/trainingReports\u0000/__id-9223372036854775808__"}}}]}},"limit":7500,"from":[{"allDescendants":true}],"select":{"fields":[{"fieldPath":"__name__"}]},"orderBy":[{"field":{"fieldPath":"__name__"}}]}}
+[debug] [2026-07-19T06:50:25.747Z] <<< [apiv2][status] POST https://firestore.googleapis.com/v1/projects/footelligence-b1ca9/databases/(default)/documents:runQuery 200
+[debug] [2026-07-19T06:50:32.027Z] ----------------------------------------------------------------------
+[debug] [2026-07-19T06:50:32.032Z] Command:       D:\node.exe C:\Users\Dell\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js firestore:delete trainingPlans --recursive --force --debug
+[debug] [2026-07-19T06:50:32.032Z] CLI Version:   15.22.4
+[debug] [2026-07-19T06:50:32.033Z] Platform:      win32
+[debug] [2026-07-19T06:50:32.033Z] Node Version:  v24.18.0
+[debug] [2026-07-19T06:50:32.033Z] Detected Agent: claude-code_2-1-209_agent
+[debug] [2026-07-19T06:50:32.033Z] Time:          Sun Jul 19 2026 13:50:32 GMT+0700 (Indochina Time)
+[debug] [2026-07-19T06:50:32.033Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-07-19T06:50:35.689Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-07-19T06:50:35.691Z] > authorizing via signed-in user (lastnameairden@gmail.com)
+[debug] [2026-07-19T06:50:35.691Z] [iam] checking project footelligence-b1ca9 for permissions ["datastore.entities.delete","datastore.entities.list","firebase.projects.get"]
+[debug] [2026-07-19T06:50:35.695Z] Checked if tokens are valid: true, expires at: 1784446976186
+[debug] [2026-07-19T06:50:35.695Z] Checked if tokens are valid: true, expires at: 1784446976186
+[debug] [2026-07-19T06:50:35.698Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions [none]
+[debug] [2026-07-19T06:50:35.698Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions  x-goog-user-project=footelligence-b1ca9
+[debug] [2026-07-19T06:50:35.698Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions {"permissions":["datastore.entities.delete","datastore.entities.list","firebase.projects.get"]}
+[debug] [2026-07-19T06:50:37.147Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions 200
+[debug] [2026-07-19T06:50:37.148Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions {"permissions":["datastore.entities.delete","datastore.entities.list","firebase.projects.get"]}
+[debug] [2026-07-19T06:50:37.161Z] Checked if tokens are valid: true, expires at: 1784446976186
+[debug] [2026-07-19T06:50:37.162Z] Checked if tokens are valid: true, expires at: 1784446976186
+[debug] [2026-07-19T06:50:37.162Z] >>> [apiv2][query] POST https://firestore.googleapis.com/v1/projects/footelligence-b1ca9/databases/(default)/documents:runQuery [none]
+[debug] [2026-07-19T06:50:37.162Z] >>> [apiv2][body] POST https://firestore.googleapis.com/v1/projects/footelligence-b1ca9/databases/(default)/documents:runQuery {"structuredQuery":{"where":{"compositeFilter":{"op":"AND","filters":[{"fieldFilter":{"field":{"fieldPath":"__name__"},"op":"GREATER_THAN_OR_EQUAL","value":{"referenceValue":"projects/footelligence-b1ca9/databases/(default)/documents/trainingPlans/__id-9223372036854775808__"}}},{"fieldFilter":{"field":{"fieldPath":"__name__"},"op":"LESS_THAN","value":{"referenceValue":"projects/footelligence-b1ca9/databases/(default)/documents/trainingPlans\u0000/__id-9223372036854775808__"}}}]}},"limit":7500,"from":[{"allDescendants":true}],"select":{"fields":[{"fieldPath":"__name__"}]},"orderBy":[{"field":{"fieldPath":"__name__"}}]}}
+[debug] [2026-07-19T06:50:37.470Z] <<< [apiv2][status] POST https://firestore.googleapis.com/v1/projects/footelligence-b1ca9/databases/(default)/documents:runQuery 200
+[debug] [2026-07-19T06:50:37.471Z] <<< [apiv2][body] POST https://firestore.googleapis.com/v1/projects/footelligence-b1ca9/databases/(default)/documents:runQuery [{"readTime":"2026-07-19T06:50:38.158314Z"}]
+[debug] [2026-07-19T06:50:43.674Z] ----------------------------------------------------------------------
+[debug] [2026-07-19T06:50:43.679Z] Command:       D:\node.exe C:\Users\Dell\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js firestore:delete injuryReports --recursive --force --debug
+[debug] [2026-07-19T06:50:43.679Z] CLI Version:   15.22.4
+[debug] [2026-07-19T06:50:43.680Z] Platform:      win32
+[debug] [2026-07-19T06:50:43.680Z] Node Version:  v24.18.0
+[debug] [2026-07-19T06:50:43.680Z] Detected Agent: claude-code_2-1-209_agent
+[debug] [2026-07-19T06:50:43.680Z] Time:          Sun Jul 19 2026 13:50:43 GMT+0700 (Indochina Time)
+[debug] [2026-07-19T06:50:43.680Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-07-19T06:50:47.401Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-07-19T06:50:47.402Z] > authorizing via signed-in user (lastnameairden@gmail.com)
+[debug] [2026-07-19T06:50:47.402Z] [iam] checking project footelligence-b1ca9 for permissions ["datastore.entities.delete","datastore.entities.list","firebase.projects.get"]
+[debug] [2026-07-19T06:50:47.404Z] Checked if tokens are valid: true, expires at: 1784446976186
+[debug] [2026-07-19T06:50:47.405Z] Checked if tokens are valid: true, expires at: 1784446976186
+[debug] [2026-07-19T06:50:47.407Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions [none]
+[debug] [2026-07-19T06:50:47.407Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions  x-goog-user-project=footelligence-b1ca9
+[debug] [2026-07-19T06:50:47.408Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions {"permissions":["datastore.entities.delete","datastore.entities.list","firebase.projects.get"]}
+[debug] [2026-07-19T06:50:48.830Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions 200
+[debug] [2026-07-19T06:50:48.830Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions {"permissions":["datastore.entities.delete","datastore.entities.list","firebase.projects.get"]}
+[debug] [2026-07-19T06:50:48.839Z] Checked if tokens are valid: true, expires at: 1784446976186
+[debug] [2026-07-19T06:50:48.839Z] Checked if tokens are valid: true, expires at: 1784446976186
+[debug] [2026-07-19T06:50:48.840Z] >>> [apiv2][query] POST https://firestore.googleapis.com/v1/projects/footelligence-b1ca9/databases/(default)/documents:runQuery [none]
+[debug] [2026-07-19T06:50:48.840Z] >>> [apiv2][body] POST https://firestore.googleapis.com/v1/projects/footelligence-b1ca9/databases/(default)/documents:runQuery {"structuredQuery":{"where":{"compositeFilter":{"op":"AND","filters":[{"fieldFilter":{"field":{"fieldPath":"__name__"},"op":"GREATER_THAN_OR_EQUAL","value":{"referenceValue":"projects/footelligence-b1ca9/databases/(default)/documents/injuryReports/__id-9223372036854775808__"}}},{"fieldFilter":{"field":{"fieldPath":"__name__"},"op":"LESS_THAN","value":{"referenceValue":"projects/footelligence-b1ca9/databases/(default)/documents/injuryReports\u0000/__id-9223372036854775808__"}}}]}},"limit":7500,"from":[{"allDescendants":true}],"select":{"fields":[{"fieldPath":"__name__"}]},"orderBy":[{"field":{"fieldPath":"__name__"}}]}}
+[debug] [2026-07-19T06:50:49.066Z] <<< [apiv2][status] POST https://firestore.googleapis.com/v1/projects/footelligence-b1ca9/databases/(default)/documents:runQuery 200
+[debug] [2026-07-19T06:50:49.067Z] <<< [apiv2][body] POST https://firestore.googleapis.com/v1/projects/footelligence-b1ca9/databases/(default)/documents:runQuery [{"readTime":"2026-07-19T06:50:49.756726Z"}]
+[debug] [2026-07-19T06:50:55.272Z] ----------------------------------------------------------------------
+[debug] [2026-07-19T06:50:55.277Z] Command:       D:\node.exe C:\Users\Dell\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js firestore:delete executiveNotes --recursive --force --debug
+[debug] [2026-07-19T06:50:55.278Z] CLI Version:   15.22.4
+[debug] [2026-07-19T06:50:55.278Z] Platform:      win32
+[debug] [2026-07-19T06:50:55.278Z] Node Version:  v24.18.0
+[debug] [2026-07-19T06:50:55.278Z] Detected Agent: claude-code_2-1-209_agent
+[debug] [2026-07-19T06:50:55.279Z] Time:          Sun Jul 19 2026 13:50:55 GMT+0700 (Indochina Time)
+[debug] [2026-07-19T06:50:55.279Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-07-19T06:50:58.768Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-07-19T06:50:58.769Z] > authorizing via signed-in user (lastnameairden@gmail.com)
+[debug] [2026-07-19T06:50:58.769Z] [iam] checking project footelligence-b1ca9 for permissions ["datastore.entities.delete","datastore.entities.list","firebase.projects.get"]
+[debug] [2026-07-19T06:50:58.771Z] Checked if tokens are valid: true, expires at: 1784446976186
+[debug] [2026-07-19T06:50:58.771Z] Checked if tokens are valid: true, expires at: 1784446976186
+[debug] [2026-07-19T06:50:58.773Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions [none]
+[debug] [2026-07-19T06:50:58.774Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions  x-goog-user-project=footelligence-b1ca9
+[debug] [2026-07-19T06:50:58.774Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions {"permissions":["datastore.entities.delete","datastore.entities.list","firebase.projects.get"]}
+[debug] [2026-07-19T06:51:00.302Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions 200
+[debug] [2026-07-19T06:51:00.303Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions {"permissions":["datastore.entities.delete","datastore.entities.list","firebase.projects.get"]}
+[debug] [2026-07-19T06:51:00.305Z] Checked if tokens are valid: true, expires at: 1784446976186
+[debug] [2026-07-19T06:51:00.305Z] Checked if tokens are valid: true, expires at: 1784446976186
+[debug] [2026-07-19T06:51:00.306Z] >>> [apiv2][query] POST https://firestore.googleapis.com/v1/projects/footelligence-b1ca9/databases/(default)/documents:runQuery [none]
+[debug] [2026-07-19T06:51:00.306Z] >>> [apiv2][body] POST https://firestore.googleapis.com/v1/projects/footelligence-b1ca9/databases/(default)/documents:runQuery {"structuredQuery":{"where":{"compositeFilter":{"op":"AND","filters":[{"fieldFilter":{"field":{"fieldPath":"__name__"},"op":"GREATER_THAN_OR_EQUAL","value":{"referenceValue":"projects/footelligence-b1ca9/databases/(default)/documents/executiveNotes/__id-9223372036854775808__"}}},{"fieldFilter":{"field":{"fieldPath":"__name__"},"op":"LESS_THAN","value":{"referenceValue":"projects/footelligence-b1ca9/databases/(default)/documents/executiveNotes\u0000/__id-9223372036854775808__"}}}]}},"limit":7500,"from":[{"allDescendants":true}],"select":{"fields":[{"fieldPath":"__name__"}]},"orderBy":[{"field":{"fieldPath":"__name__"}}]}}
+[debug] [2026-07-19T06:51:00.533Z] <<< [apiv2][status] POST https://firestore.googleapis.com/v1/projects/footelligence-b1ca9/databases/(default)/documents:runQuery 200
+[debug] [2026-07-19T06:51:07.186Z] ----------------------------------------------------------------------
+[debug] [2026-07-19T06:51:07.191Z] Command:       D:\node.exe C:\Users\Dell\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js firestore:delete adminNotificationReads --recursive --force --debug
+[debug] [2026-07-19T06:51:07.192Z] CLI Version:   15.22.4
+[debug] [2026-07-19T06:51:07.193Z] Platform:      win32
+[debug] [2026-07-19T06:51:07.193Z] Node Version:  v24.18.0
+[debug] [2026-07-19T06:51:07.193Z] Detected Agent: claude-code_2-1-209_agent
+[debug] [2026-07-19T06:51:07.194Z] Time:          Sun Jul 19 2026 13:51:07 GMT+0700 (Indochina Time)
+[debug] [2026-07-19T06:51:07.194Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-07-19T06:51:12.155Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-07-19T06:51:12.156Z] > authorizing via signed-in user (lastnameairden@gmail.com)
+[debug] [2026-07-19T06:51:12.157Z] [iam] checking project footelligence-b1ca9 for permissions ["datastore.entities.delete","datastore.entities.list","firebase.projects.get"]
+[debug] [2026-07-19T06:51:12.161Z] Checked if tokens are valid: true, expires at: 1784446976186
+[debug] [2026-07-19T06:51:12.162Z] Checked if tokens are valid: true, expires at: 1784446976186
+[debug] [2026-07-19T06:51:12.164Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions [none]
+[debug] [2026-07-19T06:51:12.164Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions  x-goog-user-project=footelligence-b1ca9
+[debug] [2026-07-19T06:51:12.165Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions {"permissions":["datastore.entities.delete","datastore.entities.list","firebase.projects.get"]}
+[debug] [2026-07-19T06:51:13.521Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions 200
+[debug] [2026-07-19T06:51:13.522Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions {"permissions":["datastore.entities.delete","datastore.entities.list","firebase.projects.get"]}
+[debug] [2026-07-19T06:51:13.526Z] Checked if tokens are valid: true, expires at: 1784446976186
+[debug] [2026-07-19T06:51:13.527Z] Checked if tokens are valid: true, expires at: 1784446976186
+[debug] [2026-07-19T06:51:13.527Z] >>> [apiv2][query] POST https://firestore.googleapis.com/v1/projects/footelligence-b1ca9/databases/(default)/documents:runQuery [none]
+[debug] [2026-07-19T06:51:13.527Z] >>> [apiv2][body] POST https://firestore.googleapis.com/v1/projects/footelligence-b1ca9/databases/(default)/documents:runQuery {"structuredQuery":{"where":{"compositeFilter":{"op":"AND","filters":[{"fieldFilter":{"field":{"fieldPath":"__name__"},"op":"GREATER_THAN_OR_EQUAL","value":{"referenceValue":"projects/footelligence-b1ca9/databases/(default)/documents/adminNotificationReads/__id-9223372036854775808__"}}},{"fieldFilter":{"field":{"fieldPath":"__name__"},"op":"LESS_THAN","value":{"referenceValue":"projects/footelligence-b1ca9/databases/(default)/documents/adminNotificationReads\u0000/__id-9223372036854775808__"}}}]}},"limit":7500,"from":[{"allDescendants":true}],"select":{"fields":[{"fieldPath":"__name__"}]},"orderBy":[{"field":{"fieldPath":"__name__"}}]}}
+[debug] [2026-07-19T06:51:13.903Z] <<< [apiv2][status] POST https://firestore.googleapis.com/v1/projects/footelligence-b1ca9/databases/(default)/documents:runQuery 200
+[debug] [2026-07-19T06:51:23.345Z] ----------------------------------------------------------------------
+[debug] [2026-07-19T06:51:23.351Z] Command:       D:\node.exe C:\Users\Dell\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js firestore:delete playerEvaluations --recursive --force --debug
+[debug] [2026-07-19T06:51:23.352Z] CLI Version:   15.22.4
+[debug] [2026-07-19T06:51:23.352Z] Platform:      win32
+[debug] [2026-07-19T06:51:23.352Z] Node Version:  v24.18.0
+[debug] [2026-07-19T06:51:23.352Z] Detected Agent: claude-code_2-1-209_agent
+[debug] [2026-07-19T06:51:23.353Z] Time:          Sun Jul 19 2026 13:51:23 GMT+0700 (Indochina Time)
+[debug] [2026-07-19T06:51:23.353Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-07-19T06:51:29.056Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-07-19T06:51:29.059Z] > authorizing via signed-in user (lastnameairden@gmail.com)
+[debug] [2026-07-19T06:51:29.060Z] [iam] checking project footelligence-b1ca9 for permissions ["datastore.entities.delete","datastore.entities.list","firebase.projects.get"]
+[debug] [2026-07-19T06:51:29.063Z] Checked if tokens are valid: true, expires at: 1784446976186
+[debug] [2026-07-19T06:51:29.064Z] Checked if tokens are valid: true, expires at: 1784446976186
+[debug] [2026-07-19T06:51:29.066Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions [none]
+[debug] [2026-07-19T06:51:29.067Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions  x-goog-user-project=footelligence-b1ca9
+[debug] [2026-07-19T06:51:29.067Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions {"permissions":["datastore.entities.delete","datastore.entities.list","firebase.projects.get"]}
+[debug] [2026-07-19T06:51:30.603Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions 200
+[debug] [2026-07-19T06:51:30.603Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/footelligence-b1ca9:testIamPermissions {"permissions":["datastore.entities.delete","datastore.entities.list","firebase.projects.get"]}
+[debug] [2026-07-19T06:51:30.621Z] Checked if tokens are valid: true, expires at: 1784446976186
+[debug] [2026-07-19T06:51:30.621Z] Checked if tokens are valid: true, expires at: 1784446976186
+[debug] [2026-07-19T06:51:30.622Z] >>> [apiv2][query] POST https://firestore.googleapis.com/v1/projects/footelligence-b1ca9/databases/(default)/documents:runQuery [none]
+[debug] [2026-07-19T06:51:30.622Z] >>> [apiv2][body] POST https://firestore.googleapis.com/v1/projects/footelligence-b1ca9/databases/(default)/documents:runQuery {"structuredQuery":{"where":{"compositeFilter":{"op":"AND","filters":[{"fieldFilter":{"field":{"fieldPath":"__name__"},"op":"GREATER_THAN_OR_EQUAL","value":{"referenceValue":"projects/footelligence-b1ca9/databases/(default)/documents/playerEvaluations/__id-9223372036854775808__"}}},{"fieldFilter":{"field":{"fieldPath":"__name__"},"op":"LESS_THAN","value":{"referenceValue":"projects/footelligence-b1ca9/databases/(default)/documents/playerEvaluations\u0000/__id-9223372036854775808__"}}}]}},"limit":7500,"from":[{"allDescendants":true}],"select":{"fields":[{"fieldPath":"__name__"}]},"orderBy":[{"field":{"fieldPath":"__name__"}}]}}
+[debug] [2026-07-19T06:51:30.888Z] <<< [apiv2][status] POST https://firestore.googleapis.com/v1/projects/footelligence-b1ca9/databases/(default)/documents:runQuery 200

@@ -1390,7 +1390,12 @@ async function loadDailyProgress(dateStr) {
     tabBtn.addEventListener("click", () => showTeam(team, tabBtn));
     progressTeamTabs.appendChild(tabBtn);
   }
-  showTeam(teamsPresent[0], progressTeamTabs.children[0]);
+  // ถ้ามาจากลิงก์แจ้งเตือนที่ระบุทีมไว้ (#admin=progress&team=...) ให้เปิดทีมนั้นให้ทันทีแทนทีมแรกตามลำดับปกติ
+  // เพื่อให้ผู้ดูแลระบบดำเนินการต่อจากที่คลิกแจ้งเตือนได้เลยโดยไม่ต้องไล่หาทีมเอง
+  const linkedTeam = new URLSearchParams(window.location.hash.replace(/^#/, "")).get("team");
+  const defaultIndex = linkedTeam ? teamsPresent.indexOf(linkedTeam) : -1;
+  const startIndex = defaultIndex >= 0 ? defaultIndex : 0;
+  showTeam(teamsPresent[startIndex], progressTeamTabs.children[startIndex]);
 }
 
 function categorizeProgress(r) {

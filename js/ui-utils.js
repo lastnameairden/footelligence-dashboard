@@ -270,7 +270,9 @@ export async function loadAdminNotifications() {
         level: "action",
         title: `ทีมที่ยังไม่ส่งแผนการฝึกซ้อมวันนี้ ${missingTeams.length} ทีม`,
         detail: `เลยเวลา ${TRAINING_PLAN_DEADLINE_HOUR}:00 น. แล้ว — ${missingTeams.join(", ")}`,
-        link: "index.html"
+        // ?team=__ALL__ เพื่อให้ผู้ดูแลระบบเห็นข้อมูลทันที (ไม่งั้น Dashboard จะโชว์หน้าเลือกทีมแทน) และ
+        // #training-plan-summary-section ให้เลื่อนไปที่ตารางสรุปแผนการฝึกซ้อมโดยตรง
+        link: "index.html?team=__ALL__#training-plan-summary-section"
       });
     }
   }
@@ -295,7 +297,7 @@ export async function loadAdminNotifications() {
       level: "action",
       title: `โค้ชที่ส่งแผนการฝึกซ้อมสายเกินเกณฑ์เดือนนี้ ${lateCoaches.length} คน`,
       detail: lateCoaches.map((g) => `${g.coachName} (สาย ${g.late}/${g.total} ครั้ง)`).join(", "),
-      link: "index.html"
+      link: "index.html?team=__ALL__#training-plan-summary-section"
     });
   }
 
@@ -316,13 +318,15 @@ export async function loadAdminNotifications() {
     }
   }
   if (incompleteTeams.length > 0) {
+    // แนบชื่อทีมแรกที่ยังไม่ครบไปกับลิงก์ ให้หน้าความคืบหน้าเปิดทีมนั้นให้ทันที (ไม่ต้องไล่หาเอง) — ถ้ามีหลาย
+    // ทีมค้างอยู่ ทีมอื่นๆ ยังเลือกดูต่อได้จากปุ่มเลือกทีมในหน้านั้นตามปกติ
     notifications.push({
       key: "incomplete_evaluations_today",
       icon: "📋",
       level: "info",
       title: `การประเมินนักกีฬาวันนี้ยังไม่ครบ ${incompleteTeams.length} ทีม`,
       detail: incompleteTeams.map((t) => `${t.team} (${t.evaluated}/${t.total} คน)`).join(", "),
-      link: "attendance.html#admin=progress"
+      link: `attendance.html#admin=progress&team=${encodeURIComponent(incompleteTeams[0].team)}`
     });
   }
 
