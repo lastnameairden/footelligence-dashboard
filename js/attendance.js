@@ -209,6 +209,7 @@ const editCoachStatusSelect = document.getElementById("edit-coach-status");
 const editCoachModalStatus = document.getElementById("edit-coach-modal-status");
 const editCoachSaveBtn = document.getElementById("edit-coach-save-btn");
 const editCoachResetPasswordBtn = document.getElementById("edit-coach-reset-password-btn");
+const editCoachDeleteBtn = document.getElementById("edit-coach-delete-btn");
 const editCoachCancelBtn = document.getElementById("edit-coach-cancel-btn");
 const progressDateInput = document.getElementById("progress-date-input");
 const progressRefreshBtn = document.getElementById("progress-refresh-btn");
@@ -1245,6 +1246,33 @@ editCoachResetPasswordBtn.addEventListener("click", async () => {
   } catch (err) {
     console.error(err);
     editCoachModalStatus.textContent = "ส่งอีเมลไม่สำเร็จ: " + (err.code ? authErrorMessage(err) : err.message);
+    editCoachModalStatus.className = "text-sm text-red-600";
+  }
+});
+
+// ลบเฉพาะโปรไฟล์ใน Firestore (coaches/{uid}) — Firebase Auth ไม่อนุญาตให้ลบบัญชีผู้ใช้อื่นจากฝั่ง client
+// เหมือนกัน (ต้องใช้ Admin SDK ฝั่งเซิร์ฟเวอร์) ผลคือบัญชีนั้นจะล็อกอินเข้าเว็บไม่ได้อีก (ระบบมองว่าไม่มีโปรไฟล์
+// จึงค้างที่หน้า "รอผู้ดูแลระบบอนุมัติ" ตลอดไป) เหมือนกับตอนกดปฏิเสธคำขอลงทะเบียนที่ทำแบบนี้อยู่แล้ว
+editCoachDeleteBtn.addEventListener("click", async () => {
+  if (!editingCoachAccountId) return;
+  if (editingCoachAccountId === auth.currentUser?.uid) {
+    alert("ไม่สามารถลบบัญชีของตัวเองได้");
+    return;
+  }
+  const name = editCoachNameInput.value.trim() || editCoachEmailInput.value.trim() || "บัญชีนี้";
+  const ok = confirm(`ยืนยันลบบัญชี "${name}" ออกจากระบบถาวร? การลบนี้ไม่สามารถย้อนกลับได้ และบัญชีนี้จะเข้าสู่ระบบไม่ได้อีก`);
+  if (!ok) return;
+  try {
+    editCoachModalStatus.textContent = "กำลังลบ...";
+    editCoachModalStatus.className = "text-sm text-slate-500";
+    await deleteDoc(doc(db, "coaches", editingCoachAccountId));
+    editCoachModalStatus.textContent = "ลบบัญชีสำเร็จ ✓";
+    editCoachModalStatus.className = "text-sm text-emerald-600";
+    await loadCoachDirectory();
+    setTimeout(closeEditCoachModal, 500);
+  } catch (err) {
+    console.error(err);
+    editCoachModalStatus.textContent = "ลบไม่สำเร็จ: " + err.message;
     editCoachModalStatus.className = "text-sm text-red-600";
   }
 });
