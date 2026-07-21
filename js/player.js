@@ -21,7 +21,6 @@ import {
 } from "./ui-utils.js";
 
 const STATUS_LABELS = { A: "มา", I: "บาดเจ็บ", R: "พักฟื้น", P: "ลา" };
-const CHART_PALETTE = ["#0f172a", "#10b981", "#f59e0b", "#3b82f6"];
 
 const statusEl = document.getElementById("status-message");
 const accessGate = document.getElementById("access-gate");
@@ -135,7 +134,9 @@ function renderScoreTrendChart(records) {
   `;
 }
 
-function renderCategoryBars(records) {
+// กราฟใยแมงมุม (radar chart) แบบ SVG ธรรมดา ไม่พึ่งไลบรารีภายนอก (เหมือน renderScoreTrendChart ด้านบน) —
+// แสดงคะแนนเฉลี่ยทั้ง 4 ด้านเทียบกันในรูปเดียว ให้เห็นจุดแข็ง/จุดที่ต้องพัฒนาของนักกีฬาได้เร็วกว่าดูเป็นแท่งเรียงกัน
+function renderCategoryRadar(records) {
   const sums = {};
   const counts = {};
   for (const cat of SCORE_CATEGORIES) {
@@ -152,20 +153,76 @@ function renderCategoryBars(records) {
     }
   }
 
-  categoryBars.innerHTML = SCORE_CATEGORIES.map((cat, i) => {
-    const avg = counts[cat.key] > 0 ? sums[cat.key] / counts[cat.key] : 0;
-    const pct = Math.min((avg / 4) * 100, 100);
-    return `
-      <div class="mb-4 last:mb-0">
-        <div class="flex justify-between text-xs text-slate-500 mb-1">
-          <span>${cat.label}</span>
-          <span>${counts[cat.key] > 0 ? avg.toFixed(2) : "-"}</span>
-        </div>
-        <div class="w-full bg-slate-100 rounded-full h-3">
-          <div class="h-3 rounded-full" style="width:${pct}%; background:${CHART_PALETTE[i % CHART_PALETTE.length]}"></div>
-        </div>
-      </div>`;
-  }).join("");
+  const hasAnyData = SCORE_CATEGORIES.some((cat) => counts[cat.key] > 0);
+  if (!hasAnyData) {
+    categoryBars.innerHTML =
+      '<p class="text-sm text-slate-400 text-center py-8">ยังไม่มีข้อมูลคะแนนเพียงพอสำหรับแสดงกราฟ</p>';
+    return;
+  }
+
+  const averages = SCORE_CATEGORIES.map((cat) => (counts[cat.key] > 0 ? sums[cat.key] / counts[cat.key] : 0));
+  const n = SCORE_CATEGORIES.length;
+  const maxScore = 4;
+  const size = 340;
+  const cx = size / 2;
+  const cy = size / 2 - 6;
+  const R = 100;
+  // เริ่มแกนแรกที่ด้านบน (12 นาฬิกา) แล้วไล่ตามเข็มนาฬิกาทีละแกน
+  const angles = SCORE_CATEGORIES.map((_, i) => -Math.PI / 2 + (i * 2 * Math.PI) / n);
+  const point = (angle, fraction) => ({
+    x: cx + R * fraction * Math.cos(angle),
+    y: cy + R * fraction * Math.sin(angle)
+  });
+
+  const gridRings = [0.25, 0.5, 0.75, 1]
+    .map((fraction) => {
+      const pts = angles
+        .map((a) => point(a, fraction))
+        .map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`)
+        .join(" ");
+      return `<polygon points="${pts}" fill="none" stroke="#e2e8f0" stroke-width="1" />`;
+    })
+    .join("");
+
+  const spokes = angles
+    .map((a) => {
+      const p = point(a, 1);
+      return `<line x1="${cx}" y1="${cy}" x2="${p.x.toFixed(1)}" y2="${p.y.toFixed(1)}" stroke="#e2e8f0" stroke-width="1" />`;
+    })
+    .join("");
+
+  const dataPoints = angles.map((a, i) => point(a, averages[i] / maxScore));
+  const dataPolygon = dataPoints.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+  const dataDots = dataPoints
+    .map((p, i) => {
+      const cat = SCORE_CATEGORIES[i];
+      const valueText = counts[cat.key] > 0 ? averages[i].toFixed(2) : "-";
+      return `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4" fill="#0f172a"><title>${cat.label}: ${valueText}</title></circle>`;
+    })
+    .join("");
+
+  const labelR = R + 34;
+  const labels = angles
+    .map((a, i) => {
+      const p = point(a, labelR / R);
+      const anchor = Math.cos(a) > 0.3 ? "start" : Math.cos(a) < -0.3 ? "end" : "middle";
+      const cat = SCORE_CATEGORIES[i];
+      const valueText = counts[cat.key] > 0 ? averages[i].toFixed(2) : "-";
+      return `
+        <text x="${p.x.toFixed(1)}" y="${(p.y - 4).toFixed(1)}" font-size="11" font-weight="600" fill="#334155" text-anchor="${anchor}">${cat.short}</text>
+        <text x="${p.x.toFixed(1)}" y="${(p.y + 11).toFixed(1)}" font-size="11" fill="#94a3b8" text-anchor="${anchor}">${valueText}</text>`;
+    })
+    .join("");
+
+  categoryBars.innerHTML = `
+    <svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" style="max-width:100%; margin:0 auto; display:block">
+      ${gridRings}
+      ${spokes}
+      <polygon points="${dataPolygon}" fill="#0f172a" fill-opacity="0.12" stroke="#0f172a" stroke-width="2" />
+      ${dataDots}
+      ${labels}
+    </svg>
+  `;
 }
 
 function renderAttendanceHistory(records) {
@@ -283,7 +340,7 @@ async function loadPlayerData(playerId) {
     statCard("คะแนนเฉลี่ยรวม", overallAvg !== null ? overallAvg.toFixed(2) : "-");
 
   renderScoreTrendChart(attendanceRecords);
-  renderCategoryBars(attendanceRecords);
+  renderCategoryRadar(attendanceRecords);
   renderAttendanceHistory(attendanceRecords);
   renderMatchHistory(matchReports);
   renderInjuryHistory(injuryReports);

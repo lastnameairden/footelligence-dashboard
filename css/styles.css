@@ -77,6 +77,24 @@ table.pro-table tbody tr:last-child td { border-bottom: none; }
 table.pro-table tbody tr:hover { background: #f8fafc; }
 table.pro-table td.emphasis { font-weight: 600; color: #0f172a; }
 
+/* ตารางเช็คชื่อการฝึกซ้อม: คอลัมน์เยอะกว่าตารางอื่นในระบบ (ผู้เล่น + สถานะ + คะแนน 4 ด้าน + เฉลี่ย) จึงมักต้อง
+   เลื่อนแนวนอนบนจอ PC/แท็บเล็ต — ปักหมุดคอลัมน์ "ผู้เล่น" ไว้ซ้ายเสมอกันหลุดว่ากำลังให้คะแนนใคร และย่อปุ่ม
+   สถานะ/คะแนนเฉพาะตารางนี้ให้เล็กลงเพื่อให้เห็นครบหลายด้านโดยไม่ต้องเลื่อนบ่อย (ครอบ min-width ไว้กันชนกับกฎ
+   ขยายปุ่มให้ใหญ่สำหรับมือถือด้านล่าง ซึ่งต้อง "ชนะ" เสมอบนจอแคบเพราะมือถือต้องการพื้นที่แตะที่ใหญ่กว่า ไม่ใช่เล็กกว่า) */
+@media (min-width: 641px) {
+  #roster-wrap table.pro-table th:first-child,
+  #roster-wrap table.pro-table td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: #fff;
+  }
+  #roster-wrap table.pro-table thead th:first-child { background: #f8fafc; }
+  #roster-wrap table.pro-table tbody tr:hover td:first-child { background: #f8fafc; }
+
+  #roster-wrap .segmented-btn { min-width: 1.7rem; height: 1.7rem; padding: 0 0.3rem; font-size: 0.75rem; }
+}
+
 /* ---------- Buttons ---------- */
 .btn {
   display: inline-flex;

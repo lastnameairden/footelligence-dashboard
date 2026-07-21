@@ -99,6 +99,7 @@ const dailyLoadBtn = document.getElementById("daily-load-btn");
 const dailyStatus = document.getElementById("daily-status");
 const dailyDateHeading = document.getElementById("daily-date-heading");
 const dailyAttendanceBody = document.getElementById("daily-attendance-body");
+const dailyAttendancePagination = document.getElementById("daily-attendance-pagination");
 const dailyTrainingReportCard = document.getElementById("daily-training-report-card");
 const dailyTrainingPlanCard = document.getElementById("daily-training-plan-card");
 const dailyMatchBody = document.getElementById("daily-match-body");
@@ -106,6 +107,10 @@ const dailyInjuryBody = document.getElementById("daily-injury-body");
 const reportDateInput = document.getElementById("report-date");
 const reportLoadBtn = document.getElementById("report-load-btn");
 const reportLoadStatus = document.getElementById("report-load-status");
+const reportSummary = document.getElementById("report-summary");
+const reportSummaryText = document.getElementById("report-summary-text");
+const reportSummaryDetails = document.getElementById("report-summary-details");
+const reportEditBtn = document.getElementById("report-edit-btn");
 const reportForm = document.getElementById("report-form");
 const reportPeriodSection = document.getElementById("report-period-section");
 const reportPeriodSegmentedWrap = document.getElementById("report-period-segmented");
@@ -182,6 +187,7 @@ const navDrawerRoleBadgeEl = document.getElementById("nav-drawer-role-badge");
 const drawerLogoutBtn = document.getElementById("drawer-logout-btn");
 const dateInput = document.getElementById("session-date");
 const loadSessionBtn = document.getElementById("load-session-btn");
+const viewSessionBtn = document.getElementById("view-session-btn");
 const markNoTrainingBtn = document.getElementById("mark-no-training-btn");
 const noTrainingBanner = document.getElementById("no-training-banner");
 const undoNoTrainingBtn = document.getElementById("undo-no-training-btn");
@@ -592,7 +598,6 @@ function renderDrawerItems() {
       navDrawerItems.appendChild(drawerItem("📝", "คำขอลงทะเบียนที่รอการอนุมัติ", openAdminApprovalsSection));
       navDrawerItems.appendChild(drawerItem("⚽", "รายงานผลการแข่งขันทั้งหมด", openAdminMatchesSection));
       navDrawerItems.appendChild(drawerItem("🩹", "รายงานอาการบาดเจ็บทั้งหมด", openAdminInjuriesSection));
-      navDrawerItems.appendChild(drawerItem("📁", "จัดการข้อมูลทีม", openAdminManageTeamSection));
       navDrawerItems.appendChild(drawerItem("📊", "ดู Dashboard ทีม", openAdminDashboardSection));
       navDrawerItems.appendChild(drawerItem("🖨️", "พิมพ์สรุป Dashboard", openAdminPrintSection));
       navDrawerItems.appendChild(drawerItem("📈", "พัฒนาการนักกีฬา", () => (window.location.href = "./development.html")));
@@ -825,6 +830,7 @@ function openReportSection() {
   hideAllScreens();
   reportSection.classList.remove("hidden");
   reportForm.classList.add("hidden");
+  reportSummary.classList.add("hidden");
   reportStatus.textContent = "";
   reportLoadStatus.textContent = "";
   if (!reportDateInput.value) {
@@ -2021,19 +2027,25 @@ addPlayerForm.addEventListener("submit", async (e) => {
 
 // ---------- Session (find-or-create by date + team) ----------
 async function findOrCreateSession(dateStr) {
+  const existing = await findSession(dateStr);
+  if (existing) return existing;
+  const newData = { date: dateStr, team: myTeam, createdAt: serverTimestamp() };
+  const newDoc = await addDoc(collection(db, "sessions"), newData);
+  return { id: newDoc.id, data: newData };
+}
+
+// ค้นหาวันซ้อมแบบอ่านอย่างเดียว ไม่สร้างเอกสารใหม่ถ้ายังไม่มี — ใช้กับปุ่ม "เรียกดู" เพื่อย้อนดูประวัติ
+// โดยไม่ทิ้งเอกสาร sessions เปล่าๆ ไว้ในฐานข้อมูลสำหรับวันที่ยังไม่เคยเช็คชื่อจริง
+async function findSession(dateStr) {
   const q = query(
     collection(db, "sessions"),
     where("date", "==", dateStr),
     where("team", "==", myTeam)
   );
   const snapshot = await getDocs(q);
-  if (!snapshot.empty) {
-    const docSnap = snapshot.docs[0];
-    return { id: docSnap.id, data: docSnap.data() };
-  }
-  const newData = { date: dateStr, team: myTeam, createdAt: serverTimestamp() };
-  const newDoc = await addDoc(collection(db, "sessions"), newData);
-  return { id: newDoc.id, data: newData };
+  if (snapshot.empty) return null;
+  const docSnap = snapshot.docs[0];
+  return { id: docSnap.id, data: docSnap.data() };
 }
 
 async function loadExistingAttendance(sessionId) {
@@ -2114,6 +2126,9 @@ function renderRoster(existingMap) {
     tr.appendChild(nameTd);
 
     const statusTd = document.createElement("td");
+    // ใช้คลาส space-x-2 เป็นตัวกระตุ้นให้เซลล์นี้ห่อบรรทัด/ชิดซ้ายบนมือถือ (ดู table.pro-table td.space-x-2
+    // ใน styles.css) กันปุ่มสถานะ A/I/R/P ถูกบีบไปชิดขวาสุดจนล้นจอแคบ
+    statusTd.className = "space-x-2";
     if (locked) {
       statusTd.innerHTML = existing.status
         ? `<span class="badge badge-neutral">${existing.status}</span>`
@@ -2127,6 +2142,7 @@ function renderRoster(existingMap) {
 
     for (const category of SCORE_CATEGORIES) {
       const catTd = document.createElement("td");
+      catTd.className = "space-x-2";
       if (locked) {
         const val = scores[category.key];
         catTd.innerHTML = val
@@ -2221,9 +2237,15 @@ function showNoTrainingView() {
   rosterWrap.classList.add("hidden");
 }
 
-async function loadSessionForDate(dateStr) {
-  setAttendanceStatus("กำลังโหลด...");
-  const session = await findOrCreateSession(dateStr);
+// ยังไม่เคยเช็คชื่อวันนี้เลย (ไม่มีเอกสาร sessions) และผู้ใช้แค่ "เรียกดู" ไม่ได้กด "โหลด/สร้าง" — ซ่อนทุกกล่องไว้
+// ก่อน แล้วให้ attendance-status อธิบายว่ายังไม่มีข้อมูล กันสับสนกับ "วันนี้ไม่มีฝึกซ้อม" ซึ่งเป็นคนละสถานะกัน
+function showNoSessionView() {
+  noTrainingBanner.classList.add("hidden");
+  rosterLockedBanner.classList.add("hidden");
+  rosterWrap.classList.add("hidden");
+}
+
+async function renderSession(session, dateStr) {
   currentSessionId = session.id;
   currentSessionData = session.data;
 
@@ -2233,9 +2255,30 @@ async function loadSessionForDate(dateStr) {
     return;
   }
   showRosterView();
-  const existingMap = await loadExistingAttendance(currentSessionId);
+  const existingMap = await loadExistingAttendance(session.id);
   renderRoster(existingMap);
   setAttendanceStatus(`พร้อมเช็คชื่อวันที่ ${dateStr} (ทีม ${myTeam})`);
+}
+
+async function loadSessionForDate(dateStr) {
+  setAttendanceStatus("กำลังโหลด...");
+  const session = await findOrCreateSession(dateStr);
+  await renderSession(session, dateStr);
+}
+
+// เรียกดูวันที่ที่เลือกแบบอ่านอย่างเดียว (ไม่สร้างวันซ้อมใหม่ถ้ายังไม่เคยมี) — ใช้ตอนโค้ชแค่อยากย้อนดูประวัติว่า
+// วันนั้นเช็คชื่อไว้หรือยัง โดยไม่ต้องกังวลว่าจะไปสร้างเอกสารเปล่าทิ้งไว้สำหรับวันที่ไม่มีการฝึกซ้อมจริง
+async function viewSessionForDate(dateStr) {
+  setAttendanceStatus("กำลังค้นหา...");
+  const session = await findSession(dateStr);
+  if (!session) {
+    currentSessionId = null;
+    currentSessionData = null;
+    showNoSessionView();
+    setAttendanceStatus(`ยังไม่มีข้อมูลวันที่ ${dateStr} (ทีม ${myTeam}) — ยังไม่เคยสร้างวันซ้อมนี้`);
+    return;
+  }
+  await renderSession(session, dateStr);
 }
 
 loadSessionBtn.addEventListener("click", async () => {
@@ -2253,6 +2296,24 @@ loadSessionBtn.addEventListener("click", async () => {
   } catch (err) {
     console.error(err);
     setAttendanceStatus("โหลดไม่สำเร็จ: " + err.message, true);
+  }
+});
+
+viewSessionBtn.addEventListener("click", async () => {
+  const dateStr = dateInput.value;
+  if (!dateStr) {
+    setAttendanceStatus("กรุณาเลือกวันที่ก่อน", true);
+    return;
+  }
+  if (!myTeam) {
+    setAttendanceStatus("ยังไม่ทราบทีมที่รับผิดชอบ", true);
+    return;
+  }
+  try {
+    await viewSessionForDate(dateStr);
+  } catch (err) {
+    console.error(err);
+    setAttendanceStatus("เรียกดูไม่สำเร็จ: " + err.message, true);
   }
 });
 
@@ -2340,12 +2401,33 @@ async function syncTrainingReportForNoTraining(dateStr, isNoTraining) {
       await addDoc(collection(db, "trainingReports"), { ...payload, createdAt: serverTimestamp() });
     }
   } else if (existing && existing.autoFromNoTraining) {
-    await updateDoc(doc(db, "trainingReports", existing.id), {
-      attended: null,
-      notes: null,
-      autoFromNoTraining: false,
-      updatedAt: serverTimestamp()
-    });
+    // เคยถูกซิงก์มาแบบอัตโนมัติเท่านั้น (โค้ชไม่เคยกรอกอะไรเองเลย) พอยกเลิก "ไม่มีฝึกซ้อม" แล้วจะไม่เหลือข้อมูล
+    // อะไรที่มีความหมายอีกต่อไป — ลบเอกสารทิ้งไปเลยแทนการล้างค่าเป็น null ค้างไว้ (ไม่ถือว่าเป็นการส่งรายงาน)
+    // กันหน้า Daily/ภาพรวมต่างๆ เข้าใจผิดว่ามีรายงานอยู่ทั้งที่ไม่มีข้อมูลจริง
+    await deleteDoc(doc(db, "trainingReports", existing.id));
+  }
+}
+
+// ทิศทางตรงข้ามกับ syncTrainingReportForNoTraining ด้านบน: เมื่อโค้ชกรอกฟอร์ม "รายงานการฝึกซ้อม" ด้วยตนเองว่า
+// "ไม่มีการซ้อม" ให้ทำเครื่องหมายวันซ้อมนั้นเป็น noTraining ทันที (สร้างวันซ้อมใหม่ให้ถ้ายังไม่เคยมี) เพื่อให้หน้า
+// เช็คชื่อรายวันเห็นสถานะนี้ทันทีโดยไม่ต้องรอโค้ชไปกดปุ่ม "วันนี้ไม่มีฝึกซ้อม" ซ้ำอีกรอบ — ถ้ารายงานบอกว่า
+// "มีการซ้อม" และวันนั้นเคยถูกทำเครื่องหมายไม่มีฝึกซ้อมไว้ก่อน (จากหน้าเช็คชื่อหรือรายงานครั้งก่อน) ให้ยกเลิกสถานะ
+// นั้นให้อัตโนมัติเช่นกัน (ไม่แตะต้องถ้ายังไม่เคยมีวันซ้อมมาก่อนเลย เพราะไม่มีอะไรต้องยกเลิก)
+async function syncSessionForReportAttendance(dateStr, attended) {
+  if (attended === true) {
+    const existing = await findSession(dateStr);
+    if (existing && existing.data.noTraining) {
+      await setDoc(doc(db, "sessions", existing.id), { noTraining: false, updatedAt: serverTimestamp() }, { merge: true });
+      if (currentSessionId === existing.id) {
+        currentSessionData = { ...currentSessionData, noTraining: false };
+      }
+    }
+    return;
+  }
+  const session = await findOrCreateSession(dateStr);
+  await setDoc(doc(db, "sessions", session.id), { noTraining: true, updatedAt: serverTimestamp() }, { merge: true });
+  if (currentSessionId === session.id) {
+    currentSessionData = { ...currentSessionData, noTraining: true };
   }
 }
 
@@ -2450,6 +2532,31 @@ function renderAttendSegmented() {
   updatePeriodSectionVisibility();
 }
 
+// แสดงเนื้อหารายงานที่มีอยู่แล้วแบบดูอย่างเดียว (การ์ดสรุป + ปุ่ม "แก้ไขรายงาน") แทนการเปิดฟอร์มที่กดส่งซ้ำ
+// ได้ทันที เพื่อกันการส่งซ้ำ/แก้โดยไม่ตั้งใจ — headline ให้ระบุเองได้ (ใช้ข้อความต่างกันตอนโหลดข้อมูลเดิม
+// เทียบกับตอนเพิ่งส่งรายงานสำเร็จ) ส่วนรายละเอียดใช้ textContent ล้วนเพื่อกัน XSS จากข้อความหมายเหตุที่โค้ชพิมพ์เอง
+function renderReportSummary(dateStr, data, headline) {
+  reportSummaryText.textContent =
+    headline || `พบรายงานที่เคยส่งไว้สำหรับวันที่ ${dateStr} — ดูอย่างเดียว กดแก้ไขรายงานหากต้องการเปลี่ยนข้อมูล`;
+
+  reportSummaryDetails.innerHTML = "";
+  const attendedLabel = typeof data.attended === "boolean" ? ATTEND_LABELS[data.attended] : "-";
+  const lines = [`สถานะการฝึกซ้อม: ${attendedLabel}`];
+  if (data.attended === true) {
+    const periodLabel =
+      data.periodType === "other" ? data.periodOtherText || "อื่นๆ" : PERIOD_LABELS[data.periodType] || "-";
+    const timeRange =
+      data.periodStartTime && data.periodEndTime ? ` (${data.periodStartTime} - ${data.periodEndTime} น.)` : "";
+    lines.push(`ช่วงเวลาฝึกซ้อม: ${periodLabel}${timeRange}`);
+  }
+  if (data.notes) lines.push(`หมายเหตุ: ${data.notes}`);
+  for (const line of lines) {
+    const p = document.createElement("p");
+    p.textContent = line;
+    reportSummaryDetails.appendChild(p);
+  }
+}
+
 async function loadReportForDate(dateStr) {
   const q = query(
     collection(db, "trainingReports"),
@@ -2472,17 +2579,35 @@ async function loadReportForDate(dateStr) {
   renderAttendSegmented();
 
   reportStatus.textContent = "";
+
+  // มีรายงานที่โค้ชเคยกรอกจริงแล้ว (ไม่ใช่แค่ค่าที่ระบบซิงก์มาจากปุ่ม "วันนี้ไม่มีฝึกซ้อม") — ล็อกไว้เป็นดูอย่าง
+  // เดียวก่อน กันส่งซ้ำ/แก้โดยไม่ตั้งใจ ต้องกดปุ่ม "แก้ไขรายงาน" เพื่อปลดล็อกฟอร์มเอง (ค่าที่กรอกไว้ในฟอร์มก็จะ
+  // ถูกต้องอยู่แล้วเพราะ render* ด้านบนอ่านจาก state ที่ตั้งไว้แล้ว)
+  if (existing && !existing.autoFromNoTraining) {
+    reportForm.classList.add("hidden");
+    renderReportSummary(dateStr, existing);
+    reportSummary.classList.remove("hidden");
+    reportLoadStatus.textContent = `พบรายงานที่เคยส่งไว้สำหรับวันที่ ${dateStr}`;
+    reportLoadStatus.className = "text-sm text-slate-500 w-full";
+    return;
+  }
+
+  reportSummary.classList.add("hidden");
   reportForm.classList.remove("hidden");
   if (existing && existing.autoFromNoTraining) {
     reportLoadStatus.textContent = `วันที่ ${dateStr} ถูกทำเครื่องหมายว่า "ไม่มีฝึกซ้อม" ไว้ในหน้าเช็คชื่อ — ระบบซิงก์สถานะมาให้อัตโนมัติ แก้ไขเพิ่มเติมได้ตามจริง`;
     reportLoadStatus.className = "text-sm text-amber-600 w-full";
   } else {
-    reportLoadStatus.textContent = existing
-      ? `พบรายงานที่เคยส่งไว้สำหรับวันที่ ${dateStr} — แก้ไข/ส่งซ้ำได้`
-      : `ยังไม่มีรายงานสำหรับวันที่ ${dateStr} — กรอกข้อมูลด้านล่างเพื่อส่งรายงานใหม่`;
+    reportLoadStatus.textContent = `ยังไม่มีรายงานสำหรับวันที่ ${dateStr} — กรอกข้อมูลด้านล่างเพื่อส่งรายงานใหม่`;
     reportLoadStatus.className = "text-sm text-slate-500 w-full";
   }
 }
+
+reportEditBtn.addEventListener("click", () => {
+  reportSummary.classList.add("hidden");
+  reportForm.classList.remove("hidden");
+  reportStatus.textContent = "";
+});
 
 reportLoadBtn.addEventListener("click", async () => {
   const dateStr = reportDateInput.value;
@@ -2612,9 +2737,15 @@ reportForm.addEventListener("submit", async (e) => {
       const newDoc = await addDoc(collection(db, "trainingReports"), { ...payload, createdAt: serverTimestamp() });
       currentReportId = newDoc.id;
     }
+    await syncSessionForReportAttendance(dateStr, reportAttended);
 
-    reportStatus.textContent = "ส่งรายงานเรียบร้อย ✓";
-    reportStatus.className = "text-sm text-emerald-600";
+    reportStatus.textContent = "";
+    // ล็อกกลับเป็นดูอย่างเดียวทันทีหลังส่งสำเร็จ กันกดส่งซ้ำโดยไม่ตั้งใจ — ต้องกด "แก้ไขรายงาน" เพื่อแก้ไขต่อ
+    reportForm.classList.add("hidden");
+    renderReportSummary(dateStr, payload, `ส่งรายงานสำหรับวันที่ ${dateStr} เรียบร้อย ✓ — ดูอย่างเดียว กดแก้ไขรายงานหากต้องการเปลี่ยนข้อมูล`);
+    reportSummary.classList.remove("hidden");
+    reportLoadStatus.textContent = `ส่งรายงานสำหรับวันที่ ${dateStr} เรียบร้อย ✓ (ซิงก์กับหน้าเช็คชื่อรายวันอัตโนมัติ)`;
+    reportLoadStatus.className = "text-sm text-emerald-600 w-full";
   } catch (err) {
     console.error(err);
     reportStatus.textContent = "ส่งรายงานไม่สำเร็จ: " + err.message;
@@ -3541,29 +3672,90 @@ function formatReportPeriodForDaily(r) {
   return timeRange ? `${label} (${timeRange})` : label;
 }
 
+const DAILY_ATTENDANCE_PAGE_SIZE = 10;
+let dailyAttendanceRows = [];
+let dailyAttendancePage = 1;
+
+function renderDailyAttendancePage() {
+  const totalPages = Math.max(1, Math.ceil(dailyAttendanceRows.length / DAILY_ATTENDANCE_PAGE_SIZE));
+  dailyAttendancePage = Math.min(Math.max(dailyAttendancePage, 1), totalPages);
+  const start = (dailyAttendancePage - 1) * DAILY_ATTENDANCE_PAGE_SIZE;
+  const pageRows = dailyAttendanceRows.slice(start, start + DAILY_ATTENDANCE_PAGE_SIZE);
+
+  dailyAttendanceBody.innerHTML = pageRows
+    .map(
+      (r) => `
+        <tr>
+          <td class="emphasis">${r.name}</td>
+          <td>${r.status}</td>
+          <td>${r.avgText}</td>
+        </tr>`
+    )
+    .join("");
+  applyDataLabels(dailyAttendanceBody);
+
+  // แสดงปุ่มเปลี่ยนหน้าเฉพาะตอนมีมากกว่า 1 หน้า (ไม่รกจอถ้ามีนักกีฬาน้อยกว่า/เท่ากับ 10 คน)
+  if (totalPages <= 1) {
+    dailyAttendancePagination.classList.add("hidden");
+    return;
+  }
+  dailyAttendancePagination.classList.remove("hidden");
+  dailyAttendancePagination.innerHTML = "";
+  const prevBtn = document.createElement("button");
+  prevBtn.type = "button";
+  prevBtn.className = "btn btn-secondary btn-sm";
+  prevBtn.textContent = "‹ ก่อนหน้า";
+  prevBtn.disabled = dailyAttendancePage <= 1;
+  prevBtn.addEventListener("click", () => {
+    dailyAttendancePage -= 1;
+    renderDailyAttendancePage();
+  });
+  const pageLabel = document.createElement("span");
+  pageLabel.className = "text-slate-500";
+  pageLabel.textContent = `หน้า ${dailyAttendancePage} จาก ${totalPages} (ทั้งหมด ${dailyAttendanceRows.length} คน)`;
+  const nextBtn = document.createElement("button");
+  nextBtn.type = "button";
+  nextBtn.className = "btn btn-secondary btn-sm";
+  nextBtn.textContent = "ถัดไป ›";
+  nextBtn.disabled = dailyAttendancePage >= totalPages;
+  nextBtn.addEventListener("click", () => {
+    dailyAttendancePage += 1;
+    renderDailyAttendancePage();
+  });
+  dailyAttendancePagination.appendChild(prevBtn);
+  dailyAttendancePagination.appendChild(pageLabel);
+  dailyAttendancePagination.appendChild(nextBtn);
+}
+
+// แสดงเฉพาะนักกีฬาที่อยู่ในขอบเขตของโค้ชคนนี้จริง (players ตัวแปรกลางถูกกรองตามรุ่นอายุ+ตำแหน่งไว้แล้วจาก
+// loadPlayers) — บันทึกเช็คชื่อผูกกับ "ทีม" ทั้งก้อนต่อวัน จึงมีนักกีฬารุ่น/ตำแหน่งอื่นปนมาด้วย ต้องกรองออกไป
+// ไม่ใช่แค่หาไม่เจอแล้วโชว์ "-" (แบบเดิมที่แก้ไปก่อนหน้า) เพื่อให้โค้ชแต่ละคนเห็นเฉพาะรุ่น/นักกีฬาของตัวเองเท่านั้น
 function renderDailyAttendance(snap) {
+  const myPlayerIds = new Set(players.map((p) => p.id));
   const records = [];
-  snap.forEach((d) => records.push(d.data()));
+  snap.forEach((d) => {
+    const data = d.data();
+    if (myPlayerIds.has(data.playerId)) records.push(data);
+  });
+  dailyAttendancePage = 1;
   if (records.length === 0) {
+    dailyAttendanceRows = [];
+    dailyAttendancePagination.classList.add("hidden");
     dailyAttendanceBody.innerHTML =
       '<tr><td colspan="3" class="px-4 py-6 text-center text-slate-400">ยังไม่มีการเช็คชื่อในวันนี้</td></tr>';
     return;
   }
   const playerMap = new Map(players.map((p) => [p.id, p]));
-  dailyAttendanceBody.innerHTML = records
-    .map((r) => {
-      const p = playerMap.get(r.playerId);
-      const name = p ? p.nickname ?? p.fullName ?? "-" : "-";
-      const avg = computeAvgScore(r.scores);
-      return `
-        <tr>
-          <td class="emphasis">${name}</td>
-          <td>${r.status ?? "-"}</td>
-          <td>${avg !== null ? avg.toFixed(2) : "-"}</td>
-        </tr>`;
-    })
-    .join("");
-  applyDataLabels(dailyAttendanceBody);
+  dailyAttendanceRows = records.map((r) => {
+    const p = playerMap.get(r.playerId);
+    const avg = computeAvgScore(r.scores);
+    return {
+      name: p ? p.nickname ?? p.fullName ?? "-" : "-",
+      status: r.status ?? "-",
+      avgText: avg !== null ? avg.toFixed(2) : "-"
+    };
+  });
+  renderDailyAttendancePage();
 }
 
 function renderDailyTrainingReport(snap) {
@@ -3588,11 +3780,17 @@ function renderDailyTrainingReport(snap) {
 }
 
 function renderDailyTrainingPlan(snap) {
-  if (snap.empty) {
+  // แผนการฝึกซ้อมส่งแยกต่างหากทีละโค้ช (มี ageGroups ของตัวเอง) ทีมหนึ่งจึงมีได้หลายแผนต่อวัน (คนละโค้ช
+  // คนละรุ่นอายุ) ต้องกรองเอาเฉพาะแผนของรุ่นอายุที่โค้ชคนนี้ดูแลจริง ไม่ใช่หยิบแผนแรกที่เจอแบบสุ่ม
+  const plans = [];
+  snap.forEach((d) => plans.push(d.data()));
+  const myPlans =
+    myAgeGroups.length > 0 ? plans.filter((pl) => (pl.ageGroups || []).some((ag) => myAgeGroups.includes(ag))) : plans;
+  if (myPlans.length === 0) {
     dailyTrainingPlanCard.innerHTML = '<p class="text-sm text-slate-400">ยังไม่มีการส่งแผนการฝึกซ้อมในวันนี้</p>';
     return;
   }
-  const p = snap.docs[0].data();
+  const p = myPlans[0];
   dailyTrainingPlanCard.innerHTML = `
     <div class="space-y-2">
       <p><span class="text-slate-400">รุ่นอายุ:</span> ${(p.ageGroups || []).join(", ") || "-"}</p>
@@ -3606,14 +3804,21 @@ function renderDailyTrainingPlan(snap) {
   `;
 }
 
+// กรองเฉพาะรุ่นอายุที่โค้ชคนนี้ดูแลจริง (myAgeGroups ว่างเปล่า = โหมดจัดการทีมแบบกว้าง ไม่เจาะจงคน จึงเห็น
+// ทุกรุ่นเหมือนเดิม) ใช้ร่วมกันทั้งผลการแข่งขันและอาการบาดเจ็บ เพราะทั้งสองผูกกับรุ่นอายุโดยตรงอยู่แล้ว
+function filterByMyAgeGroups(reports) {
+  return myAgeGroups.length > 0 ? reports.filter((r) => myAgeGroups.includes(r.ageGroup)) : reports;
+}
+
 function renderDailyMatchReports(snap) {
-  if (snap.empty) {
+  const allReports = [];
+  snap.forEach((d) => allReports.push(d.data()));
+  const reports = filterByMyAgeGroups(allReports);
+  if (reports.length === 0) {
     dailyMatchBody.innerHTML =
       '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">ไม่มีการแข่งขันในวันนี้</td></tr>';
     return;
   }
-  const reports = [];
-  snap.forEach((d) => reports.push(d.data()));
   dailyMatchBody.innerHTML = reports
     .map(
       (m) => `
@@ -3631,13 +3836,14 @@ function renderDailyMatchReports(snap) {
 }
 
 function renderDailyInjuryReports(snap) {
-  if (snap.empty) {
+  const allReports = [];
+  snap.forEach((d) => allReports.push(d.data()));
+  const reports = filterByMyAgeGroups(allReports);
+  if (reports.length === 0) {
     dailyInjuryBody.innerHTML =
       '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">ไม่มีรายงานอาการบาดเจ็บในวันนี้</td></tr>';
     return;
   }
-  const reports = [];
-  snap.forEach((d) => reports.push(d.data()));
   dailyInjuryBody.innerHTML = reports
     .map(
       (inj) => `

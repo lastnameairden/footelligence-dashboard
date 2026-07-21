@@ -45,6 +45,14 @@ export const TEAM_LOGOS = {
   "THAMMASATHIT": "./assets/logo-thammasathit.jpg"
 };
 
+// ---------- สีประจำทีม (ใช้กับกราฟ/แผนภูมิทุกจุดที่ต้องแยกสีตามทีม เพื่อให้สีของแต่ละทีมคงที่เสมอ
+// ไม่ว่าจะเรียงลำดับอย่างไรบนหน้าจอ) ----------
+export const TEAM_COLORS = {
+  "KHAMPHEE FOOTBALL": "#0ea5e9", // ฟ้า/น้ำเงิน
+  "THAWEE SC": "#dc2626", // แดง
+  "THAMMASATHIT": "#16a34a" // เขียว
+};
+
 // กล่องไอคอนสี่เหลี่ยมมน (เหมือน .icon-badge/.icon-badge-lg เดิม) แต่ใส่โลโก้ทีมจริงแทนอิโมจิ
 // ใช้แทนที่ `<div class="icon-badge icon-badge-lg">🛡️</div>` ได้ทันที — ทีมที่ไม่รู้จัก (เช่นยังไม่ตั้งชื่อ)
 // จะ fallback กลับไปใช้อิโมจิ 🛡️ เดิมโดยอัตโนมัติ

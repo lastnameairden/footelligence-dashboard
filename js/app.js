@@ -14,6 +14,7 @@ import {
   isPlayerFullyEvaluated,
   teamIconBadge,
   teamLogoImg,
+  TEAM_COLORS,
   isTrainingPlanLate,
   TRAINING_PLAN_LATE_WARNING_THRESHOLD,
   statCard,
@@ -47,6 +48,7 @@ const scoreBarsTitleEl = document.getElementById("score-bars-title");
 const teamSummaryColGroupEl = document.getElementById("team-summary-col-group");
 const teamSummaryBodyEl = document.getElementById("team-summary-body");
 const teamSummaryTabsEl = document.getElementById("team-summary-tabs");
+const teamSummaryPagination = document.getElementById("team-summary-pagination");
 const statusEl = document.getElementById("status-message");
 const loginGate = document.getElementById("login-gate");
 const loginGateMessage = document.getElementById("login-gate-message");
@@ -64,10 +66,13 @@ const trainingReportsBody = document.getElementById("training-reports-body");
 const trainingReportsLocationHeader = document.getElementById("training-reports-location-header");
 const trainingPlanSummaryBody = document.getElementById("training-plan-summary-body");
 const trainingPlanSummaryActionHeader = document.getElementById("training-plan-summary-action-header");
+const trainingPlanSummaryPagination = document.getElementById("training-plan-summary-pagination");
 const matchReportsStatCardsEl = document.getElementById("match-reports-stat-cards");
 const dashboardMatchBody = document.getElementById("dashboard-match-body");
+const dashboardMatchPagination = document.getElementById("dashboard-match-pagination");
 const injuryReportsStatCardsEl = document.getElementById("injury-reports-stat-cards");
 const dashboardInjuryBody = document.getElementById("dashboard-injury-body");
+const dashboardInjuryPagination = document.getElementById("dashboard-injury-pagination");
 const headerAttendanceLink = document.getElementById("header-attendance-link");
 const dashboardBackLink = document.getElementById("dashboard-back-link");
 const hamburgerBtn = document.getElementById("hamburger-btn");
@@ -235,20 +240,18 @@ function renderPlayersGroups(playerGroups) {
           </thead>
           <tbody></tbody>
         </table>
+        <div class="pagination-controls hidden flex items-center justify-between gap-3 mt-3 text-sm"></div>
       </div>
     `;
     const tabsEl = wrapper.querySelector("div");
     const tbody = wrapper.querySelector("tbody");
-
-    function showAgeGroup(ageGroup, btn) {
-      for (const tabBtn of tabsEl.children) {
-        tabBtn.classList.toggle("btn-primary", tabBtn === btn);
-        tabBtn.classList.toggle("btn-secondary", tabBtn !== btn);
-      }
-      const groupPlayers = (ageGroupMap.get(ageGroup) || []).slice().sort((a, b) => (a.number ?? 0) - (b.number ?? 0));
-      tbody.innerHTML = groupPlayers
-        .map(
-          (p) => `
+    const table = createPaginatedTable({
+      bodyEl: tbody,
+      paginationEl: wrapper.querySelector(".pagination-controls"),
+      colCount: 5,
+      emptyText: "ไม่มีนักกีฬาในรุ่นนี้",
+      noun: "คน",
+      renderRow: (p) => `
         <tr>
           <td>${p.number ?? "-"}</td>
           <td class="emphasis"><a href="./player.html#id=${p.id}" class="text-blue-600 hover:underline">${p.nickname ?? "-"}</a></td>
@@ -256,9 +259,15 @@ function renderPlayersGroups(playerGroups) {
           <td>${p.birthday ?? "-"}</td>
           <td>${p.ageGroup ?? "-"}</td>
         </tr>`
-        )
-        .join("");
-      applyDataLabels(tbody);
+    });
+
+    function showAgeGroup(ageGroup, btn) {
+      for (const tabBtn of tabsEl.children) {
+        tabBtn.classList.toggle("btn-primary", tabBtn === btn);
+        tabBtn.classList.toggle("btn-secondary", tabBtn !== btn);
+      }
+      const groupPlayers = (ageGroupMap.get(ageGroup) || []).slice().sort((a, b) => (a.number ?? 0) - (b.number ?? 0));
+      table.setRows(groupPlayers);
     }
 
     for (const ageGroup of ageGroupKeys) {
@@ -352,19 +361,22 @@ function renderPlayersPie(playerGroups) {
     return;
   }
 
+  // ใช้สีประจำทีม (TEAM_COLORS) เสมอเมื่อ label ตรงกับชื่อทีมที่รู้จัก เพื่อให้สีของแต่ละทีมคงที่ไม่ขึ้นกับลำดับ
+  // ที่แสดงบนจอ — fallback กลับไปใช้ CHART_PALETTE ตามลำดับถ้าเป็นทีมที่ไม่รู้จัก (กันเคสข้อมูลตั้งชื่อทีมแปลกๆ)
+  const colors = entries.map((e, i) => TEAM_COLORS[e.team] || CHART_PALETTE[i % CHART_PALETTE.length]);
   let acc = 0;
   const segments = entries.map((e, i) => {
     const percent = (e.count / total) * 100;
     const start = acc;
     acc += percent;
-    return `${CHART_PALETTE[i % CHART_PALETTE.length]} ${start}% ${acc}%`;
+    return `${colors[i]} ${start}% ${acc}%`;
   });
   pieEl.style.background = `conic-gradient(${segments.join(", ")})`;
   legendEl.innerHTML = entries
     .map(
       (e, i) => `
       <div class="flex items-center gap-2">
-        <span class="w-3 h-3 rounded-full inline-block" style="background:${CHART_PALETTE[i % CHART_PALETTE.length]}"></span>
+        <span class="w-3 h-3 rounded-full inline-block" style="background:${colors[i]}"></span>
         <span class="text-slate-600">${e.team}: ${e.count} คน</span>
       </div>`
     )
@@ -380,6 +392,8 @@ function renderBarChart(containerId, entries, valueFormatter, maxValue) {
   el.innerHTML = entries
     .map((e, i) => {
       const pct = maxValue > 0 ? Math.min((e.value / maxValue) * 100, 100) : 0;
+      // label เป็นชื่อทีมตอนดูภาพรวมทุกทีม หรือชื่อรุ่นอายุตอนดูทีมเดียว — ใช้สีประจำทีมเมื่อ label ตรงกับทีมที่รู้จัก
+      const color = TEAM_COLORS[e.label] || CHART_PALETTE[i % CHART_PALETTE.length];
       return `
       <div>
         <div class="flex justify-between text-xs text-slate-500 mb-1">
@@ -387,7 +401,7 @@ function renderBarChart(containerId, entries, valueFormatter, maxValue) {
           <span>${valueFormatter(e.value)}</span>
         </div>
         <div class="w-full bg-slate-100 rounded-full h-3">
-          <div class="h-3 rounded-full" style="width:${pct}%; background:${CHART_PALETTE[i % CHART_PALETTE.length]}"></div>
+          <div class="h-3 rounded-full" style="width:${pct}%; background:${color}"></div>
         </div>
       </div>`;
     })
@@ -447,8 +461,7 @@ function renderOverview(groups, groupStats, mode, coachLookup) {
   );
 
   if (groupStats.size === 0) {
-    teamSummaryBodyEl.innerHTML =
-      '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">ยังไม่มีข้อมูล</td></tr>';
+    teamSummaryTable.setRows([], 5, "ยังไม่มีข้อมูล");
     return;
   }
 
@@ -456,27 +469,23 @@ function renderOverview(groups, groupStats, mode, coachLookup) {
     // ดูทีมเดียวอยู่แล้ว (มาจาก URL) ไม่ต้องมีปุ่มเลือกทีมซ้ำ
     teamSummaryTabsEl.classList.add("hidden");
     teamSummaryTabsEl.innerHTML = "";
-    teamSummaryBodyEl.innerHTML = Array.from(groupStats.entries())
-      .map(([key, { totals, playerCount }]) => {
-        const percent = totals.total > 0 ? Math.round((totals.attended / totals.total) * 100) : 0;
-        const avgScore = totals.scoreCount > 0 ? (totals.scoreSum / totals.scoreCount).toFixed(1) : "-";
-        const coachName = coachLookup(key) || "-";
-        return `
-        <tr>
-          <td class="emphasis">${key}</td>
-          <td>${coachName}</td>
-          <td>${playerCount}</td>
-          <td>${percent}%</td>
-          <td>${avgScore}</td>
-        </tr>`;
-      })
-      .join("");
-    applyDataLabels(teamSummaryBodyEl);
+    const rows = Array.from(groupStats.entries()).map(([key, { totals, playerCount }]) => {
+      const percent = totals.total > 0 ? Math.round((totals.attended / totals.total) * 100) : 0;
+      const avgScore = totals.scoreCount > 0 ? (totals.scoreSum / totals.scoreCount).toFixed(1) : "-";
+      const coachName = coachLookup(key) || "-";
+      return {
+        nameCell: `<td class="emphasis">${key}</td>`,
+        subCell: `<td>${coachName}</td>`,
+        playerCount,
+        percent,
+        avgScore
+      };
+    });
+    teamSummaryTable.setRows(rows, 5);
   } else if (coachLookup.length === 0) {
     teamSummaryTabsEl.classList.add("hidden");
     teamSummaryTabsEl.innerHTML = "";
-    teamSummaryBodyEl.innerHTML =
-      '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">ยังไม่มีข้อมูลโค้ช</td></tr>';
+    teamSummaryTable.setRows([], 5, "ยังไม่มีข้อมูลโค้ช");
   } else {
     // ดูภาพรวมทุกทีม — เลือกดูทีละทีมผ่านปุ่มแทนการแสดงโค้ชทุกทีมพร้อมกัน (ไม่งั้นตารางยาวเกินไปเมื่อมีหลายทีม
     // หลายโค้ช) โดย default เลือกทีมแรกตามลำดับ TEAMS ให้อัตโนมัติ
@@ -489,22 +498,20 @@ function renderOverview(groups, groupStats, mode, coachLookup) {
         tabBtn.classList.toggle("btn-primary", tabBtn === btn);
         tabBtn.classList.toggle("btn-secondary", tabBtn !== btn);
       }
-      teamSummaryBodyEl.innerHTML = coachLookup
+      const rows = coachLookup
         .filter((row) => row.team === team)
         .map((row) => {
           const percent = row.totals.total > 0 ? Math.round((row.totals.attended / row.totals.total) * 100) : 0;
           const avgScore = row.totals.scoreCount > 0 ? (row.totals.scoreSum / row.totals.scoreCount).toFixed(1) : "-";
-          return `
-        <tr>
-          <td class="emphasis">${teamLogoImg(row.team)}${row.team}</td>
-          <td>${row.coachName} — ${coachPositionLabel(row.coachPosition)} (${row.ageGroups.join(", ") || "-"})</td>
-          <td>${row.playerCount}</td>
-          <td>${percent}%</td>
-          <td>${avgScore}</td>
-        </tr>`;
-        })
-        .join("");
-      applyDataLabels(teamSummaryBodyEl);
+          return {
+            nameCell: `<td class="emphasis">${teamLogoImg(row.team)}${row.team}</td>`,
+            subCell: `<td>${row.coachName} — ${coachPositionLabel(row.coachPosition)} (${row.ageGroups.join(", ") || "-"})</td>`,
+            playerCount: row.playerCount,
+            percent,
+            avgScore
+          };
+        });
+      teamSummaryTable.setRows(rows, 5);
     }
 
     for (const team of teamsPresent) {
@@ -549,22 +556,21 @@ function renderAttendanceGroups(playerGroups, attendanceRecords) {
           </thead>
           <tbody></tbody>
         </table>
+        <div class="pagination-controls hidden flex items-center justify-between gap-3 mt-3 text-sm"></div>
       </div>
     `;
     const tabsEl = wrapper.querySelector("div");
     const tbody = wrapper.querySelector("tbody");
-
-    function showAgeGroup(ageGroup, btn) {
-      for (const tabBtn of tabsEl.children) {
-        tabBtn.classList.toggle("btn-primary", tabBtn === btn);
-        tabBtn.classList.toggle("btn-secondary", tabBtn !== btn);
-      }
-      const stats = ageGroupStats.get(ageGroup)?.stats ?? [];
-      tbody.innerHTML = stats
-        .map((s) => {
-          const percent = s.total > 0 ? Math.round((s.attended / s.total) * 100) : 0;
-          const avgScore = s.scoreCount > 0 ? (s.scoreSum / s.scoreCount).toFixed(1) : "-";
-          return `
+    const table = createPaginatedTable({
+      bodyEl: tbody,
+      paginationEl: wrapper.querySelector(".pagination-controls"),
+      colCount: 6,
+      emptyText: "ไม่มีนักกีฬาในรุ่นนี้",
+      noun: "คน",
+      renderRow: (s) => {
+        const percent = s.total > 0 ? Math.round((s.attended / s.total) * 100) : 0;
+        const avgScore = s.scoreCount > 0 ? (s.scoreSum / s.scoreCount).toFixed(1) : "-";
+        return `
         <tr>
           <td class="emphasis">${s.nickname ?? "-"}</td>
           <td>${s.total}</td>
@@ -573,9 +579,16 @@ function renderAttendanceGroups(playerGroups, attendanceRecords) {
           <td>${percent}%</td>
           <td>${avgScore}</td>
         </tr>`;
-        })
-        .join("");
-      applyDataLabels(tbody);
+      }
+    });
+
+    function showAgeGroup(ageGroup, btn) {
+      for (const tabBtn of tabsEl.children) {
+        tabBtn.classList.toggle("btn-primary", tabBtn === btn);
+        tabBtn.classList.toggle("btn-secondary", tabBtn !== btn);
+      }
+      const stats = ageGroupStats.get(ageGroup)?.stats ?? [];
+      table.setRows(stats);
     }
 
     for (const ageGroup of ageGroupKeys) {
@@ -819,6 +832,155 @@ async function loadTrainingReports(team) {
   applyDataLabels(trainingReportsBody);
 }
 
+// ตัวช่วย pagination แบบใช้ซ้ำได้สำหรับตารางยาวในหน้า Dashboard (10 แถว/หน้า) — เก็บ rows เต็มไว้ภายใน,
+// renderRow(row, absoluteIndex) รับ index สัมบูรณ์ (ไม่ใช่ index ในหน้านั้น) เผื่อผูกกับปุ่ม action ที่ต้องอ้างอิง
+// แถวในอาร์เรย์เต็ม (เช่น data-send-coach-index ของสรุปแผนการฝึกซ้อม)
+function createPaginatedTable({ bodyEl, paginationEl, pageSize = 10, colCount: initialColCount = 1, emptyText, renderRow, noun }) {
+  let rows = [];
+  let page = 1;
+  let colCount = initialColCount;
+
+  function render() {
+    if (rows.length === 0) {
+      bodyEl.innerHTML = `<tr><td colspan="${colCount}" class="px-4 py-6 text-center text-slate-400">${emptyText}</td></tr>`;
+      paginationEl.classList.add("hidden");
+      return;
+    }
+
+    const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+    page = Math.min(Math.max(page, 1), totalPages);
+    const start = (page - 1) * pageSize;
+    const pageRows = rows.slice(start, start + pageSize);
+
+    bodyEl.innerHTML = pageRows.map((r, i) => renderRow(r, start + i)).join("");
+    applyDataLabels(bodyEl);
+
+    if (totalPages <= 1) {
+      paginationEl.classList.add("hidden");
+      return;
+    }
+    paginationEl.classList.remove("hidden");
+    paginationEl.innerHTML = "";
+    const prevBtn = document.createElement("button");
+    prevBtn.type = "button";
+    prevBtn.className = "btn btn-secondary btn-sm";
+    prevBtn.textContent = "‹ ก่อนหน้า";
+    prevBtn.disabled = page <= 1;
+    prevBtn.addEventListener("click", () => {
+      page -= 1;
+      render();
+    });
+    const pageLabel = document.createElement("span");
+    pageLabel.className = "text-slate-500";
+    pageLabel.textContent = `หน้า ${page} จาก ${totalPages} (ทั้งหมด ${rows.length} ${noun})`;
+    const nextBtn = document.createElement("button");
+    nextBtn.type = "button";
+    nextBtn.className = "btn btn-secondary btn-sm";
+    nextBtn.textContent = "ถัดไป ›";
+    nextBtn.disabled = page >= totalPages;
+    nextBtn.addEventListener("click", () => {
+      page += 1;
+      render();
+    });
+    paginationEl.appendChild(prevBtn);
+    paginationEl.appendChild(pageLabel);
+    paginationEl.appendChild(nextBtn);
+  }
+
+  return {
+    setRows(newRows, newColCount, newEmptyText) {
+      rows = newRows;
+      if (newColCount !== undefined) colCount = newColCount;
+      if (newEmptyText !== undefined) emptyText = newEmptyText;
+      page = 1;
+      render();
+    }
+  };
+}
+
+// แถวที่ normalize แล้วจาก renderOverview ทั้ง 2 รูปแบบ (โหมดรุ่นอายุของทีมเดียว / โหมดโค้ชรายคนทุกทีม) ให้เข้า
+// รูปเดียวกันก่อนส่งเข้า renderRow เพราะคอลัมน์แรก-สอง (ชื่อ/โค้ช) มีเนื้อหาต่างกันตามโหมด แต่ 3 คอลัมน์หลังเหมือนกัน
+const teamSummaryTable = createPaginatedTable({
+  bodyEl: teamSummaryBodyEl,
+  paginationEl: teamSummaryPagination,
+  colCount: 5,
+  emptyText: "ยังไม่มีข้อมูล",
+  noun: "รายการ",
+  renderRow: (row) => `
+        <tr>
+          ${row.nameCell}
+          ${row.subCell}
+          <td>${row.playerCount}</td>
+          <td>${row.percent}%</td>
+          <td>${row.avgScore}</td>
+        </tr>`
+});
+
+const trainingPlanSummaryTable = createPaginatedTable({
+  bodyEl: trainingPlanSummaryBody,
+  paginationEl: trainingPlanSummaryPagination,
+  emptyText: "ยังไม่มีการส่งแผนการฝึกซ้อมในเดือนนี้",
+  noun: "รายการ",
+  renderRow: (r, i) => {
+    const onTime = r.total - r.late;
+    const needsImprovement = r.late > TRAINING_PLAN_LATE_WARNING_THRESHOLD;
+    const statusBadge = needsImprovement
+      ? '<span class="badge badge-danger">⚠️ ต้องปรับปรุง</span>'
+      : '<span class="badge badge-success">ปกติ</span>';
+    const actionCell = currentViewerRole === "admin"
+      ? `<td><button type="button" class="btn btn-secondary btn-sm" data-send-coach-index="${i}">📤 แจ้ง</button></td>`
+      : "";
+    return `
+        <tr>
+          <td class="emphasis">${r.coachName}</td>
+          <td>${teamLogoImg(r.team)}${r.team}</td>
+          <td>${r.total}</td>
+          <td class="text-emerald-600 font-medium">${onTime}</td>
+          <td class="text-red-500 font-medium">${r.late}</td>
+          <td>${statusBadge}</td>
+          ${actionCell}
+        </tr>`;
+  }
+});
+
+const dashboardMatchTable = createPaginatedTable({
+  bodyEl: dashboardMatchBody,
+  paginationEl: dashboardMatchPagination,
+  colCount: 8,
+  emptyText: "ยังไม่มีรายการแข่งขัน",
+  noun: "รายการ",
+  renderRow: (m) => `
+        <tr>
+          <td class="emphasis">${teamLogoImg(m.team)}${m.team ?? "-"}</td>
+          <td>${m.date ?? "-"}</td>
+          <td>${m.opponent ?? "-"}</td>
+          <td>${m.competitionType ?? "-"}</td>
+          <td>${m.ageGroup ?? "-"}</td>
+          <td>${matchResultBadge(m.result)}</td>
+          <td class="emphasis">${m.scoreUs} - ${m.scoreThem}</td>
+          <td>${m.competition ?? "-"}</td>
+        </tr>`
+});
+
+const dashboardInjuryTable = createPaginatedTable({
+  bodyEl: dashboardInjuryBody,
+  paginationEl: dashboardInjuryPagination,
+  colCount: 8,
+  emptyText: "ไม่มีรายงานอาการบาดเจ็บ",
+  noun: "รายการ",
+  renderRow: (inj) => `
+        <tr>
+          <td class="emphasis">${teamLogoImg(inj.team)}${inj.team ?? "-"}</td>
+          <td>${inj.date ?? "-"}</td>
+          <td class="emphasis">${inj.playerName ?? "-"}</td>
+          <td>${inj.ageGroup ?? "-"}</td>
+          <td>${inj.description ?? "-"}</td>
+          <td>${injurySeverityBadge(inj.severity)}</td>
+          <td>${injuryStatusBadge(inj.status)}</td>
+          <td>${inj.expectedReturn ?? "-"}</td>
+        </tr>`
+});
+
 // scopeTeam: null = ผู้ดูแลระบบ เห็นทุกทีม / string = โค้ช เห็นเฉพาะทีมตัวเอง
 // ---------- สรุปการส่งแผนการฝึกซ้อมรายวัน (ภาพรวมทุกโค้ช เพื่อจับตาดูโค้ชที่ส่งสายบ่อย) ----------
 async function loadTrainingPlanSummary(scopeTeam) {
@@ -852,37 +1014,7 @@ async function loadTrainingPlanSummary(scopeTeam) {
 
   const rows = Array.from(groups.values()).sort((a, b) => b.late - a.late);
   currentTrainingPlanRows = rows;
-
-  if (rows.length === 0) {
-    trainingPlanSummaryBody.innerHTML =
-      `<tr><td colspan="${colCount}" class="px-4 py-6 text-center text-slate-400">ยังไม่มีการส่งแผนการฝึกซ้อมในเดือนนี้</td></tr>`;
-    return;
-  }
-
-  trainingPlanSummaryBody.innerHTML = rows
-    .map((r, i) => {
-      const onTime = r.total - r.late;
-      // สายเกินเกณฑ์ (>3 ครั้ง/เดือน) = ต้องปรับปรุงมาตรฐานการส่งแผน
-      const needsImprovement = r.late > TRAINING_PLAN_LATE_WARNING_THRESHOLD;
-      const statusBadge = needsImprovement
-        ? '<span class="badge badge-danger">⚠️ ต้องปรับปรุง</span>'
-        : '<span class="badge badge-success">ปกติ</span>';
-      const actionCell = isAdminViewer
-        ? `<td><button type="button" class="btn btn-secondary btn-sm" data-send-coach-index="${i}">📤 แจ้ง</button></td>`
-        : "";
-      return `
-        <tr>
-          <td class="emphasis">${r.coachName}</td>
-          <td>${teamLogoImg(r.team)}${r.team}</td>
-          <td>${r.total}</td>
-          <td class="text-emerald-600 font-medium">${onTime}</td>
-          <td class="text-red-500 font-medium">${r.late}</td>
-          <td>${statusBadge}</td>
-          ${actionCell}
-        </tr>`;
-    })
-    .join("");
-  applyDataLabels(trainingPlanSummaryBody);
+  trainingPlanSummaryTable.setRows(rows, colCount);
 }
 
 // แจ้งผู้บริหารทีมว่าโค้ชคนนี้ส่งแผนสายเกินเกณฑ์ (ปุ่มนี้แสดงเฉพาะผู้ดูแลระบบ) — ใช้ event delegation
@@ -944,27 +1076,7 @@ async function loadMatchAndInjuryReports(scopeTeam) {
     statCard("แพ้", loseCount) +
     statCard("เสมอ", drawCount);
 
-  if (matches.length === 0) {
-    dashboardMatchBody.innerHTML =
-      '<tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">ยังไม่มีรายการแข่งขัน</td></tr>';
-  } else {
-    dashboardMatchBody.innerHTML = matches
-      .map(
-        (m) => `
-        <tr>
-          <td class="emphasis">${teamLogoImg(m.team)}${m.team ?? "-"}</td>
-          <td>${m.date ?? "-"}</td>
-          <td>${m.opponent ?? "-"}</td>
-          <td>${m.competitionType ?? "-"}</td>
-          <td>${m.ageGroup ?? "-"}</td>
-          <td>${matchResultBadge(m.result)}</td>
-          <td class="emphasis">${m.scoreUs} - ${m.scoreThem}</td>
-          <td>${m.competition ?? "-"}</td>
-        </tr>`
-      )
-      .join("");
-    applyDataLabels(dashboardMatchBody);
-  }
+  dashboardMatchTable.setRows(matches);
 
   const injuries = [];
   injurySnap.forEach((d) => injuries.push(d.data()));
@@ -980,27 +1092,7 @@ async function loadMatchAndInjuryReports(scopeTeam) {
     statCard("หายแล้ว", recoveredCount) +
     statCard("รุนแรง", severeCount);
 
-  if (injuries.length === 0) {
-    dashboardInjuryBody.innerHTML =
-      '<tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">ไม่มีรายงานอาการบาดเจ็บ</td></tr>';
-  } else {
-    dashboardInjuryBody.innerHTML = injuries
-      .map(
-        (inj) => `
-        <tr>
-          <td class="emphasis">${teamLogoImg(inj.team)}${inj.team ?? "-"}</td>
-          <td>${inj.date ?? "-"}</td>
-          <td class="emphasis">${inj.playerName ?? "-"}</td>
-          <td>${inj.ageGroup ?? "-"}</td>
-          <td>${inj.description ?? "-"}</td>
-          <td>${injurySeverityBadge(inj.severity)}</td>
-          <td>${injuryStatusBadge(inj.status)}</td>
-          <td>${inj.expectedReturn ?? "-"}</td>
-        </tr>`
-      )
-      .join("");
-    applyDataLabels(dashboardInjuryBody);
-  }
+  dashboardInjuryTable.setRows(injuries);
 }
 
 // วาดภาพรวมของทีมที่เลือกอยู่ (การ์ดสรุป/พาย/กราฟแท่ง/ตาราง) เฉพาะตำแหน่งที่เลือก ("player" = ทุกตำแหน่ง
@@ -1220,7 +1312,6 @@ function renderDrawerItems() {
     navDrawerItems.appendChild(drawerItem("📝", "คำขอลงทะเบียนที่รอการอนุมัติ", "./attendance.html#admin=approvals"));
     navDrawerItems.appendChild(drawerItem("⚽", "รายงานผลการแข่งขันทั้งหมด", "./attendance.html#admin=matches"));
     navDrawerItems.appendChild(drawerItem("🩹", "รายงานอาการบาดเจ็บทั้งหมด", "./attendance.html#admin=injuries"));
-    navDrawerItems.appendChild(drawerItem("📁", "จัดการข้อมูลทีม", "./attendance.html#admin=manage-team"));
     navDrawerItems.appendChild(drawerItem("🖨️", "พิมพ์สรุป Dashboard", "./attendance.html#admin=print"));
     navDrawerItems.appendChild(drawerItem("📈", "พัฒนาการนักกีฬา", "./development.html"));
     navDrawerItems.appendChild(drawerDivider());

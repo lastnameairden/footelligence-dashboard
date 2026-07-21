@@ -720,6 +720,7 @@
           <input id="session-date" type="date" class="field-input" />
         </div>
         <button id="load-session-btn" class="btn btn-primary">โหลด / สร้างวันซ้อมนี้</button>
+        <button id="view-session-btn" class="btn btn-secondary">🔍 เรียกดู (ไม่สร้างวันซ้อมใหม่)</button>
         <button id="mark-no-training-btn" class="btn btn-warning-soft">วันนี้ไม่มีฝึกซ้อม</button>
         <p id="attendance-status" class="text-sm text-slate-500 w-full">เลือกวันที่แล้วกดปุ่ม เพื่อเริ่มเช็คชื่อ</p>
       </div>
@@ -775,6 +776,14 @@
         </div>
         <button id="report-load-btn" class="btn btn-primary">โหลดวันนี้</button>
         <p id="report-load-status" class="text-sm text-slate-500 w-full"></p>
+      </div>
+
+      <!-- แสดงเมื่อวันที่เลือกมีรายงานที่โค้ชเคยส่งไว้จริงแล้ว (ไม่ใช่ค่าที่ระบบซิงก์มาจาก "วันนี้ไม่มีฝึกซ้อม") —
+      ล็อกไว้เป็นดูอย่างเดียวก่อนกันส่งซ้ำ/แก้โดยไม่ตั้งใจ ต้องกดปุ่ม "แก้ไขรายงาน" เพื่อปลดล็อกฟอร์มเอง -->
+      <div id="report-summary" class="hidden card card-pad space-y-3">
+        <p id="report-summary-text" class="text-sm text-emerald-700 font-medium"></p>
+        <div id="report-summary-details" class="text-sm text-slate-600 space-y-1"></div>
+        <button type="button" id="report-edit-btn" class="btn btn-secondary btn-sm">✏️ แก้ไขรายงาน</button>
       </div>
 
       <form id="report-form" class="card card-pad space-y-6 hidden">
@@ -1171,6 +1180,7 @@
             </tbody>
           </table>
         </div>
+        <div id="daily-attendance-pagination" class="hidden flex items-center justify-between gap-3 mt-3 text-sm"></div>
       </div>
 
       <div>
