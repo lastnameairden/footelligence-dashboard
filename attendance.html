@@ -1164,6 +1164,19 @@
 
       <div id="daily-date-heading" class="hidden text-lg font-bold text-slate-900"></div>
 
+      <!-- เตือนงานประจำวันที่ยังไม่ได้ทำ (เช็คชื่อ/ส่งรายงานการฝึกซ้อมของ "วันนี้" — ไม่ผูกกับวันที่ที่เลือกดูด้านบน)
+      เพื่อลดปัญหาโค้ชลืมทำ/ส่งสาย โดยไม่ต้องรอผู้ดูแลระบบตามทีหลัง -->
+      <div id="daily-reminder-banner" class="hidden card card-warning card-pad space-y-2"></div>
+
+      <!-- ข้อความที่ผู้ดูแลระบบส่งถึงทีมนี้โดยตรง (เดิมมีให้แค่บัญชีผู้บริหารทีมเห็น — เพิ่มให้โค้ชจริงเห็นด้วย
+      เพราะเป็นผู้รับผิดชอบตัวจริงที่ควรรู้เรื่องนี้) -->
+      <div id="daily-executive-notes-section">
+        <h2 class="section-title mb-3"><span class="icon-badge">📬</span> ข้อความจากผู้ดูแลระบบ</h2>
+        <div id="daily-executive-notes-list" class="space-y-3">
+          <p class="text-sm text-slate-400">กำลังโหลด...</p>
+        </div>
+      </div>
+
       <div>
         <h2 class="section-title mb-3"><span class="icon-badge">✅</span> เช็คชื่อการฝึกซ้อม</h2>
         <div class="card table-wrap">

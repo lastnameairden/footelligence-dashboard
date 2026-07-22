@@ -55,6 +55,10 @@ const loginGateMessage = document.getElementById("login-gate-message");
 const dashboardContent = document.getElementById("dashboard-content");
 const adminPickTeamPrompt = document.getElementById("admin-pick-team-prompt");
 const adminPickTeamGrid = document.getElementById("admin-pick-team-grid");
+const adminSearchBtn = document.getElementById("admin-search-btn");
+const adminSearchPanel = document.getElementById("admin-search-panel");
+const adminSearchInput = document.getElementById("admin-search-input");
+const adminSearchDropdown = document.getElementById("admin-search-dropdown");
 const ageProgressSection = document.getElementById("age-group-progress-section");
 const ageProgressDateInput = document.getElementById("age-progress-date-input");
 const ageProgressRefreshBtn = document.getElementById("age-progress-refresh-btn");
@@ -1212,6 +1216,110 @@ function renderAdminPickTeamGrid() {
   }
 }
 
+// ---------- ผู้ดูแลระบบ: ค้นหาชื่อโค้ช/นักกีฬาแบบพิมพ์แล้วเห็นผลทันที (จากหน้าเลือกทีม) ----------
+// โหลด coaches/players ทั้งหมดครั้งเดียวตอนพิมพ์ครั้งแรก (cache ไว้ใน memory) แทนการ query ทุกครั้งที่พิมพ์
+// เพราะ Firestore rules ให้ isAdmin() อ่านได้ไม่จำกัดอยู่แล้ว และจำนวนเอกสารทั้งระบบไม่มากพอจะโหลดทั้งก้อนได้สบาย
+let adminSearchCoaches = null;
+let adminSearchPlayers = null;
+
+async function ensureAdminSearchData() {
+  if (adminSearchCoaches && adminSearchPlayers) return;
+  const [coachSnap, playerSnap] = await Promise.all([
+    getDocs(collection(db, "coaches")),
+    getDocs(collection(db, "players"))
+  ]);
+  adminSearchCoaches = [];
+  coachSnap.forEach((d) => adminSearchCoaches.push({ id: d.id, ...d.data() }));
+  adminSearchPlayers = [];
+  playerSnap.forEach((d) => adminSearchPlayers.push({ id: d.id, ...d.data() }));
+}
+
+function adminSearchResultItem({ emoji, title, subtitle, href }) {
+  const item = document.createElement("div");
+  item.className = "block px-3 py-2 hover:bg-slate-50 cursor-pointer";
+  item.innerHTML = `
+    <p class="text-sm font-medium text-slate-900">${emoji} ${title}</p>
+    <p class="text-xs text-slate-500">${subtitle}</p>
+  `;
+  // ใช้ mousedown แทน click เพื่อให้ทำงานก่อน blur ของช่องค้นหาซ่อน dropdown ทิ้ง (แบบเดียวกับ
+  // match-lineup-search ในหน้าเช็คชื่อ)
+  item.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    window.location.href = href;
+  });
+  return item;
+}
+
+function renderAdminSearchDropdown(searchText) {
+  const keyword = searchText.trim().toLowerCase();
+  if (!keyword) {
+    adminSearchDropdown.classList.add("hidden");
+    adminSearchDropdown.innerHTML = "";
+    return;
+  }
+
+  const matchedCoaches = (adminSearchCoaches || [])
+    .filter((c) => c.role !== "admin" && (c.name ?? "").toLowerCase().includes(keyword))
+    .slice(0, 8);
+  const matchedPlayers = (adminSearchPlayers || [])
+    .filter(
+      (p) => (p.nickname ?? "").toLowerCase().includes(keyword) || (p.fullName ?? "").toLowerCase().includes(keyword)
+    )
+    .slice(0, 8);
+
+  adminSearchDropdown.innerHTML = "";
+  if (matchedCoaches.length === 0 && matchedPlayers.length === 0) {
+    adminSearchDropdown.innerHTML = '<p class="text-sm text-slate-400 px-3 py-3">ไม่พบผลลัพธ์</p>';
+    adminSearchDropdown.classList.remove("hidden");
+    return;
+  }
+
+  for (const c of matchedCoaches) {
+    const roleLabel = c.role === "executive" ? "ผู้บริหารทีม" : "โค้ช";
+    const ageGroupsText = c.ageGroups?.length ? ` • ${c.ageGroups.join(", ")}` : "";
+    adminSearchDropdown.appendChild(
+      adminSearchResultItem({
+        emoji: "👤",
+        title: c.name ?? "-",
+        subtitle: `${roleLabel} • ${c.team ?? "ยังไม่ระบุทีม"}${ageGroupsText}`,
+        href: `./attendance.html#admin=coach&id=${c.id}`
+      })
+    );
+  }
+  for (const p of matchedPlayers) {
+    adminSearchDropdown.appendChild(
+      adminSearchResultItem({
+        emoji: "⚽",
+        title: p.nickname ?? p.fullName ?? "-",
+        subtitle: `นักกีฬา • ${p.team ?? "-"} • ${p.ageGroup ?? "-"}`,
+        href: `./player.html#id=${p.id}`
+      })
+    );
+  }
+  adminSearchDropdown.classList.remove("hidden");
+}
+
+adminSearchInput.addEventListener("input", async () => {
+  await ensureAdminSearchData();
+  renderAdminSearchDropdown(adminSearchInput.value);
+});
+
+// ปุ่ม 🔍 ข้างกระดิ่ง เปิด/ปิด panel ค้นหาแบบเดียวกับ panel การแจ้งเตือน — โฟกัสช่องพิมพ์ให้อัตโนมัติตอนเปิด
+adminSearchBtn.addEventListener("click", async () => {
+  const opening = adminSearchPanel.classList.contains("hidden");
+  adminSearchPanel.classList.toggle("hidden", !opening);
+  if (opening) {
+    await ensureAdminSearchData();
+    renderAdminSearchDropdown(adminSearchInput.value);
+    adminSearchInput.focus();
+  }
+});
+document.addEventListener("click", (e) => {
+  if (adminSearchPanel.classList.contains("hidden")) return;
+  if (adminSearchPanel.contains(e.target) || adminSearchBtn.contains(e.target)) return;
+  adminSearchPanel.classList.add("hidden");
+});
+
 // ---------- เมนูนำทางแบบเลื่อน (Hamburger Drawer) — เหมือนกับใน attendance.html ----------
 function openDrawer() {
   navDrawerOverlay.classList.remove("hidden");
@@ -1332,6 +1440,8 @@ onAuthStateChanged(auth, async (user) => {
   const isCoachSession = !!user && !user.isAnonymous;
   hamburgerBtn.classList.add("hidden");
   notificationBellBtn.classList.add("hidden");
+  adminSearchBtn.classList.add("hidden");
+  adminSearchPanel.classList.add("hidden");
   if (!isCoachSession) {
     adminPickTeamPrompt.classList.add("hidden");
     dashboardBackLink.classList.add("hidden");
@@ -1372,6 +1482,9 @@ onAuthStateChanged(auth, async (user) => {
     renderDrawerItems();
 
     const isAdmin = data.role === "admin";
+    // ปุ่มค้นหาโค้ช/นักกีฬาข้างกระดิ่ง แสดงเฉพาะผู้ดูแลระบบ (โค้ช/ผู้บริหารทีมมีทีมเดียวอยู่แล้ว ไม่จำเป็นต้องค้นข้ามทีม
+    // และ Firestore rules ก็จำกัดให้เห็นผู้เล่นแค่ทีมตัวเองด้วย ค้นข้ามทีมจะได้ผลลัพธ์ไม่ครบ)
+    adminSearchBtn.classList.toggle("hidden", !isAdmin);
     // ลิงก์ "← กลับเมนูหลัก" แบบเดิมไปหน้าเช็คชื่อตรงๆ ใช้ไม่ได้กับผู้ดูแลระบบอีกต่อไป (จะโดน redirect
     // กลับมาหน้านี้ทันที) จึงซ่อนไว้เฉพาะผู้ดูแลระบบ ให้ใช้เมนู ☰ แทน — โค้ช/ผู้บริหารทีมยังใช้ได้ตามปกติ
     headerAttendanceLink.classList.toggle("hidden", isAdmin);

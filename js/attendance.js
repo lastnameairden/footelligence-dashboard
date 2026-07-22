@@ -98,6 +98,8 @@ const dailyDateInput = document.getElementById("daily-date-input");
 const dailyLoadBtn = document.getElementById("daily-load-btn");
 const dailyStatus = document.getElementById("daily-status");
 const dailyDateHeading = document.getElementById("daily-date-heading");
+const dailyReminderBanner = document.getElementById("daily-reminder-banner");
+const dailyExecutiveNotesList = document.getElementById("daily-executive-notes-list");
 const dailyAttendanceBody = document.getElementById("daily-attendance-body");
 const dailyAttendancePagination = document.getElementById("daily-attendance-pagination");
 const dailyTrainingReportCard = document.getElementById("daily-training-report-card");
@@ -448,6 +450,51 @@ function showDaily() {
     dailyDateInput.value = new Date().toISOString().slice(0, 10);
   }
   loadDailyData(dailyDateInput.value);
+  checkTodayReminders();
+  loadExecutiveNotes(myTeam, dailyExecutiveNotesList);
+}
+
+// เตือนงานประจำวันที่ยังไม่ได้ทำของ "วันนี้" จริงๆ (ไม่ผูกกับวันที่ที่เลือกดูในการ์ดด้านบนของหน้านี้) — เรียก
+// ครั้งเดียวตอนเปิดหน้า Daily (หน้าแรกของโค้ช) เพื่อกันลืมเช็คชื่อ/ส่งรายงาน โดยไม่ต้องรอผู้ดูแลระบบส่งข้อความ
+// เตือนย้อนหลัง ตรวจแค่ "เริ่มทำหรือยัง" ไม่ตรวจความครบถ้วน (มีระบบแจ้งเตือนของผู้ดูแลระบบดูแลส่วนนั้นอยู่แล้ว)
+async function checkTodayReminders() {
+  if (!myTeam) return;
+  const todayStr = new Date().toISOString().slice(0, 10);
+  dailyReminderBanner.classList.add("hidden");
+  dailyReminderBanner.innerHTML = "";
+  try {
+    const [session, reportSnap] = await Promise.all([
+      findSession(todayStr),
+      getDocs(query(collection(db, "trainingReports"), where("team", "==", myTeam), where("date", "==", todayStr)))
+    ]);
+
+    const reminders = [];
+    if (!session) {
+      reminders.push({ text: "ยังไม่ได้เช็คชื่อการฝึกซ้อมวันนี้", action: openCheckinSection });
+    }
+    if (reportSnap.empty) {
+      reminders.push({ text: "ยังไม่ได้ส่งรายงานการฝึกซ้อมวันนี้", action: openReportSection });
+    }
+    if (reminders.length === 0) return;
+
+    dailyReminderBanner.innerHTML = '<p class="text-sm font-semibold text-amber-800 mb-1">🔔 สิ่งที่ยังไม่ได้ทำวันนี้</p>';
+    for (const r of reminders) {
+      const row = document.createElement("div");
+      row.className = "flex items-center justify-between gap-3";
+      row.innerHTML = `<p class="text-sm text-amber-700">${r.text}</p>`;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn btn-secondary btn-sm";
+      btn.textContent = "ไปทำเลย →";
+      btn.addEventListener("click", r.action);
+      row.appendChild(btn);
+      dailyReminderBanner.appendChild(row);
+    }
+    dailyReminderBanner.classList.remove("hidden");
+  } catch (err) {
+    console.error(err);
+    // ไม่ต้องแสดง error ให้กวนใจ เพราะเป็นแค่ตัวเตือนเสริม ไม่ใช่ข้อมูลหลักของหน้านี้
+  }
 }
 
 // ---------- เมนูนำทางแบบเลื่อน (Hamburger Drawer) ----------
@@ -639,6 +686,35 @@ function openAdminCoachesSection() {
   hideAllScreens();
   adminCoachesSection.classList.remove("hidden");
   loadCoachDirectory();
+}
+
+// เปิดตรงไปยังโค้ช/ผู้บริหารทีมคนที่ระบุ (มาจากผลค้นหาชื่อในหน้า Dashboard: #admin=coach&id=<coachId>)
+// สวมบทบาทเข้าไปดูหน้าจอของคนนั้นทันทีเหมือนคลิกชื่อในรายชื่อโค้ช — ถ้าหา id นี้ไม่เจอหรือไม่มี id แนบมา
+// ให้ fallback ไปหน้ารายชื่อโค้ชทั้งหมดแทน
+async function openAdminCoachDeepLink() {
+  const coachId = new URLSearchParams(window.location.hash.replace(/^#/, "")).get("id");
+  if (!coachId) {
+    openAdminCoachesSection();
+    return;
+  }
+  try {
+    const snap = await getDoc(doc(db, "coaches", coachId));
+    if (!snap.exists()) {
+      openAdminCoachesSection();
+      return;
+    }
+    const coach = { id: snap.id, ...snap.data() };
+    if (coach.role === "executive") {
+      enterExecutiveViewMode(coach.team, adminCoachesSection, coach);
+    } else if (coach.role === "coach") {
+      enterTeamManagementMode(coach.team, adminCoachesSection, coach);
+    } else {
+      openAdminCoachesSection();
+    }
+  } catch (err) {
+    console.error(err);
+    openAdminCoachesSection();
+  }
 }
 
 function openAdminProgressSection() {
@@ -1566,7 +1642,7 @@ async function enterExecutiveViewMode(team, returnSection, execRecordOverride) {
   executiveSection.classList.remove("hidden");
   renderDrawerItems();
   loadExecutiveSummary(team);
-  loadExecutiveNotes(team);
+  loadExecutiveNotes(team, executiveNotesList);
 }
 
 // สรุปภาพรวมทีมสั้นๆ ที่ผู้บริหารทีมควรเห็นทันทีที่เข้าระบบ (ไม่ต้องคลิกไปหน้า Dashboard ก่อนถึงจะเห็นอะไร)
@@ -1617,13 +1693,17 @@ async function loadExecutiveSummary(team) {
   }
 }
 
-// ข้อความที่ผู้ดูแลระบบส่งถึงทีมนี้โดยตรง (เช่น แจ้งนักกีฬาที่มีพัฒนาการดี หรือแจ้งปัญหาของโค้ช) — ใช้ร่วมกัน
-// ทั้งบัญชีผู้บริหารทีมจริง และผู้ดูแลระบบที่สวมบทบาทผ่าน enterExecutiveViewMode
+// ข้อความที่ผู้ดูแลระบบส่งถึงทีมนี้โดยตรง (เช่น แจ้งนักกีฬาที่มีพัฒนาการดี หรือแจ้งปัญหาของโค้ช) — ใช้ร่วมกันทั้ง
+// บัญชีผู้บริหารทีมจริง (executiveNotesList ในหน้าสรุปภาพรวม), โค้ชจริง (dailyExecutiveNotesList ในหน้า Daily
+// ซึ่งเป็นผู้รับผิดชอบตัวจริงที่ควรเห็นข้อความนี้ด้วย ไม่ใช่แค่ผู้บริหารทีม), และผู้ดูแลระบบที่สวมบทบาทเป็นทั้งสองแบบ
+// listEl ระบุปลายทางที่จะ render (รับพารามิเตอร์แทนการฝัง element เดียวตายตัว เพราะมีสองจุดที่ต้องใช้ร่วมกัน)
 let currentExecutiveNotesTeam = null;
+let currentExecutiveNotesListEl = null;
 
-async function loadExecutiveNotes(team) {
+async function loadExecutiveNotes(team, listEl) {
   currentExecutiveNotesTeam = team;
-  executiveNotesList.innerHTML = '<p class="text-sm text-slate-400">กำลังโหลด...</p>';
+  currentExecutiveNotesListEl = listEl;
+  listEl.innerHTML = '<p class="text-sm text-slate-400">กำลังโหลด...</p>';
   try {
     const snap = await getDocs(query(collection(db, "executiveNotes"), where("team", "==", team)));
     const notes = [];
@@ -1635,11 +1715,11 @@ async function loadExecutiveNotes(team) {
     });
 
     if (notes.length === 0) {
-      executiveNotesList.innerHTML = '<p class="text-sm text-slate-400">ยังไม่มีข้อความจากผู้ดูแลระบบ</p>';
+      listEl.innerHTML = '<p class="text-sm text-slate-400">ยังไม่มีข้อความจากผู้ดูแลระบบ</p>';
       return;
     }
 
-    executiveNotesList.innerHTML = notes
+    listEl.innerHTML = notes
       .map((n) => {
         const typeIcon = n.type === "player" ? "⭐" : n.type === "coach" ? "⚠️" : "📌";
         const postedAt =
@@ -1664,21 +1744,23 @@ async function loadExecutiveNotes(team) {
       .join("");
   } catch (err) {
     console.error(err);
-    executiveNotesList.innerHTML = `<p class="text-sm text-red-600">โหลดข้อความไม่สำเร็จ: ${err.message}</p>`;
+    listEl.innerHTML = `<p class="text-sm text-red-600">โหลดข้อความไม่สำเร็จ: ${err.message}</p>`;
   }
 }
 
-executiveNotesList.addEventListener("click", async (e) => {
+async function handleExecutiveNoteMarkRead(e) {
   const btn = e.target.closest("[data-mark-read-id]");
-  if (!btn || !currentExecutiveNotesTeam) return;
+  if (!btn || !currentExecutiveNotesTeam || !currentExecutiveNotesListEl) return;
   try {
     await updateDoc(doc(db, "executiveNotes", btn.dataset.markReadId), { read: true });
-    await loadExecutiveNotes(currentExecutiveNotesTeam);
+    await loadExecutiveNotes(currentExecutiveNotesTeam, currentExecutiveNotesListEl);
   } catch (err) {
     console.error(err);
     alert("อัปเดตไม่สำเร็จ: " + err.message);
   }
-});
+}
+executiveNotesList.addEventListener("click", handleExecutiveNoteMarkRead);
+dailyExecutiveNotesList.addEventListener("click", handleExecutiveNoteMarkRead);
 
 adminViewDashboardBtn.addEventListener("click", () => {
   const team = adminDashboardTeamSelect.value;
@@ -1787,6 +1869,7 @@ onAuthStateChanged(auth, async (user) => {
       // เลยจึงไม่โดนตัด ใช้ได้ทั้งในเครื่องและบน Vercel เหมือนกัน
       const adminDeepLinks = {
         coaches: openAdminCoachesSection,
+        coach: openAdminCoachDeepLink,
         progress: openAdminProgressSection,
         approvals: openAdminApprovalsSection,
         matches: openAdminMatchesSection,
@@ -1818,7 +1901,7 @@ onAuthStateChanged(auth, async (user) => {
       hideAllScreens();
       executiveSection.classList.remove("hidden");
       loadExecutiveSummary(data.team);
-      loadExecutiveNotes(data.team);
+      loadExecutiveNotes(data.team, executiveNotesList);
       return;
     }
 
