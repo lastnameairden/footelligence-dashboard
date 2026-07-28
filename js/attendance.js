@@ -39,7 +39,8 @@ import {
   ageGroupSortKey,
   COACH_POSITIONS,
   coachPositionLabel,
-  coachPositionAllowsMultipleAgeGroups
+  coachPositionAllowsMultipleAgeGroups,
+  sendExecutiveNote
 } from "./ui-utils.js";
 
 const STATUS_OPTIONS = ["A", "I", "R", "P"];
@@ -142,6 +143,7 @@ const executiveStatusEl = document.getElementById("executive-status");
 const executiveStatCards = document.getElementById("executive-stat-cards");
 const executiveLateWarning = document.getElementById("executive-late-warning");
 const executiveLateCountEl = document.getElementById("executive-late-count");
+const executiveCoachSummary = document.getElementById("executive-coach-summary");
 const executiveNotesList = document.getElementById("executive-notes-list");
 const coachNameEl = document.getElementById("coach-name");
 const coachEmailEl = document.getElementById("coach-email");
@@ -1211,10 +1213,21 @@ async function loadCoachDirectory() {
     viewTeamBtn.className = "btn btn-secondary btn-sm mb-3";
     viewTeamBtn.addEventListener("click", () => enterTeamManagementMode(team, adminCoachesSection));
 
+    const sendSummaryBtn = document.createElement("button");
+    sendSummaryBtn.type = "button";
+    sendSummaryBtn.textContent = "📤 ส่งสรุปการทำงานโค้ชให้ผู้บริหารทีม";
+    sendSummaryBtn.className = "btn btn-secondary btn-sm mb-3";
+    sendSummaryBtn.addEventListener("click", () => sendCoachActivitySummaryToExecutive(team, sendSummaryBtn));
+
+    const btnGroup = document.createElement("div");
+    btnGroup.className = "flex gap-2 flex-wrap";
+    btnGroup.appendChild(sendSummaryBtn);
+    btnGroup.appendChild(viewTeamBtn);
+
     const groupWrap = document.createElement("div");
     groupWrap.className = "mb-2 flex items-center justify-between flex-wrap gap-2";
     groupWrap.appendChild(heading);
-    groupWrap.appendChild(viewTeamBtn);
+    groupWrap.appendChild(btnGroup);
 
     coachDirectoryGroups.appendChild(groupWrap);
     coachDirectoryGroups.appendChild(buildCoachGroupTable(teamCoaches, sessions, attendanceRecords, players));
@@ -1227,6 +1240,173 @@ async function loadCoachDirectory() {
     heading.textContent = `🛡️ ยังไม่มีทีม (ผู้ดูแลระบบ/รอกำหนดทีม) (${unassignedGroup.length} คน)`;
     coachDirectoryGroups.appendChild(heading);
     coachDirectoryGroups.appendChild(buildCoachGroupTable(unassignedGroup, sessions, attendanceRecords, players));
+  }
+}
+
+// ---------- สรุปการทำงานของโค้ชแต่ละคนประจำเดือนนี้ (เช็คชื่อ/รายงานการฝึกซ้อม/แผนการฝึกซ้อม) ----------
+// ใช้ร่วมกัน 2 จุด: (1) หน้าสรุปของผู้บริหารทีมเอง — ดูได้เองแบบ passive ไม่ต้องรอใครส่งให้ (2) ปุ่ม "ส่งสรุป
+// การทำงานโค้ชให้ผู้บริหารทีม" ของผู้ดูแลระบบในหน้ารายชื่อโค้ช — แบบ push แจ้งเตือนผ่าน executiveNotes ที่มีอยู่แล้ว
+// นับคะแนนเช็คชื่อ/ตรงเวลาด้วยหลักการเดียวกับ buildCoachRow (getCoachPlayerIds + isCoachSubmissionOnTime) แต่
+// จำกัดเฉพาะ "เดือนนี้" ต่างจากตารางรายชื่อโค้ชที่นับสะสมทุกเดือนรวมกัน — ส่วนรายงาน/แผนฝึกซ้อมจับคู่ด้วยชื่อโค้ช
+// (coachName) ไม่ใช่ coachId เพราะเวลาผู้ดูแลระบบสวมบทบาทส่งแทนโค้ช coachId จะกลายเป็น uid ของผู้ดูแลระบบเอง
+// (ตามหลักการเดียวกับ loadTrainingPlanSummary ใน app.js)
+async function computeCoachMonthlySummaryRows(team) {
+  const thisMonth = new Date().toISOString().slice(0, 7);
+  const [coachSnap, playerSnap, sessionSnap, attendanceSnap, reportSnap, planSnap] = await Promise.all([
+    getDocs(query(collection(db, "coaches"), where("team", "==", team), where("role", "==", "coach"))),
+    getDocs(query(collection(db, "players"), where("team", "==", team))),
+    getDocs(query(collection(db, "sessions"), where("team", "==", team))),
+    getDocs(query(collection(db, "attendance"), where("team", "==", team))),
+    getDocs(query(collection(db, "trainingReports"), where("team", "==", team))),
+    getDocs(query(collection(db, "trainingPlans"), where("team", "==", team)))
+  ]);
+
+  const coaches = [];
+  coachSnap.forEach((d) => coaches.push({ id: d.id, ...d.data() }));
+  const players = [];
+  playerSnap.forEach((d) => players.push({ id: d.id, ...d.data() }));
+  const sessions = [];
+  sessionSnap.forEach((d) => sessions.push({ id: d.id, ...d.data() }));
+  const monthSessions = sessions.filter((s) => (s.date || "").startsWith(thisMonth));
+  const attendanceRecords = [];
+  attendanceSnap.forEach((d) => attendanceRecords.push(d.data()));
+  const reports = [];
+  reportSnap.forEach((d) => reports.push(d.data()));
+  const monthReports = reports.filter((r) => (r.date || "").startsWith(thisMonth));
+  const plans = [];
+  planSnap.forEach((d) => plans.push(d.data()));
+  const monthPlans = plans.filter((p) => (p.date || "").startsWith(thisMonth));
+
+  coaches.sort(
+    (a, b) => ageGroupSortKey(a.ageGroups) - ageGroupSortKey(b.ageGroups) || (a.name ?? "").localeCompare(b.name ?? "")
+  );
+
+  return coaches.map((c) => {
+    const myPlayerIds = getCoachPlayerIds(c, players);
+    let checkinDays = 0;
+    let onTimeCount = 0;
+    for (const s of monthSessions) {
+      const myAttendanceForSession = attendanceRecords.filter((a) => a.sessionId === s.id && myPlayerIds.has(a.playerId));
+      if (myAttendanceForSession.length === 0) continue;
+      checkinDays += 1;
+      if (isCoachSubmissionOnTime(s, myAttendanceForSession)) onTimeCount += 1;
+    }
+    const reportCount = monthReports.filter((r) => r.coachName === c.name).length;
+    const myPlans = monthPlans.filter((p) => p.coachName === c.name);
+    const planLateCount = myPlans.filter((p) => isTrainingPlanLate(p)).length;
+
+    return {
+      coachId: c.id,
+      coachName: c.name ?? "-",
+      coachPosition: c.coachPosition,
+      ageGroups: c.ageGroups || [],
+      checkinDays,
+      onTimeCount,
+      reportCount,
+      planCount: myPlans.length,
+      planLateCount
+    };
+  });
+}
+
+function renderCoachActivitySummaryTable(containerEl, rows) {
+  if (rows.length === 0) {
+    containerEl.innerHTML = '<p class="text-sm text-slate-400">ยังไม่มีโค้ชในทีมนี้</p>';
+    return;
+  }
+  containerEl.innerHTML = `
+    <div class="card table-wrap">
+      <table class="pro-table">
+        <thead>
+          <tr>
+            <th>โค้ช</th>
+            <th>ตำแหน่ง/รุ่นอายุ</th>
+            <th title="จำนวนวันที่เช็คชื่อเดือนนี้ (%ตรงเวลาก่อน 20:00 น.)">เช็คชื่อเดือนนี้</th>
+            <th>รายงานการฝึกซ้อม</th>
+            <th>แผนการฝึกซ้อม</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows
+            .map((r) => {
+              const onTimePercent = r.checkinDays > 0 ? Math.round((r.onTimeCount / r.checkinDays) * 100) : null;
+              const checkinText = r.checkinDays > 0 ? `${r.checkinDays} วัน (${onTimePercent}% ตรงเวลา)` : "ยังไม่ได้เช็คชื่อ";
+              const planText =
+                r.planCount > 0 ? `${r.planCount} ครั้ง${r.planLateCount > 0 ? ` (สาย ${r.planLateCount})` : ""}` : "ยังไม่ได้ส่ง";
+              return `
+              <tr>
+                <td class="emphasis">${r.coachName}</td>
+                <td>${coachPositionLabel(r.coachPosition)} (${r.ageGroups.join(", ") || "-"})</td>
+                <td>${checkinText}</td>
+                <td>${r.reportCount > 0 ? `${r.reportCount} วัน` : "ยังไม่ได้ส่ง"}</td>
+                <td>${planText}</td>
+              </tr>`;
+            })
+            .join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+  applyDataLabels(containerEl.querySelector("tbody"));
+}
+
+function formatCoachActivitySummaryText(team, rows) {
+  const monthLabel = new Date().toLocaleDateString("th-TH", { year: "numeric", month: "long" });
+  const lines = [`สรุปการทำงานของโค้ชทีม ${team} ประจำเดือน${monthLabel}:`, ""];
+  for (const r of rows) {
+    const onTimePercent = r.checkinDays > 0 ? Math.round((r.onTimeCount / r.checkinDays) * 100) : null;
+    const checkinText = r.checkinDays > 0 ? `เช็คชื่อ ${r.checkinDays} วัน (${onTimePercent}% ตรงเวลา)` : "ยังไม่ได้เช็คชื่อ";
+    const reportText = r.reportCount > 0 ? `ส่งรายงานฝึกซ้อม ${r.reportCount} วัน` : "ยังไม่ได้ส่งรายงานฝึกซ้อม";
+    const planText =
+      r.planCount > 0
+        ? `ส่งแผนฝึกซ้อม ${r.planCount} ครั้ง${r.planLateCount > 0 ? ` (สาย ${r.planLateCount})` : ""}`
+        : "ยังไม่ได้ส่งแผนฝึกซ้อม";
+    lines.push(
+      `${r.coachName} (${coachPositionLabel(r.coachPosition)}, ${r.ageGroups.join(", ") || "-"}): ${checkinText} • ${reportText} • ${planText}`
+    );
+  }
+  return lines.join("\n");
+}
+
+// เรียกจากหน้าสรุปของผู้บริหารทีมเอง (real executive หรือผู้ดูแลระบบที่สวมบทบาท) — ดูได้เองแบบ passive
+async function loadCoachActivitySummary(team) {
+  executiveCoachSummary.innerHTML = '<p class="text-sm text-slate-400">กำลังโหลด...</p>';
+  try {
+    const rows = await computeCoachMonthlySummaryRows(team);
+    renderCoachActivitySummaryTable(executiveCoachSummary, rows);
+  } catch (err) {
+    console.error(err);
+    executiveCoachSummary.innerHTML = `<p class="text-sm text-red-600">โหลดข้อมูลไม่สำเร็จ: ${err.message}</p>`;
+  }
+}
+
+// เรียกจากปุ่ม "ส่งสรุปการทำงานโค้ชให้ผู้บริหารทีม" ในหน้ารายชื่อโค้ชของผู้ดูแลระบบ — แบบ push แจ้งเตือนไปที่
+// executiveNotes ของทีมนั้น (ผู้บริหารทีมเห็นในกล่อง "ข้อความจากผู้ดูแลระบบ" ทันที ไม่ต้องรอเข้ามาดูเอง)
+async function sendCoachActivitySummaryToExecutive(team, btn) {
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "กำลังส่ง...";
+  try {
+    const rows = await computeCoachMonthlySummaryRows(team);
+    if (rows.length === 0) {
+      alert(`ทีม ${team} ยังไม่มีโค้ชในระบบ ไม่มีข้อมูลจะส่ง`);
+      return;
+    }
+    await sendExecutiveNote({
+      team,
+      type: "summary",
+      refId: null,
+      refLabel: "สรุปการทำงานของโค้ชประจำเดือนนี้",
+      message: formatCoachActivitySummaryText(team, rows),
+      createdBy: adminOwnName
+    });
+    alert(`ส่งสรุปการทำงานของโค้ชให้ผู้บริหารทีม ${team} แล้ว ✓`);
+  } catch (err) {
+    console.error(err);
+    alert("ส่งไม่สำเร็จ: " + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
   }
 }
 
@@ -1642,6 +1822,7 @@ async function enterExecutiveViewMode(team, returnSection, execRecordOverride) {
   executiveSection.classList.remove("hidden");
   renderDrawerItems();
   loadExecutiveSummary(team);
+  loadCoachActivitySummary(team);
   loadExecutiveNotes(team, executiveNotesList);
 }
 
@@ -1736,7 +1917,7 @@ async function loadExecutiveNotes(team, listEl) {
               <p class="font-semibold">${typeIcon} ${n.refLabel ?? "-"}</p>
               ${unreadBadge}
             </div>
-            <p class="text-sm text-slate-600 mt-1">${n.message ?? "-"}</p>
+            <p class="text-sm text-slate-600 mt-1 whitespace-pre-line">${n.message ?? "-"}</p>
             <p class="text-xs text-slate-400 mt-2">จาก ${n.createdBy ?? "ผู้ดูแลระบบ"} • ${postedAt}</p>
             ${readBtn}
           </div>`;
@@ -1901,6 +2082,7 @@ onAuthStateChanged(auth, async (user) => {
       hideAllScreens();
       executiveSection.classList.remove("hidden");
       loadExecutiveSummary(data.team);
+      loadCoachActivitySummary(data.team);
       loadExecutiveNotes(data.team, executiveNotesList);
       return;
     }
