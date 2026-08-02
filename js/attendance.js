@@ -121,6 +121,7 @@ const reportLoadStatus = document.getElementById("report-load-status");
 const reportSummary = document.getElementById("report-summary");
 const reportSummaryText = document.getElementById("report-summary-text");
 const reportSummaryDetails = document.getElementById("report-summary-details");
+const reportSummaryPhotos = document.getElementById("report-summary-photos");
 const reportEditBtn = document.getElementById("report-edit-btn");
 const reportForm = document.getElementById("report-form");
 const reportPeriodSection = document.getElementById("report-period-section");
@@ -128,6 +129,9 @@ const reportPeriodSegmentedWrap = document.getElementById("report-period-segment
 const reportPeriodDetailWrap = document.getElementById("report-period-detail-wrap");
 const reportAttendSegmentedWrap = document.getElementById("report-attend-segmented");
 const reportNotesInput = document.getElementById("report-notes");
+const reportPhotoWrap = document.getElementById("report-photo-wrap");
+const reportPhotoInput = document.getElementById("report-photo-input");
+const reportPhotoPreview = document.getElementById("report-photo-preview");
 const reportSubmitBtn = document.getElementById("report-submit-btn");
 const reportStatus = document.getElementById("report-status");
 const backButtons = document.querySelectorAll("[data-back]");
@@ -919,6 +923,7 @@ function openReportSection() {
   reportSummary.classList.add("hidden");
   reportStatus.textContent = "";
   reportLoadStatus.textContent = "";
+  updateReportPhotoWrapVisibility();
   if (!reportDateInput.value) {
     reportDateInput.value = new Date().toISOString().slice(0, 10);
   }
@@ -2712,11 +2717,18 @@ const PERIOD_CODES_BY_LABEL = Object.fromEntries(
 // (สถานะนี้บันทึกว่า "วันนี้มีการฝึกซ้อมเกิดขึ้นหรือไม่" ไม่ใช่การประเมินตัวโค้ช)
 const ATTEND_LABELS = { true: "มีการซ้อม", false: "ไม่มีการซ้อม" };
 
+// แนบรูปภาพจากการฝึกซ้อมในรายงาน — เปิดใช้เฉพาะทีมนี้ตามคำขอ ทีมอื่นไม่แสดงช่องแนบรูปเลย
+const REPORT_PHOTO_TEAM = "THAWEE SC";
+
 let reportPeriodType = null; // "morning" | "evening" | "other"
 let reportPeriodStartTime = "";
 let reportPeriodEndTime = "";
 let reportPeriodOtherText = "";
 let reportAttended = null; // true | false
+// รูปภาพที่แนบไว้ตอนโหลดรายงานขึ้นมา (ก่อนแก้ไข) กับสำเนาที่แก้ไขได้ (กดลบแล้วตัดออกจาก array นี้) — เทียบสอง
+// อันนี้ตอนบันทึกเพื่อรู้ว่ารูปไหนถูกลบไปจริง จะได้ไปลบไฟล์ใน Storage ทิ้งด้วย (ดู deleteStorageFileBestEffort)
+let reportOriginalPhotos = [];
+let reportExistingPhotos = [];
 
 function renderPeriodSegmented() {
   reportPeriodSegmentedWrap.innerHTML = "";
@@ -2805,6 +2817,54 @@ function renderAttendSegmented() {
   updatePeriodSectionVisibility();
 }
 
+// แสดง/ซ่อนช่องแนบรูปภาพตามทีม (เฉพาะ THAWEE SC) — เรียกทุกครั้งที่เข้าหน้ารายงานหรือโหลดข้อมูลของวันที่เลือก
+function updateReportPhotoWrapVisibility() {
+  reportPhotoWrap.classList.toggle("hidden", myTeam !== REPORT_PHOTO_TEAM);
+}
+
+// แสดงรูปที่แนบไว้แล้ว (ของเดิม มีปุ่ม ✕ ลบทีละรูป) ต่อด้วยรูปที่เพิ่งเลือกใหม่จาก input (พรีวิวด้วย object URL
+// ยังไม่อัปโหลดจริงจนกว่าจะกดส่งรายงาน)
+function renderReportPhotoPreview() {
+  reportPhotoPreview.innerHTML = "";
+  for (const photo of reportExistingPhotos) {
+    const wrap = document.createElement("div");
+    wrap.className = "relative";
+    wrap.innerHTML = `<a href="${photo.url}" target="_blank" rel="noopener"><img src="${photo.url}" class="w-16 h-16 object-cover rounded border border-slate-200" /></a>`;
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className =
+      "absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 text-xs leading-none flex items-center justify-center";
+    removeBtn.textContent = "✕";
+    removeBtn.title = "ลบรูปนี้";
+    removeBtn.addEventListener("click", () => {
+      reportExistingPhotos = reportExistingPhotos.filter((p) => p !== photo);
+      renderReportPhotoPreview();
+    });
+    wrap.appendChild(removeBtn);
+    reportPhotoPreview.appendChild(wrap);
+  }
+  for (const file of reportPhotoInput.files) {
+    const img = document.createElement("img");
+    img.src = URL.createObjectURL(file);
+    img.className = "w-16 h-16 object-cover rounded border border-dashed border-slate-300";
+    img.title = `ใหม่: ${file.name}`;
+    reportPhotoPreview.appendChild(img);
+  }
+}
+
+reportPhotoInput.addEventListener("change", renderReportPhotoPreview);
+
+// อัปโหลดรูปภาพแนบรายงานขึ้น Storage แล้วคืน {url, name, path} — path แยกตามทีม/วันที่/เวลาที่อัปโหลด
+// เพื่อกันชื่อไฟล์ชนกัน (ใช้ path เดียวกับที่ storage.rules ล็อกไว้เฉพาะทีม THAWEE SC เท่านั้น)
+async function uploadReportPhoto(file, team, dateStr) {
+  const safeName = file.name.replace(/[^\w.\-ก-๙]/g, "_");
+  const filePath = `trainingReports/${team}/${dateStr}/${Date.now()}_${safeName}`;
+  const fileRef = storageRef(storage, filePath);
+  await uploadBytes(fileRef, file);
+  const url = await getDownloadURL(fileRef);
+  return { url, name: file.name, path: filePath };
+}
+
 // แสดงเนื้อหารายงานที่มีอยู่แล้วแบบดูอย่างเดียว (การ์ดสรุป + ปุ่ม "แก้ไขรายงาน") แทนการเปิดฟอร์มที่กดส่งซ้ำ
 // ได้ทันที เพื่อกันการส่งซ้ำ/แก้โดยไม่ตั้งใจ — headline ให้ระบุเองได้ (ใช้ข้อความต่างกันตอนโหลดข้อมูลเดิม
 // เทียบกับตอนเพิ่งส่งรายงานสำเร็จ) ส่วนรายละเอียดใช้ textContent ล้วนเพื่อกัน XSS จากข้อความหมายเหตุที่โค้ชพิมพ์เอง
@@ -2828,6 +2888,12 @@ function renderReportSummary(dateStr, data, headline) {
     p.textContent = line;
     reportSummaryDetails.appendChild(p);
   }
+  reportSummaryPhotos.innerHTML = (data.photos || [])
+    .map(
+      (photo) =>
+        `<a href="${photo.url}" target="_blank" rel="noopener"><img src="${photo.url}" class="w-16 h-16 object-cover rounded border border-slate-200" /></a>`
+    )
+    .join("");
 }
 
 async function loadReportForDate(dateStr) {
@@ -2846,6 +2912,11 @@ async function loadReportForDate(dateStr) {
   reportPeriodOtherText = existing ? existing.periodOtherText || "" : "";
   reportAttended = existing && typeof existing.attended === "boolean" ? existing.attended : null;
   reportNotesInput.value = existing ? existing.notes || "" : "";
+  reportOriginalPhotos = existing?.photos ? existing.photos.slice() : [];
+  reportExistingPhotos = reportOriginalPhotos.slice();
+  reportPhotoInput.value = "";
+  updateReportPhotoWrapVisibility();
+  renderReportPhotoPreview();
 
   renderPeriodSegmented();
   renderPeriodDetail();
@@ -2970,6 +3041,20 @@ reportForm.addEventListener("submit", async (e) => {
     }
   }
 
+  const newPhotoFiles = myTeam === REPORT_PHOTO_TEAM ? Array.from(reportPhotoInput.files) : [];
+  for (const file of newPhotoFiles) {
+    if (file.size > MAX_ATTACHMENT_FILE_SIZE) {
+      reportStatus.textContent = `รูป "${file.name}" ใหญ่เกินไป (จำกัดไม่เกิน 10MB)`;
+      reportStatus.className = "text-sm text-red-600";
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      reportStatus.textContent = `"${file.name}" ไม่ใช่ไฟล์รูปภาพ`;
+      reportStatus.className = "text-sm text-red-600";
+      return;
+    }
+  }
+
   reportSubmitBtn.disabled = true;
   reportStatus.textContent = "กำลังส่งรายงาน...";
   reportStatus.className = "text-sm text-slate-500";
@@ -3004,6 +3089,18 @@ reportForm.addEventListener("submit", async (e) => {
       updatedAt: serverTimestamp()
     };
 
+    const removedPhotos = reportOriginalPhotos.filter(
+      (op) => !reportExistingPhotos.some((ep) => ep.path === op.path)
+    );
+    if (myTeam === REPORT_PHOTO_TEAM) {
+      if (newPhotoFiles.length > 0) {
+        reportStatus.textContent = "กำลังอัปโหลดรูปภาพ...";
+      }
+      const uploaded = await Promise.all(newPhotoFiles.map((f) => uploadReportPhoto(f, myTeam, dateStr)));
+      payload.photos = [...reportExistingPhotos, ...uploaded];
+      reportStatus.textContent = "กำลังส่งรายงาน...";
+    }
+
     if (currentReportId) {
       await updateDoc(doc(db, "trainingReports", currentReportId), payload);
     } else {
@@ -3011,6 +3108,15 @@ reportForm.addEventListener("submit", async (e) => {
       currentReportId = newDoc.id;
     }
     await syncSessionForReportAttendance(dateStr, reportAttended);
+    for (const photo of removedPhotos) {
+      await deleteStorageFileBestEffort(photo.path);
+    }
+    // sync state ของรูปภาพให้ตรงกับที่เพิ่งบันทึกไปจริง กัน re-upload ไฟล์เดิมซ้ำถ้ากด "แก้ไขรายงาน" ต่อทันที
+    // โดยไม่ได้กด "โหลดวันนี้" ใหม่ (ปุ่มแก้ไขแค่สลับการแสดงผล ไม่ได้เรียก loadReportForDate ซ้ำ)
+    reportOriginalPhotos = payload.photos ? payload.photos.slice() : [];
+    reportExistingPhotos = reportOriginalPhotos.slice();
+    reportPhotoInput.value = "";
+    renderReportPhotoPreview();
 
     reportStatus.textContent = "";
     // ล็อกกลับเป็นดูอย่างเดียวทันทีหลังส่งสำเร็จ กันกดส่งซ้ำโดยไม่ตั้งใจ — ต้องกด "แก้ไขรายงาน" เพื่อแก้ไขต่อ
@@ -3621,7 +3727,7 @@ const TRAINING_PLAN_PHYSICAL_OPTIONS = [
   "Speed & reaction", "Balance & basic skills", "Scrimmage / Game day"
 ];
 
-const MAX_TRAINING_PLAN_FILE_SIZE = 10 * 1024 * 1024; // ต้องตรงกับ storage.rules
+const MAX_ATTACHMENT_FILE_SIZE = 10 * 1024 * 1024; // ต้องตรงกับ storage.rules
 
 // อัปโหลดไฟล์แนบแผนการฝึกซ้อมขึ้น Storage แล้วคืน {fileUrl, fileName, filePath} — path แยกตามทีม/วันที่/เวลา
 // ที่อัปโหลด (timestamp) เพื่อกันชื่อไฟล์ชนกัน (สองแผนคนละวันแนบไฟล์ชื่อเดียวกันได้โดยไม่ทับกัน)
@@ -3831,14 +3937,15 @@ function startEditTrainingPlan(plan) {
   trainingPlanForm.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-// ลบไฟล์แนบใน Storage แบบ best-effort — ไม่ให้ error จุดนี้ไปบล็อกการลบ/แก้ไขเอกสารหลักใน Firestore
-// (เช่นไฟล์ถูกลบไปแล้วจากรอบก่อน หรือ path เพี้ยน ก็ไม่ควรทำให้ผู้ใช้ลบแผนไม่ได้)
-async function deleteTrainingPlanFileBestEffort(filePath) {
+// ลบไฟล์ใน Storage แบบ best-effort — ใช้ร่วมกันทั้งไฟล์แนบแผนการฝึกซ้อมและรูปภาพแนบรายงานการฝึกซ้อม
+// ไม่ให้ error จุดนี้ไปบล็อกการลบ/แก้ไขเอกสารหลักใน Firestore (เช่นไฟล์ถูกลบไปแล้วจากรอบก่อน หรือ path เพี้ยน
+// ก็ไม่ควรทำให้ผู้ใช้บันทึกข้อมูลหลักไม่ได้)
+async function deleteStorageFileBestEffort(filePath) {
   if (!filePath) return;
   try {
     await deleteObject(storageRef(storage, filePath));
   } catch (err) {
-    console.warn("ลบไฟล์แนบเดิมไม่สำเร็จ (ไม่บล็อกการทำงานหลัก):", err);
+    console.warn("ลบไฟล์เดิมไม่สำเร็จ (ไม่บล็อกการทำงานหลัก):", err);
   }
 }
 
@@ -3847,7 +3954,7 @@ async function deleteTrainingPlan(plan) {
   if (!ok) return;
   try {
     await deleteDoc(doc(db, "trainingPlans", plan.id));
-    await deleteTrainingPlanFileBestEffort(plan.filePath);
+    await deleteStorageFileBestEffort(plan.filePath);
     if (editingTrainingPlanId === plan.id) stopEditTrainingPlan();
     trainingPlanStatus.textContent = "ลบแผนการฝึกซ้อมแล้ว";
     trainingPlanStatus.className = "text-sm text-slate-500";
@@ -3967,7 +4074,7 @@ trainingPlanForm.addEventListener("submit", async (e) => {
 
   const selectedFile = trainingPlanFileInput.files[0] || null;
   if (selectedFile) {
-    if (selectedFile.size > MAX_TRAINING_PLAN_FILE_SIZE) {
+    if (selectedFile.size > MAX_ATTACHMENT_FILE_SIZE) {
       trainingPlanStatus.textContent = "ไฟล์ใหญ่เกินไป (จำกัดไม่เกิน 10MB)";
       trainingPlanStatus.className = "text-sm text-red-600";
       return;
@@ -4031,7 +4138,7 @@ trainingPlanForm.addEventListener("submit", async (e) => {
     }
     // ลบไฟล์เก่าทิ้งแบบ best-effort หลังบันทึกสำเร็จแล้วเท่านั้น (เฉพาะตอนถูกแทนที่ด้วยไฟล์ใหม่ หรือถูกลบทิ้ง)
     if (oldFilePath && (selectedFile || payload.filePath === null)) {
-      await deleteTrainingPlanFileBestEffort(oldFilePath);
+      await deleteStorageFileBestEffort(oldFilePath);
     }
     await renderTrainingPlanList();
   } catch (err) {

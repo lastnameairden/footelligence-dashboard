@@ -790,6 +790,7 @@
       <div id="report-summary" class="hidden card card-pad space-y-3">
         <p id="report-summary-text" class="text-sm text-emerald-700 font-medium"></p>
         <div id="report-summary-details" class="text-sm text-slate-600 space-y-1"></div>
+        <div id="report-summary-photos" class="flex flex-wrap gap-2"></div>
         <button type="button" id="report-edit-btn" class="btn btn-secondary btn-sm">✏️ แก้ไขรายงาน</button>
       </div>
 
@@ -810,11 +811,11 @@
           <textarea id="report-notes" rows="3" class="field-input" placeholder="หากไม่มีการซ้อม กรุณาระบุเหตุผลที่นี่ หรือบันทึกเหตุการณ์สำคัญอื่นๆ"></textarea>
         </div>
 
-        <!-- เตรียมช่องแนบรูปไว้ล่วงหน้า (ยังไม่เปิดใช้งาน) — ซ่อนด้วย hidden จนกว่าจะตั้งค่า Firebase Storage
-        และเขียน storage.rules เสร็จ จึงค่อยเอา class="hidden" ออกและต่อ logic อัปโหลดจริง -->
+        <!-- เฉพาะทีม THAWEE SC เท่านั้น (ตามคำขอ) — ซ่อน/แสดงคุมด้วย JS ผ่าน updateReportPhotoWrapVisibility() -->
         <div id="report-photo-wrap" class="hidden">
-          <label class="field-label">แนบรูปภาพ</label>
+          <label class="field-label">แนบรูปภาพจากการฝึกซ้อม</label>
           <input id="report-photo-input" type="file" accept="image/*" multiple class="field-input" />
+          <div id="report-photo-preview" class="flex flex-wrap gap-2 mt-2"></div>
         </div>
 
         <div class="flex items-center gap-4">

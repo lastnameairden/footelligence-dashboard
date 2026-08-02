@@ -24,5 +24,16 @@ service firebase.storage {
                               && request.resource.contentType.matches('image/.*|application/pdf');
       allow delete: if isAdmin() || (canManageTeam() && team == myTeam());
     }
+
+    // รูปภาพแนบรายงานการฝึกซ้อม — เปิดใช้เฉพาะทีม THAWEE SC ตามคำขอ (ทีมอื่นยังไม่ต้องมีฟีเจอร์นี้) จึงล็อก
+    // team == 'THAWEE SC' ไว้ในชั้น rules ด้วยเลย ไม่ใช่แค่ซ่อนปุ่มฝั่งหน้าเว็บ กันพลาดถ้ามีทีมอื่นพยายามอัปโหลด
+    match /trainingReports/{team}/{allPaths=**} {
+      allow read: if isAdmin() || (canViewTeam() && team == myTeam());
+      allow create, update: if team == 'THAWEE SC'
+                              && (isAdmin() || (canManageTeam() && team == myTeam()))
+                              && request.resource.size < 10 * 1024 * 1024
+                              && request.resource.contentType.matches('image/.*');
+      allow delete: if isAdmin() || (canManageTeam() && team == myTeam());
+    }
   }
 }
