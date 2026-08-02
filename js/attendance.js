@@ -3985,12 +3985,18 @@ async function renderTrainingPlanList() {
   trainingPlanListBody.innerHTML =
     '<tr><td colspan="9" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>';
   const snap = await getDocs(query(collection(db, "trainingPlans"), where("team", "==", myTeam)));
-  const plans = [];
-  snap.forEach((d) => plans.push({ id: d.id, ...d.data() }));
+  const allPlans = [];
+  snap.forEach((d) => allPlans.push({ id: d.id, ...d.data() }));
+
+  // แสดงเฉพาะแผนของรุ่นอายุที่ตัวเองรับผิดชอบ (ถ้ารู้ตัวโค้ชแน่ชัด — myAgeGroups ไม่ว่าง เช่นโค้ชจริงล็อกอินเอง
+  // หรือผู้ดูแลระบบสวมบทบาทเป็นโค้ชคนใดคนหนึ่งเจาะจง) ไม่ปนกับแผนของโค้ชรุ่นอื่นในทีมเดียวกัน — trainingPlans
+  // เก็บ ageGroups เป็น array (เลือกได้หลายรุ่นต่อแผน) จึงเช็คว่ามีรุ่นใดรุ่นหนึ่งตรงกับที่ดูแลหรือไม่ แทนที่จะ
+  // เทียบค่าเดียวตรงๆ แบบ filterByMyAgeGroups — โหมด "จัดการทีมนี้" แบบกว้าง (myAgeGroups ว่าง) ยังเห็นทุกแผนเหมือนเดิม
+  const plans = myAgeGroups.length > 0
+    ? allPlans.filter((p) => (p.ageGroups || []).some((ag) => myAgeGroups.includes(ag)))
+    : allPlans;
   plans.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
 
-  // แจ้งเตือนถ้าเดือนนี้ส่งสายเกินเกณฑ์ (นับรวมทั้งทีม เพราะผู้ดูแลระบบที่สวมบทบาทจัดการทีมแทนโค้ชก็ควร
-  // เห็นสถิติเดียวกับที่โค้ชจริงเห็น)
   const lateCountThisMonth = countLateTrainingPlansThisMonth(plans);
   trainingPlanLateWarning.classList.toggle("hidden", lateCountThisMonth <= TRAINING_PLAN_LATE_WARNING_THRESHOLD);
   trainingPlanLateCountEl.textContent = lateCountThisMonth;
