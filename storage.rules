@@ -14,25 +14,25 @@ service firebase.storage {
     function myTeam() { return myCoachDoc().team; }
 
     // ไฟล์แนบแผนการฝึกซ้อมรายวัน (รูป/PDF) แยกโฟลเดอร์ตามทีม — โค้ชอัปโหลด/อ่าน/ลบได้เฉพาะทีมตัวเอง
-    // ผู้บริหารทีมอ่านได้อย่างเดียว ผู้ดูแลระบบทำได้ทุกอย่าง — จำกัดขนาดไฟล์ไม่เกิน 10MB และต้องเป็นรูปภาพ
-    // หรือ PDF เท่านั้น (กันอัปโหลดไฟล์ชนิดอันตราย) แยก create/update ออกจาก delete เพราะตอนลบไฟล์
-    // request.resource จะเป็น null อ้างอิง request.resource.size ตอนลบจะพังทันที
+    // ผู้บริหารทีมอ่านได้อย่างเดียว ผู้ดูแลระบบทำได้ทุกอย่าง — จำกัดขนาดไฟล์ไม่เกิน 10MB (ชนิดไฟล์คุมด้วย accept
+    // ของ input ฝั่งหน้าเว็บแทน ไม่เช็ค request.resource.contentType ในชั้น rules เพราะพบว่า browser/OS บาง
+    // เครื่องรายงาน content-type ของไฟล์เดียวกันไม่ตรงกับที่ฝั่ง client เห็น ทำให้ไฟล์ที่ถูกต้องถูกปฏิเสธเอง)
+    // แยก create/update ออกจาก delete เพราะตอนลบไฟล์ request.resource จะเป็น null อ้างอิง .size ตอนลบจะพังทันที
     match /trainingPlans/{team}/{allPaths=**} {
       allow read: if isAdmin() || (canViewTeam() && team == myTeam());
       allow create, update: if (isAdmin() || (canManageTeam() && team == myTeam()))
-                              && request.resource.size < 10 * 1024 * 1024
-                              && request.resource.contentType.matches('image/.*|application/pdf');
+                              && request.resource.size < 10 * 1024 * 1024;
       allow delete: if isAdmin() || (canManageTeam() && team == myTeam());
     }
 
     // รูปภาพแนบรายงานการฝึกซ้อม — เปิดใช้เฉพาะทีม THAWEE SC ตามคำขอ (ทีมอื่นยังไม่ต้องมีฟีเจอร์นี้) จึงล็อก
     // team == 'THAWEE SC' ไว้ในชั้น rules ด้วยเลย ไม่ใช่แค่ซ่อนปุ่มฝั่งหน้าเว็บ กันพลาดถ้ามีทีมอื่นพยายามอัปโหลด
+    // (ไม่เช็ค contentType ด้วยเหตุผลเดียวกับ trainingPlans ด้านบน)
     match /trainingReports/{team}/{allPaths=**} {
       allow read: if isAdmin() || (canViewTeam() && team == myTeam());
       allow create, update: if team == 'THAWEE SC'
                               && (isAdmin() || (canManageTeam() && team == myTeam()))
-                              && request.resource.size < 10 * 1024 * 1024
-                              && request.resource.contentType.matches('image/.*');
+                              && request.resource.size < 10 * 1024 * 1024;
       allow delete: if isAdmin() || (canManageTeam() && team == myTeam());
     }
   }
