@@ -1,0 +1,28 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // ใช้หลักการเดียวกับ firestore.rules ทุกประการ (อ่านข้อมูลบัญชีโค้ชจาก Firestore ข้ามบริการผ่าน firestore.get)
+    function isSignedIn() { return request.auth != null; }
+    function myCoachDoc() {
+      return firestore.get(/databases/(default)/documents/coaches/$(request.auth.uid)).data;
+    }
+    function myRole() { return myCoachDoc().role; }
+    function isApproved() { return isSignedIn() && myCoachDoc().status == 'approved'; }
+    function isAdmin() { return isSignedIn() && myRole() == 'admin'; }
+    function canManageTeam() { return isApproved() && myRole() == 'coach'; }
+    function canViewTeam() { return isApproved() && (myRole() == 'coach' || myRole() == 'executive'); }
+    function myTeam() { return myCoachDoc().team; }
+
+    // ไฟล์แนบแผนการฝึกซ้อมรายวัน (รูป/PDF) แยกโฟลเดอร์ตามทีม — โค้ชอัปโหลด/อ่าน/ลบได้เฉพาะทีมตัวเอง
+    // ผู้บริหารทีมอ่านได้อย่างเดียว ผู้ดูแลระบบทำได้ทุกอย่าง — จำกัดขนาดไฟล์ไม่เกิน 10MB และต้องเป็นรูปภาพ
+    // หรือ PDF เท่านั้น (กันอัปโหลดไฟล์ชนิดอันตราย) แยก create/update ออกจาก delete เพราะตอนลบไฟล์
+    // request.resource จะเป็น null อ้างอิง request.resource.size ตอนลบจะพังทันที
+    match /trainingPlans/{team}/{allPaths=**} {
+      allow read: if isAdmin() || (canViewTeam() && team == myTeam());
+      allow create, update: if (isAdmin() || (canManageTeam() && team == myTeam()))
+                              && request.resource.size < 10 * 1024 * 1024
+                              && request.resource.contentType.matches('image/.*|application/pdf');
+      allow delete: if isAdmin() || (canManageTeam() && team == myTeam());
+    }
+  }
+}

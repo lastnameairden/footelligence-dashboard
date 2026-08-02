@@ -1109,8 +1109,8 @@
 
           <div class="sm:col-span-2">
             <label class="field-label">แผนการฝึก (รูป/PDF)</label>
-            <input type="file" disabled class="field-input opacity-60 cursor-not-allowed" />
-            <p class="text-xs text-slate-400 mt-1">ฟีเจอร์แนบไฟล์แผนการฝึกจะเปิดใช้งานเร็วๆ นี้</p>
+            <input type="file" id="training-plan-file-input" accept="image/*,application/pdf" class="field-input" />
+            <p id="training-plan-file-status" class="text-xs text-slate-500 mt-1"></p>
           </div>
 
           <div class="sm:col-span-2">
@@ -1139,11 +1139,12 @@
                 <th>หัวข้อหลัก</th>
                 <th>Physical</th>
                 <th>สถานะการส่ง</th>
+                <th>ไฟล์แนบ</th>
                 <th>ดำเนินการ</th>
               </tr>
             </thead>
             <tbody id="training-plan-list-body">
-              <tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">ยังไม่มีแผนการฝึกซ้อม</td></tr>
+              <tr><td colspan="9" class="px-4 py-6 text-center text-slate-400">ยังไม่มีแผนการฝึกซ้อม</td></tr>
             </tbody>
           </table>
         </div>

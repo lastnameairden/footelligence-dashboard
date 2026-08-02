@@ -19,7 +19,13 @@ import {
   sendPasswordResetEmail,
   deleteUser
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
-import { db, auth } from "./firebase-init.js";
+import {
+  ref as storageRef,
+  uploadBytes,
+  getDownloadURL,
+  deleteObject
+} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-storage.js";
+import { db, auth, storage } from "./firebase-init.js";
 import {
   applyDataLabels,
   SCORE_CATEGORIES,
@@ -92,6 +98,8 @@ const trainingPlanCompetitionTopicInput = document.getElementById("training-plan
 const trainingPlanMainPartSelect = document.getElementById("training-plan-main-part");
 const trainingPlanPhysicalToggleWrap = document.getElementById("training-plan-physical-toggle");
 const trainingPlanNotesInput = document.getElementById("training-plan-notes");
+const trainingPlanFileInput = document.getElementById("training-plan-file-input");
+const trainingPlanFileStatus = document.getElementById("training-plan-file-status");
 const trainingPlanLateWarning = document.getElementById("training-plan-late-warning");
 const trainingPlanLateCountEl = document.getElementById("training-plan-late-count");
 const dailySection = document.getElementById("daily-section");
@@ -3613,12 +3621,31 @@ const TRAINING_PLAN_PHYSICAL_OPTIONS = [
   "Speed & reaction", "Balance & basic skills", "Scrimmage / Game day"
 ];
 
+const MAX_TRAINING_PLAN_FILE_SIZE = 10 * 1024 * 1024; // ต้องตรงกับ storage.rules
+
+// อัปโหลดไฟล์แนบแผนการฝึกซ้อมขึ้น Storage แล้วคืน {fileUrl, fileName, filePath} — path แยกตามทีม/วันที่/เวลา
+// ที่อัปโหลด (timestamp) เพื่อกันชื่อไฟล์ชนกัน (สองแผนคนละวันแนบไฟล์ชื่อเดียวกันได้โดยไม่ทับกัน)
+async function uploadTrainingPlanFile(file, team, dateStr) {
+  const safeName = file.name.replace(/[^\w.\-ก-๙]/g, "_");
+  const filePath = `trainingPlans/${team}/${dateStr}/${Date.now()}_${safeName}`;
+  const fileRef = storageRef(storage, filePath);
+  await uploadBytes(fileRef, file);
+  const fileUrl = await getDownloadURL(fileRef);
+  return { fileUrl, fileName: file.name, filePath };
+}
+
 let editingTrainingPlanId = null;
 let trainingPlanAgeGroupsSelected = new Set();
 let trainingPlanPlayerGroup = null;
 let trainingPlanType = null;
 let trainingPlanPhase = null;
 let trainingPlanPhysicalSelected = new Set();
+// ไฟล์แนบของแผนที่กำลังแก้ไขอยู่ (ถ้ามี) — เก็บไว้แยกจาก input[type=file] เพราะเลือกไฟล์ใหม่แล้วยังต้องรู้ว่า
+// ของเดิมคืออะไร (โชว์ลิงก์เดิมไว้จนกว่าจะอัปโหลดไฟล์ใหม่ทับหรือกดลบ)
+let trainingPlanExistingFileUrl = null;
+let trainingPlanExistingFileName = null;
+let trainingPlanExistingFilePath = null;
+let trainingPlanRemoveExistingFile = false;
 
 // รุ่นอายุที่เลือกอาจคาบเกี่ยวหลายช่วง (bracket) — ใช้ช่วงอายุของรุ่นที่เด็กที่สุดที่เลือกไว้เป็นตัวกำหนด
 // ชุดตัวเลือก Main part ที่จะแสดง (ลดความซับซ้อนจาก Airtable ที่มีฟิลด์แยกต่อ bracket)
@@ -3717,6 +3744,35 @@ function renderTrainingPlanPhaseSegmented() {
   updateTrainingPlanCompetitionTopicVisibility();
 }
 
+// แสดงสถานะไฟล์แนบปัจจุบันใต้ช่องเลือกไฟล์ — ของเดิม (ถ้ามีและยังไม่ถูกลบ) จะมีลิงก์เปิดดู + ปุ่ม "ลบไฟล์แนบ"
+// เลือกไฟล์ใหม่แล้วจะถือว่าใช้ไฟล์ใหม่แทนตอนบันทึก โดยไม่ต้องกดลบของเดิมก่อน
+function renderTrainingPlanFileStatus() {
+  trainingPlanFileStatus.innerHTML = "";
+  if (trainingPlanFileInput.files[0]) {
+    trainingPlanFileStatus.textContent = `เลือกไฟล์ใหม่: ${trainingPlanFileInput.files[0].name}`;
+    return;
+  }
+  if (trainingPlanExistingFileUrl && !trainingPlanRemoveExistingFile) {
+    trainingPlanFileStatus.innerHTML = `📎 ไฟล์ที่แนบไว้: <a href="${trainingPlanExistingFileUrl}" target="_blank" rel="noopener" class="text-blue-600 hover:underline">${trainingPlanExistingFileName ?? "เปิดไฟล์"}</a> `;
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "btn btn-ghost-danger btn-sm";
+    removeBtn.textContent = "ลบไฟล์แนบ";
+    removeBtn.addEventListener("click", () => {
+      trainingPlanRemoveExistingFile = true;
+      renderTrainingPlanFileStatus();
+    });
+    trainingPlanFileStatus.appendChild(removeBtn);
+    return;
+  }
+  trainingPlanFileStatus.textContent = trainingPlanExistingFileUrl ? "ไฟล์แนบเดิมจะถูกลบเมื่อบันทึก" : "ยังไม่ได้แนบไฟล์";
+}
+
+trainingPlanFileInput.addEventListener("change", () => {
+  trainingPlanRemoveExistingFile = false;
+  renderTrainingPlanFileStatus();
+});
+
 function stopEditTrainingPlan() {
   editingTrainingPlanId = null;
   trainingPlanForm.reset();
@@ -3725,12 +3781,17 @@ function stopEditTrainingPlan() {
   trainingPlanType = null;
   trainingPlanPhase = null;
   trainingPlanPhysicalSelected = new Set();
+  trainingPlanExistingFileUrl = null;
+  trainingPlanExistingFileName = null;
+  trainingPlanExistingFilePath = null;
+  trainingPlanRemoveExistingFile = false;
   renderTrainingPlanAgeGroupToggle();
   renderTrainingPlanMainPartOptions();
   renderTrainingPlanPhysicalToggle();
   renderTrainingPlanPlayerGroupSegmented();
   renderTrainingPlanTypeSegmented();
   renderTrainingPlanPhaseSegmented();
+  renderTrainingPlanFileStatus();
   trainingPlanSubmitBtn.textContent = "ส่งแผนการฝึกซ้อม";
   cancelEditTrainingPlanBtn.classList.add("hidden");
 }
@@ -3750,6 +3811,11 @@ function startEditTrainingPlan(plan) {
   trainingPlanPhysicalSelected = new Set(plan.physicalFocus || []);
   trainingPlanCompetitionTopicInput.value = plan.competitionTopic ?? "";
   trainingPlanNotesInput.value = plan.notes ?? "";
+  trainingPlanFileInput.value = "";
+  trainingPlanExistingFileUrl = plan.fileUrl ?? null;
+  trainingPlanExistingFileName = plan.fileName ?? null;
+  trainingPlanExistingFilePath = plan.filePath ?? null;
+  trainingPlanRemoveExistingFile = false;
   renderTrainingPlanAgeGroupToggle();
   renderTrainingPlanMainPartOptions();
   trainingPlanMainPartSelect.value = plan.mainPart ?? "";
@@ -3757,6 +3823,7 @@ function startEditTrainingPlan(plan) {
   renderTrainingPlanPlayerGroupSegmented();
   renderTrainingPlanTypeSegmented();
   renderTrainingPlanPhaseSegmented();
+  renderTrainingPlanFileStatus();
   trainingPlanSubmitBtn.textContent = "บันทึกการแก้ไข";
   cancelEditTrainingPlanBtn.classList.remove("hidden");
   trainingPlanStatus.textContent = `กำลังแก้ไขแผนการฝึกซ้อมวันที่ ${plan.date}`;
@@ -3764,11 +3831,23 @@ function startEditTrainingPlan(plan) {
   trainingPlanForm.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+// ลบไฟล์แนบใน Storage แบบ best-effort — ไม่ให้ error จุดนี้ไปบล็อกการลบ/แก้ไขเอกสารหลักใน Firestore
+// (เช่นไฟล์ถูกลบไปแล้วจากรอบก่อน หรือ path เพี้ยน ก็ไม่ควรทำให้ผู้ใช้ลบแผนไม่ได้)
+async function deleteTrainingPlanFileBestEffort(filePath) {
+  if (!filePath) return;
+  try {
+    await deleteObject(storageRef(storage, filePath));
+  } catch (err) {
+    console.warn("ลบไฟล์แนบเดิมไม่สำเร็จ (ไม่บล็อกการทำงานหลัก):", err);
+  }
+}
+
 async function deleteTrainingPlan(plan) {
   const ok = confirm(`ยืนยันลบแผนการฝึกซ้อมวันที่ ${plan.date}? การลบนี้ไม่สามารถย้อนกลับได้`);
   if (!ok) return;
   try {
     await deleteDoc(doc(db, "trainingPlans", plan.id));
+    await deleteTrainingPlanFileBestEffort(plan.filePath);
     if (editingTrainingPlanId === plan.id) stopEditTrainingPlan();
     trainingPlanStatus.textContent = "ลบแผนการฝึกซ้อมแล้ว";
     trainingPlanStatus.className = "text-sm text-slate-500";
@@ -3797,7 +3876,7 @@ function countLateTrainingPlansThisMonth(plans) {
 
 async function renderTrainingPlanList() {
   trainingPlanListBody.innerHTML =
-    '<tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>';
+    '<tr><td colspan="9" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>';
   const snap = await getDocs(query(collection(db, "trainingPlans"), where("team", "==", myTeam)));
   const plans = [];
   snap.forEach((d) => plans.push({ id: d.id, ...d.data() }));
@@ -3811,13 +3890,16 @@ async function renderTrainingPlanList() {
 
   if (plans.length === 0) {
     trainingPlanListBody.innerHTML =
-      '<tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">ยังไม่มีแผนการฝึกซ้อม</td></tr>';
+      '<tr><td colspan="9" class="px-4 py-6 text-center text-slate-400">ยังไม่มีแผนการฝึกซ้อม</td></tr>';
     return;
   }
 
   trainingPlanListBody.innerHTML = "";
   for (const plan of plans) {
     const tr = document.createElement("tr");
+    const fileCell = plan.fileUrl
+      ? `<a href="${plan.fileUrl}" target="_blank" rel="noopener" class="text-blue-600 hover:underline">📎 เปิดไฟล์</a>`
+      : "-";
     tr.innerHTML = `
       <td class="emphasis">${plan.date ?? "-"}</td>
       <td>${(plan.ageGroups || []).join(", ") || "-"}</td>
@@ -3826,6 +3908,7 @@ async function renderTrainingPlanList() {
       <td>${plan.mainPart ?? "-"}</td>
       <td>${(plan.physicalFocus || []).join(", ") || "-"}</td>
       <td>${trainingPlanSubmissionStatus(plan)}</td>
+      <td>${fileCell}</td>
     `;
     const actionTd = document.createElement("td");
     actionTd.className = "space-x-2";
@@ -3882,6 +3965,20 @@ trainingPlanForm.addEventListener("submit", async (e) => {
     return;
   }
 
+  const selectedFile = trainingPlanFileInput.files[0] || null;
+  if (selectedFile) {
+    if (selectedFile.size > MAX_TRAINING_PLAN_FILE_SIZE) {
+      trainingPlanStatus.textContent = "ไฟล์ใหญ่เกินไป (จำกัดไม่เกิน 10MB)";
+      trainingPlanStatus.className = "text-sm text-red-600";
+      return;
+    }
+    if (!/^image\/|^application\/pdf$/.test(selectedFile.type)) {
+      trainingPlanStatus.textContent = "รองรับเฉพาะไฟล์รูปภาพหรือ PDF เท่านั้น";
+      trainingPlanStatus.className = "text-sm text-red-600";
+      return;
+    }
+  }
+
   const payload = {
     team: myTeam,
     date: dateStr,
@@ -3899,7 +3996,24 @@ trainingPlanForm.addEventListener("submit", async (e) => {
     updatedAt: serverTimestamp()
   };
 
+  trainingPlanSubmitBtn.disabled = true;
+  const oldFilePath = trainingPlanExistingFilePath;
   try {
+    if (selectedFile) {
+      trainingPlanStatus.textContent = "กำลังอัปโหลดไฟล์แนบ...";
+      trainingPlanStatus.className = "text-sm text-slate-500";
+      const uploaded = await uploadTrainingPlanFile(selectedFile, myTeam, dateStr);
+      payload.fileUrl = uploaded.fileUrl;
+      payload.fileName = uploaded.fileName;
+      payload.filePath = uploaded.filePath;
+    } else if (trainingPlanRemoveExistingFile) {
+      payload.fileUrl = null;
+      payload.fileName = null;
+      payload.filePath = null;
+    }
+    // ถ้าไม่ได้เลือกไฟล์ใหม่และไม่ได้กดลบไฟล์เดิม จะไม่ใส่ fileUrl/fileName/filePath ใน payload เลย —
+    // updateDoc เป็น partial update จึงไม่แตะฟิลด์เดิม ไฟล์ที่แนบไว้ก่อนหน้ายังอยู่ครบตามเดิม
+
     trainingPlanStatus.textContent = "กำลังบันทึก...";
     trainingPlanStatus.className = "text-sm text-slate-500";
 
@@ -3915,11 +4029,17 @@ trainingPlanForm.addEventListener("submit", async (e) => {
       trainingPlanStatus.textContent = "ส่งแผนการฝึกซ้อมสำเร็จ ✓";
       trainingPlanStatus.className = "text-sm text-emerald-600";
     }
+    // ลบไฟล์เก่าทิ้งแบบ best-effort หลังบันทึกสำเร็จแล้วเท่านั้น (เฉพาะตอนถูกแทนที่ด้วยไฟล์ใหม่ หรือถูกลบทิ้ง)
+    if (oldFilePath && (selectedFile || payload.filePath === null)) {
+      await deleteTrainingPlanFileBestEffort(oldFilePath);
+    }
     await renderTrainingPlanList();
   } catch (err) {
     console.error(err);
     trainingPlanStatus.textContent = "บันทึกไม่สำเร็จ: " + err.message;
     trainingPlanStatus.className = "text-sm text-red-600";
+  } finally {
+    trainingPlanSubmitBtn.disabled = false;
   }
 });
 
