@@ -36,9 +36,18 @@ const ATTENDED_CODES = new Set(["A", "1", "2", "3", "4"]);
 const UNASSIGNED_TEAM = "ยังไม่ระบุทีม";
 const TEAMS = ["KHAMPHEE FOOTBALL", "THAWEE SC", "THAMMASATHIT"];
 
+// Dashboard หลักแสดงเฉพาะข้อมูลเดือนปัจจุบันเท่านั้น (เช็คชื่อ/รายงานการฝึกซ้อม/ผลการแข่งขัน/อาการบาดเจ็บ)
+// ต้องการดูข้อมูลย้อนหลังเดือนอื่นให้ไปที่เมนู "พิมพ์สรุป Dashboard" ซึ่งมีตัวเลือกเดือนแยกต่างหากอยู่แล้ว
+const CURRENT_MONTH_STR = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+const CURRENT_MONTH_LABEL = new Date().toLocaleDateString("th-TH", { year: "numeric", month: "long" });
+function isInCurrentMonth(dateStr) {
+  return (dateStr || "").startsWith(CURRENT_MONTH_STR);
+}
+
 const playersGroupsEl = document.getElementById("players-groups");
 const attendanceGroupsEl = document.getElementById("attendance-groups");
 const overviewCardsEl = document.getElementById("overview-cards");
+const currentMonthNoticeEl = document.getElementById("current-month-notice");
 const positionToggleWrap = document.getElementById("position-toggle-wrap");
 const playerPositionToggleBtn = document.getElementById("player-position-toggle-btn");
 const gkPositionToggleBtn = document.getElementById("gk-position-toggle-btn");
@@ -798,13 +807,15 @@ async function loadTrainingReports(team) {
     `<tr><td colspan="${colCount}" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>`;
 
   const snap = await getDocs(query(collection(db, "trainingReports"), where("team", "==", team)));
-  const reports = [];
-  snap.forEach((d) => reports.push({ id: d.id, ...d.data() }));
+  const allReports = [];
+  snap.forEach((d) => allReports.push({ id: d.id, ...d.data() }));
+  // Dashboard หลักแสดงเฉพาะเดือนปัจจุบัน — ดูข้อมูลย้อนหลังได้ที่เมนู "พิมพ์สรุป Dashboard" แทน
+  const reports = allReports.filter((r) => isInCurrentMonth(r.date));
   reports.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
 
   if (reports.length === 0) {
     trainingReportsBody.innerHTML =
-      `<tr><td colspan="${colCount}" class="px-4 py-6 text-center text-slate-400">ยังไม่มีรายงานจากโค้ช</td></tr>`;
+      `<tr><td colspan="${colCount}" class="px-4 py-6 text-center text-slate-400">ยังไม่มีรายงานจากโค้ชในเดือนนี้</td></tr>`;
     return;
   }
 
@@ -1066,37 +1077,40 @@ async function loadMatchAndInjuryReports(scopeTeam) {
       : getDocs(collection(db, "injuryReports"))
   ]);
 
+  // Dashboard หลักแสดงเฉพาะเดือนปัจจุบัน — ดูข้อมูลย้อนหลังได้ที่เมนู "พิมพ์สรุป Dashboard" แทน
   const matches = [];
   matchSnap.forEach((d) => matches.push(d.data()));
-  matches.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  const monthMatches = matches.filter((m) => isInCurrentMonth(m.date));
+  monthMatches.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
 
-  const winCount = matches.filter((m) => m.result === "ชนะ").length;
-  const loseCount = matches.filter((m) => m.result === "แพ้").length;
-  const drawCount = matches.filter((m) => m.result === "เสมอ").length;
+  const winCount = monthMatches.filter((m) => m.result === "ชนะ").length;
+  const loseCount = monthMatches.filter((m) => m.result === "แพ้").length;
+  const drawCount = monthMatches.filter((m) => m.result === "เสมอ").length;
 
   matchReportsStatCardsEl.innerHTML =
-    statCard("แข่งทั้งหมด", matches.length) +
+    statCard("แข่งทั้งหมด", monthMatches.length) +
     statCard("ชนะ", winCount) +
     statCard("แพ้", loseCount) +
     statCard("เสมอ", drawCount);
 
-  dashboardMatchTable.setRows(matches);
+  dashboardMatchTable.setRows(monthMatches);
 
   const injuries = [];
   injurySnap.forEach((d) => injuries.push(d.data()));
-  injuries.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  const monthInjuries = injuries.filter((i) => isInCurrentMonth(i.date));
+  monthInjuries.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
 
-  const activeCount = injuries.filter((i) => i.status !== "หายแล้ว").length;
-  const recoveredCount = injuries.filter((i) => i.status === "หายแล้ว").length;
-  const severeCount = injuries.filter((i) => i.severity === "รุนแรง").length;
+  const activeCount = monthInjuries.filter((i) => i.status !== "หายแล้ว").length;
+  const recoveredCount = monthInjuries.filter((i) => i.status === "หายแล้ว").length;
+  const severeCount = monthInjuries.filter((i) => i.severity === "รุนแรง").length;
 
   injuryReportsStatCardsEl.innerHTML =
-    statCard("รายการทั้งหมด", injuries.length) +
+    statCard("รายการทั้งหมด", monthInjuries.length) +
     statCard("ยังไม่หาย", activeCount) +
     statCard("หายแล้ว", recoveredCount) +
     statCard("รุนแรง", severeCount);
 
-  dashboardInjuryTable.setRows(injuries);
+  dashboardInjuryTable.setRows(monthInjuries);
 }
 
 // วาดภาพรวมของทีมที่เลือกอยู่ (การ์ดสรุป/พาย/กราฟแท่ง/ตาราง) เฉพาะตำแหน่งที่เลือก ("player" = ทุกตำแหน่ง
@@ -1135,11 +1149,17 @@ async function loadDashboard(scopeTeam) {
     setStatus("กำลังโหลดข้อมูล...");
     scrollToHashTarget();
     currentScopeTeam = scopeTeam;
-    const [players, attendanceRecords, coaches] = await Promise.all([
+    currentMonthNoticeEl.textContent =
+      currentViewerRole === "admin"
+        ? `แสดงข้อมูลเฉพาะเดือน${CURRENT_MONTH_LABEL}เท่านั้น — ดูข้อมูลย้อนหลังได้ที่เมนู 🖨️ พิมพ์สรุป Dashboard`
+        : `แสดงข้อมูลเฉพาะเดือน${CURRENT_MONTH_LABEL}เท่านั้น`;
+    const [players, attendanceRecordsAllTime, coaches] = await Promise.all([
       scopeTeam ? loadCollectionForTeam("players", scopeTeam) : loadCollection("players"),
       scopeTeam ? loadCollectionForTeam("attendance", scopeTeam) : loadCollection("attendance"),
       loadCollection("coaches")
     ]);
+    // Dashboard หลักแสดงเฉพาะเดือนปัจจุบัน — ดูข้อมูลย้อนหลังได้ที่เมนู "พิมพ์สรุป Dashboard" แทน
+    const attendanceRecords = attendanceRecordsAllTime.filter((r) => isInCurrentMonth(r.date));
     currentTeamPlayers = scopeTeam ? players : [];
     const coachNameByAgeGroup = buildCoachNameByAgeGroup(coaches);
     const playerGroups = groupByTeam(players);
