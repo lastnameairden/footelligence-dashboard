@@ -156,6 +156,9 @@ const executiveStatCards = document.getElementById("executive-stat-cards");
 const executiveLateWarning = document.getElementById("executive-late-warning");
 const executiveLateCountEl = document.getElementById("executive-late-count");
 const executiveCoachSummary = document.getElementById("executive-coach-summary");
+const coachPlanDetailOverlay = document.getElementById("coach-plan-detail-overlay");
+const coachPlanDetailBody = document.getElementById("coach-plan-detail-body");
+const coachPlanDetailCloseBtn = document.getElementById("coach-plan-detail-close-btn");
 const executiveNotesList = document.getElementById("executive-notes-list");
 const coachNameEl = document.getElementById("coach-name");
 const coachEmailEl = document.getElementById("coach-email");
@@ -1287,8 +1290,10 @@ async function computeCoachMonthlySummaryRows(team) {
   reportSnap.forEach((d) => reports.push(d.data()));
   const monthReports = reports.filter((r) => (r.date || "").startsWith(thisMonth));
   const plans = [];
-  planSnap.forEach((d) => plans.push(d.data()));
+  planSnap.forEach((d) => plans.push({ id: d.id, ...d.data() }));
   const monthPlans = plans.filter((p) => (p.date || "").startsWith(thisMonth));
+  const today = new Date();
+  const todayDay = today.getDate();
 
   coaches.sort(
     (a, b) => ageGroupSortKey(a.ageGroups) - ageGroupSortKey(b.ageGroups) || (a.name ?? "").localeCompare(b.name ?? "")
@@ -1305,8 +1310,26 @@ async function computeCoachMonthlySummaryRows(team) {
       if (isCoachSubmissionOnTime(s, myAttendanceForSession)) onTimeCount += 1;
     }
     const reportCount = monthReports.filter((r) => r.coachName === c.name).length;
-    const myPlans = monthPlans.filter((p) => p.coachName === c.name);
+    const myPlans = monthPlans
+      .filter((p) => p.coachName === c.name)
+      .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
     const planLateCount = myPlans.filter((p) => isTrainingPlanLate(p)).length;
+
+    // สถานะการส่งแผนรายวัน ตั้งแต่วันที่ 1 ถึงวันนี้ ใช้วาดกราฟแนวโน้ม — ถ้าวันไหนมีหลายแผน (ปกติไม่ควรมี แต่กัน
+    // ไว้เผื่อ) ถือว่า "ตรงเวลา" ถ้ามีอย่างน้อยหนึ่งแผนของวันนั้นตรงเวลา
+    const statusByDate = new Map();
+    for (const p of myPlans) {
+      if (!p.date) continue;
+      const late = isTrainingPlanLate(p);
+      if (statusByDate.get(p.date) !== "onTime") {
+        statusByDate.set(p.date, late ? "late" : "onTime");
+      }
+    }
+    const planTrend = [];
+    for (let day = 1; day <= todayDay; day++) {
+      const dateStr = `${thisMonth}-${String(day).padStart(2, "0")}`;
+      planTrend.push({ date: dateStr, status: statusByDate.get(dateStr) || "none" });
+    }
 
     return {
       coachId: c.id,
@@ -1317,11 +1340,154 @@ async function computeCoachMonthlySummaryRows(team) {
       onTimeCount,
       reportCount,
       planCount: myPlans.length,
-      planLateCount
+      planLateCount,
+      plans: myPlans,
+      planTrend
     };
   });
 }
 
+// กราฟแนวโน้มการส่งแผนการฝึกซ้อมรายวัน แบบ heatmap ทีละวันตั้งแต่วันที่ 1 ถึงวันนี้ (ไม่ใช้ไลบรารีภายนอก
+// เหมือนกราฟอื่นๆ ในระบบ) — เขียว = ส่งตรงเวลา, ส้ม = ส่งสาย, เทา = ยังไม่ได้ส่งวันนั้น
+function renderCoachPlanTrendChart(planTrend) {
+  const colors = { onTime: "#10b981", late: "#f59e0b", none: "#e2e8f0" };
+  const labels = { onTime: "ส่งตรงเวลา", late: "ส่งสาย", none: "ไม่ได้ส่ง" };
+  const cells = planTrend
+    .map((d) => {
+      const day = Number(d.date.slice(-2));
+      const textColor = d.status === "none" ? "#94a3b8" : "#fff";
+      return `<div class="w-6 h-6 rounded flex items-center justify-center text-[10px] font-medium" style="background:${colors[d.status]};color:${textColor}" title="วันที่ ${d.date}: ${labels[d.status]}">${day}</div>`;
+    })
+    .join("");
+  return `
+    <div class="flex flex-wrap gap-1">${cells}</div>
+    <div class="flex items-center gap-3 mt-2 text-xs text-slate-500">
+      <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm inline-block" style="background:${colors.onTime}"></span>ตรงเวลา</span>
+      <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm inline-block" style="background:${colors.late}"></span>สาย</span>
+      <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm inline-block" style="background:${colors.none}"></span>ไม่ได้ส่ง</span>
+    </div>
+  `;
+}
+
+// เนื้อหาในแถวรายละเอียดที่ขยายออกมาต่อจากแถวสรุปของโค้ชแต่ละคน — สถิติละเอียด + กราฟแนวโน้ม + รายการแผนที่
+// คลิกดูรายละเอียดแต่ละฉบับได้ (เปิด modal ผ่าน renderPlanDetailModal)
+function renderCoachDetailContent(row) {
+  const wrap = document.createElement("div");
+  wrap.className = "space-y-4";
+
+  const onTimePercent = row.checkinDays > 0 ? Math.round((row.onTimeCount / row.checkinDays) * 100) : null;
+  const statsWrap = document.createElement("div");
+  statsWrap.className = "grid grid-cols-2 sm:grid-cols-4 gap-3";
+  statsWrap.innerHTML =
+    statCard("เช็คชื่อเดือนนี้", row.checkinDays > 0 ? `${row.checkinDays} วัน` : "-") +
+    statCard("% ตรงเวลา (เช็คชื่อ)", onTimePercent !== null ? `${onTimePercent}%` : "-") +
+    statCard("ส่งรายงานฝึกซ้อม", row.reportCount > 0 ? `${row.reportCount} วัน` : "-") +
+    statCard("ส่งแผนฝึกซ้อม", row.planCount > 0 ? `${row.planCount} ครั้ง` : "-");
+  wrap.appendChild(statsWrap);
+
+  const trendTitle = document.createElement("h4");
+  trendTitle.className = "text-sm font-semibold text-slate-700";
+  trendTitle.textContent = "แนวโน้มการส่งแผนการฝึกซ้อมรายวัน";
+  wrap.appendChild(trendTitle);
+
+  const trendWrap = document.createElement("div");
+  trendWrap.innerHTML = renderCoachPlanTrendChart(row.planTrend);
+  wrap.appendChild(trendWrap);
+
+  const listTitle = document.createElement("h4");
+  listTitle.className = "text-sm font-semibold text-slate-700";
+  listTitle.textContent = `แผนการฝึกซ้อมที่ส่งเดือนนี้ (${row.plans.length} รายการ) — คลิกเพื่อดูรายละเอียด`;
+  wrap.appendChild(listTitle);
+
+  if (row.plans.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "text-sm text-slate-400";
+    empty.textContent = "ยังไม่มีแผนที่ส่งเดือนนี้";
+    wrap.appendChild(empty);
+  } else {
+    const list = document.createElement("div");
+    list.className = "space-y-1.5";
+    for (const plan of row.plans) {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className =
+        "w-full text-left card card-pad py-2 px-3 hover:bg-slate-50 flex items-center justify-between gap-3 flex-wrap";
+      item.innerHTML = `
+        <span class="text-sm">
+          <span class="emphasis">${plan.date ?? "-"}</span>
+          <span class="text-slate-500"> — ${plan.trainingType ?? "-"} • ${(plan.ageGroups || []).join(", ") || "-"}</span>
+        </span>
+        ${trainingPlanSubmissionStatus(plan)}
+      `;
+      item.addEventListener("click", () => renderPlanDetailModal(plan));
+      list.appendChild(item);
+    }
+    wrap.appendChild(list);
+  }
+
+  return wrap;
+}
+
+// เปิด modal ดูรายละเอียดแผนการฝึกซ้อม 1 ฉบับแบบดูอย่างเดียว (ผู้บริหารทีม/ผู้ดูแลระบบคลิกจากรายการในการ์ด
+// สรุปการทำงานโค้ช) — ใช้ textContent ล้วนสำหรับค่าที่มาจากผู้ใช้ (หมายเหตุ/ชื่อไฟล์) เพื่อกัน XSS
+function renderPlanDetailModal(plan) {
+  coachPlanDetailBody.innerHTML = "";
+
+  const fields = [
+    ["วันที่", plan.date ?? "-"],
+    ["โค้ชผู้ส่ง", plan.coachName ?? "-"],
+    ["รุ่นอายุ", (plan.ageGroups || []).join(", ") || "-"],
+    ["กลุ่มผู้เล่น", plan.playerGroup ?? "-"],
+    ["ประเภทการฝึก", plan.trainingType ?? "-"],
+    ["Phase", plan.phase ?? "-"]
+  ];
+  if (plan.competitionTopic) fields.push(["หัวข้อการแข่งขัน", plan.competitionTopic]);
+  fields.push(["หัวข้อหลัก", plan.mainPart ?? "-"]);
+  fields.push(["Physical", (plan.physicalFocus || []).join(", ") || "-"]);
+  fields.push(["หมายเหตุ", plan.notes ?? "-"]);
+
+  for (const [label, value] of fields) {
+    const row = document.createElement("div");
+    row.className = "flex justify-between gap-4 py-1.5 border-b border-slate-50 last:border-0";
+    const labelEl = document.createElement("span");
+    labelEl.className = "text-slate-400 flex-shrink-0";
+    labelEl.textContent = label;
+    const valueEl = document.createElement("span");
+    valueEl.className = "text-slate-800 text-right";
+    valueEl.textContent = value;
+    row.append(labelEl, valueEl);
+    coachPlanDetailBody.appendChild(row);
+  }
+
+  const statusRow = document.createElement("div");
+  statusRow.className = "flex justify-between gap-4 py-1.5";
+  const statusLabel = document.createElement("span");
+  statusLabel.className = "text-slate-400";
+  statusLabel.textContent = "สถานะการส่ง";
+  const statusValue = document.createElement("span");
+  statusValue.innerHTML = trainingPlanSubmissionStatus(plan);
+  statusRow.append(statusLabel, statusValue);
+  coachPlanDetailBody.appendChild(statusRow);
+
+  if (plan.fileUrl) {
+    const fileLink = document.createElement("a");
+    fileLink.href = plan.fileUrl;
+    fileLink.target = "_blank";
+    fileLink.rel = "noopener";
+    fileLink.className = "btn btn-secondary btn-sm inline-block mt-2";
+    fileLink.textContent = plan.fileName ? `📎 เปิดไฟล์แนบ: ${plan.fileName}` : "📎 เปิดไฟล์แนบ";
+    coachPlanDetailBody.appendChild(fileLink);
+  }
+
+  coachPlanDetailOverlay.classList.remove("hidden");
+}
+
+coachPlanDetailCloseBtn.addEventListener("click", () => coachPlanDetailOverlay.classList.add("hidden"));
+coachPlanDetailOverlay.addEventListener("click", (e) => {
+  if (e.target === coachPlanDetailOverlay) coachPlanDetailOverlay.classList.add("hidden");
+});
+
+// ตารางสรุปการทำงานของโค้ชแต่ละคน — คลิกที่แถวเพื่อขยายดูรายละเอียด (สถิติละเอียด/กราฟแนวโน้ม/รายการแผนที่ส่ง)
 function renderCoachActivitySummaryTable(containerEl, rows) {
   if (rows.length === 0) {
     containerEl.innerHTML = '<p class="text-sm text-slate-400">ยังไม่มีโค้ชในทีมนี้</p>';
@@ -1339,28 +1505,48 @@ function renderCoachActivitySummaryTable(containerEl, rows) {
             <th>แผนการฝึกซ้อม</th>
           </tr>
         </thead>
-        <tbody>
-          ${rows
-            .map((r) => {
-              const onTimePercent = r.checkinDays > 0 ? Math.round((r.onTimeCount / r.checkinDays) * 100) : null;
-              const checkinText = r.checkinDays > 0 ? `${r.checkinDays} วัน (${onTimePercent}% ตรงเวลา)` : "ยังไม่ได้เช็คชื่อ";
-              const planText =
-                r.planCount > 0 ? `${r.planCount} ครั้ง${r.planLateCount > 0 ? ` (สาย ${r.planLateCount})` : ""}` : "ยังไม่ได้ส่ง";
-              return `
-              <tr>
-                <td class="emphasis">${r.coachName}</td>
-                <td>${coachPositionLabel(r.coachPosition)} (${r.ageGroups.join(", ") || "-"})</td>
-                <td>${checkinText}</td>
-                <td>${r.reportCount > 0 ? `${r.reportCount} วัน` : "ยังไม่ได้ส่ง"}</td>
-                <td>${planText}</td>
-              </tr>`;
-            })
-            .join("")}
-        </tbody>
+        <tbody></tbody>
       </table>
     </div>
   `;
-  applyDataLabels(containerEl.querySelector("tbody"));
+  const tbody = containerEl.querySelector("tbody");
+  for (const r of rows) {
+    const onTimePercent = r.checkinDays > 0 ? Math.round((r.onTimeCount / r.checkinDays) * 100) : null;
+    const checkinText = r.checkinDays > 0 ? `${r.checkinDays} วัน (${onTimePercent}% ตรงเวลา)` : "ยังไม่ได้เช็คชื่อ";
+    const planText =
+      r.planCount > 0 ? `${r.planCount} ครั้ง${r.planLateCount > 0 ? ` (สาย ${r.planLateCount})` : ""}` : "ยังไม่ได้ส่ง";
+
+    const mainRow = document.createElement("tr");
+    mainRow.className = "cursor-pointer";
+    mainRow.innerHTML = `
+      <td class="emphasis"><span class="inline-block w-3 text-slate-400" data-toggle-arrow>▸</span> ${r.coachName}</td>
+      <td>${coachPositionLabel(r.coachPosition)} (${r.ageGroups.join(", ") || "-"})</td>
+      <td>${checkinText}</td>
+      <td>${r.reportCount > 0 ? `${r.reportCount} วัน` : "ยังไม่ได้ส่ง"}</td>
+      <td>${planText}</td>
+    `;
+
+    const detailRow = document.createElement("tr");
+    detailRow.className = "hidden";
+    const detailTd = document.createElement("td");
+    detailTd.colSpan = 5;
+    detailTd.className = "bg-slate-50 px-4 py-4";
+    detailRow.appendChild(detailTd);
+
+    let expanded = false;
+    mainRow.addEventListener("click", () => {
+      expanded = !expanded;
+      mainRow.querySelector("[data-toggle-arrow]").textContent = expanded ? "▾" : "▸";
+      detailRow.classList.toggle("hidden", !expanded);
+      if (expanded && detailTd.children.length === 0) {
+        detailTd.appendChild(renderCoachDetailContent(r));
+      }
+    });
+
+    tbody.appendChild(mainRow);
+    tbody.appendChild(detailRow);
+  }
+  applyDataLabels(tbody);
 }
 
 function formatCoachActivitySummaryText(team, rows) {
