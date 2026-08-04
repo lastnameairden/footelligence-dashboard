@@ -449,7 +449,12 @@ function renderOverview(groups, groupStats, mode, coachLookup) {
   playersPieTitleEl.textContent = isAgeGroupMode ? "สัดส่วนนักกีฬาต่อรุ่น" : "สัดส่วนนักกีฬาต่อทีม";
   attendanceBarsTitleEl.textContent = isAgeGroupMode ? "% เข้าร่วมฝึกซ้อมแต่ละรุ่น" : "% เข้าร่วมฝึกซ้อมแต่ละทีม";
   scoreBarsTitleEl.textContent = isAgeGroupMode ? "คะแนนเฉลี่ยแต่ละรุ่น (เต็ม 4)" : "คะแนนเฉลี่ยแต่ละทีม (เต็ม 4)";
-  teamSummaryColGroupEl.textContent = isAgeGroupMode ? "รุ่นอายุ" : "ทีม";
+  // โหมดดูภาพรวมทุกทีม (มีแท็บเลือกทีมอยู่แล้ว) ไม่ต้องมีคอลัมน์ "ทีม" ซ้ำในตาราง เพราะแถวทั้งหมดในแท็บที่เลือก
+  // เป็นทีมเดียวกันอยู่แล้ว จึงซ่อนคอลัมน์นี้ไปเลยแทนที่จะโชว์ชื่อทีมซ้ำทุกแถว — โหมดดูทีมเดียวยังต้องมี "รุ่นอายุ"
+  // เพราะแต่ละแถวเป็นคนละรุ่นอายุกัน ไม่ซ้ำกัน
+  teamSummaryColGroupEl.classList.toggle("hidden", !isAgeGroupMode);
+  if (isAgeGroupMode) teamSummaryColGroupEl.textContent = "รุ่นอายุ";
+  const teamSummaryColCount = isAgeGroupMode ? 5 : 4;
 
   renderPlayersPie(groups);
   renderBarChart(
@@ -472,7 +477,7 @@ function renderOverview(groups, groupStats, mode, coachLookup) {
   );
 
   if (groupStats.size === 0) {
-    teamSummaryTable.setRows([], 5, "ยังไม่มีข้อมูล");
+    teamSummaryTable.setRows([], teamSummaryColCount, "ยังไม่มีข้อมูล");
     return;
   }
 
@@ -496,7 +501,7 @@ function renderOverview(groups, groupStats, mode, coachLookup) {
   } else if (coachLookup.length === 0) {
     teamSummaryTabsEl.classList.add("hidden");
     teamSummaryTabsEl.innerHTML = "";
-    teamSummaryTable.setRows([], 5, "ยังไม่มีข้อมูลโค้ช");
+    teamSummaryTable.setRows([], teamSummaryColCount, "ยังไม่มีข้อมูลโค้ช");
   } else {
     // ดูภาพรวมทุกทีม — เลือกดูทีละทีมผ่านปุ่มแทนการแสดงโค้ชทุกทีมพร้อมกัน (ไม่งั้นตารางยาวเกินไปเมื่อมีหลายทีม
     // หลายโค้ช) โดย default เลือกทีมแรกตามลำดับ TEAMS ให้อัตโนมัติ
@@ -515,14 +520,15 @@ function renderOverview(groups, groupStats, mode, coachLookup) {
           const percent = row.totals.total > 0 ? Math.round((row.totals.attended / row.totals.total) * 100) : 0;
           const avgScore = row.totals.scoreCount > 0 ? (row.totals.scoreSum / row.totals.scoreCount).toFixed(1) : "-";
           return {
-            nameCell: `<td class="emphasis">${teamLogoImg(row.team)}${row.team}</td>`,
-            subCell: `<td>${row.coachName} — ${coachPositionLabel(row.coachPosition)} (${row.ageGroups.join(", ") || "-"})</td>`,
+            // ไม่ต้องมีคอลัมน์ทีมซ้ำ (ดูอยู่ในแท็บทีมเดียวกันหมดแล้ว) เริ่มตารางจากคอลัมน์โค้ชเลย
+            nameCell: "",
+            subCell: `<td class="emphasis">${row.coachName} — ${coachPositionLabel(row.coachPosition)} (${row.ageGroups.join(", ") || "-"})</td>`,
             playerCount: row.playerCount,
             percent,
             avgScore
           };
         });
-      teamSummaryTable.setRows(rows, 5);
+      teamSummaryTable.setRows(rows, 4);
     }
 
     for (const team of teamsPresent) {
