@@ -17,7 +17,8 @@ import {
   injurySeverityBadge,
   injuryStatusBadge,
   statCard,
-  sendExecutiveNote
+  sendExecutiveNote,
+  calcAge
 } from "./ui-utils.js";
 
 const STATUS_LABELS = { A: "มา", I: "บาดเจ็บ", R: "พักฟื้น", P: "ลา" };
@@ -49,17 +50,6 @@ function showAccessGate(message) {
   accessGate.classList.remove("hidden");
   playerContent.classList.add("hidden");
   setStatus("");
-}
-
-function calcAge(birthday) {
-  if (!birthday) return null;
-  const b = new Date(birthday);
-  if (isNaN(b.getTime())) return null;
-  const today = new Date();
-  let age = today.getFullYear() - b.getFullYear();
-  const m = today.getMonth() - b.getMonth();
-  if (m < 0 || (m === 0 && today.getDate() < b.getDate())) age--;
-  return age;
 }
 
 function renderPlayerInfo(player) {

@@ -145,6 +145,20 @@ export function ageGroupSortKey(ageGroups) {
   return nums.length > 0 ? Math.min(...nums) : Infinity;
 }
 
+// คำนวณอายุปัจจุบันจากวันเกิด (ค.ศ. เสมอ เพราะ input[type=date] ของเบราว์เซอร์เก็บค่าแบบเกรกอเรียนภายในอยู่แล้ว
+// ไม่ว่า locale ของเครื่องจะแสดงผลเป็นปฏิทินอะไรก็ตาม) คืนค่า null ถ้าวันเกิดว่างหรือ parse ไม่ได้ — ใช้ร่วมกัน
+// ทั้งหน้าข้อมูลนักกีฬารายบุคคลและเครื่องมือตรวจสอบข้อมูลนักกีฬาผิดปกติของผู้ดูแลระบบ
+export function calcAge(birthday) {
+  if (!birthday) return null;
+  const b = new Date(birthday);
+  if (isNaN(b.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - b.getFullYear();
+  const m = today.getMonth() - b.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < b.getDate())) age--;
+  return age;
+}
+
 // ---------- แผนการฝึกซ้อมรายวัน: กฎ "ส่งสาย" ----------
 // ใช้ร่วมกันทั้งหน้าโค้ช (attendance.js — เตือนโค้ชเจ้าของแผนเอง) และ Dashboard (app.js — สรุปให้ผู้ดูแล
 // ระบบเห็นภาพรวมทุกโค้ช) เพื่อให้กฎ "สาย" ตรงกันทุกจุด ไม่มีจุดไหนคำนวณเพี้ยนจากอีกจุด

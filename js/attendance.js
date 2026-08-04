@@ -43,6 +43,8 @@ import {
   markNotificationRead,
   getCoachPlayerIds,
   ageGroupSortKey,
+  ageGroupNumber,
+  calcAge,
   COACH_POSITIONS,
   coachPositionLabel,
   coachPositionAllowsMultipleAgeGroups,
@@ -177,6 +179,9 @@ const adminInjuryListBody = document.getElementById("admin-injury-list-body");
 const adminManageTeamSection = document.getElementById("admin-manage-team-section");
 const adminDashboardSection = document.getElementById("admin-dashboard-section");
 const adminPrintSection = document.getElementById("admin-print-section");
+const adminPlayerAuditSection = document.getElementById("admin-player-audit-section");
+const playerAuditStatus = document.getElementById("player-audit-status");
+const playerAuditBody = document.getElementById("player-audit-body");
 const adminBackButtons = document.querySelectorAll("[data-admin-back]");
 const pendingApprovalsBody = document.getElementById("pending-approvals-body");
 const adminTeamSelect = document.getElementById("admin-team-select");
@@ -450,6 +455,7 @@ function hideAllScreens() {
   adminManageTeamSection.classList.add("hidden");
   adminDashboardSection.classList.add("hidden");
   adminPrintSection.classList.add("hidden");
+  adminPlayerAuditSection.classList.add("hidden");
   addPlayerSection.classList.add("hidden");
   checkinSection.classList.add("hidden");
   reportSection.classList.add("hidden");
@@ -658,6 +664,7 @@ function renderDrawerItems() {
     } else {
       navDrawerItems.appendChild(drawerSectionLabel("ผู้ดูแลระบบ"));
       navDrawerItems.appendChild(drawerItem("👥", "รายชื่อโค้ชในระบบ", openAdminCoachesSection));
+      navDrawerItems.appendChild(drawerItem("🧐", "ตรวจสอบข้อมูลนักกีฬาที่ผิดปกติ", openAdminPlayerAuditSection));
       navDrawerItems.appendChild(drawerItem("📈", "ความคืบหน้าการประเมินรายวัน", openAdminProgressSection));
       navDrawerItems.appendChild(drawerItem("📝", "คำขอลงทะเบียนที่รอการอนุมัติ", openAdminApprovalsSection));
       navDrawerItems.appendChild(drawerItem("⚽", "รายงานผลการแข่งขันทั้งหมด", openAdminMatchesSection));
@@ -1609,6 +1616,152 @@ async function sendCoachActivitySummaryToExecutive(team, btn) {
   }
 }
 
+// ---------- ผู้ดูแลระบบ: ตรวจสอบข้อมูลนักกีฬาที่ผิดปกติ ----------
+// สแกนนักกีฬาทุกทีม ชี้เป้า 2 ปัญหาที่มักเกิดจากการกรอกข้อมูลพลาด: (1) ไม่ได้เลือกรุ่นอายุตอนเพิ่มนักกีฬา
+// (ฟอร์มเดิมไม่บังคับเลือก แก้ไปแล้วให้บังคับเลือกสำหรับนักกีฬาใหม่ แต่คนเก่าที่เคยเพิ่มไว้ก่อนหน้ายังต้องมาไล่แก้
+// เอง) และ (2) วันเกิดที่คำนวณอายุแล้วดูผิดปกติ (เช่น พิมพ์ปี พ.ศ. เข้าไปในช่องแทนที่จะเป็น ค.ศ. ทำให้อายุคำนวณ
+// ได้ติดลบหรือมากผิดปกติ — input[type=date] ของเบราว์เซอร์เก็บค่าเป็น ค.ศ. เสมออยู่แล้ว ปัญหาจึงมักมาจากข้อมูล
+// เก่าที่นำเข้ามาแบบอื่น ไม่ใช่จากฟอร์มนี้โดยตรง) — แก้ไขได้ทันทีในตารางโดยไม่ต้องสวมบทบาทเข้าไปทีละทีม
+const PLAYER_AUDIT_AGE_GROUPS = ["U6", "U7", "U8", "U9", "U10", "U11", "U12", "U13", "U14", "U15", "U16", "U17", "U18"];
+const PLAYER_AUDIT_MIN_AGE = 3;
+const PLAYER_AUDIT_MAX_AGE = 22;
+
+function playerAuditIssues(p, age) {
+  const issues = [];
+  if (!p.ageGroup) issues.push("ไม่ระบุรุ่นอายุ");
+  if (p.birthday && (age === null || age < PLAYER_AUDIT_MIN_AGE || age > PLAYER_AUDIT_MAX_AGE)) {
+    issues.push(age === null ? "วันเกิดอ่านค่าไม่ได้" : `วันเกิดผิดปกติ (อายุคำนวณได้ ${age} ปี)`);
+  }
+  return issues;
+}
+
+// ถ้าวันเกิดดูผิดปกติ ลองเดาว่าน่าจะเป็นปี พ.ศ. ที่กรอกเข้าไปตรงๆ แทนที่จะแปลงเป็น ค.ศ. ก่อน (ปี พ.ศ. = ค.ศ. + 543
+// เช่น 2560 แทนที่จะเป็น 2017) — ลองลบ 543 ออกจากปีแล้วเช็คว่าอายุที่ได้จากค่าที่แก้แล้วอยู่ในช่วงที่สมเหตุสมผล
+// หรือไม่ ถ้าใช่ค่อยคืนวันที่ที่แก้แล้วออกไปเป็นคำแนะนำ (ยังต้องให้แอดมินตรวจสอบแล้วกดบันทึกเองอยู่ดี ไม่ได้แก้
+// ฐานข้อมูลจริงให้อัตโนมัติ) — คืน null ถ้าลบ 543 แล้วยังดูผิดปกติอยู่ (ไม่ใช่ปัญหาปฏิทิน พ.ศ./ค.ศ. แน่ๆ)
+function suggestedBirthdayFix(birthday, age) {
+  if (!birthday || age === null) return null;
+  const match = /^(\d{4})(-\d{2}-\d{2})$/.exec(birthday);
+  if (!match) return null;
+  const fixedDate = `${Number(match[1]) - 543}${match[2]}`;
+  const fixedAge = calcAge(fixedDate);
+  return fixedAge !== null && fixedAge >= PLAYER_AUDIT_MIN_AGE && fixedAge <= PLAYER_AUDIT_MAX_AGE ? fixedDate : null;
+}
+
+function playerAuditRowHtml(p) {
+  const rawAge = calcAge(p.birthday);
+  const birthdayAbnormal = Boolean(p.birthday) && (rawAge === null || rawAge < PLAYER_AUDIT_MIN_AGE || rawAge > PLAYER_AUDIT_MAX_AGE);
+  const suggestedBirthday = birthdayAbnormal ? suggestedBirthdayFix(p.birthday, rawAge) : null;
+  // ถ้าเดาได้ว่าเป็นปัญหา พ.ศ./ค.ศ. ให้ใส่ค่าที่แก้แล้วในช่องให้เลยเพื่อความรวดเร็ว (แค่ตรวจสอบแล้วกดบันทึก
+  // ไม่ต้องพิมพ์วันที่ใหม่เอง) — ถ้าเดาไม่ได้ก็ยังโชว์ค่าเดิมไว้ให้แก้เอง
+  const displayBirthday = suggestedBirthday || p.birthday || "";
+  const displayAge = calcAge(displayBirthday);
+
+  const issues = [];
+  if (!p.ageGroup) issues.push("ไม่ระบุรุ่นอายุ");
+  if (birthdayAbnormal) {
+    issues.push(
+      suggestedBirthday
+        ? "🔧 พบว่าน่าจะกรอกปี พ.ศ. ในวันเกิด — ปรับเป็น ค.ศ. ให้อัตโนมัติแล้ว โปรดตรวจสอบก่อนบันทึก"
+        : rawAge === null
+          ? "วันเกิดอ่านค่าไม่ได้"
+          : `วันเกิดผิดปกติ (อายุคำนวณได้ ${rawAge} ปี)`
+    );
+  }
+
+  const ageGroupOptions = PLAYER_AUDIT_AGE_GROUPS
+    .map((ag) => `<option value="${ag}"${p.ageGroup === ag ? " selected" : ""}>${ag}</option>`)
+    .join("");
+  return `
+    <tr data-player-id="${p.id}">
+      <td>${teamLogoImg(p.team)}${p.team ?? "-"}</td>
+      <td class="emphasis">${p.nickname ?? p.fullName ?? "-"}</td>
+      <td><input type="date" class="field-input" data-audit-birthday value="${displayBirthday}" /></td>
+      <td data-audit-age-display>${displayAge !== null ? `${displayAge} ปี` : "-"}</td>
+      <td><select class="field-input" data-audit-age-group><option value="">-- เลือกรุ่นอายุ --</option>${ageGroupOptions}</select></td>
+      <td>${issues.map((i) => `<span class="badge badge-warning">${i}</span>`).join(" ")}</td>
+      <td><button type="button" class="btn btn-primary btn-sm" data-audit-save>บันทึก</button></td>
+    </tr>`;
+}
+
+async function loadPlayerAudit() {
+  playerAuditStatus.textContent = "กำลังโหลด...";
+  playerAuditBody.innerHTML =
+    '<tr><td colspan="7" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>';
+  try {
+    const snap = await getDocs(collection(db, "players"));
+    const players = [];
+    snap.forEach((d) => players.push({ id: d.id, ...d.data() }));
+
+    const flagged = players.filter((p) => playerAuditIssues(p, calcAge(p.birthday)).length > 0);
+    flagged.sort(
+      (a, b) => (a.team ?? "").localeCompare(b.team ?? "") || ageGroupNumber(a.ageGroup) - ageGroupNumber(b.ageGroup)
+    );
+
+    if (flagged.length === 0) {
+      playerAuditStatus.textContent = `ตรวจสอบนักกีฬาทั้งหมด ${players.length} คนแล้ว ไม่พบข้อมูลที่ผิดปกติ ✓`;
+      playerAuditBody.innerHTML =
+        '<tr><td colspan="7" class="px-4 py-6 text-center text-slate-400">ไม่พบนักกีฬาที่ข้อมูลผิดปกติ</td></tr>';
+      return;
+    }
+
+    playerAuditStatus.textContent = `พบนักกีฬา ${flagged.length} คน (จากทั้งหมด ${players.length} คน) ที่ข้อมูลอาจไม่ถูกต้อง — แก้ไขแล้วกด "บันทึก" ทีละแถวได้เลย`;
+    playerAuditBody.innerHTML = flagged.map(playerAuditRowHtml).join("");
+  } catch (err) {
+    console.error(err);
+    playerAuditStatus.textContent = "โหลดข้อมูลไม่สำเร็จ: " + err.message;
+    playerAuditBody.innerHTML =
+      '<tr><td colspan="7" class="px-4 py-6 text-center text-slate-400">โหลดไม่สำเร็จ</td></tr>';
+  }
+}
+
+// อัปเดตคอลัมน์ "อายุที่คำนวณได้" สดๆ ตอนแก้วันเกิดในตาราง (ก่อนกดบันทึก) ให้เห็นผลทันทีว่าค่าที่แก้ดูสมเหตุสมผล
+// หรือยัง และกดบันทึกทีละแถวด้วย event delegation เพราะแถวถูกสร้างใหม่ทุกครั้งที่โหลด — บันทึกสำเร็จแล้วลบแถว
+// นั้นออกจากตารางเลย (ไม่ต้องโหลดใหม่ทั้งหมด) เพราะแก้ไขแล้วก็ไม่ผิดปกติอีกต่อไป
+playerAuditBody.addEventListener("input", (e) => {
+  if (!e.target.matches("[data-audit-birthday]")) return;
+  const tr = e.target.closest("tr");
+  const age = calcAge(e.target.value);
+  tr.querySelector("[data-audit-age-display]").textContent = age !== null ? `${age} ปี` : "-";
+});
+
+playerAuditBody.addEventListener("click", async (e) => {
+  const btn = e.target.closest("[data-audit-save]");
+  if (!btn) return;
+  const tr = btn.closest("tr");
+  const playerId = tr.dataset.playerId;
+  const birthday = tr.querySelector("[data-audit-birthday]").value || null;
+  const ageGroup = tr.querySelector("[data-audit-age-group]").value || null;
+
+  if (!ageGroup) {
+    alert("กรุณาเลือกรุ่นอายุก่อนบันทึก");
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "กำลังบันทึก...";
+  try {
+    await updateDoc(doc(db, "players", playerId), { birthday, ageGroup });
+    tr.remove();
+    if (playerAuditBody.children.length === 0) {
+      playerAuditStatus.textContent = "แก้ไขครบทุกรายการแล้ว ✓";
+      playerAuditBody.innerHTML =
+        '<tr><td colspan="7" class="px-4 py-6 text-center text-slate-400">ไม่พบนักกีฬาที่ข้อมูลผิดปกติ</td></tr>';
+    }
+  } catch (err) {
+    console.error(err);
+    alert("บันทึกไม่สำเร็จ: " + err.message);
+    btn.disabled = false;
+    btn.textContent = "บันทึก";
+  }
+});
+
+function openAdminPlayerAuditSection() {
+  hideAllScreens();
+  adminPlayerAuditSection.classList.remove("hidden");
+  loadPlayerAudit();
+}
+
 // ---------- ผู้ดูแลระบบ: แก้ไขบัญชีผู้ใช้คนอื่น (ชื่อ/บทบาท/ทีม/รุ่นอายุ/สถานะ) ----------
 // Firestore rules อนุญาต isAdmin() ให้ update เอกสาร coaches ได้ทุกฟิลด์อยู่แล้ว (allow update: if isAdmin();)
 // จึงไม่ต้องแก้ rules เพิ่ม — อีเมลปิดแก้ไขไว้เพราะเป็นบัญชี Firebase Auth จริง แก้แค่ฟิลด์ใน Firestore
@@ -2256,7 +2409,8 @@ onAuthStateChanged(auth, async (user) => {
         injuries: openAdminInjuriesSection,
         "manage-team": openAdminManageTeamSection,
         dashboard: openAdminDashboardSection,
-        print: openAdminPrintSection
+        print: openAdminPrintSection,
+        "player-audit": openAdminPlayerAuditSection
       };
       const adminDeepLink = new URLSearchParams(window.location.hash.replace(/^#/, "")).get("admin");
       if (adminDeepLink && adminDeepLinks[adminDeepLink]) {

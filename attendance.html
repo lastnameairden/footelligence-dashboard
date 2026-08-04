@@ -274,6 +274,37 @@
       <p id="admin-status" class="text-sm text-slate-500 w-full"></p>
     </section>
 
+    <!-- ตรวจสอบข้อมูลนักกีฬาที่ผิดปกติ: ไม่ระบุรุ่นอายุ หรือวันเกิดที่คำนวณอายุแล้วดูผิดปกติ (เช่น กรอกปี พ.ศ.
+    แทนที่จะเป็น ค.ศ. ทำให้อายุคำนวณได้ติดลบหรือมากผิดปกติ) — สแกนนักกีฬาทุกทีม แก้ไขได้ทันทีในตารางเลย -->
+    <section id="admin-player-audit-section" class="hidden space-y-6">
+      <button data-admin-back class="btn btn-ghost px-0">← กลับหน้า Dashboard</button>
+      <div class="page-heading">
+        <div class="icon-badge icon-badge-lg">🧐</div>
+        <div>
+          <h2>ตรวจสอบข้อมูลนักกีฬาที่ผิดปกติ</h2>
+          <p id="player-audit-status">กำลังโหลด...</p>
+        </div>
+      </div>
+      <div class="card table-wrap">
+        <table class="pro-table">
+          <thead>
+            <tr>
+              <th>ทีม</th>
+              <th>ผู้เล่น</th>
+              <th>วันเกิด (ค.ศ.)</th>
+              <th>อายุที่คำนวณได้</th>
+              <th>รุ่นอายุ</th>
+              <th>ปัญหาที่พบ</th>
+              <th>จัดการ</th>
+            </tr>
+          </thead>
+          <tbody id="player-audit-body">
+            <tr><td colspan="7" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
     <!-- ป็อปอัปแก้ไขบัญชีผู้ใช้ (ชื่อ/บทบาท/ทีม/รุ่นอายุ/สถานะ) — เปิดจากปุ่ม "แก้ไขบัญชี" ในตารางรายชื่อโค้ช -->
     <div id="edit-coach-overlay" class="hidden fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4">
       <div class="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col">
@@ -642,7 +673,7 @@
           </div>
           <div>
             <label class="field-label">รุ่นอายุ</label>
-            <select id="player-age-group" class="field-input">
+            <select id="player-age-group" required class="field-input">
               <option value="">-- เลือกรุ่นอายุ --</option>
               <option value="U6">U6</option>
               <option value="U7">U7</option>
