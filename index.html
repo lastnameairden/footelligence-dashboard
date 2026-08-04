@@ -233,12 +233,14 @@
          มี id ไว้ให้ลิงก์จากการแจ้งเตือนเลื่อนมาที่ส่วนนี้ได้ทันที (ดู scrollToHashTarget ใน app.js) -->
     <section id="training-plan-summary-section">
       <h2 class="section-title mb-4"><span class="icon-badge">📋</span> สรุปการส่งแผนการฝึกซ้อมรายวัน (เดือนนี้)</h2>
+      <!-- แสดงเฉพาะตอนดูภาพรวม "ทุกทีม" (scopeTeam ว่าง) ให้เลือกดูทีละทีมผ่านแท็บแบบเดียวกับ "ภาพรวมทุกทีม"
+      ด้านบน — ตอนดูทีมเดียวอยู่แล้ว (มี scopeTeam) ไม่ต้องมีแท็บซ้ำ -->
+      <div id="training-plan-summary-tabs" class="hidden flex flex-wrap gap-2 mb-3"></div>
       <div class="card table-wrap">
         <table class="pro-table">
           <thead>
             <tr>
               <th>โค้ช</th>
-              <th>ทีม</th>
               <th>จำนวนแผนที่ส่งเดือนนี้</th>
               <th>ส่งตรงเวลา</th>
               <th>ส่งสาย</th>
@@ -247,7 +249,7 @@
             </tr>
           </thead>
           <tbody id="training-plan-summary-body">
-            <tr><td colspan="7" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
+            <tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
           </tbody>
         </table>
         <div id="training-plan-summary-pagination" class="hidden flex items-center justify-between gap-3 mt-3 text-sm"></div>

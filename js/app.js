@@ -75,6 +75,7 @@ const ageProgressLegend = document.getElementById("age-progress-legend");
 const trainingReportsSection = document.getElementById("training-reports-section");
 const trainingReportsBody = document.getElementById("training-reports-body");
 const trainingReportsLocationHeader = document.getElementById("training-reports-location-header");
+const trainingPlanSummaryTabs = document.getElementById("training-plan-summary-tabs");
 const trainingPlanSummaryBody = document.getElementById("training-plan-summary-body");
 const trainingPlanSummaryActionHeader = document.getElementById("training-plan-summary-action-header");
 const trainingPlanSummaryPagination = document.getElementById("training-plan-summary-pagination");
@@ -952,7 +953,6 @@ const trainingPlanSummaryTable = createPaginatedTable({
     return `
         <tr>
           <td class="emphasis">${r.coachName}</td>
-          <td>${teamLogoImg(r.team)}${r.team}</td>
           <td>${r.total}</td>
           <td class="text-emerald-600 font-medium">${onTime}</td>
           <td class="text-red-500 font-medium">${r.late}</td>
@@ -1005,7 +1005,7 @@ const dashboardInjuryTable = createPaginatedTable({
 async function loadTrainingPlanSummary(scopeTeam) {
   const isAdminViewer = currentViewerRole === "admin";
   trainingPlanSummaryActionHeader.classList.toggle("hidden", !isAdminViewer);
-  const colCount = isAdminViewer ? 7 : 6;
+  const colCount = isAdminViewer ? 6 : 5;
 
   trainingPlanSummaryBody.innerHTML =
     `<tr><td colspan="${colCount}" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>`;
@@ -1030,10 +1030,42 @@ async function loadTrainingPlanSummary(scopeTeam) {
     g.total += 1;
     if (isTrainingPlanLate(p)) g.late += 1;
   }
+  const allRows = Array.from(groups.values());
 
-  const rows = Array.from(groups.values()).sort((a, b) => b.late - a.late);
-  currentTrainingPlanRows = rows;
-  trainingPlanSummaryTable.setRows(rows, colCount);
+  if (scopeTeam) {
+    // ดูทีมเดียวอยู่แล้ว (มี scopeTeam) ไม่ต้องมีแท็บเลือกทีมซ้ำ
+    trainingPlanSummaryTabs.classList.add("hidden");
+    trainingPlanSummaryTabs.innerHTML = "";
+    const rows = allRows.sort((a, b) => b.late - a.late);
+    currentTrainingPlanRows = rows;
+    trainingPlanSummaryTable.setRows(rows, colCount);
+    return;
+  }
+
+  // ดูภาพรวมทุกทีม — เลือกดูทีละทีมผ่านแท็บแบบเดียวกับ "ภาพรวมทุกทีม" ด้านบน (ไม่รวมเป็นตารางเดียวปนกันอีกต่อไป)
+  // ใช้ทีมจาก TEAMS ทั้งหมดเสมอ (ไม่ใช่แค่ทีมที่มีข้อมูล) เพื่อให้เห็นได้ว่าทีมไหน "ยังไม่ส่งอะไรเลยทั้งเดือน" ด้วย
+  trainingPlanSummaryTabs.classList.remove("hidden");
+  trainingPlanSummaryTabs.innerHTML = "";
+
+  function showTeamRows(team, btn) {
+    for (const tabBtn of trainingPlanSummaryTabs.children) {
+      tabBtn.classList.toggle("btn-primary", tabBtn === btn);
+      tabBtn.classList.toggle("btn-secondary", tabBtn !== btn);
+    }
+    const rows = allRows.filter((r) => r.team === team).sort((a, b) => b.late - a.late);
+    currentTrainingPlanRows = rows;
+    trainingPlanSummaryTable.setRows(rows, colCount);
+  }
+
+  for (const team of TEAMS) {
+    const tabBtn = document.createElement("button");
+    tabBtn.type = "button";
+    tabBtn.className = "btn btn-secondary btn-sm";
+    tabBtn.innerHTML = `${teamLogoImg(team)}${team}`;
+    tabBtn.addEventListener("click", () => showTeamRows(team, tabBtn));
+    trainingPlanSummaryTabs.appendChild(tabBtn);
+  }
+  showTeamRows(TEAMS[0], trainingPlanSummaryTabs.children[0]);
 }
 
 // แจ้งผู้บริหารทีมว่าโค้ชคนนี้ส่งแผนสายเกินเกณฑ์ (ปุ่มนี้แสดงเฉพาะผู้ดูแลระบบ) — ใช้ event delegation
