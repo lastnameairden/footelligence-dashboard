@@ -39,7 +39,6 @@ const TEAMS = ["KHAMPHEE FOOTBALL", "THAWEE SC", "THAMMASATHIT"];
 // Dashboard หลักแสดงเฉพาะข้อมูลเดือนปัจจุบันเท่านั้น (เช็คชื่อ/รายงานการฝึกซ้อม/ผลการแข่งขัน/อาการบาดเจ็บ)
 // ต้องการดูข้อมูลย้อนหลังเดือนอื่นให้ไปที่เมนู "พิมพ์สรุป Dashboard" ซึ่งมีตัวเลือกเดือนแยกต่างหากอยู่แล้ว
 const CURRENT_MONTH_STR = new Date().toISOString().slice(0, 7); // "YYYY-MM"
-const CURRENT_MONTH_LABEL = new Date().toLocaleDateString("th-TH", { year: "numeric", month: "long" });
 function isInCurrentMonth(dateStr) {
   return (dateStr || "").startsWith(CURRENT_MONTH_STR);
 }
@@ -47,7 +46,6 @@ function isInCurrentMonth(dateStr) {
 const playersGroupsEl = document.getElementById("players-groups");
 const attendanceGroupsEl = document.getElementById("attendance-groups");
 const overviewCardsEl = document.getElementById("overview-cards");
-const currentMonthNoticeEl = document.getElementById("current-month-notice");
 const positionToggleWrap = document.getElementById("position-toggle-wrap");
 const playerPositionToggleBtn = document.getElementById("player-position-toggle-btn");
 const gkPositionToggleBtn = document.getElementById("gk-position-toggle-btn");
@@ -1149,10 +1147,6 @@ async function loadDashboard(scopeTeam) {
     setStatus("กำลังโหลดข้อมูล...");
     scrollToHashTarget();
     currentScopeTeam = scopeTeam;
-    currentMonthNoticeEl.textContent =
-      currentViewerRole === "admin"
-        ? `แสดงข้อมูลเฉพาะเดือน${CURRENT_MONTH_LABEL}เท่านั้น — ดูข้อมูลย้อนหลังได้ที่เมนู 🖨️ พิมพ์สรุป Dashboard`
-        : `แสดงข้อมูลเฉพาะเดือน${CURRENT_MONTH_LABEL}เท่านั้น`;
     const [players, attendanceRecordsAllTime, coaches] = await Promise.all([
       scopeTeam ? loadCollectionForTeam("players", scopeTeam) : loadCollection("players"),
       scopeTeam ? loadCollectionForTeam("attendance", scopeTeam) : loadCollection("attendance"),
