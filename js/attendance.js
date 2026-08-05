@@ -2758,6 +2758,12 @@ function renderRoster(existingMap) {
     }
     tr.appendChild(statusTd);
 
+    // ให้คะแนนได้เฉพาะสถานะ "มา (A)" เท่านั้น — I (บาดเจ็บ) / R (พักฟื้น) / P (ลา) ไม่จำเป็นต้องให้คะแนน (ตรงกับ
+    // isPlayerFullyEvaluated ใน ui-utils.js ที่ถือว่าประเมินครบแล้วถ้าไม่ใช่ A อยู่แล้ว) — แต่ถ้ายังไม่ได้เลือก
+    // สถานะเลย ต้องไม่โชว์ข้อความ "ไม่ต้องให้คะแนน" ทันที เพราะจะดูเหมือนไม่ต้องให้คะแนนใครเลยทั้งตาราง ทำให้โค้ช
+    // สับสน จึงแยกเป็น 3 สถานะ: ยังไม่เลือกสถานะ (รอ) / A (ให้คะแนนได้) / I,R,P (ไม่ต้องให้คะแนน)
+    const scoringAllowed = existing.status === "A";
+    const statusChosen = Boolean(existing.status);
     for (const category of SCORE_CATEGORIES) {
       const catTd = document.createElement("td");
       catTd.className = "space-x-2";
@@ -2766,6 +2772,13 @@ function renderRoster(existingMap) {
         catTd.innerHTML = val
           ? `<span class="badge badge-neutral">${val}</span>`
           : '<span class="text-slate-400">-</span>';
+      } else if (!statusChosen) {
+        catTd.innerHTML = '<span class="text-slate-300 text-xs">เลือกสถานะก่อน</span>';
+      } else if (!scoringAllowed) {
+        const val = scores[category.key];
+        catTd.innerHTML = val
+          ? `<span class="text-slate-500">${val}</span> <span class="text-slate-300 text-xs">(ไม่บังคับ)</span>`
+          : '<span class="text-slate-300 text-xs" title="ให้คะแนนได้เฉพาะสถานะ มา (A) เท่านั้น">ไม่ต้องให้คะแนน</span>';
       } else {
         catTd.appendChild(
           createSegmentedGroup(SCORE_OPTIONS, scores[category.key], (score) =>
@@ -2795,20 +2808,25 @@ async function saveStatus(playerId, status) {
   if (!currentSessionId) return;
   try {
     const docId = `${playerId}_${currentSessionId}`;
-    await setDoc(
-      doc(db, "attendance", docId),
-      {
-        playerId,
-        sessionId: currentSessionId,
-        team: myTeam,
-        date: dateInput.value,
-        status,
-        updatedAt: serverTimestamp()
-      },
-      { merge: true }
-    );
+    const payload = {
+      playerId,
+      sessionId: currentSessionId,
+      team: myTeam,
+      date: dateInput.value,
+      status,
+      updatedAt: serverTimestamp()
+    };
+    // ให้คะแนนได้เฉพาะสถานะ "มา (A)" เท่านั้น — ถ้าเปลี่ยนสถานะเป็นอย่างอื่น (I/R/P) ล้างคะแนนเก่าทิ้งไปด้วย
+    // เผื่อเคสที่โค้ชให้คะแนนไว้ก่อนแล้ว (ตอนยังเป็น A) แล้วค่อยเปลี่ยนสถานะทีหลัง ไม่ให้มีคะแนนที่ไม่มีความหมาย
+    // ค้างอยู่ในฐานข้อมูล (scores: {} แทนที่ทั้ง field เดิมเพราะ setDoc merge:true แทนที่ทั้งค่าของ field นี้)
+    if (status !== "A") {
+      payload.scores = {};
+    }
+    await setDoc(doc(db, "attendance", docId), payload, { merge: true });
     const prev = currentAttendanceMap.get(playerId) || {};
-    currentAttendanceMap.set(playerId, { ...prev, status, updatedAt: { toDate: () => new Date() } });
+    const updated = { ...prev, status, updatedAt: { toDate: () => new Date() } };
+    if (status !== "A") updated.scores = {};
+    currentAttendanceMap.set(playerId, updated);
     renderRoster(currentAttendanceMap);
     setAttendanceStatus("บันทึกแล้ว ✓");
   } catch (err) {
