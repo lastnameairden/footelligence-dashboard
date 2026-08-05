@@ -157,6 +157,7 @@ const executiveStatusEl = document.getElementById("executive-status");
 const executiveStatCards = document.getElementById("executive-stat-cards");
 const executiveLateWarning = document.getElementById("executive-late-warning");
 const executiveLateCountEl = document.getElementById("executive-late-count");
+const executiveLateDetailEl = document.getElementById("executive-late-detail");
 const executiveCoachSummary = document.getElementById("executive-coach-summary");
 const coachPlanDetailOverlay = document.getElementById("coach-plan-detail-overlay");
 const coachPlanDetailBody = document.getElementById("coach-plan-detail-body");
@@ -2208,7 +2209,20 @@ async function loadExecutiveSummary(team) {
     const trainingPlans = [];
     trainingPlansSnap.forEach((d) => trainingPlans.push(d.data()));
     const monthPlans = trainingPlans.filter((p) => (p.date || "").startsWith(thisMonth));
-    const lateCount = monthPlans.filter((p) => isTrainingPlanLate(p)).length;
+
+    // นับจำนวนครั้งที่ส่งสายแยกเป็นรายโค้ช ไม่ใช่รวมทั้งทีม เพราะโค้ชแต่ละคนดูแลคนละรุ่นอายุ การรวมกันจะ
+    // แจ้งเตือนทั้งทีมทั้งที่มีแค่โค้ชบางคนที่ส่งสายบ่อย (ใช้ตรรกะเดียวกับ loadAdminNotifications ใน ui-utils.js)
+    const coachGroups = new Map();
+    for (const p of monthPlans) {
+      const coachName = p.coachName ?? "-";
+      if (!coachGroups.has(coachName)) {
+        coachGroups.set(coachName, { coachName, total: 0, late: 0 });
+      }
+      const g = coachGroups.get(coachName);
+      g.total += 1;
+      if (isTrainingPlanLate(p)) g.late += 1;
+    }
+    const lateCoaches = Array.from(coachGroups.values()).filter((g) => g.late > TRAINING_PLAN_LATE_WARNING_THRESHOLD);
 
     executiveStatCards.innerHTML =
       statCard("นักกีฬาทั้งหมด", totalPlayers) +
@@ -2216,8 +2230,9 @@ async function loadExecutiveSummary(team) {
       statCard("คะแนนประเมินเฉลี่ยเดือนนี้", avgScore) +
       statCard("แผนฝึกซ้อมที่ส่งเดือนนี้", monthPlans.length);
 
-    executiveLateWarning.classList.toggle("hidden", lateCount <= TRAINING_PLAN_LATE_WARNING_THRESHOLD);
-    executiveLateCountEl.textContent = lateCount;
+    executiveLateWarning.classList.toggle("hidden", lateCoaches.length === 0);
+    executiveLateCountEl.textContent = lateCoaches.length;
+    executiveLateDetailEl.textContent = lateCoaches.map((g) => `${g.coachName} (สาย ${g.late}/${g.total} ครั้ง) ควรพูดคุยเรื่องมาตรฐานการส่งแผน`).join(" • ");
 
     executiveStatusEl.textContent = `อัปเดตข้อมูลล่าสุด • ทีม ${team}`;
   } catch (err) {
@@ -4082,6 +4097,20 @@ const TRAINING_PLAN_MAIN_PART_BY_BRACKET = {
     "Attacking in movement & Final third"
   ]
 };
+// หัวข้อหลักเฉพาะผู้รักษาประตู — เหมือนกันทุกรุ่นอายุ (ต่างจากหัวข้อของผู้เล่นทั่วไปที่แยกตาม bracket) เพิ่มเข้าไป
+// ต่อท้ายหัวข้อของ bracket นั้นๆ เมื่อเลือกประเภทการฝึกเป็น "Goalkeeper" (ดู renderTrainingPlanMainPartOptions)
+const TRAINING_PLAN_GOALKEEPER_MAIN_PARTS = [
+  "Handling & Catching",
+  "Diving",
+  "Shot Stopping",
+  "Positioning",
+  "Angle Play",
+  "Footwork",
+  "Agility & Coordination",
+  "Mental Toughness",
+  "Decision Making",
+  "Distribution"
+];
 const TRAINING_PLAN_PHYSICAL_OPTIONS = [
   "Strength Endurance", "Explosive Strength", "Maximal Strength", "Core Strength",
   "Aerobic Capacity", "Aerobic Power", "Anaerobic Lactic", "Anaerobic Alactic",
@@ -4146,7 +4175,8 @@ function renderTrainingPlanAgeGroupToggle() {
 }
 
 // อัปเดตตัวเลือกในช่อง Main part ให้ตรงกับ bracket ของรุ่นอายุที่เลือกไว้ ถ้าเปลี่ยนรุ่นอายุจนตัวเลือกเดิม
-// ไม่อยู่ในชุดใหม่แล้ว จะล้างค่าที่เลือกไว้ก่อนหน้าทิ้ง (กันไม่ให้ค่าที่บันทึกไม่ตรงกับรุ่นอายุจริง)
+// ไม่อยู่ในชุดใหม่แล้ว จะล้างค่าที่เลือกไว้ก่อนหน้าทิ้ง (กันไม่ให้ค่าที่บันทึกไม่ตรงกับรุ่นอายุจริง) — ถ้าเลือก
+// ประเภทการฝึกเป็น "Goalkeeper" จะเพิ่มหัวข้อเฉพาะผู้รักษาประตูต่อท้ายหัวข้อของ bracket นั้นด้วย (เหมือนกันทุกรุ่นอายุ)
 function renderTrainingPlanMainPartOptions() {
   const bracket = bracketForAgeGroups(trainingPlanAgeGroupsSelected);
   const currentValue = trainingPlanMainPartSelect.value;
@@ -4155,7 +4185,10 @@ function renderTrainingPlanMainPartOptions() {
     trainingPlanMainPartSelect.disabled = true;
     return;
   }
-  const options = TRAINING_PLAN_MAIN_PART_BY_BRACKET[bracket];
+  const options =
+    trainingPlanType === "Goalkeeper"
+      ? [...TRAINING_PLAN_MAIN_PART_BY_BRACKET[bracket], ...TRAINING_PLAN_GOALKEEPER_MAIN_PARTS]
+      : TRAINING_PLAN_MAIN_PART_BY_BRACKET[bracket];
   trainingPlanMainPartSelect.disabled = false;
   trainingPlanMainPartSelect.innerHTML =
     `<option value="">-- เลือกหัวข้อหลัก (${bracket}) --</option>` +
@@ -4195,6 +4228,9 @@ function renderTrainingPlanTypeSegmented() {
     createSegmentedGroup(TRAINING_PLAN_TYPE_OPTIONS, trainingPlanType, (val) => {
       trainingPlanType = val;
       renderTrainingPlanTypeSegmented();
+      // หัวข้อหลัก (Main part) มีตัวเลือกเพิ่มเติมเฉพาะตอนเลือกประเภท "Goalkeeper" ต้องอัปเดตช่องนี้ด้วยทุกครั้ง
+      // ที่เปลี่ยนประเภทการฝึก ไม่ใช่แค่ตอนเปลี่ยนรุ่นอายุเหมือนเดิม
+      renderTrainingPlanMainPartOptions();
     })
   );
 }
