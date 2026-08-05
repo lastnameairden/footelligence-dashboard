@@ -422,12 +422,13 @@
       </div>
     </div>
 
-    <!-- ดูรายละเอียดแผนการฝึกซ้อมรายวันของโค้ชคนใดคนหนึ่ง (ดูอย่างเดียว) — เปิดจากรายการแผนในการ์ดสรุปการทำงาน
-    ของโค้ชแต่ละคนในหน้าผู้บริหารทีม/ผู้ดูแลระบบ -->
+    <!-- ดูรายละเอียดแผนการฝึกซ้อม/รายงานการฝึกซ้อมรายวันของโค้ชคนใดคนหนึ่ง (ดูอย่างเดียว) — เปิดจากรายการแผน/
+    รายงานในการ์ดสรุปการทำงานของโค้ชแต่ละคนในหน้าผู้บริหารทีม/ผู้ดูแลระบบ ใช้ overlay เดียวกันทั้งสองแบบ
+    (สลับหัวข้อและเนื้อหาด้วย JS) -->
     <div id="coach-plan-detail-overlay" class="hidden fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4">
       <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
         <div class="flex items-center justify-between p-6 pb-4 border-b border-slate-100 flex-shrink-0">
-          <h3 class="text-lg font-semibold">รายละเอียดแผนการฝึกซ้อม</h3>
+          <h3 id="coach-plan-detail-title" class="text-lg font-semibold">รายละเอียดแผนการฝึกซ้อม</h3>
           <button id="coach-plan-detail-close-btn" class="btn-icon" aria-label="ปิด">✕</button>
         </div>
         <div id="coach-plan-detail-body" class="p-6 overflow-y-auto flex-1 space-y-2 text-sm"></div>

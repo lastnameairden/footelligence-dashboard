@@ -160,6 +160,7 @@ const executiveLateCountEl = document.getElementById("executive-late-count");
 const executiveLateDetailEl = document.getElementById("executive-late-detail");
 const executiveCoachSummary = document.getElementById("executive-coach-summary");
 const coachPlanDetailOverlay = document.getElementById("coach-plan-detail-overlay");
+const coachPlanDetailTitleEl = document.getElementById("coach-plan-detail-title");
 const coachPlanDetailBody = document.getElementById("coach-plan-detail-body");
 const coachPlanDetailCloseBtn = document.getElementById("coach-plan-detail-close-btn");
 const executiveNotesList = document.getElementById("executive-notes-list");
@@ -249,7 +250,15 @@ const progressPie = document.getElementById("progress-pie");
 const progressLegend = document.getElementById("progress-legend");
 const progressTeamTabs = document.getElementById("progress-team-tabs");
 
-const SUBMISSION_DEADLINE_HOUR = 20; // ต้องส่งข้อมูล/ประเมินภายใน 20:00 น. ของวันนั้น
+// ต้องเช็คชื่อ+ให้คะแนน และส่งรายงานการฝึกซ้อม ภายใน 23:59 น. ของวันนั้น ใช้ deadline เดียวกันทั้งสองอย่าง
+// (ดู isCoachSubmissionOnTime สำหรับเช็คชื่อ และ isReportLate สำหรับรายงานการฝึกซ้อม)
+const SUBMISSION_DEADLINE_HOUR = 23;
+const SUBMISSION_DEADLINE_MINUTE = 59;
+function submissionDeadlineFor(dateStr) {
+  return new Date(
+    `${dateStr}T${String(SUBMISSION_DEADLINE_HOUR).padStart(2, "0")}:${String(SUBMISSION_DEADLINE_MINUTE).padStart(2, "0")}:59`
+  );
+}
 
 let currentSessionId = null;
 let currentSessionData = null;
@@ -1064,7 +1073,7 @@ async function rejectCoach(coachId) {
 
 // ---------- ผู้ดูแลระบบ: รายชื่อโค้ช + % ส่งข้อมูลตรงเวลา ----------
 // เกณฑ์: แต่ละ session (วัน) ที่โค้ชคนนี้มีนักกีฬาของตัวเองบันทึกไว้ ถือว่า "ตรงเวลา" ถ้าเวลาแก้ไขล่าสุดของ
-// บันทึกนักกีฬาที่ตัวเองดูแล (ไม่รวมของโค้ชอื่นในเซสชันเดียวกัน) อยู่ก่อน 20:00 น. ของวันนั้น — คำนวณแยกรายคน
+// บันทึกนักกีฬาที่ตัวเองดูแล (ไม่รวมของโค้ชอื่นในเซสชันเดียวกัน) อยู่ก่อน 23:59 น. ของวันนั้น — คำนวณแยกรายคน
 // เพราะ 1 เซสชันใช้ร่วมกันได้หลายโค้ช (คนละรุ่นอายุ) การแก้ไขของโค้ชอื่นไม่ควรกระทบผลของโค้ชคนนี้
 function isCoachSubmissionOnTime(session, myAttendanceForSession) {
   if (!session.date) return false;
@@ -1076,8 +1085,14 @@ function isCoachSubmissionOnTime(session, myAttendanceForSession) {
     }
   }
   if (!latest) return false;
-  const deadline = new Date(`${session.date}T${String(SUBMISSION_DEADLINE_HOUR).padStart(2, "0")}:00:00`);
-  return latest <= deadline;
+  return latest <= submissionDeadlineFor(session.date);
+}
+
+// รายงานการฝึกซ้อมต้องส่งภายในเวลาเดียวกับการเช็คชื่อ (23:59 น.) — เดิมไม่มีเกณฑ์ "สาย" สำหรับรายงานนี้เลย
+function isReportLate(report) {
+  const ts = report.updatedAt && typeof report.updatedAt.toDate === "function" ? report.updatedAt.toDate() : null;
+  if (!ts || !report.date) return false;
+  return ts > submissionDeadlineFor(report.date);
 }
 
 function buildCoachRow(c, sessions, attendanceRecords, players) {
@@ -1160,7 +1175,7 @@ function buildCoachGroupTable(coaches, sessions, attendanceRecords, players) {
             <th>ตำแหน่งโค้ช</th>
             <th>รุ่นอายุ</th>
             <th>สถานะ</th>
-            <th title="เปอร์เซ็นต์ของวันที่ส่งข้อมูลก่อน 20:00 น. เทียบกับจำนวนวันที่บันทึกทั้งหมด">% ตรงเวลา</th>
+            <th title="เปอร์เซ็นต์ของวันที่ส่งข้อมูลก่อน 23:59 น. เทียบกับจำนวนวันที่บันทึกทั้งหมด">% ตรงเวลา</th>
             <th>จัดการ</th>
           </tr>
         </thead>
@@ -1311,13 +1326,26 @@ async function computeCoachMonthlySummaryRows(team) {
     const myPlayerIds = getCoachPlayerIds(c, players);
     let checkinDays = 0;
     let onTimeCount = 0;
+    // สถานะการเช็คชื่อรายวัน ใช้เทียบกับแผน/รายงานของวันเดียวกัน เพื่อตรวจความสอดคล้อง (ดู dailyConsistency)
+    const checkinStatusByDate = new Map();
     for (const s of monthSessions) {
       const myAttendanceForSession = attendanceRecords.filter((a) => a.sessionId === s.id && myPlayerIds.has(a.playerId));
       if (myAttendanceForSession.length === 0) continue;
       checkinDays += 1;
-      if (isCoachSubmissionOnTime(s, myAttendanceForSession)) onTimeCount += 1;
+      const onTime = isCoachSubmissionOnTime(s, myAttendanceForSession);
+      if (onTime) onTimeCount += 1;
+      if (s.date) checkinStatusByDate.set(s.date, onTime ? "onTime" : "late");
     }
-    const reportCount = monthReports.filter((r) => r.coachName === c.name).length;
+    const myReports = monthReports
+      .filter((r) => r.coachName === c.name)
+      .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+    const reportCount = myReports.length;
+    // สถานะการส่งรายงานรายวัน ใช้เกณฑ์ "สาย" เดียวกับเช็คชื่อ (23:59 น. ดู isReportLate)
+    const reportStatusByDate = new Map();
+    for (const r of myReports) {
+      if (!r.date) continue;
+      reportStatusByDate.set(r.date, isReportLate(r) ? "late" : "onTime");
+    }
     const myPlans = monthPlans
       .filter((p) => p.coachName === c.name)
       .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
@@ -1325,19 +1353,35 @@ async function computeCoachMonthlySummaryRows(team) {
 
     // สถานะการส่งแผนรายวัน ตั้งแต่วันที่ 1 ถึงวันนี้ ใช้วาดกราฟแนวโน้ม — ถ้าวันไหนมีหลายแผน (ปกติไม่ควรมี แต่กัน
     // ไว้เผื่อ) ถือว่า "ตรงเวลา" ถ้ามีอย่างน้อยหนึ่งแผนของวันนั้นตรงเวลา
-    const statusByDate = new Map();
+    const planStatusByDate = new Map();
     for (const p of myPlans) {
       if (!p.date) continue;
       const late = isTrainingPlanLate(p);
-      if (statusByDate.get(p.date) !== "onTime") {
-        statusByDate.set(p.date, late ? "late" : "onTime");
+      if (planStatusByDate.get(p.date) !== "onTime") {
+        planStatusByDate.set(p.date, late ? "late" : "onTime");
       }
     }
     const planTrend = [];
     for (let day = 1; day <= todayDay; day++) {
       const dateStr = `${thisMonth}-${String(day).padStart(2, "0")}`;
-      planTrend.push({ date: dateStr, status: statusByDate.get(dateStr) || "none" });
+      planTrend.push({ date: dateStr, status: planStatusByDate.get(dateStr) || "none" });
     }
+
+    // ตรวจความสอดคล้องของแผน/เช็คชื่อ/รายงาน รายวัน — เอาเฉพาะวันที่มีอย่างน้อย 1 อย่างเกิดขึ้นจริง (ไม่รวมวันที่
+    // ไม่มีอะไรเลยทั้งสามอย่าง เช่น วันหยุด) เรียงล่าสุดก่อน เพื่อให้เห็นวันที่ทำไม่ครบ/ไม่ตรงกันได้ทันที
+    const allActivityDates = new Set([
+      ...planStatusByDate.keys(),
+      ...checkinStatusByDate.keys(),
+      ...reportStatusByDate.keys()
+    ]);
+    const dailyConsistency = Array.from(allActivityDates)
+      .sort((a, b) => b.localeCompare(a))
+      .map((date) => ({
+        date,
+        plan: planStatusByDate.get(date) || "none",
+        checkin: checkinStatusByDate.get(date) || "none",
+        report: reportStatusByDate.get(date) || "none"
+      }));
 
     return {
       coachId: c.id,
@@ -1347,10 +1391,12 @@ async function computeCoachMonthlySummaryRows(team) {
       checkinDays,
       onTimeCount,
       reportCount,
+      reports: myReports,
       planCount: myPlans.length,
       planLateCount,
       plans: myPlans,
-      planTrend
+      planTrend,
+      dailyConsistency
     };
   });
 }
@@ -1374,6 +1420,52 @@ function renderCoachPlanTrendChart(planTrend) {
       <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm inline-block" style="background:${colors.late}"></span>สาย</span>
       <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm inline-block" style="background:${colors.none}"></span>ไม่ได้ส่ง</span>
     </div>
+  `;
+}
+
+function dailyConsistencyBadge(status) {
+  if (status === "onTime") return '<span class="badge badge-success">✅ ตรงเวลา</span>';
+  if (status === "late") return '<span class="badge badge-warning">⚠️ สาย</span>';
+  return '<span class="badge badge-danger">❌ ไม่ได้ส่ง</span>';
+}
+
+// ตารางตรวจความสอดคล้องรายวัน: แผนฝึกซ้อม/เช็คชื่อ+ให้คะแนน/รายงานการฝึกซ้อม ของโค้ชคนเดียวกันควรทำครบทั้ง 3
+// อย่างในวันเดียวกัน ถ้าวันไหนมีบางอย่างแต่ขาดอย่างอื่นไป แปลว่าโค้ชยังไม่ได้ดำเนินการ (หรือส่งสายจนพ้นเกณฑ์) จึง
+// ไฮไลต์แถวนั้นให้เห็นชัด — เอาเฉพาะวันที่มีอย่างน้อย 1 ใน 3 อย่างเกิดขึ้นจริง (ดู dailyConsistency ในฟังก์ชัน
+// computeCoachMonthlySummaryRows)
+function renderDailyConsistencyTable(dailyConsistency) {
+  if (dailyConsistency.length === 0) {
+    return '<p class="text-sm text-slate-400">ยังไม่มีข้อมูลเดือนนี้</p>';
+  }
+  const rows = dailyConsistency
+    .map((d) => {
+      const consistent = d.plan === d.checkin && d.checkin === d.report;
+      const rowClass = consistent ? "" : "bg-red-50";
+      return `
+        <tr class="${rowClass}">
+          <td>${d.date}</td>
+          <td>${dailyConsistencyBadge(d.plan)}</td>
+          <td>${dailyConsistencyBadge(d.checkin)}</td>
+          <td>${dailyConsistencyBadge(d.report)}</td>
+        </tr>
+      `;
+    })
+    .join("");
+  return `
+    <div class="card table-wrap">
+      <table class="pro-table text-xs">
+        <thead>
+          <tr>
+            <th>วันที่</th>
+            <th>แผนฝึกซ้อม</th>
+            <th>เช็คชื่อ+ให้คะแนน</th>
+            <th>รายงานการฝึกซ้อม</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <p class="text-xs text-slate-400 mt-1">🔴 แถวสีแดง = วันที่ทำ 3 อย่างไม่สอดคล้องกัน (ทำบางอย่างแต่ขาดอย่างอื่น หรือส่งสายไม่พร้อมกัน)</p>
   `;
 }
 
@@ -1401,6 +1493,15 @@ function renderCoachDetailContent(row) {
   const trendWrap = document.createElement("div");
   trendWrap.innerHTML = renderCoachPlanTrendChart(row.planTrend);
   wrap.appendChild(trendWrap);
+
+  const consistencyTitle = document.createElement("h4");
+  consistencyTitle.className = "text-sm font-semibold text-slate-700";
+  consistencyTitle.textContent = "ตรวจความสอดคล้องรายวัน (แผน / เช็คชื่อ / รายงาน)";
+  wrap.appendChild(consistencyTitle);
+
+  const consistencyWrap = document.createElement("div");
+  consistencyWrap.innerHTML = renderDailyConsistencyTable(row.dailyConsistency);
+  wrap.appendChild(consistencyWrap);
 
   const listTitle = document.createElement("h4");
   listTitle.className = "text-sm font-semibold text-slate-700";
@@ -1433,12 +1534,47 @@ function renderCoachDetailContent(row) {
     wrap.appendChild(list);
   }
 
+  const reportListTitle = document.createElement("h4");
+  reportListTitle.className = "text-sm font-semibold text-slate-700";
+  reportListTitle.textContent = `รายงานการฝึกซ้อมที่ส่งเดือนนี้ (${row.reports.length} รายการ) — คลิกเพื่อดูรายละเอียด`;
+  wrap.appendChild(reportListTitle);
+
+  if (row.reports.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "text-sm text-slate-400";
+    empty.textContent = "ยังไม่มีรายงานที่ส่งเดือนนี้";
+    wrap.appendChild(empty);
+  } else {
+    const reportList = document.createElement("div");
+    reportList.className = "space-y-1.5";
+    for (const report of row.reports) {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className =
+        "w-full text-left card card-pad py-2 px-3 hover:bg-slate-50 flex items-center justify-between gap-3 flex-wrap";
+      const attendedBadge =
+        report.attended === true
+          ? '<span class="badge badge-success">มีการซ้อม</span>'
+          : report.attended === false
+            ? '<span class="badge badge-warning">ไม่มีการซ้อม</span>'
+            : "-";
+      item.innerHTML = `
+        <span class="text-sm"><span class="emphasis">${report.date ?? "-"}</span></span>
+        ${attendedBadge}
+      `;
+      item.addEventListener("click", () => renderReportDetailModal(report));
+      reportList.appendChild(item);
+    }
+    wrap.appendChild(reportList);
+  }
+
   return wrap;
 }
 
 // เปิด modal ดูรายละเอียดแผนการฝึกซ้อม 1 ฉบับแบบดูอย่างเดียว (ผู้บริหารทีม/ผู้ดูแลระบบคลิกจากรายการในการ์ด
 // สรุปการทำงานโค้ช) — ใช้ textContent ล้วนสำหรับค่าที่มาจากผู้ใช้ (หมายเหตุ/ชื่อไฟล์) เพื่อกัน XSS
 function renderPlanDetailModal(plan) {
+  coachPlanDetailTitleEl.textContent = "รายละเอียดแผนการฝึกซ้อม";
   coachPlanDetailBody.innerHTML = "";
 
   const fields = [
@@ -1490,6 +1626,58 @@ function renderPlanDetailModal(plan) {
   coachPlanDetailOverlay.classList.remove("hidden");
 }
 
+// เปิด modal ดูรายละเอียดรายงานการฝึกซ้อม 1 ฉบับแบบดูอย่างเดียว (ผู้บริหารทีม/ผู้ดูแลระบบคลิกจากรายการในการ์ด
+// สรุปการทำงานโค้ช) — ใช้ overlay เดียวกับรายละเอียดแผนการฝึกซ้อม (renderPlanDetailModal), formatReportPeriodForDaily
+// อยู่ท้ายไฟล์แต่เรียกใช้ได้ที่นี่เพราะ function declaration ถูก hoist
+function renderReportDetailModal(report) {
+  coachPlanDetailTitleEl.textContent = "รายละเอียดรายงานการฝึกซ้อม";
+  coachPlanDetailBody.innerHTML = "";
+
+  const attendedText = report.attended === true ? "มีการซ้อม" : report.attended === false ? "ไม่มีการซ้อม" : "-";
+
+  const fields = [
+    ["วันที่", report.date ?? "-"],
+    ["โค้ชผู้ส่ง", report.coachName ?? "-"],
+    ["สถานะ", attendedText],
+    ["ช่วงเวลาฝึกซ้อม", formatReportPeriodForDaily(report)],
+    ["หมายเหตุ", report.notes ?? "-"]
+  ];
+
+  for (const [label, value] of fields) {
+    const row = document.createElement("div");
+    row.className = "flex justify-between gap-4 py-1.5 border-b border-slate-50 last:border-0";
+    const labelEl = document.createElement("span");
+    labelEl.className = "text-slate-400 flex-shrink-0";
+    labelEl.textContent = label;
+    const valueEl = document.createElement("span");
+    valueEl.className = "text-slate-800 text-right";
+    valueEl.textContent = value;
+    row.append(labelEl, valueEl);
+    coachPlanDetailBody.appendChild(row);
+  }
+
+  // รูปภาพจากการฝึกซ้อมมีเฉพาะทีม THAWEE SC (ดู REPORT_PHOTO_TEAM) รายงานของทีมอื่นจะไม่มีฟิลด์นี้เลย
+  if (Array.isArray(report.photos) && report.photos.length > 0) {
+    const photoWrap = document.createElement("div");
+    photoWrap.className = "flex flex-wrap gap-2 mt-2";
+    for (const photo of report.photos) {
+      const link = document.createElement("a");
+      link.href = photo.fileUrl;
+      link.target = "_blank";
+      link.rel = "noopener";
+      const img = document.createElement("img");
+      img.src = photo.fileUrl;
+      img.alt = photo.fileName || "รูปการฝึกซ้อม";
+      img.className = "w-20 h-20 object-cover rounded-lg border border-slate-200";
+      link.appendChild(img);
+      photoWrap.appendChild(link);
+    }
+    coachPlanDetailBody.appendChild(photoWrap);
+  }
+
+  coachPlanDetailOverlay.classList.remove("hidden");
+}
+
 coachPlanDetailCloseBtn.addEventListener("click", () => coachPlanDetailOverlay.classList.add("hidden"));
 coachPlanDetailOverlay.addEventListener("click", (e) => {
   if (e.target === coachPlanDetailOverlay) coachPlanDetailOverlay.classList.add("hidden");
@@ -1508,7 +1696,7 @@ function renderCoachActivitySummaryTable(containerEl, rows) {
           <tr>
             <th>โค้ช</th>
             <th>ตำแหน่ง/รุ่นอายุ</th>
-            <th title="จำนวนวันที่เช็คชื่อเดือนนี้ (%ตรงเวลาก่อน 20:00 น.)">เช็คชื่อเดือนนี้</th>
+            <th title="จำนวนวันที่เช็คชื่อเดือนนี้ (%ตรงเวลาก่อน 23:59 น.)">เช็คชื่อเดือนนี้</th>
             <th>รายงานการฝึกซ้อม</th>
             <th>แผนการฝึกซ้อม</th>
           </tr>
