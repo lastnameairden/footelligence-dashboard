@@ -1662,12 +1662,12 @@ function renderReportDetailModal(report) {
     photoWrap.className = "flex flex-wrap gap-2 mt-2";
     for (const photo of report.photos) {
       const link = document.createElement("a");
-      link.href = photo.fileUrl;
+      link.href = photo.url;
       link.target = "_blank";
       link.rel = "noopener";
       const img = document.createElement("img");
-      img.src = photo.fileUrl;
-      img.alt = photo.fileName || "รูปการฝึกซ้อม";
+      img.src = photo.url;
+      img.alt = photo.name || "รูปการฝึกซ้อม";
       img.className = "w-20 h-20 object-cover rounded-lg border border-slate-200";
       link.appendChild(img);
       photoWrap.appendChild(link);
