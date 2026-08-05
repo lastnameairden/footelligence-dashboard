@@ -3013,7 +3013,11 @@ async function syncTrainingReportForNoTraining(dateStr, isNoTraining) {
     where("date", "==", dateStr)
   );
   const snap = await getDocs(q);
-  const existing = snap.empty ? null : { id: snap.docs[0].id, ...snap.docs[0].data() };
+  const allReports = [];
+  snap.forEach((d) => allReports.push({ id: d.id, ...d.data() }));
+  // แก้ไข/สร้างรายงานของโค้ชคนนี้เองเท่านั้น กันไปทับ/แย่งรายงานของโค้ชคนอื่นในทีมเดียวกัน (ดู filterByMyCoachName)
+  const myReports = filterByMyCoachName(allReports);
+  const existing = myReports.length > 0 ? myReports[0] : null;
 
   if (isNoTraining) {
     const payload = {
@@ -3261,7 +3265,11 @@ async function loadReportForDate(dateStr) {
     where("date", "==", dateStr)
   );
   const snap = await getDocs(q);
-  const existing = snap.empty ? null : { id: snap.docs[0].id, ...snap.docs[0].data() };
+  const allReports = [];
+  snap.forEach((d) => allReports.push({ id: d.id, ...d.data() }));
+  // กรองเอาเฉพาะรายงานของโค้ชคนนี้เอง ไม่เอารายงานของโค้ชคนอื่นในทีมเดียวกันมาปนกัน (ดู filterByMyCoachName)
+  const myReports = filterByMyCoachName(allReports);
+  const existing = myReports.length > 0 ? myReports[0] : null;
 
   currentReportId = existing ? existing.id : null;
   reportPeriodType = existing ? existing.periodType || null : null;
@@ -4615,11 +4623,16 @@ function renderDailyAttendance(snap) {
 }
 
 function renderDailyTrainingReport(snap) {
-  if (snap.empty) {
+  // รายงานการฝึกซ้อมส่งแยกต่างหากทีละโค้ช (ไม่มีฟิลด์ ageGroup ให้กรองเหมือนแผนการฝึกซ้อม) ต้องกรองเอาเฉพาะ
+  // รายงานของโค้ชคนนี้เอง ไม่ใช่หยิบรายงานแรกที่เจอ (อาจเป็นของโค้ชรุ่นอื่นในทีมเดียวกัน)
+  const allReports = [];
+  snap.forEach((d) => allReports.push(d.data()));
+  const reports = filterByMyCoachName(allReports);
+  if (reports.length === 0) {
     dailyTrainingReportCard.innerHTML = '<p class="text-sm text-slate-400">ยังไม่มีรายงานการฝึกซ้อมในวันนี้</p>';
     return;
   }
-  const r = snap.docs[0].data();
+  const r = reports[0];
   const attendedText =
     r.attended === true
       ? '<span class="badge badge-success">มีการซ้อม</span>'
@@ -4664,6 +4677,15 @@ function renderDailyTrainingPlan(snap) {
 // ทุกรุ่นเหมือนเดิม) ใช้ร่วมกันทั้งผลการแข่งขันและอาการบาดเจ็บ เพราะทั้งสองผูกกับรุ่นอายุโดยตรงอยู่แล้ว
 function filterByMyAgeGroups(reports) {
   return myAgeGroups.length > 0 ? reports.filter((r) => myAgeGroups.includes(r.ageGroup)) : reports;
+}
+
+// เหมือน filterByMyAgeGroups ด้านบนแต่กรองด้วยชื่อโค้ชแทน — ใช้กับ "รายงานการฝึกซ้อม" (trainingReports) ซึ่งไม่มี
+// ฟิลด์ ageGroup ให้กรอง (เดิมออกแบบเป็นรายงานเดียวต่อทีมต่อวัน แต่ทีมหนึ่งมีหลายโค้ชคนละรุ่นอายุ ทำให้เห็น
+// รายงานของโค้ชคนอื่นปนกันอยู่) myAgeGroups.length > 0 เป็นสัญญาณเดียวกับที่ใช้ทั่วทั้งระบบว่า "รู้ตัวโค้ชคนนี้
+// แน่ชัดแล้ว" (โค้ชจริงล็อกอินเอง หรือผู้ดูแลระบบสวมบทบาทเจาะจงคนใดคนหนึ่ง) — โหมด "จัดการทีมนี้" แบบกว้าง
+// (myAgeGroups ว่างเปล่า) ยังเห็นรายงานของทุกโค้ชในทีมเหมือนเดิม เพราะยังไม่รู้ว่าจะจำกัดขอบเขตแค่ไหน
+function filterByMyCoachName(reports) {
+  return myAgeGroups.length > 0 ? reports.filter((r) => r.coachName === myCoachName) : reports;
 }
 
 function renderDailyMatchReports(snap) {
