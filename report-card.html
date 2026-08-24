@@ -11,7 +11,14 @@
     /* คำเห็นโค้ชแสดงเป็น <textarea> แก้ไขได้ตอนดูปกติ แต่ตอนพิมพ์สลับไปแสดงเป็นข้อความอ่านอย่างเดียวแทน
        (textarea ไม่พิมพ์ค่าที่กรอกออกมาในบางเบราว์เซอร์ถ้าไม่ได้ใช้ attribute value ตรงๆ) */
     .print-only { display: none; }
+    /* จำกัดข้อความยาว (จุดเด่น/จุดที่ต้องพัฒนาจาก MASC, คำเห็นโค้ช) ให้ตัดด้วย ... แทนการดันเนื้อหาอื่นล้นกรอบ
+       — Tailwind Play CDN ไม่มี line-clamp ใน build มาตรฐาน จึงประกาศเองตรงนี้ */
+    .line-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+    .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
     @media print {
+      /* เบราว์เซอร์ตัดสีพื้นหลัง/สีตัวอักษรทิ้งเป็นค่าเริ่มต้นตอนพิมพ์ (ประหยัดหมึก) — ต้องบังคับให้คงสีไว้
+         ไม่งั้นแถบหัวกระดาษสีทีมและการ์ดสถิติสีสันต่างๆ จะพิมพ์ออกมาเป็นขาวล้วนหมด */
+      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
       .no-print { display: none !important; }
       .print-only { display: block !important; }
       body { background: #fff; }
@@ -19,16 +26,16 @@
       .report-card-page {
         page-break-after: always;
         page-break-inside: avoid;
-        font-size: 10.5px;
+        font-size: 10px;
       }
       .report-card-page:last-child { page-break-after: auto; }
-      /* ย่อ padding/ตัวอักษรของตารางประวัติต่างๆ เฉพาะตอนพิมพ์ ให้แน่นพออยู่ใน A4 ได้ 1 หน้าต่อคนในกรณีทั่วไป
+      /* ย่อ padding/ตัวอักษรของตารางประวัติต่างๆ เฉพาะตอนพิมพ์ ให้แน่นพออยู่ใน A4 แนวนอนได้ 1 หน้าต่อคนในกรณีทั่วไป
          (จอปกติยังคงเว้นระยะสบายตาเหมือนเดิม เพราะหน้าจอไม่มีข้อจำกัดเรื่องพื้นที่แบบกระดาษ) */
-      .report-card-page table.pro-table thead th { padding: 0.2rem 0.4rem; font-size: 8px; }
-      .report-card-page table.pro-table tbody td { padding: 0.15rem 0.4rem; font-size: 9px; }
-      .report-card-page h2 { font-size: 12px; }
+      .report-card-page table.pro-table thead th { padding: 0.15rem 0.35rem; font-size: 7px; }
+      .report-card-page table.pro-table tbody td { padding: 0.1rem 0.35rem; font-size: 8px; }
     }
-    @page { size: A4; margin: 1.2cm; }
+    /* A4 แนวนอน ให้พื้นที่กว้างพอสำหรับเลย์เอาต์ 3 คอลัมน์ (โปรไฟล์ / ผลประเมิน+MASC / ประวัติ+สรุป) */
+    @page { size: A4 landscape; margin: 1cm; }
   </style>
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-900">
@@ -39,7 +46,7 @@
     </div>
   </header>
 
-  <main class="max-w-3xl mx-auto px-6 py-8 space-y-6">
+  <main class="max-w-5xl mx-auto px-6 py-8 space-y-6">
     <!-- หน้านี้เข้าถึงได้เฉพาะผู้ดูแลระบบ ผ่านเครื่องมือ "สมุดพกนักกีฬา" เท่านั้น จึงย้อนกลับไปที่เครื่องมือนั้น
          โดยตรงด้วย #admin=report-card (ใช้ attendance.html เฉยๆ จะโดน redirect ไปหน้า Dashboard แทน) -->
     <a href="./attendance.html#admin=report-card" class="btn btn-ghost px-0 no-print">← กลับหน้าสมุดพกนักกีฬา</a>

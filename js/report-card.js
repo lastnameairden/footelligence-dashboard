@@ -13,7 +13,6 @@ import { db, auth } from "./firebase-init.js";
 import {
   computeAvgScore,
   teamLogoImg,
-  statCard,
   calcAge,
   matchResultBadge,
   injurySeverityBadge,
@@ -21,10 +20,16 @@ import {
   buildCategoryRadarComparisonSvg,
   categoryAveragesFromRecords,
   applyDataLabels,
-  STATUS_LABELS
+  STATUS_LABELS,
+  TEAM_COLORS
 } from "./ui-utils.js";
+import { SECT, categoryRawScore, scoreToGrade } from "./masc-data.js";
 
 const UNASSIGNED_AGE_GROUP = "ไม่ระบุรุ่นอายุ";
+const DEFAULT_ACCENT = "#0f172a";
+// สีตามความหมาย (เขียว=มา/บวก, แดง=บาดเจ็บ/ลบ, เหลือง=พักฟื้น/เป็นกลาง, เทา=ลา) ใช้ให้การ์ดสถิติมีสีสันแต่ยังสื่อ
+// ความหมายตรงกับ badge สี success/danger/warning/neutral ที่ใช้อยู่แล้วทั่วแอป
+const STATUS_COLORS = { A: "#16a34a", I: "#dc2626", R: "#d97706", P: "#64748b" };
 
 const statusEl = document.getElementById("status-message");
 const accessGate = document.getElementById("access-gate");
@@ -129,9 +134,15 @@ async function saveComment(player, team, start, end, commentText, indicatorEl) {
   }
 }
 
-function buildHistoryTable(headers, rows) {
+// ตัดรายการให้เหลือไม่เกิน max แถว พร้อมบอกว่ามีเพิ่มอีกกี่รายการ — กันตารางประวัติยาวจนล้นหน้ากระดาษ (นักกีฬา
+// ที่มีข้อมูลเยอะผิดปกติ เช่น ลงแข่ง/บาดเจ็บถี่มาก) พ่อแม่ยังเห็นรายการล่าสุดครบ แค่ไม่เห็นแบบละเอียดทั้งหมด
+function capRows(items, max) {
+  return { shown: items.slice(0, max), extra: Math.max(0, items.length - max) };
+}
+
+function buildHistoryTable(headers, rows, extraCount) {
   if (rows.length === 0) {
-    return '<p class="text-sm text-slate-400">ไม่มีข้อมูลในช่วงเวลานี้</p>';
+    return '<p class="text-xs text-slate-400">ไม่มีข้อมูลในช่วงเวลานี้</p>';
   }
   const wrap = document.createElement("div");
   wrap.className = "card table-wrap";
@@ -144,18 +155,19 @@ function buildHistoryTable(headers, rows) {
   const tbody = wrap.querySelector("tbody");
   tbody.innerHTML = rows.join("");
   applyDataLabels(tbody);
-  return wrap.outerHTML;
+  const extraNote = extraCount > 0 ? `<p class="text-[10px] text-slate-400 mt-0.5">และอีก ${extraCount} รายการ</p>` : "";
+  return wrap.outerHTML + extraNote;
 }
 
 // แถบสเกล 1-4 แบบจิ๋วในตารางเปรียบเทียบ — จุดแดง = คะแนนรอบก่อน, จุดน้ำเงิน = คะแนนรอบนี้ วางบนเส้นเดียวกัน
 // ให้เห็นตำแหน่งเทียบกันได้ทันทีโดยไม่ต้องอ่านตัวเลข (คล้ายแถบ "SCALE" ในตัวอย่างการ์ดที่ผู้ใช้ส่งมา)
 function buildScaleBarSvg(prevAvg, curAvg, max = 4) {
-  const width = 90;
-  const height = 16;
+  const width = 80;
+  const height = 14;
   const toX = (v) => 4 + (v / max) * (width - 8);
-  const prevDot = prevAvg !== null ? `<circle cx="${toX(prevAvg).toFixed(1)}" cy="8" r="3" fill="#ef4444" />` : "";
-  const curDot = curAvg !== null ? `<circle cx="${toX(curAvg).toFixed(1)}" cy="8" r="3" fill="#2563eb" />` : "";
-  return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><line x1="4" y1="8" x2="${width - 4}" y2="8" stroke="#e2e8f0" stroke-width="2" />${prevDot}${curDot}</svg>`;
+  const prevDot = prevAvg !== null ? `<circle cx="${toX(prevAvg).toFixed(1)}" cy="7" r="3" fill="#ef4444" />` : "";
+  const curDot = curAvg !== null ? `<circle cx="${toX(curAvg).toFixed(1)}" cy="7" r="3" fill="#2563eb" />` : "";
+  return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><line x1="4" y1="7" x2="${width - 4}" y2="7" stroke="#e2e8f0" stroke-width="2" />${prevDot}${curDot}</svg>`;
 }
 
 // รวมค่าเฉลี่ยรอบก่อน/รอบนี้ทั้ง 4 หมวด พร้อม delta (ผลต่าง) — ใช้ทั้งตารางเปรียบเทียบและ Key takeaways
@@ -175,9 +187,9 @@ function buildSkillComparisonTable(comparisons) {
       c.delta === null
         ? '<span class="text-slate-400">-</span>'
         : c.delta > 0.05
-          ? `<span class="text-emerald-600">▲ ${c.delta.toFixed(1)}</span>`
+          ? `<span class="text-emerald-600 font-semibold">▲ ${c.delta.toFixed(1)}</span>`
           : c.delta < -0.05
-            ? `<span class="text-red-600">▼ ${Math.abs(c.delta).toFixed(1)}</span>`
+            ? `<span class="text-red-600 font-semibold">▼ ${Math.abs(c.delta).toFixed(1)}</span>`
             : '<span class="text-slate-400">≈ คงที่</span>';
     return `
       <tr>
@@ -188,11 +200,11 @@ function buildSkillComparisonTable(comparisons) {
         <td>${changeHtml}</td>
       </tr>`;
   });
-  return buildHistoryTable(["ด้านการประเมิน", "รอบก่อน", "รอบนี้", "สเกล 1-4", "การเปลี่ยนแปลง"], rows);
+  return buildHistoryTable(["ด้านการประเมิน", "รอบก่อน", "รอบนี้", "สเกล 1-4", "เปลี่ยนแปลง"], rows, 0);
 }
 
 // สรุปประเด็นสำคัญเป็นข้อความสั้นๆ (จุดแข็ง/จุดที่ควรพัฒนา/พัฒนาการเด่น/สรุปลงสนาม/สรุปเข้าฝึกซ้อม) — สร้างจาก
-// ข้อมูลจริงล้วนๆ ไม่เดาหรือเติมข้อมูลที่ไม่มี ข้อไหนไม่มีข้อมูลพอจะสรุปก็ข้ามไปเฉยๆ
+// ข้อมูลจริงล้วนๆ ไม่เดาหรือเติมข้อมูลที่ไม่มี ข้อไหนไม่มีข้อมูลพอจะสรุปก็ข้ามไปเฉยๆ — จำกัดไว้ไม่เกิน 4 ข้อ กันล้นกรอบ
 function buildKeyTakeaways(comparisons, matchStats, attendanceStats) {
   const bullets = [];
   const scored = comparisons.filter((c) => c.curAvg !== null);
@@ -214,7 +226,7 @@ function buildKeyTakeaways(comparisons, matchStats, attendanceStats) {
   if (attendanceStats.total > 0) {
     bullets.push(`เข้าร่วมฝึกซ้อม ${attendanceStats.percent}% (มา ${attendanceStats.attended}/${attendanceStats.total} ครั้ง)`);
   }
-  return bullets;
+  return bullets.slice(0, 4);
 }
 
 function matchStatsFor(matchReports) {
@@ -226,11 +238,59 @@ function matchStatsFor(matchReports) {
   };
 }
 
-// การ์ดสไตล์ "PLAYER PROFILE" (ซ้าย) + เนื้อหาหลัก (ขวา) ตามรูปแบบตัวอย่างที่ผู้ใช้ส่งมา — ไม่มีรูปนักกีฬาจริง
-// ในระบบ จึงใช้โลโก้ทีมแทนไอคอนวงกลม ส่วนหมวดคะแนน 4 ด้านที่มีอยู่แล้วยังคงเดิม (ไม่เพิ่มหมวดใหม่ที่ไม่มีข้อมูล
-// จริงรองรับ) ปรับแค่วิธีแสดงผลเป็นตารางเทียบรอบก่อน/รอบนี้ + เรดาร์ซ้อนสองรอบ ตามที่ตกลงกันไว้
+// การ์ดสถิติจิ๋วมีสี — ต่างจาก statCard กลาง (ui-utils.js, สีเทาเรียบใช้ทั่วแอป) เพราะหน้านี้ต้องการความมีสีสัน
+// ตามที่ผู้ใช้ขอโดยเฉพาะ ไม่กระทบหน้าจออื่น — พื้นหลังโทนอ่อนของสีที่ระบุ (~10% opacity) ตัวเลข/label ใช้สีเข้ม
+function colorStatCard(label, value, hex) {
+  return `
+    <div class="rounded-lg p-1.5 text-center" style="background:${hex}1a; border:1px solid ${hex}40;">
+      <p class="text-[9px] font-medium leading-tight" style="color:${hex}">${label}</p>
+      <p class="text-sm font-bold leading-tight" style="color:${hex}">${value}</p>
+    </div>
+  `;
+}
+
+const ROLE_LABELS = { important: "ตัวหลัก", rotation: "ตัวหมุนเวียน", reserve: "ตัวสำรอง" };
+const MASC_COLORS = { M: "#0ea5e9", A: "#8b5cf6", S: "#f59e0b", C: "#ec4899" };
+
+// สรุปผลประเมิน MASC ล่าสุดของนักกีฬาคนนี้ (ดึงจากฟีเจอร์ "🧬 การประเมิน MASC" ที่มีอยู่แล้วในระบบ — เก็บจริงใน
+// Firestore collection playerEvaluations) ไม่ใช่จากฟอร์มภายนอกที่ผู้ใช้ส่งลิงก์มา เพราะฟอร์มนั้นเป็น static form
+// ล้วนๆ ไม่มีฐานข้อมูลให้ดึง (ตรวจสอบแล้วไม่มี network request ใดๆ นอกจากโหลดหน้าเว็บ)
+function buildMascSection(evaluation) {
+  if (!evaluation) {
+    return '<p class="text-xs text-slate-400">ยังไม่มีข้อมูลการประเมิน MASC สำหรับนักกีฬาคนนี้</p>';
+  }
+  const grades = ["M", "A", "S", "C"].map((key) => ({
+    key,
+    grade: scoreToGrade(categoryRawScore(evaluation.scores?.[key]))
+  }));
+  const badgeRow = grades
+    .map(
+      (g) => `
+      <div class="rounded-lg p-1.5 text-center flex-1" style="background:${MASC_COLORS[g.key]}1a; border:1px solid ${MASC_COLORS[g.key]}40;">
+        <p class="text-[9px] font-semibold" style="color:${MASC_COLORS[g.key]}">${g.key} · ${SECT[g.key].nm}</p>
+        <p class="text-base font-bold" style="color:${MASC_COLORS[g.key]}">${g.grade ?? "-"}</p>
+      </div>`
+    )
+    .join("");
+  const roleText = (evaluation.playerRoles || []).map((r) => ROLE_LABELS[r] || r).join(", ") || "-";
+  const updatedLabel = evaluation.updatedAt?.toDate
+    ? evaluation.updatedAt.toDate().toLocaleDateString("th-TH", { year: "numeric", month: "short", day: "numeric" })
+    : "-";
+  return `
+    <p class="text-[10px] text-slate-400 mb-1">ประเมินล่าสุด: ${evaluation.assessmentPeriod || "-"} • อัปเดต ${updatedLabel} • บทบาท: ${roleText}</p>
+    <div class="flex gap-1.5 mb-1.5">${badgeRow}</div>
+    <div class="text-[10px] text-slate-600 space-y-0.5">
+      ${evaluation.talent ? `<p class="line-clamp-1"><span class="font-semibold text-slate-500">จุดเด่น:</span> ${evaluation.talent}</p>` : ""}
+      ${evaluation.limitations ? `<p class="line-clamp-1"><span class="font-semibold text-slate-500">จุดที่ต้องพัฒนา:</span> ${evaluation.limitations}</p>` : ""}
+    </div>
+  `;
+}
+
+// การ์ดรายงานแนวนอน (A4 landscape) 3 คอลัมน์ ตามรูปแบบตัวอย่างที่ผู้ใช้ส่งมา — แถบสีหัวกระดาษใช้สีประจำทีม
+// (TEAM_COLORS) ไม่มีรูปนักกีฬาจริงในระบบ จึงใช้โลโก้ทีมแทนไอคอนวงกลม ส่วนหมวดคะแนน 4 ด้านที่มีอยู่แล้วยังคงเดิม
 function buildPlayerPage(player, data, scope) {
   const { team, start, end } = scope;
+  const accent = TEAM_COLORS[team] || DEFAULT_ACCENT;
   const age = calcAge(player.birthday);
   const comparisons = categoryComparisons(data.prevAttendanceRecords, data.attendanceRecords);
   const matchStats = matchStatsFor(data.matchReports);
@@ -247,168 +307,209 @@ function buildPlayerPage(player, data, scope) {
   const attitudeComparison = comparisons.find((c) => c.key === "attitude");
 
   const page = document.createElement("div");
-  page.className = "report-card-page card card-pad space-y-3";
+  page.className = "report-card-page card overflow-hidden";
+  page.style.setProperty("--accent", accent);
 
+  // ---------- แถบหัวกระดาษสีประจำทีม ----------
   const header = document.createElement("div");
-  header.className = "flex items-start justify-between border-b border-slate-100 pb-2 gap-3";
+  header.className = "flex items-center justify-between px-4 py-2 text-white";
+  header.style.background = accent;
   header.innerHTML = `
-    <div>
-      <h2 class="text-base font-bold tracking-tight">รายงานทักษะและพัฒนาการ</h2>
-      <p class="text-xs text-slate-500 mt-0.5">รอบการประเมิน ${monthRangeLabel(start, end)} • ${teamLogoImg(team, "w-3.5 h-3.5 object-contain inline-block align-middle rounded mr-1")}${team}</p>
+    <div class="flex items-center gap-2">
+      <div class="w-8 h-8 rounded-full bg-white flex items-center justify-center overflow-hidden flex-shrink-0">
+        ${teamLogoImg(team, "w-6 h-6 object-contain")}
+      </div>
+      <div>
+        <p class="text-sm font-bold leading-tight">${player.nickname || player.fullName || "-"} <span class="font-normal opacity-80">• ${player.fullName ?? "-"}</span></p>
+        <p class="text-[10px] opacity-90 leading-tight">${team} • รอบการประเมิน ${monthRangeLabel(start, end)}</p>
+      </div>
     </div>
-    <p class="text-xs text-slate-400 whitespace-nowrap">ออกรายงาน ${new Date().toLocaleDateString("th-TH", { year: "numeric", month: "short", day: "numeric" })}</p>
+    <p class="text-[10px] opacity-90 whitespace-nowrap">ออกรายงาน ${new Date().toLocaleDateString("th-TH", { year: "numeric", month: "short", day: "numeric" })}</p>
   `;
   page.appendChild(header);
 
   const body = document.createElement("div");
-  body.className = "grid grid-cols-[130px_1fr] gap-4";
+  body.className = "grid grid-cols-[170px_1fr_1fr] gap-3 p-3";
 
-  // ---------- แถบซ้าย: โปรไฟล์นักกีฬา ----------
+  // ---------- คอลัมน์ 1: โปรไฟล์นักกีฬา ----------
   const sidebar = document.createElement("aside");
-  sidebar.className = "space-y-2";
+  sidebar.className = "space-y-1.5";
   sidebar.innerHTML = `
-    <p class="text-[10px] font-semibold tracking-wide text-slate-400 uppercase">Player Profile</p>
-    <div class="w-16 h-16 rounded-full border-2 border-slate-200 flex items-center justify-center overflow-hidden bg-slate-50 mx-auto">
-      ${teamLogoImg(team, "w-10 h-10 object-contain")}
+    <p class="text-[9px] font-semibold tracking-wide uppercase" style="color:${accent}">Player Profile</p>
+    <div class="w-14 h-14 rounded-full flex items-center justify-center overflow-hidden bg-slate-50 mx-auto" style="border:2px solid ${accent}">
+      ${teamLogoImg(team, "w-9 h-9 object-contain")}
     </div>
-    <p class="text-sm font-semibold text-center">${player.nickname || player.fullName || "-"}</p>
-    <div class="text-xs text-slate-600 space-y-0.5 pt-1 border-t border-slate-100">
-      <p class="flex justify-between"><span class="text-slate-400">รุ่น</span><span>${player.ageGroup || UNASSIGNED_AGE_GROUP}</span></p>
-      <p class="flex justify-between"><span class="text-slate-400">อายุ</span><span>${age !== null ? `${age} ปี` : "-"}</span></p>
-      <p class="flex justify-between"><span class="text-slate-400">ตำแหน่ง</span><span>${player.position ?? "-"}</span></p>
-      <p class="flex justify-between"><span class="text-slate-400">เบอร์เสื้อ</span><span>${player.number ?? "-"}</span></p>
+    <div class="text-[10px] text-slate-600 space-y-0.5 pt-1 border-t border-slate-100">
+      <p class="flex justify-between"><span class="text-slate-400">รุ่น</span><span class="font-medium">${player.ageGroup || UNASSIGNED_AGE_GROUP}</span></p>
+      <p class="flex justify-between"><span class="text-slate-400">อายุ</span><span class="font-medium">${age !== null ? `${age} ปี` : "-"}</span></p>
+      <p class="flex justify-between"><span class="text-slate-400">ตำแหน่ง</span><span class="font-medium">${player.position ?? "-"}</span></p>
+      <p class="flex justify-between"><span class="text-slate-400">เบอร์เสื้อ</span><span class="font-medium">${player.number ?? "-"}</span></p>
     </div>
-    <p class="text-[10px] font-semibold tracking-wide text-slate-400 uppercase pt-1 border-t border-slate-100">Profile Radar</p>
+    <p class="text-[9px] font-semibold tracking-wide uppercase pt-1 border-t border-slate-100" style="color:${accent}">Profile Radar</p>
     <div>${buildCategoryRadarComparisonSvg(data.prevAttendanceRecords, data.attendanceRecords, 130)}</div>
-    <div class="grid grid-cols-1 gap-1 text-center pt-1 border-t border-slate-100">
-      <div><p class="text-[10px] text-slate-400">ด้านทักษะ</p><p class="text-sm font-bold">${skillAvg !== null ? skillAvg.toFixed(1) : "-"}/4</p></div>
-      <div><p class="text-[10px] text-slate-400">ด้านทัศนคติ</p><p class="text-sm font-bold">${attitudeComparison?.curAvg !== null && attitudeComparison?.curAvg !== undefined ? attitudeComparison.curAvg.toFixed(1) : "-"}/4</p></div>
+    <div class="grid grid-cols-2 gap-1 text-center pt-1 border-t border-slate-100">
+      <div><p class="text-[9px] text-slate-400">ด้านทักษะ</p><p class="text-sm font-bold" style="color:${accent}">${skillAvg !== null ? skillAvg.toFixed(1) : "-"}/4</p></div>
+      <div><p class="text-[9px] text-slate-400">ด้านทัศนคติ</p><p class="text-sm font-bold" style="color:${accent}">${attitudeComparison?.curAvg !== null && attitudeComparison?.curAvg !== undefined ? attitudeComparison.curAvg.toFixed(1) : "-"}/4</p></div>
     </div>
   `;
   body.appendChild(sidebar);
 
-  // ---------- เนื้อหาหลัก ----------
-  const main = document.createElement("div");
-  main.className = "space-y-3";
+  // ---------- คอลัมน์ 2: ผลการประเมิน + MASC ----------
+  const col2 = document.createElement("div");
+  col2.className = "space-y-2";
 
   const statsWrap = document.createElement("div");
-  statsWrap.className = "grid grid-cols-4 gap-2";
+  statsWrap.className = "grid grid-cols-4 gap-1.5";
   statsWrap.innerHTML =
-    statCard("นัดที่ลงสนาม", matchStats.total) +
-    statCard("ผลการแข่งขัน (ช-ส-พ)", `${matchStats.win}-${matchStats.draw}-${matchStats.loss}`) +
-    statCard("% เข้าร่วมฝึกซ้อม", `${data.percent}%`) +
-    statCard("คะแนนเฉลี่ยรวม", data.overallAvg !== null ? data.overallAvg.toFixed(2) : "-");
-  main.appendChild(statsWrap);
+    colorStatCard("นัดที่ลงสนาม", matchStats.total, "#2563eb") +
+    colorStatCard("ผล (ช-ส-พ)", `${matchStats.win}-${matchStats.draw}-${matchStats.loss}`, "#7c3aed") +
+    colorStatCard("% เข้าซ้อม", `${data.percent}%`, "#059669") +
+    colorStatCard("คะแนนเฉลี่ย", data.overallAvg !== null ? data.overallAvg.toFixed(2) : "-", "#d97706");
+  col2.appendChild(statsWrap);
 
   const skillTitle = document.createElement("h4");
-  skillTitle.className = "text-sm font-semibold text-slate-700";
+  skillTitle.className = "text-xs font-semibold pl-2";
+  skillTitle.style.borderLeft = `3px solid ${accent}`;
   skillTitle.textContent = "ผลการประเมิน 4 ด้าน (เทียบรอบก่อนหน้า)";
-  main.appendChild(skillTitle);
+  col2.appendChild(skillTitle);
   const skillTableWrap = document.createElement("div");
   skillTableWrap.innerHTML = buildSkillComparisonTable(comparisons);
-  main.appendChild(skillTableWrap);
+  col2.appendChild(skillTableWrap);
+
+  const mascTitle = document.createElement("h4");
+  mascTitle.className = "text-xs font-semibold pl-2";
+  mascTitle.style.borderLeft = `3px solid ${accent}`;
+  mascTitle.textContent = "การประเมิน MASC ล่าสุด";
+  col2.appendChild(mascTitle);
+  const mascWrap = document.createElement("div");
+  mascWrap.innerHTML = buildMascSection(data.mascEvaluation);
+  col2.appendChild(mascWrap);
+
+  body.appendChild(col2);
+
+  // ---------- คอลัมน์ 3: ประวัติและสรุปประเด็นสำคัญ ----------
+  const col3 = document.createElement("div");
+  col3.className = "space-y-2";
 
   const attendanceTitle = document.createElement("h4");
-  attendanceTitle.className = "text-sm font-semibold text-slate-700";
+  attendanceTitle.className = "text-xs font-semibold pl-2";
+  attendanceTitle.style.borderLeft = `3px solid ${accent}`;
   attendanceTitle.textContent = "สรุปการฝึกซ้อม";
-  main.appendChild(attendanceTitle);
-  // สรุปจำนวนครั้งแยกตามสถานะ (มา/บาดเจ็บ/พักฟื้น/ลา) แทนตารางรายวันละเอียด — สั้นกระชับพอสำหรับผู้ปกครอง
-  // และช่วยให้เนื้อหาต่อคนพอดี 1 หน้า A4 มากขึ้นด้วย
+  col3.appendChild(attendanceTitle);
   const attendanceSummaryWrap = document.createElement("div");
-  attendanceSummaryWrap.className = "grid grid-cols-4 gap-2";
+  attendanceSummaryWrap.className = "grid grid-cols-4 gap-1.5";
   attendanceSummaryWrap.innerHTML = Object.keys(STATUS_LABELS)
-    .map((key) => statCard(STATUS_LABELS[key], `${statusCounts[key]} ครั้ง`))
+    .map((key) => colorStatCard(STATUS_LABELS[key], `${statusCounts[key]} ครั้ง`, STATUS_COLORS[key]))
     .join("");
-  main.appendChild(attendanceSummaryWrap);
-
-  const keyTakeawaysTitle = document.createElement("h4");
-  keyTakeawaysTitle.className = "text-sm font-semibold text-slate-700";
-  keyTakeawaysTitle.textContent = "สรุปประเด็นสำคัญ";
-  main.appendChild(keyTakeawaysTitle);
-  const takeaways = buildKeyTakeaways(comparisons, matchStats, {
-    total: data.totalCount,
-    attended: statusCounts.A,
-    percent: data.percent
-  });
-  const takeawaysWrap = document.createElement("div");
-  takeawaysWrap.className = "card p-3";
-  takeawaysWrap.innerHTML =
-    takeaways.length > 0
-      ? `<ul class="text-xs text-slate-600 space-y-1 list-disc pl-4">${takeaways.map((t) => `<li>${t}</li>`).join("")}</ul>`
-      : '<p class="text-xs text-slate-400">ยังไม่มีข้อมูลเพียงพอสำหรับสรุปประเด็นสำคัญ</p>';
-  main.appendChild(takeawaysWrap);
-
-  body.appendChild(main);
-  page.appendChild(body);
+  col3.appendChild(attendanceSummaryWrap);
 
   const matchTitle = document.createElement("h4");
-  matchTitle.className = "text-sm font-semibold text-slate-700";
+  matchTitle.className = "text-xs font-semibold pl-2";
+  matchTitle.style.borderLeft = `3px solid ${accent}`;
   matchTitle.textContent = "ผลการแข่งขันที่ลงสนาม";
-  page.appendChild(matchTitle);
-  const matchRows = [...data.matchReports]
-    .sort((a, b) => (b.date || "").localeCompare(a.date || ""))
-    .map(
-      (m) => `
+  col3.appendChild(matchTitle);
+  const cappedMatches = capRows(
+    [...data.matchReports].sort((a, b) => (b.date || "").localeCompare(a.date || "")),
+    4
+  );
+  const matchRows = cappedMatches.shown.map(
+    (m) => `
       <tr>
         <td class="emphasis">${m.date ?? "-"}</td>
         <td>${m.opponent ?? "-"}</td>
         <td>${matchResultBadge(m.result)}</td>
         <td class="emphasis">${m.scoreUs} - ${m.scoreThem}</td>
       </tr>`
-    );
+  );
   const matchWrap = document.createElement("div");
-  matchWrap.innerHTML = buildHistoryTable(["วันที่", "คู่แข่ง", "ผล", "สกอร์"], matchRows);
-  page.appendChild(matchWrap);
+  matchWrap.innerHTML = buildHistoryTable(["วันที่", "คู่แข่ง", "ผล", "สกอร์"], matchRows, cappedMatches.extra);
+  col3.appendChild(matchWrap);
 
   const injuryTitle = document.createElement("h4");
-  injuryTitle.className = "text-sm font-semibold text-slate-700";
+  injuryTitle.className = "text-xs font-semibold pl-2";
+  injuryTitle.style.borderLeft = `3px solid ${accent}`;
   injuryTitle.textContent = "ประวัติการบาดเจ็บ";
-  page.appendChild(injuryTitle);
-  const injuryRows = [...data.injuryReports]
-    .sort((a, b) => (b.date || "").localeCompare(a.date || ""))
-    .map(
-      (inj) => `
+  col3.appendChild(injuryTitle);
+  const cappedInjuries = capRows(
+    [...data.injuryReports].sort((a, b) => (b.date || "").localeCompare(a.date || "")),
+    3
+  );
+  const injuryRows = cappedInjuries.shown.map(
+    (inj) => `
       <tr>
         <td class="emphasis">${inj.date ?? "-"}</td>
         <td>${inj.description ?? "-"}</td>
         <td>${injurySeverityBadge(inj.severity)}</td>
         <td>${injuryStatusBadge(inj.status)}</td>
       </tr>`
-    );
+  );
   const injuryWrap = document.createElement("div");
-  injuryWrap.innerHTML = buildHistoryTable(["วันที่", "อาการ", "ความรุนแรง", "สถานะ"], injuryRows);
-  page.appendChild(injuryWrap);
+  injuryWrap.innerHTML = buildHistoryTable(["วันที่", "อาการ", "ความรุนแรง", "สถานะ"], injuryRows, cappedInjuries.extra);
+  col3.appendChild(injuryWrap);
+
+  const keyTakeawaysTitle = document.createElement("h4");
+  keyTakeawaysTitle.className = "text-xs font-semibold pl-2";
+  keyTakeawaysTitle.style.borderLeft = `3px solid ${accent}`;
+  keyTakeawaysTitle.textContent = "สรุปประเด็นสำคัญ";
+  col3.appendChild(keyTakeawaysTitle);
+  const takeaways = buildKeyTakeaways(comparisons, matchStats, {
+    total: data.totalCount,
+    attended: statusCounts.A,
+    percent: data.percent
+  });
+  const takeawaysWrap = document.createElement("div");
+  takeawaysWrap.className = "rounded-lg p-2";
+  takeawaysWrap.style.background = `${accent}0d`;
+  takeawaysWrap.innerHTML =
+    takeaways.length > 0
+      ? `<ul class="text-[10px] text-slate-600 space-y-0.5 list-disc pl-3">${takeaways.map((t) => `<li>${t}</li>`).join("")}</ul>`
+      : '<p class="text-[10px] text-slate-400">ยังไม่มีข้อมูลเพียงพอสำหรับสรุปประเด็นสำคัญ</p>';
+  col3.appendChild(takeawaysWrap);
+
+  body.appendChild(col3);
+  page.appendChild(body);
+
+  // ---------- ส่วนล่าง: คำเห็นโค้ช + ลายเซ็น (เต็มความกว้าง ใต้ 3 คอลัมน์) ----------
+  const footerWrap = document.createElement("div");
+  footerWrap.className = "px-4 pb-3 pt-2 border-t border-slate-100";
 
   const commentTitle = document.createElement("h4");
-  commentTitle.className = "text-sm font-semibold text-slate-700";
+  commentTitle.className = "text-xs font-semibold pl-2 mb-1";
+  commentTitle.style.borderLeft = `3px solid ${accent}`;
   commentTitle.textContent = "คำเห็นและข้อเสนอแนะจากโค้ช";
-  page.appendChild(commentTitle);
+  footerWrap.appendChild(commentTitle);
+
+  const commentRow = document.createElement("div");
+  commentRow.className = "grid grid-cols-[1fr_200px] gap-3 items-start";
 
   const commentPrintText = document.createElement("p");
-  commentPrintText.className = "print-only text-sm whitespace-pre-wrap border border-slate-200 rounded-lg p-2 min-h-[3rem]";
-  page.appendChild(commentPrintText);
-
+  commentPrintText.className = "print-only text-xs whitespace-pre-wrap border border-slate-200 rounded-lg p-2 min-h-[2.5rem] line-clamp-3";
   const commentTextarea = document.createElement("textarea");
-  commentTextarea.className = "field-input w-full no-print";
-  commentTextarea.rows = 3;
+  commentTextarea.className = "field-input w-full no-print text-sm";
+  commentTextarea.rows = 2;
   commentTextarea.placeholder = "เขียนคำเห็น/ข้อเสนอแนะสำหรับนักกีฬาคนนี้...";
   commentTextarea.value = data.comment || "";
   commentPrintText.textContent = data.comment || "-";
   const commentIndicator = document.createElement("p");
-  commentIndicator.className = "text-xs text-slate-400 no-print";
+  commentIndicator.className = "text-[10px] text-slate-400 no-print";
   commentTextarea.addEventListener("blur", () => {
     commentPrintText.textContent = commentTextarea.value.trim() || "-";
     saveComment(player, team, start, end, commentTextarea.value.trim(), commentIndicator);
   });
-  page.append(commentTextarea, commentIndicator);
+  const commentCol = document.createElement("div");
+  commentCol.append(commentPrintText, commentTextarea, commentIndicator);
+  commentRow.appendChild(commentCol);
 
-  const footer = document.createElement("div");
-  footer.className = "grid grid-cols-2 gap-6 pt-3 mt-2 border-t border-slate-100 text-sm text-slate-500";
-  footer.innerHTML = `
-    <p>ลงชื่อโค้ช ........................................</p>
-    <p>ลงชื่อผู้ปกครอง ........................................</p>
+  const signatureCol = document.createElement("div");
+  signatureCol.className = "text-[10px] text-slate-500 space-y-3 pt-1";
+  signatureCol.innerHTML = `
+    <p>ลงชื่อโค้ช .......................................</p>
+    <p>ลงชื่อผู้ปกครอง .......................................</p>
   `;
-  page.appendChild(footer);
+  commentRow.appendChild(signatureCol);
+
+  footerWrap.appendChild(commentRow);
+  page.appendChild(footerWrap);
 
   return page;
 }
@@ -424,7 +525,7 @@ async function loadReportCards(team, ageGroup, start, end) {
   const prevStartDate = `${prevPeriod.start}-01`;
   const prevEndDate = lastDayOfMonth(prevPeriod.end);
 
-  const [playersSnap, attendanceSnap, matchSnap, injurySnap, commentsSnap] = await Promise.all([
+  const [playersSnap, attendanceSnap, matchSnap, injurySnap, commentsSnap, evaluationsSnap] = await Promise.all([
     getDocs(query(collection(db, "players"), where("team", "==", team))),
     getDocs(query(collection(db, "attendance"), where("team", "==", team))),
     getDocs(query(collection(db, "matchReports"), where("team", "==", team))),
@@ -436,7 +537,8 @@ async function loadReportCards(team, ageGroup, start, end) {
         where("startMonth", "==", start),
         where("endMonth", "==", end)
       )
-    )
+    ),
+    getDocs(query(collection(db, "playerEvaluations"), where("team", "==", team)))
   ]);
 
   let players = [];
@@ -471,6 +573,9 @@ async function loadReportCards(team, ageGroup, start, end) {
   const commentsByPlayerId = new Map();
   commentsSnap.forEach((d) => commentsByPlayerId.set(d.data().playerId, d.data()));
 
+  const evaluations = [];
+  evaluationsSnap.forEach((d) => evaluations.push(d.data()));
+
   const monthLabel = monthRangeLabel(start, end);
   const scopeText =
     ageGroup === "__ALL__"
@@ -495,6 +600,16 @@ async function loadReportCards(team, ageGroup, start, end) {
     const myInjuries = periodInjuries.filter((i) => i.playerId === player.id);
     const existingComment = commentsByPlayerId.get(player.id);
 
+    // เลือกการประเมิน MASC ล่าสุดของนักกีฬาคนนี้ (เรียงตามเวลาบันทึกล่าสุด) ไม่ได้กรองตามช่วงเวลาของสมุดพก
+    // เพราะรอบประเมิน MASC ("ช่วงที่ 1-4") เป็นคนละระบบ ไม่ได้ผูกกับเดือนปฏิทินแบบเดียวกับสมุดพก
+    const myEvaluations = evaluations.filter((e) => e.playerId === player.id);
+    const mascEvaluation =
+      myEvaluations.length > 0
+        ? myEvaluations
+            .slice()
+            .sort((a, b) => (b.updatedAt?.toDate?.().getTime() ?? 0) - (a.updatedAt?.toDate?.().getTime() ?? 0))[0]
+        : null;
+
     const page = buildPlayerPage(player, {
       attendanceRecords: myAttendance,
       prevAttendanceRecords: myPrevAttendance,
@@ -503,7 +618,8 @@ async function loadReportCards(team, ageGroup, start, end) {
       overallAvg,
       matchReports: myMatches,
       injuryReports: myInjuries,
-      comment: existingComment?.comment || ""
+      comment: existingComment?.comment || "",
+      mascEvaluation
     }, { team, start, end });
     reportCardPages.appendChild(page);
   }
