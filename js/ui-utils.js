@@ -174,70 +174,6 @@ export function buildScoreTrendChartSvg(records) {
   `;
 }
 
-// กราฟเส้นแบบ SVG สรุปคะแนนเฉลี่ยเป็นรายเดือน (1 จุดต่อเดือน) แทนรายวัน — ใช้ในสมุดพกนักกีฬาสำหรับพิมพ์
-// (report-card.js) เพราะรอบการประเมินยาวหลายเดือน กราฟรายวันจะกว้างเกินจนล้นหน้ากระดาษ A4 เวลาพิมพ์ ส่วนหน้า
-// ข้อมูลนักกีฬา (player.js) สำหรับโค้ชดูเองยังคงใช้ buildScoreTrendChartSvg (รายวัน ละเอียดกว่า) ตามเดิม —
-// points: [{ label, avg }] โดย avg เป็น null ได้ (เดือนที่ไม่มีข้อมูลคะแนน) ความกว้างคงที่ ไม่ขยายตามจำนวนจุด
-// เพื่อไม่ให้ต้องเลื่อนดู (ต่างจาก buildScoreTrendChartSvg ที่ยิ่งมีจุดเยอะยิ่งกว้างขึ้น)
-export function buildMonthlyTrendChartSvg(points) {
-  const hasAnyData = points.some((p) => p.avg !== null);
-  if (!hasAnyData) {
-    return '<p class="text-sm text-slate-400 text-center py-6">ยังไม่มีข้อมูลคะแนนเพียงพอสำหรับแสดงกราฟ</p>';
-  }
-
-  const width = 320;
-  const height = 170;
-  const padTop = 18;
-  const padBottom = 30;
-  const padLeft = 26;
-  const padRight = 16;
-  const chartW = width - padLeft - padRight;
-  const chartH = height - padTop - padBottom;
-  const maxScore = 4;
-
-  const coords = points.map((p, i) => {
-    const x = points.length === 1 ? padLeft + chartW / 2 : padLeft + (i / (points.length - 1)) * chartW;
-    const y = p.avg !== null ? padTop + chartH - (p.avg / maxScore) * chartH : null;
-    return { x, y, avg: p.avg, label: p.label };
-  });
-
-  const linePath = coords
-    .filter((c) => c.y !== null)
-    .map((c, i) => `${i === 0 ? "M" : "L"}${c.x.toFixed(1)},${c.y.toFixed(1)}`)
-    .join(" ");
-
-  const gridLines = [1, 2, 3, 4]
-    .map((v) => {
-      const y = padTop + chartH - (v / maxScore) * chartH;
-      return `<line x1="${padLeft}" y1="${y}" x2="${width - padRight}" y2="${y}" stroke="#e2e8f0" stroke-width="1" />
-              <text x="${padLeft - 6}" y="${y + 4}" font-size="10" fill="#94a3b8" text-anchor="end">${v}</text>`;
-    })
-    .join("");
-
-  const pointMarks = coords
-    .map((c) => {
-      const labelText = `<text x="${c.x.toFixed(1)}" y="${height - 10}" font-size="10" fill="#64748b" text-anchor="middle">${c.label}</text>`;
-      if (c.y === null) {
-        return labelText;
-      }
-      return `
-        <circle cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="4" fill="#0f172a">
-          <title>${c.label}: ${c.avg.toFixed(2)}</title>
-        </circle>
-        <text x="${c.x.toFixed(1)}" y="${(c.y - 10).toFixed(1)}" font-size="10" fill="#334155" text-anchor="middle">${c.avg.toFixed(2)}</text>
-        ${labelText}`;
-    })
-    .join("");
-
-  return `
-    <svg viewBox="0 0 ${width} ${height}" width="100%" height="${height}" preserveAspectRatio="xMidYMid meet">
-      ${gridLines}
-      <path d="${linePath}" fill="none" stroke="#0f172a" stroke-width="2" />
-      ${pointMarks}
-    </svg>
-  `;
-}
-
 // กราฟใยแมงมุม (radar chart) แบบ SVG แสดงคะแนนเฉลี่ยทั้ง 4 ด้านเทียบกันในรูปเดียว ให้เห็นจุดแข็ง/จุดที่ต้อง
 // พัฒนาของนักกีฬาได้เร็วกว่าดูเป็นแท่งเรียงกัน — size ปรับได้ (สมุดพกสำหรับพิมพ์ใช้ขนาดเล็กกว่าค่าเริ่มต้นเพื่อ
 // ประหยัดพื้นที่หน้ากระดาษ A4)
@@ -323,6 +259,105 @@ export function buildCategoryRadarSvg(records, size = 340) {
       <polygon points="${dataPolygon}" fill="#0f172a" fill-opacity="0.12" stroke="#0f172a" stroke-width="2" />
       ${dataDots}
       ${labels}
+    </svg>
+  `;
+}
+
+// ค่าเฉลี่ยแต่ละหมวด (SCORE_CATEGORIES) จาก records ที่ให้มา — ตัวช่วยกลางใช้ทั้งใน buildCategoryRadarComparisonSvg
+// และตารางเปรียบเทียบก่อน/หลังในสมุดพกนักกีฬา (report-card.js) เพื่อไม่ให้คำนวณค่าเฉลี่ยเพี้ยนกันคนละจุด
+function categoryAveragesFromRecords(records) {
+  const sums = {};
+  const counts = {};
+  for (const cat of SCORE_CATEGORIES) {
+    sums[cat.key] = 0;
+    counts[cat.key] = 0;
+  }
+  for (const r of records) {
+    const scores = r.scores || {};
+    for (const cat of SCORE_CATEGORIES) {
+      if (typeof scores[cat.key] === "number") {
+        sums[cat.key] += scores[cat.key];
+        counts[cat.key] += 1;
+      }
+    }
+  }
+  return SCORE_CATEGORIES.map((cat) => ({
+    key: cat.key,
+    label: cat.label,
+    short: cat.short,
+    avg: counts[cat.key] > 0 ? sums[cat.key] / counts[cat.key] : null
+  }));
+}
+export { categoryAveragesFromRecords };
+
+// กราฟเรดาร์เปรียบเทียบ 2 ช่วงเวลาซ้อนกันในรูปเดียว (แดง = รอบก่อนหน้า, น้ำเงิน = รอบปัจจุบัน) ใช้ในสมุดพก
+// นักกีฬาสำหรับพิมพ์ (report-card.js) ให้เห็นพัฒนาการเทียบรอบต่อรอบได้ในภาพเดียว ต่างจาก buildCategoryRadarSvg
+// ที่แสดงแค่ช่วงเดียว — หมวดที่ไม่มีข้อมูลของรอบใดรอบหนึ่งจะไม่ลากเส้นในรอบนั้น (จุดที่ไม่มีค่าเว้นไว้ที่ 0)
+export function buildCategoryRadarComparisonSvg(prevRecords, currentRecords, size = 260) {
+  const prevAverages = categoryAveragesFromRecords(prevRecords);
+  const currentAverages = categoryAveragesFromRecords(currentRecords);
+  const hasAnyData = currentAverages.some((c) => c.avg !== null) || prevAverages.some((c) => c.avg !== null);
+  if (!hasAnyData) {
+    return '<p class="text-xs text-slate-400 text-center py-6">ยังไม่มีข้อมูลคะแนนเพียงพอสำหรับแสดงกราฟ</p>';
+  }
+
+  const n = SCORE_CATEGORIES.length;
+  const maxScore = 4;
+  const cx = size / 2;
+  const cy = size / 2 - 4;
+  const R = size * 0.29;
+  const angles = SCORE_CATEGORIES.map((_, i) => -Math.PI / 2 + (i * 2 * Math.PI) / n);
+  const point = (angle, fraction) => ({
+    x: cx + R * fraction * Math.cos(angle),
+    y: cy + R * fraction * Math.sin(angle)
+  });
+
+  const gridRings = [0.25, 0.5, 0.75, 1]
+    .map((fraction) => {
+      const pts = angles
+        .map((a) => point(a, fraction))
+        .map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`)
+        .join(" ");
+      return `<polygon points="${pts}" fill="none" stroke="#e2e8f0" stroke-width="1" />`;
+    })
+    .join("");
+
+  const spokes = angles
+    .map((a) => {
+      const p = point(a, 1);
+      return `<line x1="${cx}" y1="${cy}" x2="${p.x.toFixed(1)}" y2="${p.y.toFixed(1)}" stroke="#e2e8f0" stroke-width="1" />`;
+    })
+    .join("");
+
+  const polygonFor = (averages, color) => {
+    const pts = angles.map((a, i) => point(a, (averages[i].avg ?? 0) / maxScore));
+    const polygon = pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+    const dots = pts
+      .map((p, i) => (averages[i].avg === null ? "" : `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="${color}" />`))
+      .join("");
+    return `<polygon points="${polygon}" fill="${color}" fill-opacity="0.1" stroke="${color}" stroke-width="2" />${dots}`;
+  };
+
+  const labelR = R + 30;
+  const labels = angles
+    .map((a, i) => {
+      const p = point(a, labelR / R);
+      const anchor = Math.cos(a) > 0.3 ? "start" : Math.cos(a) < -0.3 ? "end" : "middle";
+      return `<text x="${p.x.toFixed(1)}" y="${(p.y + 3).toFixed(1)}" font-size="9" font-weight="600" fill="#334155" text-anchor="${anchor}">${SCORE_CATEGORIES[i].short}</text>`;
+    })
+    .join("");
+
+  return `
+    <svg viewBox="0 0 ${size} ${size + 18}" width="100%" style="max-width:${size}px; margin:0 auto; display:block">
+      ${gridRings}
+      ${spokes}
+      ${polygonFor(prevAverages, "#ef4444")}
+      ${polygonFor(currentAverages, "#2563eb")}
+      ${labels}
+      <g transform="translate(${cx - 60}, ${size + 8})" font-size="9" fill="#64748b">
+        <circle cx="0" cy="-3" r="3" fill="#ef4444" /><text x="6" y="0">รอบก่อน</text>
+        <circle cx="60" cy="-3" r="3" fill="#2563eb" /><text x="66" y="0">รอบนี้</text>
+      </g>
     </svg>
   `;
 }

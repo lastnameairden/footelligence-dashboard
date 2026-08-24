@@ -18,8 +18,8 @@ import {
   matchResultBadge,
   injurySeverityBadge,
   injuryStatusBadge,
-  buildMonthlyTrendChartSvg,
-  buildCategoryRadarSvg,
+  buildCategoryRadarComparisonSvg,
+  categoryAveragesFromRecords,
   applyDataLabels,
   STATUS_LABELS
 } from "./ui-utils.js";
@@ -69,8 +69,8 @@ function monthRangeLabel(start, end) {
   return start === end ? startLabel : `${startLabel} – ${endLabel}`;
 }
 
-// ไล่รายชื่อเดือนทั้งหมดในช่วง [start, end] (รวมปลายทั้งสองด้าน) รูปแบบ "YYYY-MM" — ใช้สรุปกราฟแนวโน้มเป็น
-// รายเดือนแทนรายวัน (กราฟรายวันของรอบ 3 เดือนจะกว้างเกินจนล้นหน้ากระดาษ A4 เวลาพิมพ์)
+// ไล่รายชื่อเดือนทั้งหมดในช่วง [start, end] (รวมปลายทั้งสองด้าน) รูปแบบ "YYYY-MM" — ใช้นับความยาวของรอบเวลา
+// เพื่อคำนวณ "รอบก่อนหน้า" ที่ยาวเท่ากัน (ดู previousPeriodRange)
 function monthsInRange(start, end) {
   const months = [];
   let [y, m] = start.split("-").map(Number);
@@ -86,19 +86,20 @@ function monthsInRange(start, end) {
   return months;
 }
 
-function shortThaiMonthLabel(monthStr) {
-  return new Date(`${monthStr}-01T00:00:00`).toLocaleDateString("th-TH", { year: "2-digit", month: "short" });
+// เลื่อนเดือน "YYYY-MM" ไปกี่เดือนก็ได้ (delta ติดลบ = ย้อนหลัง)
+function addMonths(monthStr, delta) {
+  const [y, m] = monthStr.split("-").map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-// สรุปคะแนนเฉลี่ยของนักกีฬาคนนี้เป็นรายเดือน (1 จุดต่อเดือนในช่วงที่เลือก) ให้ buildMonthlyTrendChartSvg วาดกราฟ
-function buildMonthlyPoints(records, start, end) {
-  return monthsInRange(start, end).map((month) => {
-    const monthRecords = records.filter((r) => (r.date || "").startsWith(month));
-    const scored = monthRecords.filter((r) => computeAvgScore(r.scores) !== null);
-    const avg =
-      scored.length > 0 ? scored.reduce((sum, r) => sum + computeAvgScore(r.scores), 0) / scored.length : null;
-    return { label: shortThaiMonthLabel(month), avg };
-  });
+// รอบเวลาก่อนหน้ารอบที่เลือกไว้ ยาวเท่ากันเสมอ (เช่น เลือกรอบ 3 เดือน มิ.ย.-ส.ค. รอบก่อนหน้าคือ มี.ค.-พ.ค.)
+// ใช้เปรียบเทียบพัฒนาการของนักกีฬาก่อน/หลัง ในตารางเปรียบเทียบและกราฟเรดาร์ซ้อนสองรอบ
+function previousPeriodRange(start, end) {
+  const monthCount = monthsInRange(start, end).length;
+  const prevEnd = addMonths(start, -1);
+  const prevStart = addMonths(prevEnd, -(monthCount - 1));
+  return { start: prevStart, end: prevEnd };
 }
 
 // บันทึกคำเห็นโค้ชของนักกีฬาคนนี้สำหรับรอบเวลานี้โดยเฉพาะ — id เอกสารผูกกับ playerId+start+end เพื่อไม่ให้
@@ -146,62 +147,199 @@ function buildHistoryTable(headers, rows) {
   return wrap.outerHTML;
 }
 
+// แถบสเกล 1-4 แบบจิ๋วในตารางเปรียบเทียบ — จุดแดง = คะแนนรอบก่อน, จุดน้ำเงิน = คะแนนรอบนี้ วางบนเส้นเดียวกัน
+// ให้เห็นตำแหน่งเทียบกันได้ทันทีโดยไม่ต้องอ่านตัวเลข (คล้ายแถบ "SCALE" ในตัวอย่างการ์ดที่ผู้ใช้ส่งมา)
+function buildScaleBarSvg(prevAvg, curAvg, max = 4) {
+  const width = 90;
+  const height = 16;
+  const toX = (v) => 4 + (v / max) * (width - 8);
+  const prevDot = prevAvg !== null ? `<circle cx="${toX(prevAvg).toFixed(1)}" cy="8" r="3" fill="#ef4444" />` : "";
+  const curDot = curAvg !== null ? `<circle cx="${toX(curAvg).toFixed(1)}" cy="8" r="3" fill="#2563eb" />` : "";
+  return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><line x1="4" y1="8" x2="${width - 4}" y2="8" stroke="#e2e8f0" stroke-width="2" />${prevDot}${curDot}</svg>`;
+}
+
+// รวมค่าเฉลี่ยรอบก่อน/รอบนี้ทั้ง 4 หมวด พร้อม delta (ผลต่าง) — ใช้ทั้งตารางเปรียบเทียบและ Key takeaways
+function categoryComparisons(prevRecords, currentRecords) {
+  const prevAverages = categoryAveragesFromRecords(prevRecords);
+  const currentAverages = categoryAveragesFromRecords(currentRecords);
+  return currentAverages.map((cur, i) => {
+    const prev = prevAverages[i];
+    const delta = cur.avg !== null && prev.avg !== null ? cur.avg - prev.avg : null;
+    return { key: cur.key, label: cur.short, prevAvg: prev.avg, curAvg: cur.avg, delta };
+  });
+}
+
+function buildSkillComparisonTable(comparisons) {
+  const rows = comparisons.map((c) => {
+    const changeHtml =
+      c.delta === null
+        ? '<span class="text-slate-400">-</span>'
+        : c.delta > 0.05
+          ? `<span class="text-emerald-600">▲ ${c.delta.toFixed(1)}</span>`
+          : c.delta < -0.05
+            ? `<span class="text-red-600">▼ ${Math.abs(c.delta).toFixed(1)}</span>`
+            : '<span class="text-slate-400">≈ คงที่</span>';
+    return `
+      <tr>
+        <td class="emphasis">${c.label}</td>
+        <td>${c.prevAvg !== null ? c.prevAvg.toFixed(1) : "-"}</td>
+        <td>${c.curAvg !== null ? c.curAvg.toFixed(1) : "-"}</td>
+        <td>${buildScaleBarSvg(c.prevAvg, c.curAvg)}</td>
+        <td>${changeHtml}</td>
+      </tr>`;
+  });
+  return buildHistoryTable(["ด้านการประเมิน", "รอบก่อน", "รอบนี้", "สเกล 1-4", "การเปลี่ยนแปลง"], rows);
+}
+
+// สรุปประเด็นสำคัญเป็นข้อความสั้นๆ (จุดแข็ง/จุดที่ควรพัฒนา/พัฒนาการเด่น/สรุปลงสนาม/สรุปเข้าฝึกซ้อม) — สร้างจาก
+// ข้อมูลจริงล้วนๆ ไม่เดาหรือเติมข้อมูลที่ไม่มี ข้อไหนไม่มีข้อมูลพอจะสรุปก็ข้ามไปเฉยๆ
+function buildKeyTakeaways(comparisons, matchStats, attendanceStats) {
+  const bullets = [];
+  const scored = comparisons.filter((c) => c.curAvg !== null);
+  if (scored.length > 0) {
+    const best = scored.reduce((a, b) => (b.curAvg > a.curAvg ? b : a));
+    bullets.push(`จุดแข็งที่สุดคือ ${best.label} (${best.curAvg.toFixed(1)}/4)`);
+    const worst = scored.reduce((a, b) => (b.curAvg < a.curAvg ? b : a));
+    if (worst.key !== best.key) {
+      bullets.push(`ควรเน้นพัฒนาเพิ่มเติมคือ ${worst.label} (${worst.curAvg.toFixed(1)}/4)`);
+    }
+  }
+  const improved = comparisons.filter((c) => c.delta !== null && c.delta > 0.05).sort((a, b) => b.delta - a.delta)[0];
+  if (improved) {
+    bullets.push(`พัฒนาการชัดเจนที่สุดคือ ${improved.label} เพิ่มขึ้น ${improved.delta.toFixed(1)} แต้มจากรอบก่อน`);
+  }
+  if (matchStats.total > 0) {
+    bullets.push(`ลงสนาม ${matchStats.total} นัด (ชนะ ${matchStats.win} เสมอ ${matchStats.draw} แพ้ ${matchStats.loss})`);
+  }
+  if (attendanceStats.total > 0) {
+    bullets.push(`เข้าร่วมฝึกซ้อม ${attendanceStats.percent}% (มา ${attendanceStats.attended}/${attendanceStats.total} ครั้ง)`);
+  }
+  return bullets;
+}
+
+function matchStatsFor(matchReports) {
+  return {
+    total: matchReports.length,
+    win: matchReports.filter((m) => m.result === "ชนะ").length,
+    draw: matchReports.filter((m) => m.result !== "ชนะ" && m.result !== "แพ้").length,
+    loss: matchReports.filter((m) => m.result === "แพ้").length
+  };
+}
+
+// การ์ดสไตล์ "PLAYER PROFILE" (ซ้าย) + เนื้อหาหลัก (ขวา) ตามรูปแบบตัวอย่างที่ผู้ใช้ส่งมา — ไม่มีรูปนักกีฬาจริง
+// ในระบบ จึงใช้โลโก้ทีมแทนไอคอนวงกลม ส่วนหมวดคะแนน 4 ด้านที่มีอยู่แล้วยังคงเดิม (ไม่เพิ่มหมวดใหม่ที่ไม่มีข้อมูล
+// จริงรองรับ) ปรับแค่วิธีแสดงผลเป็นตารางเทียบรอบก่อน/รอบนี้ + เรดาร์ซ้อนสองรอบ ตามที่ตกลงกันไว้
 function buildPlayerPage(player, data, scope) {
   const { team, start, end } = scope;
   const age = calcAge(player.birthday);
+  const comparisons = categoryComparisons(data.prevAttendanceRecords, data.attendanceRecords);
+  const matchStats = matchStatsFor(data.matchReports);
+
+  const statusCounts = { A: 0, I: 0, R: 0, P: 0 };
+  for (const r of data.attendanceRecords) {
+    if (r.status && Object.prototype.hasOwnProperty.call(statusCounts, r.status)) statusCounts[r.status] += 1;
+  }
+
+  // avg ของ 3 หมวดสมรรถภาพ/ทักษะบอล/อ่านเกม (ใกล้เคียงคำว่า "ทักษะ" มากที่สุดจาก 4 หมวดที่มีอยู่จริง)
+  const skillComparisons = comparisons.filter((c) => c.key !== "attitude");
+  const skillAvgValues = skillComparisons.map((c) => c.curAvg).filter((v) => v !== null);
+  const skillAvg = skillAvgValues.length > 0 ? skillAvgValues.reduce((a, b) => a + b, 0) / skillAvgValues.length : null;
+  const attitudeComparison = comparisons.find((c) => c.key === "attitude");
 
   const page = document.createElement("div");
   page.className = "report-card-page card card-pad space-y-3";
 
   const header = document.createElement("div");
-  header.className = "text-center border-b border-slate-100 pb-3";
+  header.className = "flex items-start justify-between border-b border-slate-100 pb-2 gap-3";
   header.innerHTML = `
-    <img src="./assets/logo.png" alt="Footelligence" class="w-10 h-10 object-contain mx-auto mb-1" />
-    <h2 class="text-base font-bold tracking-tight">สมุดพกนักกีฬา — รอบการประเมิน ${monthRangeLabel(start, end)}</h2>
-    <p class="text-base font-semibold mt-1">${player.nickname || player.fullName || "-"}</p>
-    <p class="text-sm text-slate-500 mt-1">
-      ${player.fullName ?? "-"} • เบอร์ ${player.number ?? "-"} •
-      ${teamLogoImg(team, "w-4 h-4 object-contain inline-block align-middle rounded mr-1")}${team} •
-      รุ่น ${player.ageGroup || UNASSIGNED_AGE_GROUP}${age !== null ? ` • อายุ ${age} ปี` : ""}${player.position ? ` • ตำแหน่ง ${player.position}` : ""}
-    </p>
+    <div>
+      <h2 class="text-base font-bold tracking-tight">รายงานทักษะและพัฒนาการ</h2>
+      <p class="text-xs text-slate-500 mt-0.5">รอบการประเมิน ${monthRangeLabel(start, end)} • ${teamLogoImg(team, "w-3.5 h-3.5 object-contain inline-block align-middle rounded mr-1")}${team}</p>
+    </div>
+    <p class="text-xs text-slate-400 whitespace-nowrap">ออกรายงาน ${new Date().toLocaleDateString("th-TH", { year: "numeric", month: "short", day: "numeric" })}</p>
   `;
   page.appendChild(header);
 
+  const body = document.createElement("div");
+  body.className = "grid grid-cols-[130px_1fr] gap-4";
+
+  // ---------- แถบซ้าย: โปรไฟล์นักกีฬา ----------
+  const sidebar = document.createElement("aside");
+  sidebar.className = "space-y-2";
+  sidebar.innerHTML = `
+    <p class="text-[10px] font-semibold tracking-wide text-slate-400 uppercase">Player Profile</p>
+    <div class="w-16 h-16 rounded-full border-2 border-slate-200 flex items-center justify-center overflow-hidden bg-slate-50 mx-auto">
+      ${teamLogoImg(team, "w-10 h-10 object-contain")}
+    </div>
+    <p class="text-sm font-semibold text-center">${player.nickname || player.fullName || "-"}</p>
+    <div class="text-xs text-slate-600 space-y-0.5 pt-1 border-t border-slate-100">
+      <p class="flex justify-between"><span class="text-slate-400">รุ่น</span><span>${player.ageGroup || UNASSIGNED_AGE_GROUP}</span></p>
+      <p class="flex justify-between"><span class="text-slate-400">อายุ</span><span>${age !== null ? `${age} ปี` : "-"}</span></p>
+      <p class="flex justify-between"><span class="text-slate-400">ตำแหน่ง</span><span>${player.position ?? "-"}</span></p>
+      <p class="flex justify-between"><span class="text-slate-400">เบอร์เสื้อ</span><span>${player.number ?? "-"}</span></p>
+    </div>
+    <p class="text-[10px] font-semibold tracking-wide text-slate-400 uppercase pt-1 border-t border-slate-100">Profile Radar</p>
+    <div>${buildCategoryRadarComparisonSvg(data.prevAttendanceRecords, data.attendanceRecords, 130)}</div>
+    <div class="grid grid-cols-1 gap-1 text-center pt-1 border-t border-slate-100">
+      <div><p class="text-[10px] text-slate-400">ด้านทักษะ</p><p class="text-sm font-bold">${skillAvg !== null ? skillAvg.toFixed(1) : "-"}/4</p></div>
+      <div><p class="text-[10px] text-slate-400">ด้านทัศนคติ</p><p class="text-sm font-bold">${attitudeComparison?.curAvg !== null && attitudeComparison?.curAvg !== undefined ? attitudeComparison.curAvg.toFixed(1) : "-"}/4</p></div>
+    </div>
+  `;
+  body.appendChild(sidebar);
+
+  // ---------- เนื้อหาหลัก ----------
+  const main = document.createElement("div");
+  main.className = "space-y-3";
+
   const statsWrap = document.createElement("div");
-  statsWrap.className = "grid grid-cols-3 gap-3";
+  statsWrap.className = "grid grid-cols-4 gap-2";
   statsWrap.innerHTML =
-    statCard("จำนวนครั้งที่บันทึก", data.totalCount) +
+    statCard("นัดที่ลงสนาม", matchStats.total) +
+    statCard("ผลการแข่งขัน (ช-ส-พ)", `${matchStats.win}-${matchStats.draw}-${matchStats.loss}`) +
     statCard("% เข้าร่วมฝึกซ้อม", `${data.percent}%`) +
     statCard("คะแนนเฉลี่ยรวม", data.overallAvg !== null ? data.overallAvg.toFixed(2) : "-");
-  page.appendChild(statsWrap);
+  main.appendChild(statsWrap);
 
-  const chartsWrap = document.createElement("div");
-  chartsWrap.className = "grid sm:grid-cols-2 gap-3";
-  const trendCard = document.createElement("div");
-  trendCard.className = "card p-3";
-  trendCard.innerHTML = `<h4 class="text-sm font-semibold text-slate-700 mb-1">แนวโน้มคะแนนเฉลี่ยรายเดือน</h4>${buildMonthlyTrendChartSvg(buildMonthlyPoints(data.attendanceRecords, start, end))}`;
-  const radarCard = document.createElement("div");
-  radarCard.className = "card p-3";
-  radarCard.innerHTML = `<h4 class="text-sm font-semibold text-slate-700 mb-1">คะแนนเฉลี่ยแยกตามด้าน</h4>${buildCategoryRadarSvg(data.attendanceRecords, 240)}`;
-  chartsWrap.append(trendCard, radarCard);
-  page.appendChild(chartsWrap);
+  const skillTitle = document.createElement("h4");
+  skillTitle.className = "text-sm font-semibold text-slate-700";
+  skillTitle.textContent = "ผลการประเมิน 4 ด้าน (เทียบรอบก่อนหน้า)";
+  main.appendChild(skillTitle);
+  const skillTableWrap = document.createElement("div");
+  skillTableWrap.innerHTML = buildSkillComparisonTable(comparisons);
+  main.appendChild(skillTableWrap);
 
   const attendanceTitle = document.createElement("h4");
   attendanceTitle.className = "text-sm font-semibold text-slate-700";
   attendanceTitle.textContent = "สรุปการฝึกซ้อม";
-  page.appendChild(attendanceTitle);
+  main.appendChild(attendanceTitle);
   // สรุปจำนวนครั้งแยกตามสถานะ (มา/บาดเจ็บ/พักฟื้น/ลา) แทนตารางรายวันละเอียด — สั้นกระชับพอสำหรับผู้ปกครอง
   // และช่วยให้เนื้อหาต่อคนพอดี 1 หน้า A4 มากขึ้นด้วย
-  const statusCounts = { A: 0, I: 0, R: 0, P: 0 };
-  for (const r of data.attendanceRecords) {
-    if (r.status && Object.prototype.hasOwnProperty.call(statusCounts, r.status)) statusCounts[r.status] += 1;
-  }
   const attendanceSummaryWrap = document.createElement("div");
-  attendanceSummaryWrap.className = "grid grid-cols-4 gap-3";
+  attendanceSummaryWrap.className = "grid grid-cols-4 gap-2";
   attendanceSummaryWrap.innerHTML = Object.keys(STATUS_LABELS)
     .map((key) => statCard(STATUS_LABELS[key], `${statusCounts[key]} ครั้ง`))
     .join("");
-  page.appendChild(attendanceSummaryWrap);
+  main.appendChild(attendanceSummaryWrap);
+
+  const keyTakeawaysTitle = document.createElement("h4");
+  keyTakeawaysTitle.className = "text-sm font-semibold text-slate-700";
+  keyTakeawaysTitle.textContent = "สรุปประเด็นสำคัญ";
+  main.appendChild(keyTakeawaysTitle);
+  const takeaways = buildKeyTakeaways(comparisons, matchStats, {
+    total: data.totalCount,
+    attended: statusCounts.A,
+    percent: data.percent
+  });
+  const takeawaysWrap = document.createElement("div");
+  takeawaysWrap.className = "card p-3";
+  takeawaysWrap.innerHTML =
+    takeaways.length > 0
+      ? `<ul class="text-xs text-slate-600 space-y-1 list-disc pl-4">${takeaways.map((t) => `<li>${t}</li>`).join("")}</ul>`
+      : '<p class="text-xs text-slate-400">ยังไม่มีข้อมูลเพียงพอสำหรับสรุปประเด็นสำคัญ</p>';
+  main.appendChild(takeawaysWrap);
+
+  body.appendChild(main);
+  page.appendChild(body);
 
   const matchTitle = document.createElement("h4");
   matchTitle.className = "text-sm font-semibold text-slate-700";
@@ -280,6 +418,11 @@ async function loadReportCards(team, ageGroup, start, end) {
 
   const startDate = `${start}-01`;
   const endDate = lastDayOfMonth(end);
+  // รอบก่อนหน้ายาวเท่ากับรอบที่เลือก ใช้เทียบพัฒนาการในตารางเปรียบเทียบ/เรดาร์ซ้อนสองรอบ — ไม่ต้อง query
+  // Firestore เพิ่ม เพราะ attendanceSnap ด้านล่างดึงข้อมูลทั้งทีมมาแล้ว (ไม่ได้กรองด้วยเดือนที่ query level)
+  const prevPeriod = previousPeriodRange(start, end);
+  const prevStartDate = `${prevPeriod.start}-01`;
+  const prevEndDate = lastDayOfMonth(prevPeriod.end);
 
   const [playersSnap, attendanceSnap, matchSnap, injurySnap, commentsSnap] = await Promise.all([
     getDocs(query(collection(db, "players"), where("team", "==", team))),
@@ -313,6 +456,9 @@ async function loadReportCards(team, ageGroup, start, end) {
   const attendanceRecords = [];
   attendanceSnap.forEach((d) => attendanceRecords.push(d.data()));
   const periodAttendance = attendanceRecords.filter((r) => (r.date || "") >= startDate && (r.date || "") <= endDate);
+  const prevPeriodAttendance = attendanceRecords.filter(
+    (r) => (r.date || "") >= prevStartDate && (r.date || "") <= prevEndDate
+  );
 
   const matchReports = [];
   matchSnap.forEach((d) => matchReports.push(d.data()));
@@ -336,6 +482,7 @@ async function loadReportCards(team, ageGroup, start, end) {
   reportCardPages.innerHTML = "";
   for (const player of players) {
     const myAttendance = periodAttendance.filter((r) => r.playerId === player.id);
+    const myPrevAttendance = prevPeriodAttendance.filter((r) => r.playerId === player.id);
     const attendedCount = myAttendance.filter((r) => r.status === "A").length;
     const totalCount = myAttendance.length;
     const percent = totalCount > 0 ? Math.round((attendedCount / totalCount) * 100) : 0;
@@ -350,6 +497,7 @@ async function loadReportCards(team, ageGroup, start, end) {
 
     const page = buildPlayerPage(player, {
       attendanceRecords: myAttendance,
+      prevAttendanceRecords: myPrevAttendance,
       totalCount,
       percent,
       overallAvg,
