@@ -650,6 +650,55 @@
       </div>
     </section>
 
+    <!-- สมุดพกนักกีฬา (รายงานผลรายบุคคลรอบ 3 เดือนสำหรับผู้ปกครอง) -->
+    <section id="admin-report-card-section" class="hidden space-y-6">
+      <button data-admin-back class="btn btn-ghost px-0">← กลับหน้า Dashboard</button>
+      <div class="page-heading">
+        <div class="icon-badge icon-badge-lg">📔</div>
+        <div>
+          <h2>สมุดพกนักกีฬา</h2>
+          <p>เลือกทีม รุ่นอายุ และช่วงเวลา แล้วสร้างสมุดพกสำหรับพิมพ์ส่งผู้ปกครองทั้งชุด</p>
+        </div>
+      </div>
+      <div class="card card-pad space-y-3 max-w-sm">
+        <div>
+          <label class="field-label">เลือกทีม</label>
+          <select id="admin-report-card-team-select" class="field-input w-full"></select>
+        </div>
+        <div>
+          <label class="field-label">เลือกรุ่นอายุ</label>
+          <select id="admin-report-card-age-group-select" class="field-input w-full">
+            <option value="__ALL__">ทุกรุ่นอายุ</option>
+            <option value="U6">U6</option>
+            <option value="U7">U7</option>
+            <option value="U8">U8</option>
+            <option value="U9">U9</option>
+            <option value="U10">U10</option>
+            <option value="U11">U11</option>
+            <option value="U12">U12</option>
+            <option value="U13">U13</option>
+            <option value="U14">U14</option>
+            <option value="U15">U15</option>
+            <option value="U16">U16</option>
+            <option value="U17">U17</option>
+            <option value="U18">U18</option>
+          </select>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="field-label">เดือนเริ่มต้น</label>
+            <input id="admin-report-card-start-select" type="month" class="field-input w-full" />
+          </div>
+          <div>
+            <label class="field-label">เดือนสิ้นสุด</label>
+            <input id="admin-report-card-end-select" type="month" class="field-input w-full" />
+          </div>
+        </div>
+        <button id="admin-generate-report-card-btn" class="btn btn-primary btn-block">สร้างสมุดพกสำหรับพิมพ์ →</button>
+        <p id="admin-report-card-status" class="text-sm text-red-600 w-full"></p>
+      </div>
+    </section>
+
     <!-- หน้าจอเพิ่มนักกีฬา -->
     <section id="add-player-section" class="hidden space-y-6">
       <button data-back class="btn btn-ghost px-0">← กลับหน้า Daily</button>

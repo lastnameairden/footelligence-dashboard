@@ -126,5 +126,12 @@ service cloud.firestore {
       allow update: if isAdmin() || (canManageTeam() && ownsTeam() && request.resource.data.team == myTeam());
       allow delete: if isAdmin() || (canManageTeam() && ownsTeam());
     }
+
+    // คำเห็นของโค้ชในสมุดพกนักกีฬา (รายงานผลรายบุคคลรอบ 3 เดือนสำหรับผู้ปกครอง) — ผู้ดูแลระบบเป็นคนสร้าง/
+    // แก้ไขทั้งหมด (เลือกทีม/รุ่นอายุแล้วพิมพ์ทั้งชุด) จึงจำกัดเฉพาะผู้ดูแลระบบเท่านั้น ไม่เปิดให้โค้ชเขียนตรงๆ
+    // เอกสารแยกตามช่วงเวลา (playerId+startMonth+endMonth) เพื่อไม่ให้คำเห็นรอบเก่าถูกทับตอนสร้างรอบใหม่
+    match /playerReportCards/{id} {
+      allow read, write: if isAdmin();
+    }
   }
 }

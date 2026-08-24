@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FOOTELLIGENCE DATA — สมุดพกนักกีฬา</title>
+  <link rel="icon" href="./assets/logo.png" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="./css/styles.css" />
+  <style>
+    /* คำเห็นโค้ชแสดงเป็น <textarea> แก้ไขได้ตอนดูปกติ แต่ตอนพิมพ์สลับไปแสดงเป็นข้อความอ่านอย่างเดียวแทน
+       (textarea ไม่พิมพ์ค่าที่กรอกออกมาในบางเบราว์เซอร์ถ้าไม่ได้ใช้ attribute value ตรงๆ) */
+    .print-only { display: none; }
+    @media print {
+      .no-print { display: none !important; }
+      .print-only { display: block !important; }
+      body { background: #fff; }
+      .card { box-shadow: none; border-color: #cbd5e1; }
+      .report-card-page { page-break-after: always; }
+      .report-card-page:last-child { page-break-after: auto; }
+    }
+    @page { size: A4; margin: 1.5cm; }
+  </style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-900">
+  <header class="app-header text-white sticky top-0 z-10 shadow-sm no-print">
+    <div class="max-w-5xl mx-auto px-6 py-5 flex items-center gap-3">
+      <img src="./assets/logo.png" alt="Footelligence" class="w-9 h-9 object-contain" />
+      <h1 class="text-xl font-bold leading-tight tracking-tight">FOOTELLIGENCE DATA</h1>
+    </div>
+  </header>
+
+  <main class="max-w-3xl mx-auto px-6 py-8 space-y-6">
+    <!-- หน้านี้เข้าถึงได้เฉพาะผู้ดูแลระบบ ผ่านเครื่องมือ "สมุดพกนักกีฬา" เท่านั้น จึงย้อนกลับไปที่เครื่องมือนั้น
+         โดยตรงด้วย #admin=report-card (ใช้ attendance.html เฉยๆ จะโดน redirect ไปหน้า Dashboard แทน) -->
+    <a href="./attendance.html#admin=report-card" class="btn btn-ghost px-0 no-print">← กลับหน้าสมุดพกนักกีฬา</a>
+    <p id="status-message" class="text-sm text-slate-500 no-print">กำลังเชื่อมต่อ...</p>
+
+    <!-- แสดงเมื่อยังไม่ได้ล็อกอิน หรือไม่ใช่บัญชีผู้ดูแลระบบ -->
+    <section id="access-gate" class="hidden card card-pad max-w-md mx-auto text-center no-print">
+      <div class="icon-badge icon-badge-lg mx-auto mb-3">🛡️</div>
+      <h2 class="text-lg font-semibold mb-2">เฉพาะผู้ดูแลระบบเท่านั้น</h2>
+      <p class="text-sm text-slate-500 mb-4" id="access-gate-message">
+        ต้องเข้าสู่ระบบด้วยบัญชีผู้ดูแลระบบก่อน จึงจะสร้างสมุดพกนักกีฬาได้
+      </p>
+      <a href="./attendance.html" class="btn btn-primary">ไปที่หน้าเข้าสู่ระบบ →</a>
+    </section>
+
+    <!-- เนื้อหาสมุดพก -->
+    <div id="report-card-content" class="hidden space-y-6">
+      <div class="flex items-center justify-between flex-wrap gap-3 no-print">
+        <p id="report-card-scope-label" class="text-sm text-slate-500"></p>
+        <button id="print-btn" class="btn btn-primary">🖨️ พิมพ์ / บันทึกเป็น PDF ทั้งชุด</button>
+      </div>
+      <p class="text-xs text-slate-400 no-print">
+        ตรวจสอบข้อมูลและเขียนคำเห็นโค้ชให้นักกีฬาแต่ละคน (บันทึกอัตโนมัติเมื่อคลิกออกจากช่อง) ก่อนกดพิมพ์
+      </p>
+
+      <div id="report-card-pages" class="space-y-8"></div>
+    </div>
+  </main>
+
+  <footer class="app-footer no-print">FOOTELLIGENCE DATA © 2026 — ระบบจัดการข้อมูลนักกีฬาและการฝึกซ้อม</footer>
+
+  <script type="module" src="./js/report-card.js"></script>
+</body>
+</html>

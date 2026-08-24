@@ -18,7 +18,9 @@ import {
   injuryStatusBadge,
   statCard,
   sendExecutiveNote,
-  calcAge
+  calcAge,
+  buildScoreTrendChartSvg,
+  buildCategoryRadarSvg
 } from "./ui-utils.js";
 
 const STATUS_LABELS = { A: "มา", I: "บาดเจ็บ", R: "พักฟื้น", P: "ลา" };
@@ -66,153 +68,15 @@ function renderPlayerInfo(player) {
   playerSubheading.innerHTML = parts.join(" • ");
 }
 
-// กราฟเส้นแบบ SVG ธรรมดา ไม่พึ่งไลบรารีภายนอก แสดงคะแนนเฉลี่ยรายวันเรียงตามเวลา เพื่อดูแนวโน้มพัฒนาการ
+// กราฟเส้น/เรดาร์ (SVG) ย้ายไปเป็นฟังก์ชันกลางใน ui-utils.js (buildScoreTrendChartSvg/buildCategoryRadarSvg)
+// แล้ว เพราะสมุดพกนักกีฬาสำหรับพิมพ์ (report-card.js) ต้องใช้กราฟแบบเดียวกันนี้กับ records ที่กรองสโคปรายช่วง
+// เวลาแทนที่จะเป็นประวัติทั้งหมด — ที่นี่แค่เรียกใช้แล้ววาดลง DOM ของหน้านี้
 function renderScoreTrendChart(records) {
-  const points = records
-    .filter((r) => computeAvgScore(r.scores) !== null)
-    .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
-
-  if (points.length === 0) {
-    scoreTrendChartWrap.innerHTML =
-      '<p class="text-sm text-slate-400 text-center py-8">ยังไม่มีข้อมูลคะแนนเพียงพอสำหรับแสดงกราฟ</p>';
-    return;
-  }
-
-  const width = Math.max(points.length * 70, 320);
-  const height = 220;
-  const padTop = 20;
-  const padBottom = 36;
-  const padLeft = 30;
-  const padRight = 20;
-  const chartW = width - padLeft - padRight;
-  const chartH = height - padTop - padBottom;
-  const maxScore = 4;
-
-  const coords = points.map((p, i) => {
-    const avg = computeAvgScore(p.scores);
-    const x = points.length === 1 ? padLeft + chartW / 2 : padLeft + (i / (points.length - 1)) * chartW;
-    const y = padTop + chartH - (avg / maxScore) * chartH;
-    return { x, y, avg, date: p.date };
-  });
-
-  const linePath = coords.map((c, i) => `${i === 0 ? "M" : "L"}${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(" ");
-
-  const gridLines = [1, 2, 3, 4]
-    .map((v) => {
-      const y = padTop + chartH - (v / maxScore) * chartH;
-      return `<line x1="${padLeft}" y1="${y}" x2="${width - padRight}" y2="${y}" stroke="#e2e8f0" stroke-width="1" />
-              <text x="${padLeft - 6}" y="${y + 4}" font-size="10" fill="#94a3b8" text-anchor="end">${v}</text>`;
-    })
-    .join("");
-
-  const dots = coords
-    .map(
-      (c) => `
-      <circle cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="4" fill="#0f172a">
-        <title>${c.date}: ${c.avg.toFixed(2)}</title>
-      </circle>
-      <text x="${c.x.toFixed(1)}" y="${height - 12}" font-size="10" fill="#64748b" text-anchor="middle">${c.date ? c.date.slice(5) : ""}</text>`
-    )
-    .join("");
-
-  scoreTrendChartWrap.innerHTML = `
-    <svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" style="min-width:${width}px">
-      ${gridLines}
-      <path d="${linePath}" fill="none" stroke="#0f172a" stroke-width="2" />
-      ${dots}
-    </svg>
-  `;
+  scoreTrendChartWrap.innerHTML = buildScoreTrendChartSvg(records);
 }
 
-// กราฟใยแมงมุม (radar chart) แบบ SVG ธรรมดา ไม่พึ่งไลบรารีภายนอก (เหมือน renderScoreTrendChart ด้านบน) —
-// แสดงคะแนนเฉลี่ยทั้ง 4 ด้านเทียบกันในรูปเดียว ให้เห็นจุดแข็ง/จุดที่ต้องพัฒนาของนักกีฬาได้เร็วกว่าดูเป็นแท่งเรียงกัน
 function renderCategoryRadar(records) {
-  const sums = {};
-  const counts = {};
-  for (const cat of SCORE_CATEGORIES) {
-    sums[cat.key] = 0;
-    counts[cat.key] = 0;
-  }
-  for (const r of records) {
-    const scores = r.scores || {};
-    for (const cat of SCORE_CATEGORIES) {
-      if (typeof scores[cat.key] === "number") {
-        sums[cat.key] += scores[cat.key];
-        counts[cat.key] += 1;
-      }
-    }
-  }
-
-  const hasAnyData = SCORE_CATEGORIES.some((cat) => counts[cat.key] > 0);
-  if (!hasAnyData) {
-    categoryBars.innerHTML =
-      '<p class="text-sm text-slate-400 text-center py-8">ยังไม่มีข้อมูลคะแนนเพียงพอสำหรับแสดงกราฟ</p>';
-    return;
-  }
-
-  const averages = SCORE_CATEGORIES.map((cat) => (counts[cat.key] > 0 ? sums[cat.key] / counts[cat.key] : 0));
-  const n = SCORE_CATEGORIES.length;
-  const maxScore = 4;
-  const size = 340;
-  const cx = size / 2;
-  const cy = size / 2 - 6;
-  const R = 100;
-  // เริ่มแกนแรกที่ด้านบน (12 นาฬิกา) แล้วไล่ตามเข็มนาฬิกาทีละแกน
-  const angles = SCORE_CATEGORIES.map((_, i) => -Math.PI / 2 + (i * 2 * Math.PI) / n);
-  const point = (angle, fraction) => ({
-    x: cx + R * fraction * Math.cos(angle),
-    y: cy + R * fraction * Math.sin(angle)
-  });
-
-  const gridRings = [0.25, 0.5, 0.75, 1]
-    .map((fraction) => {
-      const pts = angles
-        .map((a) => point(a, fraction))
-        .map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`)
-        .join(" ");
-      return `<polygon points="${pts}" fill="none" stroke="#e2e8f0" stroke-width="1" />`;
-    })
-    .join("");
-
-  const spokes = angles
-    .map((a) => {
-      const p = point(a, 1);
-      return `<line x1="${cx}" y1="${cy}" x2="${p.x.toFixed(1)}" y2="${p.y.toFixed(1)}" stroke="#e2e8f0" stroke-width="1" />`;
-    })
-    .join("");
-
-  const dataPoints = angles.map((a, i) => point(a, averages[i] / maxScore));
-  const dataPolygon = dataPoints.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
-  const dataDots = dataPoints
-    .map((p, i) => {
-      const cat = SCORE_CATEGORIES[i];
-      const valueText = counts[cat.key] > 0 ? averages[i].toFixed(2) : "-";
-      return `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4" fill="#0f172a"><title>${cat.label}: ${valueText}</title></circle>`;
-    })
-    .join("");
-
-  const labelR = R + 34;
-  const labels = angles
-    .map((a, i) => {
-      const p = point(a, labelR / R);
-      const anchor = Math.cos(a) > 0.3 ? "start" : Math.cos(a) < -0.3 ? "end" : "middle";
-      const cat = SCORE_CATEGORIES[i];
-      const valueText = counts[cat.key] > 0 ? averages[i].toFixed(2) : "-";
-      return `
-        <text x="${p.x.toFixed(1)}" y="${(p.y - 4).toFixed(1)}" font-size="11" font-weight="600" fill="#334155" text-anchor="${anchor}">${cat.short}</text>
-        <text x="${p.x.toFixed(1)}" y="${(p.y + 11).toFixed(1)}" font-size="11" fill="#94a3b8" text-anchor="${anchor}">${valueText}</text>`;
-    })
-    .join("");
-
-  categoryBars.innerHTML = `
-    <svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" style="max-width:100%; margin:0 auto; display:block">
-      ${gridRings}
-      ${spokes}
-      <polygon points="${dataPolygon}" fill="#0f172a" fill-opacity="0.12" stroke="#0f172a" stroke-width="2" />
-      ${dataDots}
-      ${labels}
-    </svg>
-  `;
+  categoryBars.innerHTML = buildCategoryRadarSvg(records);
 }
 
 function renderAttendanceHistory(records) {

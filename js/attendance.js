@@ -195,6 +195,13 @@ const adminPrintTeamSelect = document.getElementById("admin-print-team-select");
 const adminPrintAgeGroupSelect = document.getElementById("admin-print-age-group-select");
 const adminPrintMonthSelect = document.getElementById("admin-print-month-select");
 const adminGeneratePrintBtn = document.getElementById("admin-generate-print-btn");
+const adminReportCardSection = document.getElementById("admin-report-card-section");
+const adminReportCardTeamSelect = document.getElementById("admin-report-card-team-select");
+const adminReportCardAgeGroupSelect = document.getElementById("admin-report-card-age-group-select");
+const adminReportCardStartSelect = document.getElementById("admin-report-card-start-select");
+const adminReportCardEndSelect = document.getElementById("admin-report-card-end-select");
+const adminGenerateReportCardBtn = document.getElementById("admin-generate-report-card-btn");
+const adminReportCardStatus = document.getElementById("admin-report-card-status");
 const adminPrintStatus = document.getElementById("admin-print-status");
 const adminStatus = document.getElementById("admin-status");
 const hamburgerBtn = document.getElementById("hamburger-btn");
@@ -465,6 +472,7 @@ function hideAllScreens() {
   adminManageTeamSection.classList.add("hidden");
   adminDashboardSection.classList.add("hidden");
   adminPrintSection.classList.add("hidden");
+  adminReportCardSection.classList.add("hidden");
   adminPlayerAuditSection.classList.add("hidden");
   addPlayerSection.classList.add("hidden");
   checkinSection.classList.add("hidden");
@@ -681,6 +689,7 @@ function renderDrawerItems() {
       navDrawerItems.appendChild(drawerItem("🩹", "รายงานอาการบาดเจ็บทั้งหมด", openAdminInjuriesSection));
       navDrawerItems.appendChild(drawerItem("📊", "ดู Dashboard ทีม", openAdminDashboardSection));
       navDrawerItems.appendChild(drawerItem("🖨️", "พิมพ์สรุป Dashboard", openAdminPrintSection));
+      navDrawerItems.appendChild(drawerItem("📔", "สมุดพกนักกีฬา", openAdminReportCardSection));
       navDrawerItems.appendChild(drawerItem("📈", "พัฒนาการนักกีฬา", () => (window.location.href = "./development.html")));
       navDrawerItems.appendChild(drawerDivider());
       navDrawerItems.appendChild(drawerItem("🏠", "หน้า Dashboard หลัก", goToDashboard));
@@ -892,6 +901,51 @@ adminGeneratePrintBtn.addEventListener("click", () => {
   window.location.href =
     `${window.location.origin}/print.html#team=${encodeURIComponent(team)}` +
     `&ageGroup=${encodeURIComponent(ageGroup)}&month=${encodeURIComponent(month)}`;
+});
+
+// เดือนก่อนหน้า n เดือน ในรูปแบบ "YYYY-MM" — ใช้ตั้งค่าเริ่มต้นของช่วงเวลาสมุดพก (3 เดือนล่าสุดนับถึงเดือนนี้)
+function monthsAgoStr(n) {
+  const d = new Date();
+  d.setDate(1); // กันวันที่ปัจจุบันเกินจำนวนวันของเดือนก่อนหน้า (เช่น 31 มี.ค. ย้อนไป ก.พ.)
+  d.setMonth(d.getMonth() - n);
+  return d.toISOString().slice(0, 7);
+}
+
+function openAdminReportCardSection() {
+  hideAllScreens();
+  adminReportCardSection.classList.remove("hidden");
+  populateTeamSelect(adminReportCardTeamSelect, null);
+  adminReportCardAgeGroupSelect.value = "__ALL__";
+  if (!adminReportCardStartSelect.value) {
+    adminReportCardStartSelect.value = monthsAgoStr(2); // ค่าเริ่มต้น: ย้อนหลัง 3 เดือนนับถึงเดือนนี้
+  }
+  if (!adminReportCardEndSelect.value) {
+    adminReportCardEndSelect.value = monthsAgoStr(0);
+  }
+  adminReportCardStatus.textContent = "";
+}
+
+adminGenerateReportCardBtn.addEventListener("click", () => {
+  const team = adminReportCardTeamSelect.value;
+  if (!team) {
+    adminReportCardStatus.textContent = "กรุณาเลือกทีมก่อน";
+    return;
+  }
+  const start = adminReportCardStartSelect.value;
+  const end = adminReportCardEndSelect.value;
+  if (!start || !end) {
+    adminReportCardStatus.textContent = "กรุณาเลือกช่วงเวลาให้ครบ";
+    return;
+  }
+  if (start > end) {
+    adminReportCardStatus.textContent = "เดือนเริ่มต้นต้องอยู่ก่อนหรือเท่ากับเดือนสิ้นสุด";
+    return;
+  }
+  const ageGroup = adminReportCardAgeGroupSelect.value;
+  adminReportCardStatus.textContent = "";
+  window.location.href =
+    `${window.location.origin}/report-card.html#team=${encodeURIComponent(team)}` +
+    `&ageGroup=${encodeURIComponent(ageGroup)}&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
 });
 
 // หน้าแผงควบคุมแบบการ์ด (admin-menu-section) ถูกยกเลิกไปแล้ว — ปุ่ม "← กลับหน้า Dashboard" ในแต่ละ
@@ -2613,7 +2667,8 @@ onAuthStateChanged(auth, async (user) => {
         "manage-team": openAdminManageTeamSection,
         dashboard: openAdminDashboardSection,
         print: openAdminPrintSection,
-        "player-audit": openAdminPlayerAuditSection
+        "player-audit": openAdminPlayerAuditSection,
+        "report-card": openAdminReportCardSection
       };
       const adminDeepLink = new URLSearchParams(window.location.hash.replace(/^#/, "")).get("admin");
       if (adminDeepLink && adminDeepLinks[adminDeepLink]) {
