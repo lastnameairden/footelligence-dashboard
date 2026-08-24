@@ -16,10 +16,19 @@
       .print-only { display: block !important; }
       body { background: #fff; }
       .card { box-shadow: none; border-color: #cbd5e1; }
-      .report-card-page { page-break-after: always; }
+      .report-card-page {
+        page-break-after: always;
+        page-break-inside: avoid;
+        font-size: 10.5px;
+      }
       .report-card-page:last-child { page-break-after: auto; }
+      /* ย่อ padding/ตัวอักษรของตารางประวัติต่างๆ เฉพาะตอนพิมพ์ ให้แน่นพออยู่ใน A4 ได้ 1 หน้าต่อคนในกรณีทั่วไป
+         (จอปกติยังคงเว้นระยะสบายตาเหมือนเดิม เพราะหน้าจอไม่มีข้อจำกัดเรื่องพื้นที่แบบกระดาษ) */
+      .report-card-page table.pro-table thead th { padding: 0.2rem 0.4rem; font-size: 8px; }
+      .report-card-page table.pro-table tbody td { padding: 0.15rem 0.4rem; font-size: 9px; }
+      .report-card-page h2 { font-size: 12px; }
     }
-    @page { size: A4; margin: 1.5cm; }
+    @page { size: A4; margin: 1.2cm; }
   </style>
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-900">

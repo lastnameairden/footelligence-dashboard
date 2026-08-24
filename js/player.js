@@ -11,6 +11,7 @@ import { db, auth } from "./firebase-init.js";
 import {
   applyDataLabels,
   SCORE_CATEGORIES,
+  STATUS_LABELS,
   computeAvgScore,
   teamLogoImg,
   matchResultBadge,
@@ -22,8 +23,6 @@ import {
   buildScoreTrendChartSvg,
   buildCategoryRadarSvg
 } from "./ui-utils.js";
-
-const STATUS_LABELS = { A: "มา", I: "บาดเจ็บ", R: "พักฟื้น", P: "ลา" };
 
 const statusEl = document.getElementById("status-message");
 const accessGate = document.getElementById("access-gate");

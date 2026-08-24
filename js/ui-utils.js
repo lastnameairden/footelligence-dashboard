@@ -94,6 +94,9 @@ export const SCORE_CATEGORIES = [
   { key: "attitude", label: "ทัศนคติและความทุ่มเท", short: "4. ทัศนคติ/ความทุ่มเท" }
 ];
 
+// ใช้ร่วมกันทั้งหน้าข้อมูลนักกีฬา (player.js) และสมุดพกนักกีฬาสำหรับพิมพ์ (report-card.js)
+export const STATUS_LABELS = { A: "มา", I: "บาดเจ็บ", R: "พักฟื้น", P: "ลา" };
+
 // คะแนนเฉลี่ยจากด้านที่กรอกแล้ว (ไม่ต้องครบ 4 ด้านก็คำนวณได้ อัปเดตสดตามที่กรอก)
 export function computeAvgScore(scores) {
   if (!scores) return null;
@@ -171,9 +174,74 @@ export function buildScoreTrendChartSvg(records) {
   `;
 }
 
+// กราฟเส้นแบบ SVG สรุปคะแนนเฉลี่ยเป็นรายเดือน (1 จุดต่อเดือน) แทนรายวัน — ใช้ในสมุดพกนักกีฬาสำหรับพิมพ์
+// (report-card.js) เพราะรอบการประเมินยาวหลายเดือน กราฟรายวันจะกว้างเกินจนล้นหน้ากระดาษ A4 เวลาพิมพ์ ส่วนหน้า
+// ข้อมูลนักกีฬา (player.js) สำหรับโค้ชดูเองยังคงใช้ buildScoreTrendChartSvg (รายวัน ละเอียดกว่า) ตามเดิม —
+// points: [{ label, avg }] โดย avg เป็น null ได้ (เดือนที่ไม่มีข้อมูลคะแนน) ความกว้างคงที่ ไม่ขยายตามจำนวนจุด
+// เพื่อไม่ให้ต้องเลื่อนดู (ต่างจาก buildScoreTrendChartSvg ที่ยิ่งมีจุดเยอะยิ่งกว้างขึ้น)
+export function buildMonthlyTrendChartSvg(points) {
+  const hasAnyData = points.some((p) => p.avg !== null);
+  if (!hasAnyData) {
+    return '<p class="text-sm text-slate-400 text-center py-6">ยังไม่มีข้อมูลคะแนนเพียงพอสำหรับแสดงกราฟ</p>';
+  }
+
+  const width = 320;
+  const height = 170;
+  const padTop = 18;
+  const padBottom = 30;
+  const padLeft = 26;
+  const padRight = 16;
+  const chartW = width - padLeft - padRight;
+  const chartH = height - padTop - padBottom;
+  const maxScore = 4;
+
+  const coords = points.map((p, i) => {
+    const x = points.length === 1 ? padLeft + chartW / 2 : padLeft + (i / (points.length - 1)) * chartW;
+    const y = p.avg !== null ? padTop + chartH - (p.avg / maxScore) * chartH : null;
+    return { x, y, avg: p.avg, label: p.label };
+  });
+
+  const linePath = coords
+    .filter((c) => c.y !== null)
+    .map((c, i) => `${i === 0 ? "M" : "L"}${c.x.toFixed(1)},${c.y.toFixed(1)}`)
+    .join(" ");
+
+  const gridLines = [1, 2, 3, 4]
+    .map((v) => {
+      const y = padTop + chartH - (v / maxScore) * chartH;
+      return `<line x1="${padLeft}" y1="${y}" x2="${width - padRight}" y2="${y}" stroke="#e2e8f0" stroke-width="1" />
+              <text x="${padLeft - 6}" y="${y + 4}" font-size="10" fill="#94a3b8" text-anchor="end">${v}</text>`;
+    })
+    .join("");
+
+  const pointMarks = coords
+    .map((c) => {
+      const labelText = `<text x="${c.x.toFixed(1)}" y="${height - 10}" font-size="10" fill="#64748b" text-anchor="middle">${c.label}</text>`;
+      if (c.y === null) {
+        return labelText;
+      }
+      return `
+        <circle cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="4" fill="#0f172a">
+          <title>${c.label}: ${c.avg.toFixed(2)}</title>
+        </circle>
+        <text x="${c.x.toFixed(1)}" y="${(c.y - 10).toFixed(1)}" font-size="10" fill="#334155" text-anchor="middle">${c.avg.toFixed(2)}</text>
+        ${labelText}`;
+    })
+    .join("");
+
+  return `
+    <svg viewBox="0 0 ${width} ${height}" width="100%" height="${height}" preserveAspectRatio="xMidYMid meet">
+      ${gridLines}
+      <path d="${linePath}" fill="none" stroke="#0f172a" stroke-width="2" />
+      ${pointMarks}
+    </svg>
+  `;
+}
+
 // กราฟใยแมงมุม (radar chart) แบบ SVG แสดงคะแนนเฉลี่ยทั้ง 4 ด้านเทียบกันในรูปเดียว ให้เห็นจุดแข็ง/จุดที่ต้อง
-// พัฒนาของนักกีฬาได้เร็วกว่าดูเป็นแท่งเรียงกัน
-export function buildCategoryRadarSvg(records) {
+// พัฒนาของนักกีฬาได้เร็วกว่าดูเป็นแท่งเรียงกัน — size ปรับได้ (สมุดพกสำหรับพิมพ์ใช้ขนาดเล็กกว่าค่าเริ่มต้นเพื่อ
+// ประหยัดพื้นที่หน้ากระดาษ A4)
+export function buildCategoryRadarSvg(records, size = 340) {
   const sums = {};
   const counts = {};
   for (const cat of SCORE_CATEGORIES) {
@@ -198,10 +266,9 @@ export function buildCategoryRadarSvg(records) {
   const averages = SCORE_CATEGORIES.map((cat) => (counts[cat.key] > 0 ? sums[cat.key] / counts[cat.key] : 0));
   const n = SCORE_CATEGORIES.length;
   const maxScore = 4;
-  const size = 340;
   const cx = size / 2;
   const cy = size / 2 - 6;
-  const R = 100;
+  const R = size * 0.29; // สัดส่วนเดิมของ 340: R=100 (~29%) รักษาสัดส่วนเดิมไว้เมื่อ size เปลี่ยน
   // เริ่มแกนแรกที่ด้านบน (12 นาฬิกา) แล้วไล่ตามเข็มนาฬิกาทีละแกน
   const angles = SCORE_CATEGORIES.map((_, i) => -Math.PI / 2 + (i * 2 * Math.PI) / n);
   const point = (angle, fraction) => ({

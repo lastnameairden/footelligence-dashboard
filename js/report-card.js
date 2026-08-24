@@ -18,9 +18,10 @@ import {
   matchResultBadge,
   injurySeverityBadge,
   injuryStatusBadge,
-  buildScoreTrendChartSvg,
+  buildMonthlyTrendChartSvg,
   buildCategoryRadarSvg,
-  applyDataLabels
+  applyDataLabels,
+  STATUS_LABELS
 } from "./ui-utils.js";
 
 const UNASSIGNED_AGE_GROUP = "ไม่ระบุรุ่นอายุ";
@@ -66,6 +67,38 @@ function monthRangeLabel(start, end) {
   const startLabel = new Date(`${start}-01T00:00:00`).toLocaleDateString("th-TH", { year: "numeric", month: "long" });
   const endLabel = new Date(`${end}-01T00:00:00`).toLocaleDateString("th-TH", { year: "numeric", month: "long" });
   return start === end ? startLabel : `${startLabel} – ${endLabel}`;
+}
+
+// ไล่รายชื่อเดือนทั้งหมดในช่วง [start, end] (รวมปลายทั้งสองด้าน) รูปแบบ "YYYY-MM" — ใช้สรุปกราฟแนวโน้มเป็น
+// รายเดือนแทนรายวัน (กราฟรายวันของรอบ 3 เดือนจะกว้างเกินจนล้นหน้ากระดาษ A4 เวลาพิมพ์)
+function monthsInRange(start, end) {
+  const months = [];
+  let [y, m] = start.split("-").map(Number);
+  const [endY, endM] = end.split("-").map(Number);
+  while (y < endY || (y === endY && m <= endM)) {
+    months.push(`${y}-${String(m).padStart(2, "0")}`);
+    m += 1;
+    if (m > 12) {
+      m = 1;
+      y += 1;
+    }
+  }
+  return months;
+}
+
+function shortThaiMonthLabel(monthStr) {
+  return new Date(`${monthStr}-01T00:00:00`).toLocaleDateString("th-TH", { year: "2-digit", month: "short" });
+}
+
+// สรุปคะแนนเฉลี่ยของนักกีฬาคนนี้เป็นรายเดือน (1 จุดต่อเดือนในช่วงที่เลือก) ให้ buildMonthlyTrendChartSvg วาดกราฟ
+function buildMonthlyPoints(records, start, end) {
+  return monthsInRange(start, end).map((month) => {
+    const monthRecords = records.filter((r) => (r.date || "").startsWith(month));
+    const scored = monthRecords.filter((r) => computeAvgScore(r.scores) !== null);
+    const avg =
+      scored.length > 0 ? scored.reduce((sum, r) => sum + computeAvgScore(r.scores), 0) / scored.length : null;
+    return { label: shortThaiMonthLabel(month), avg };
+  });
 }
 
 // บันทึกคำเห็นโค้ชของนักกีฬาคนนี้สำหรับรอบเวลานี้โดยเฉพาะ — id เอกสารผูกกับ playerId+start+end เพื่อไม่ให้
@@ -118,14 +151,14 @@ function buildPlayerPage(player, data, scope) {
   const age = calcAge(player.birthday);
 
   const page = document.createElement("div");
-  page.className = "report-card-page card card-pad space-y-5";
+  page.className = "report-card-page card card-pad space-y-3";
 
   const header = document.createElement("div");
-  header.className = "text-center border-b border-slate-100 pb-4";
+  header.className = "text-center border-b border-slate-100 pb-3";
   header.innerHTML = `
-    <img src="./assets/logo.png" alt="Footelligence" class="w-12 h-12 object-contain mx-auto mb-2" />
-    <h2 class="text-lg font-bold tracking-tight">สมุดพกนักกีฬา — รอบการประเมิน ${monthRangeLabel(start, end)}</h2>
-    <p class="text-base font-semibold mt-2">${player.nickname || player.fullName || "-"}</p>
+    <img src="./assets/logo.png" alt="Footelligence" class="w-10 h-10 object-contain mx-auto mb-1" />
+    <h2 class="text-base font-bold tracking-tight">สมุดพกนักกีฬา — รอบการประเมิน ${monthRangeLabel(start, end)}</h2>
+    <p class="text-base font-semibold mt-1">${player.nickname || player.fullName || "-"}</p>
     <p class="text-sm text-slate-500 mt-1">
       ${player.fullName ?? "-"} • เบอร์ ${player.number ?? "-"} •
       ${teamLogoImg(team, "w-4 h-4 object-contain inline-block align-middle rounded mr-1")}${team} •
@@ -143,15 +176,32 @@ function buildPlayerPage(player, data, scope) {
   page.appendChild(statsWrap);
 
   const chartsWrap = document.createElement("div");
-  chartsWrap.className = "grid sm:grid-cols-2 gap-4";
+  chartsWrap.className = "grid sm:grid-cols-2 gap-3";
   const trendCard = document.createElement("div");
-  trendCard.className = "card card-pad";
-  trendCard.innerHTML = `<h4 class="text-sm font-semibold text-slate-700 mb-2">แนวโน้มคะแนนเฉลี่ยรายวัน</h4><div class="overflow-x-auto">${buildScoreTrendChartSvg(data.attendanceRecords)}</div>`;
+  trendCard.className = "card p-3";
+  trendCard.innerHTML = `<h4 class="text-sm font-semibold text-slate-700 mb-1">แนวโน้มคะแนนเฉลี่ยรายเดือน</h4>${buildMonthlyTrendChartSvg(buildMonthlyPoints(data.attendanceRecords, start, end))}`;
   const radarCard = document.createElement("div");
-  radarCard.className = "card card-pad";
-  radarCard.innerHTML = `<h4 class="text-sm font-semibold text-slate-700 mb-2">คะแนนเฉลี่ยแยกตามด้าน</h4>${buildCategoryRadarSvg(data.attendanceRecords)}`;
+  radarCard.className = "card p-3";
+  radarCard.innerHTML = `<h4 class="text-sm font-semibold text-slate-700 mb-1">คะแนนเฉลี่ยแยกตามด้าน</h4>${buildCategoryRadarSvg(data.attendanceRecords, 240)}`;
   chartsWrap.append(trendCard, radarCard);
   page.appendChild(chartsWrap);
+
+  const attendanceTitle = document.createElement("h4");
+  attendanceTitle.className = "text-sm font-semibold text-slate-700";
+  attendanceTitle.textContent = "สรุปการฝึกซ้อม";
+  page.appendChild(attendanceTitle);
+  // สรุปจำนวนครั้งแยกตามสถานะ (มา/บาดเจ็บ/พักฟื้น/ลา) แทนตารางรายวันละเอียด — สั้นกระชับพอสำหรับผู้ปกครอง
+  // และช่วยให้เนื้อหาต่อคนพอดี 1 หน้า A4 มากขึ้นด้วย
+  const statusCounts = { A: 0, I: 0, R: 0, P: 0 };
+  for (const r of data.attendanceRecords) {
+    if (r.status && Object.prototype.hasOwnProperty.call(statusCounts, r.status)) statusCounts[r.status] += 1;
+  }
+  const attendanceSummaryWrap = document.createElement("div");
+  attendanceSummaryWrap.className = "grid grid-cols-4 gap-3";
+  attendanceSummaryWrap.innerHTML = Object.keys(STATUS_LABELS)
+    .map((key) => statCard(STATUS_LABELS[key], `${statusCounts[key]} ครั้ง`))
+    .join("");
+  page.appendChild(attendanceSummaryWrap);
 
   const matchTitle = document.createElement("h4");
   matchTitle.className = "text-sm font-semibold text-slate-700";
@@ -197,12 +247,12 @@ function buildPlayerPage(player, data, scope) {
   page.appendChild(commentTitle);
 
   const commentPrintText = document.createElement("p");
-  commentPrintText.className = "print-only text-sm whitespace-pre-wrap border border-slate-200 rounded-lg p-3 min-h-[4rem]";
+  commentPrintText.className = "print-only text-sm whitespace-pre-wrap border border-slate-200 rounded-lg p-2 min-h-[3rem]";
   page.appendChild(commentPrintText);
 
   const commentTextarea = document.createElement("textarea");
   commentTextarea.className = "field-input w-full no-print";
-  commentTextarea.rows = 4;
+  commentTextarea.rows = 3;
   commentTextarea.placeholder = "เขียนคำเห็น/ข้อเสนอแนะสำหรับนักกีฬาคนนี้...";
   commentTextarea.value = data.comment || "";
   commentPrintText.textContent = data.comment || "-";
@@ -215,7 +265,7 @@ function buildPlayerPage(player, data, scope) {
   page.append(commentTextarea, commentIndicator);
 
   const footer = document.createElement("div");
-  footer.className = "grid grid-cols-2 gap-6 pt-6 mt-4 border-t border-slate-100 text-sm text-slate-500";
+  footer.className = "grid grid-cols-2 gap-6 pt-3 mt-2 border-t border-slate-100 text-sm text-slate-500";
   footer.innerHTML = `
     <p>ลงชื่อโค้ช ........................................</p>
     <p>ลงชื่อผู้ปกครอง ........................................</p>
