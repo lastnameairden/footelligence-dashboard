@@ -15,6 +15,13 @@
        — Tailwind Play CDN ไม่มี line-clamp ใน build มาตรฐาน จึงประกาศเองตรงนี้ */
     .line-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
     .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+    /* ตารางประวัติ (ผลแข่งขัน/บาดเจ็บ) ในคอลัมน์แคบๆ ของการ์ด — padding/font-size เริ่มต้นของ .pro-table ทั่วแอป
+       (ออกแบบไว้สำหรับตารางเต็มจอ) ทำให้คอลัมน์ข้อความ เช่น "อาการ" แคบจนตัวอักษรไทยตัดขึ้นบรรทัดใหม่ทีละคำ
+       อ่านยาก จึงย่อทั้งบนจอปกติและตอนพิมพ์ (ต่างจากกฎ .report-card-page ด้านล่างซึ่งใช้เฉพาะตอนพิมพ์เท่านั้น) */
+    .rc-mini-table table.pro-table { font-size: 10px; }
+    .rc-mini-table table.pro-table thead th { padding: 0.2rem 0.4rem; font-size: 8px; white-space: normal; }
+    .rc-mini-table table.pro-table tbody td { padding: 0.15rem 0.4rem; line-height: 1.3; }
+    .rc-mini-table .badge { font-size: 8px; padding: 0.1rem 0.4rem; }
     @media print {
       /* เบราว์เซอร์ตัดสีพื้นหลัง/สีตัวอักษรทิ้งเป็นค่าเริ่มต้นตอนพิมพ์ (ประหยัดหมึก) — ต้องบังคับให้คงสีไว้
          ไม่งั้นแถบหัวกระดาษสีทีมและการ์ดสถิติสีสันต่างๆ จะพิมพ์ออกมาเป็นขาวล้วนหมด */
@@ -29,8 +36,8 @@
         font-size: 10px;
       }
       .report-card-page:last-child { page-break-after: auto; }
-      /* ย่อ padding/ตัวอักษรของตารางประวัติต่างๆ เฉพาะตอนพิมพ์ ให้แน่นพออยู่ใน A4 แนวนอนได้ 1 หน้าต่อคนในกรณีทั่วไป
-         (จอปกติยังคงเว้นระยะสบายตาเหมือนเดิม เพราะหน้าจอไม่มีข้อจำกัดเรื่องพื้นที่แบบกระดาษ) */
+      /* ย่อ padding/ตัวอักษรของตารางประวัติต่างๆ ให้เล็กลงอีกขั้นเฉพาะตอนพิมพ์ (มากกว่า .rc-mini-table ด้านบนซึ่ง
+         ใช้ทั้งจอปกติและตอนพิมพ์) เพื่อให้แน่นพออยู่ใน A4 แนวนอนได้ 1 หน้าต่อคนในกรณีทั่วไป */
       .report-card-page table.pro-table thead th { padding: 0.15rem 0.35rem; font-size: 7px; }
       .report-card-page table.pro-table tbody td { padding: 0.1rem 0.35rem; font-size: 8px; }
     }

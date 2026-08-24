@@ -17,13 +17,14 @@ import {
   matchResultBadge,
   injurySeverityBadge,
   injuryStatusBadge,
-  buildCategoryRadarComparisonSvg,
   categoryAveragesFromRecords,
   applyDataLabels,
   STATUS_LABELS,
-  TEAM_COLORS
+  TEAM_COLORS,
+  SCORE_CATEGORIES,
+  SCORE_CATEGORY_COLORS
 } from "./ui-utils.js";
-import { SECT, categoryRawScore, scoreToGrade } from "./masc-data.js";
+import { CRITERIA, SECT, categoryRawScore, scoreToGrade } from "./masc-data.js";
 
 const UNASSIGNED_AGE_GROUP = "ไม่ระบุรุ่นอายุ";
 const DEFAULT_ACCENT = "#0f172a";
@@ -145,9 +146,9 @@ function buildHistoryTable(headers, rows, extraCount) {
     return '<p class="text-xs text-slate-400">ไม่มีข้อมูลในช่วงเวลานี้</p>';
   }
   const wrap = document.createElement("div");
-  wrap.className = "card table-wrap";
+  wrap.className = "card table-wrap rc-mini-table";
   wrap.innerHTML = `
-    <table class="pro-table text-xs">
+    <table class="pro-table">
       <thead><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr></thead>
       <tbody></tbody>
     </table>
@@ -159,18 +160,8 @@ function buildHistoryTable(headers, rows, extraCount) {
   return wrap.outerHTML + extraNote;
 }
 
-// แถบสเกล 1-4 แบบจิ๋วในตารางเปรียบเทียบ — จุดแดง = คะแนนรอบก่อน, จุดน้ำเงิน = คะแนนรอบนี้ วางบนเส้นเดียวกัน
-// ให้เห็นตำแหน่งเทียบกันได้ทันทีโดยไม่ต้องอ่านตัวเลข (คล้ายแถบ "SCALE" ในตัวอย่างการ์ดที่ผู้ใช้ส่งมา)
-function buildScaleBarSvg(prevAvg, curAvg, max = 4) {
-  const width = 80;
-  const height = 14;
-  const toX = (v) => 4 + (v / max) * (width - 8);
-  const prevDot = prevAvg !== null ? `<circle cx="${toX(prevAvg).toFixed(1)}" cy="7" r="3" fill="#ef4444" />` : "";
-  const curDot = curAvg !== null ? `<circle cx="${toX(curAvg).toFixed(1)}" cy="7" r="3" fill="#2563eb" />` : "";
-  return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><line x1="4" y1="7" x2="${width - 4}" y2="7" stroke="#e2e8f0" stroke-width="2" />${prevDot}${curDot}</svg>`;
-}
-
-// รวมค่าเฉลี่ยรอบก่อน/รอบนี้ทั้ง 4 หมวด พร้อม delta (ผลต่าง) — ใช้ทั้งตารางเปรียบเทียบและ Key takeaways
+// รวมค่าเฉลี่ยรอบก่อน/รอบนี้ทั้ง 4 หมวด พร้อม delta (ผลต่าง) — ใช้ใน Key takeaways เท่านั้นตอนนี้ (เดิมมีตาราง
+// เปรียบเทียบแสดงด้วย แต่ผู้ใช้ให้เอาออกแล้วใส่ผลประเมิน MASC โดยละเอียดแทน — ดู buildMascSection)
 function categoryComparisons(prevRecords, currentRecords) {
   const prevAverages = categoryAveragesFromRecords(prevRecords);
   const currentAverages = categoryAveragesFromRecords(currentRecords);
@@ -179,28 +170,6 @@ function categoryComparisons(prevRecords, currentRecords) {
     const delta = cur.avg !== null && prev.avg !== null ? cur.avg - prev.avg : null;
     return { key: cur.key, label: cur.short, prevAvg: prev.avg, curAvg: cur.avg, delta };
   });
-}
-
-function buildSkillComparisonTable(comparisons) {
-  const rows = comparisons.map((c) => {
-    const changeHtml =
-      c.delta === null
-        ? '<span class="text-slate-400">-</span>'
-        : c.delta > 0.05
-          ? `<span class="text-emerald-600 font-semibold">▲ ${c.delta.toFixed(1)}</span>`
-          : c.delta < -0.05
-            ? `<span class="text-red-600 font-semibold">▼ ${Math.abs(c.delta).toFixed(1)}</span>`
-            : '<span class="text-slate-400">≈ คงที่</span>';
-    return `
-      <tr>
-        <td class="emphasis">${c.label}</td>
-        <td>${c.prevAvg !== null ? c.prevAvg.toFixed(1) : "-"}</td>
-        <td>${c.curAvg !== null ? c.curAvg.toFixed(1) : "-"}</td>
-        <td>${buildScaleBarSvg(c.prevAvg, c.curAvg)}</td>
-        <td>${changeHtml}</td>
-      </tr>`;
-  });
-  return buildHistoryTable(["ด้านการประเมิน", "รอบก่อน", "รอบนี้", "สเกล 1-4", "เปลี่ยนแปลง"], rows, 0);
 }
 
 // สรุปประเด็นสำคัญเป็นข้อความสั้นๆ (จุดแข็ง/จุดที่ควรพัฒนา/พัฒนาการเด่น/สรุปลงสนาม/สรุปเข้าฝึกซ้อม) — สร้างจาก
@@ -252,37 +221,235 @@ function colorStatCard(label, value, hex) {
 const ROLE_LABELS = { important: "ตัวหลัก", rotation: "ตัวหมุนเวียน", reserve: "ตัวสำรอง" };
 const MASC_COLORS = { M: "#0ea5e9", A: "#8b5cf6", S: "#f59e0b", C: "#ec4899" };
 
-// สรุปผลประเมิน MASC ล่าสุดของนักกีฬาคนนี้ (ดึงจากฟีเจอร์ "🧬 การประเมิน MASC" ที่มีอยู่แล้วในระบบ — เก็บจริงใน
-// Firestore collection playerEvaluations) ไม่ใช่จากฟอร์มภายนอกที่ผู้ใช้ส่งลิงก์มา เพราะฟอร์มนั้นเป็น static form
-// ล้วนๆ ไม่มีฐานข้อมูลให้ดึง (ตรวจสอบแล้วไม่มี network request ใดๆ นอกจากโหลดหน้าเว็บ)
+// เกรด M/A/S/C (1/3/7/9) จากการประเมิน MASC ล่าสุด — คืนค่า null ทั้งหมดถ้ายังไม่เคยประเมิน (ใช้ทั้งในป้ายเล็กๆ
+// ใต้ Profile Radar และเนื้อหาข้อความในคอลัมน์ผลประเมิน แยกฟังก์ชันไว้กันคำนวณเพี้ยนกันคนละจุด)
+function mascGradesFor(evaluation) {
+  return ["M", "A", "S", "C"].map((key) => ({
+    key,
+    grade: evaluation ? scoreToGrade(categoryRawScore(evaluation.scores?.[key])) : null
+  }));
+}
+
+// กราฟเรดาร์ของเกรด MASC (M/A/S/C) 4 แกน สเกล 1-9 (ค่าที่ระบบให้จริงมีแค่ 1/3/7/9) แทนที่ป้ายตัวเลขเดิมในแถบซ้าย
+// ให้เห็นรูปทรงจุดแข็ง/จุดที่ต้องพัฒนาได้ในภาพเดียว เหมือนกับที่ Profile Radar เคยทำกับคะแนนรายวัน (ซึ่งย้ายไป
+// เป็นกราฟแนวโน้มในคอลัมน์กลางแทนแล้ว — ดู buildCategoryTrendChartSvg)
+function buildMascRadarSvg(mascGrades, size = 130) {
+  const hasAnyData = mascGrades.some((g) => g.grade !== null);
+  if (!hasAnyData) {
+    return '<p class="text-xs text-slate-400 text-center py-4">ยังไม่มีข้อมูลการประเมิน MASC</p>';
+  }
+  const maxScore = 9;
+  const n = mascGrades.length;
+  // เผื่อขอบซ้าย/ขวา/บน-ล่างของ canvas ให้กว้างกว่าวงกลมจริง ไม่งั้นป้ายชื่อ+ตัวเลขของจุดซ้ายสุด/ขวาสุด
+  // (ที่ text-anchor เป็น start/end) จะยื่นออกไปนอก viewBox แล้วโดนตัดหาย (พบจากภาพที่ผู้ใช้ส่งมา)
+  const padX = 28;
+  const padY = 16;
+  const canvasW = size + padX * 2;
+  const canvasH = size + padY * 2;
+  const cx = canvasW / 2;
+  const cy = canvasH / 2;
+  const R = size * 0.32;
+  const angles = mascGrades.map((_, i) => -Math.PI / 2 + (i * 2 * Math.PI) / n);
+  const point = (angle, fraction) => ({
+    x: cx + R * fraction * Math.cos(angle),
+    y: cy + R * fraction * Math.sin(angle)
+  });
+
+  const gridRings = [0.25, 0.5, 0.75, 1]
+    .map((fraction) => {
+      const pts = angles.map((a) => point(a, fraction)).map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+      return `<polygon points="${pts}" fill="none" stroke="#e2e8f0" stroke-width="1" />`;
+    })
+    .join("");
+
+  const spokes = angles
+    .map((a) => {
+      const p = point(a, 1);
+      return `<line x1="${cx}" y1="${cy}" x2="${p.x.toFixed(1)}" y2="${p.y.toFixed(1)}" stroke="#e2e8f0" stroke-width="1" />`;
+    })
+    .join("");
+
+  const dataPoints = angles.map((a, i) => point(a, (mascGrades[i].grade ?? 0) / maxScore));
+  const polygon = dataPoints.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+  const dots = dataPoints
+    .map((p, i) => {
+      const g = mascGrades[i];
+      const color = MASC_COLORS[g.key];
+      return `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4" fill="${color}"><title>${g.key}: ${g.grade ?? "-"}</title></circle>`;
+    })
+    .join("");
+
+  const labelR = R + 16;
+  const labels = angles
+    .map((a, i) => {
+      const p = point(a, labelR / R);
+      const anchor = Math.cos(a) > 0.3 ? "start" : Math.cos(a) < -0.3 ? "end" : "middle";
+      const g = mascGrades[i];
+      const color = MASC_COLORS[g.key];
+      return `<text x="${p.x.toFixed(1)}" y="${(p.y + 3).toFixed(1)}" font-size="9" font-weight="700" fill="${color}" text-anchor="${anchor}">${g.key} ${g.grade ?? "-"}</text>`;
+    })
+    .join("");
+
+  // คำอธิบายสีใต้กราฟ (สีไหน = หมวดอะไร) แยกจากป้ายชื่อบนกราฟที่มีแค่ตัวย่อ M/A/S/C
+  const legend = ["M", "A", "S", "C"]
+    .map(
+      (key) =>
+        `<span class="inline-flex items-center gap-0.5"><span class="inline-block w-1.5 h-1.5 rounded-full flex-shrink-0" style="background:${MASC_COLORS[key]}"></span>${key} · ${SECT[key].nm}</span>`
+    )
+    .join("");
+
+  return `
+    <svg viewBox="0 0 ${canvasW} ${canvasH}" width="100%" style="max-width:${canvasW}px; margin:0 auto; display:block">
+      ${gridRings}
+      ${spokes}
+      <polygon points="${polygon}" fill="#64748b" fill-opacity="0.08" stroke="#94a3b8" stroke-width="1.5" />
+      ${dots}
+      ${labels}
+    </svg>
+    <div class="text-[7px] text-slate-500 flex flex-wrap justify-center gap-x-1.5 gap-y-0.5 mt-0.5">${legend}</div>
+  `;
+}
+
+// รายละเอียดผลประเมิน MASC ล่าสุดของนักกีฬาคนนี้แบบครบทุกเกณฑ์ (ดึงจากฟีเจอร์ "🧬 การประเมิน MASC" ที่มีอยู่แล้ว
+// ในระบบ — เก็บจริงใน Firestore collection playerEvaluations) ไม่ใช่จากฟอร์มภายนอกที่ผู้ใช้ส่งลิงก์มา เพราะฟอร์ม
+// นั้นเป็น static form ล้วนๆ ไม่มีฐานข้อมูลให้ดึง — แทนที่ตารางเปรียบเทียบคะแนนรายวัน 4 หมวดเดิมตามที่ผู้ใช้ขอ
+// (เอาออกแล้วใส่ผล MASC แบบละเอียดแทน) เกณฑ์แต่ละข้อดึง label ตามตำแหน่ง/ช่วงอายุของนักกีฬาจาก masc-data.js
+// เหมือนกับที่หน้า masc.html ใช้จริง (CRITERIA[position][ageBracket][category])
 function buildMascSection(evaluation) {
   if (!evaluation) {
     return '<p class="text-xs text-slate-400">ยังไม่มีข้อมูลการประเมิน MASC สำหรับนักกีฬาคนนี้</p>';
   }
-  const grades = ["M", "A", "S", "C"].map((key) => ({
-    key,
-    grade: scoreToGrade(categoryRawScore(evaluation.scores?.[key]))
-  }));
-  const badgeRow = grades
-    .map(
-      (g) => `
-      <div class="rounded-lg p-1.5 text-center flex-1" style="background:${MASC_COLORS[g.key]}1a; border:1px solid ${MASC_COLORS[g.key]}40;">
-        <p class="text-[9px] font-semibold" style="color:${MASC_COLORS[g.key]}">${g.key} · ${SECT[g.key].nm}</p>
-        <p class="text-base font-bold" style="color:${MASC_COLORS[g.key]}">${g.grade ?? "-"}</p>
-      </div>`
-    )
-    .join("");
   const roleText = (evaluation.playerRoles || []).map((r) => ROLE_LABELS[r] || r).join(", ") || "-";
   const updatedLabel = evaluation.updatedAt?.toDate
     ? evaluation.updatedAt.toDate().toLocaleDateString("th-TH", { year: "numeric", month: "short", day: "numeric" })
     : "-";
+  const criteriaForPosition = CRITERIA[evaluation.position]?.[evaluation.ageBracket] || null;
+
+  const categoryBlocks = ["M", "A", "S", "C"]
+    .map((key) => {
+      const grade = scoreToGrade(categoryRawScore(evaluation.scores?.[key]));
+      const criteriaList = criteriaForPosition?.[key] || [];
+      const scoreValues = evaluation.scores?.[key] || [];
+      const rows =
+        criteriaList
+          .map(([th], i) => {
+            const val = scoreValues[i];
+            const weightLabel = i === 0 ? "CORE" : "SUP";
+            return `<p class="flex justify-between gap-1 leading-tight"><span class="text-slate-500 truncate">${weightLabel} · ${th}</span><span class="font-semibold flex-shrink-0" style="color:${MASC_COLORS[key]}">${val ?? "-"}</span></p>`;
+          })
+          .join("") || '<p class="text-slate-400">ไม่พบเกณฑ์สำหรับตำแหน่ง/ช่วงอายุนี้</p>';
+      return `
+        <div class="rounded-lg p-1.5" style="background:${MASC_COLORS[key]}0d; border:1px solid ${MASC_COLORS[key]}30;">
+          <p class="flex items-center justify-between mb-0.5">
+            <span class="text-[10px] font-bold" style="color:${MASC_COLORS[key]}">${key} · ${SECT[key].nm}</span>
+            <span class="text-xs font-bold" style="color:${MASC_COLORS[key]}">เกรด ${grade ?? "-"}</span>
+          </p>
+          <div class="text-[9px] space-y-0.5">${rows}</div>
+        </div>`;
+    })
+    .join("");
+
   return `
-    <p class="text-[10px] text-slate-400 mb-1">ประเมินล่าสุด: ${evaluation.assessmentPeriod || "-"} • อัปเดต ${updatedLabel} • บทบาท: ${roleText}</p>
-    <div class="flex gap-1.5 mb-1.5">${badgeRow}</div>
-    <div class="text-[10px] text-slate-600 space-y-0.5">
+    <p class="text-[10px] text-slate-400 mb-1">ประเมินล่าสุด: ${evaluation.assessmentPeriod || "-"} • อัปเดต ${updatedLabel} • ตำแหน่ง ${evaluation.position ?? "-"} (${evaluation.ageBracket ?? "-"}) • บทบาท: ${roleText}</p>
+    <div class="grid grid-cols-2 gap-1.5">${categoryBlocks}</div>
+    <div class="text-[10px] text-slate-600 space-y-0.5 mt-1.5">
       ${evaluation.talent ? `<p class="line-clamp-1"><span class="font-semibold text-slate-500">จุดเด่น:</span> ${evaluation.talent}</p>` : ""}
       ${evaluation.limitations ? `<p class="line-clamp-1"><span class="font-semibold text-slate-500">จุดที่ต้องพัฒนา:</span> ${evaluation.limitations}</p>` : ""}
     </div>
+  `;
+}
+
+function shortThaiMonthLabel(monthStr) {
+  return new Date(`${monthStr}-01T00:00:00`).toLocaleDateString("th-TH", { year: "2-digit", month: "short" });
+}
+
+// กราฟแท่งกลุ่มรายเดือนของคะแนนประเมินรายวัน 4 ด้าน แทนที่ Profile Radar เดิมซึ่งย้ายไปเป็นเรดาร์ MASC ในแถบซ้าย
+// แล้ว — เลือกใช้แท่งแทนเส้นเพราะรอบเวลาสั้น (มักแค่ 2-3 เดือน) กราฟเส้นจะมีจุดน้อยจนดูโล่ง ไม่มีน้ำหนักภาพ ส่วน
+// แท่งยังดูมีเนื้อหาครบแม้มีข้อมูลน้อยจุด — สีแท่งตรงกับ SCORE_CATEGORY_COLORS เหมือนเดิม
+function buildCategoryTrendChartSvg(records, start, end) {
+  const months = monthsInRange(start, end);
+  const width = 230;
+  const height = 92;
+  const padTop = 8;
+  const padBottom = 16;
+  const padLeft = 16;
+  const padRight = 6;
+  const chartW = width - padLeft - padRight;
+  const chartH = height - padTop - padBottom;
+  const maxScore = 4;
+
+  const series = SCORE_CATEGORIES.map((cat) => {
+    const values = months.map((month) => {
+      const monthRecords = records.filter((r) => (r.date || "").startsWith(month));
+      let sum = 0;
+      let count = 0;
+      for (const r of monthRecords) {
+        const v = r.scores?.[cat.key];
+        if (typeof v === "number") {
+          sum += v;
+          count += 1;
+        }
+      }
+      return count > 0 ? sum / count : null;
+    });
+    return { key: cat.key, label: cat.short, color: SCORE_CATEGORY_COLORS[cat.key], values };
+  });
+
+  const hasAnyData = series.some((s) => s.values.some((v) => v !== null));
+  if (!hasAnyData) {
+    return '<p class="text-xs text-slate-400 text-center py-6">ยังไม่มีข้อมูลคะแนนเพียงพอสำหรับแสดงกราฟ</p>';
+  }
+
+  const gridLines = [2, 4]
+    .map((v) => {
+      const y = padTop + chartH - (v / maxScore) * chartH;
+      return `<line x1="${padLeft}" y1="${y}" x2="${width - padRight}" y2="${y}" stroke="#e2e8f0" stroke-width="1" />
+              <text x="${padLeft - 3}" y="${y + 2.5}" font-size="6" fill="#94a3b8" text-anchor="end">${v}</text>`;
+    })
+    .join("");
+
+  const baselineY = padTop + chartH;
+  const groupWidth = chartW / months.length;
+  const groupGap = groupWidth * 0.18; // ช่องว่างระหว่างกลุ่มเดือน กันแท่งของเดือนติดกันจนดูเป็นแท่งเดียว
+  const barWidth = (groupWidth - groupGap) / series.length;
+
+  const bars = months
+    .map((month, gi) => {
+      const groupX = padLeft + gi * groupWidth + groupGap / 2;
+      return series
+        .map((s, si) => {
+          const val = s.values[gi];
+          if (val === null) return "";
+          const barH = (val / maxScore) * chartH;
+          const x = groupX + si * barWidth;
+          const y = baselineY - barH;
+          const w = Math.max(barWidth - 1, 1);
+          return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${barH.toFixed(1)}" rx="1" fill="${s.color}"><title>${s.label}: ${val.toFixed(1)}</title></rect>`;
+        })
+        .join("");
+    })
+    .join("");
+
+  const monthLabels = months
+    .map((m, i) => {
+      const x = padLeft + i * groupWidth + groupWidth / 2;
+      return `<text x="${x.toFixed(1)}" y="${height - 4}" font-size="6" fill="#64748b" text-anchor="middle">${shortThaiMonthLabel(m)}</text>`;
+    })
+    .join("");
+
+  const legend = SCORE_CATEGORIES.map(
+    (cat) =>
+      `<span class="inline-flex items-center gap-0.5"><span class="inline-block w-1.5 h-1.5 rounded-full flex-shrink-0" style="background:${SCORE_CATEGORY_COLORS[cat.key]}"></span>${cat.short.replace(/^\d+\.\s*/, "")}</span>`
+  ).join("");
+
+  return `
+    <svg viewBox="0 0 ${width} ${height}" width="100%" style="max-width:${width}px" preserveAspectRatio="xMidYMid meet">
+      ${gridLines}
+      <line x1="${padLeft}" y1="${baselineY.toFixed(1)}" x2="${width - padRight}" y2="${baselineY.toFixed(1)}" stroke="#cbd5e1" stroke-width="1" />
+      ${bars}
+      ${monthLabels}
+    </svg>
+    <div class="text-[7px] text-slate-500 flex flex-wrap justify-center gap-x-1.5 mt-0.5">${legend}</div>
   `;
 }
 
@@ -300,11 +467,7 @@ function buildPlayerPage(player, data, scope) {
     if (r.status && Object.prototype.hasOwnProperty.call(statusCounts, r.status)) statusCounts[r.status] += 1;
   }
 
-  // avg ของ 3 หมวดสมรรถภาพ/ทักษะบอล/อ่านเกม (ใกล้เคียงคำว่า "ทักษะ" มากที่สุดจาก 4 หมวดที่มีอยู่จริง)
-  const skillComparisons = comparisons.filter((c) => c.key !== "attitude");
-  const skillAvgValues = skillComparisons.map((c) => c.curAvg).filter((v) => v !== null);
-  const skillAvg = skillAvgValues.length > 0 ? skillAvgValues.reduce((a, b) => a + b, 0) / skillAvgValues.length : null;
-  const attitudeComparison = comparisons.find((c) => c.key === "attitude");
+  const mascGrades = mascGradesFor(data.mascEvaluation);
 
   const page = document.createElement("div");
   page.className = "report-card-page card overflow-hidden";
@@ -345,12 +508,8 @@ function buildPlayerPage(player, data, scope) {
       <p class="flex justify-between"><span class="text-slate-400">ตำแหน่ง</span><span class="font-medium">${player.position ?? "-"}</span></p>
       <p class="flex justify-between"><span class="text-slate-400">เบอร์เสื้อ</span><span class="font-medium">${player.number ?? "-"}</span></p>
     </div>
-    <p class="text-[9px] font-semibold tracking-wide uppercase pt-1 border-t border-slate-100" style="color:${accent}">Profile Radar</p>
-    <div>${buildCategoryRadarComparisonSvg(data.prevAttendanceRecords, data.attendanceRecords, 130)}</div>
-    <div class="grid grid-cols-2 gap-1 text-center pt-1 border-t border-slate-100">
-      <div><p class="text-[9px] text-slate-400">ด้านทักษะ</p><p class="text-sm font-bold" style="color:${accent}">${skillAvg !== null ? skillAvg.toFixed(1) : "-"}/4</p></div>
-      <div><p class="text-[9px] text-slate-400">ด้านทัศนคติ</p><p class="text-sm font-bold" style="color:${accent}">${attitudeComparison?.curAvg !== null && attitudeComparison?.curAvg !== undefined ? attitudeComparison.curAvg.toFixed(1) : "-"}/4</p></div>
-    </div>
+    <p class="text-[9px] font-semibold tracking-wide uppercase pt-1 border-t border-slate-100" style="color:${accent}">MASC ล่าสุด</p>
+    <div>${buildMascRadarSvg(mascGrades, 130)}</div>
   `;
   body.appendChild(sidebar);
 
@@ -367,23 +526,26 @@ function buildPlayerPage(player, data, scope) {
     colorStatCard("คะแนนเฉลี่ย", data.overallAvg !== null ? data.overallAvg.toFixed(2) : "-", "#d97706");
   col2.appendChild(statsWrap);
 
-  const skillTitle = document.createElement("h4");
-  skillTitle.className = "text-xs font-semibold pl-2";
-  skillTitle.style.borderLeft = `3px solid ${accent}`;
-  skillTitle.textContent = "ผลการประเมิน 4 ด้าน (เทียบรอบก่อนหน้า)";
-  col2.appendChild(skillTitle);
-  const skillTableWrap = document.createElement("div");
-  skillTableWrap.innerHTML = buildSkillComparisonTable(comparisons);
-  col2.appendChild(skillTableWrap);
-
   const mascTitle = document.createElement("h4");
   mascTitle.className = "text-xs font-semibold pl-2";
   mascTitle.style.borderLeft = `3px solid ${accent}`;
-  mascTitle.textContent = "การประเมิน MASC ล่าสุด";
+  mascTitle.textContent = "การประเมิน MASC โดยละเอียด";
   col2.appendChild(mascTitle);
   const mascWrap = document.createElement("div");
   mascWrap.innerHTML = buildMascSection(data.mascEvaluation);
   col2.appendChild(mascWrap);
+
+  // เดิม Profile Radar (คะแนนรายวัน 4 ด้าน) อยู่ในแถบซ้าย ย้ายมาแสดงเป็นกราฟแนวโน้มรายเดือนตรงนี้แทนตามที่ผู้ใช้
+  // ขอ — แถบซ้ายเหลือแค่เรดาร์ MASC (ดู mascGrades ด้านบน) ไม่ให้มีเรดาร์ซ้ำสองอันในหน้าเดียว
+  const trendTitle = document.createElement("h4");
+  trendTitle.className = "text-xs font-semibold pl-2";
+  trendTitle.style.borderLeft = `3px solid ${accent}`;
+  trendTitle.textContent = "แนวโน้มคะแนนประเมินรายวัน (รายเดือน)";
+  col2.appendChild(trendTitle);
+  const trendWrap = document.createElement("div");
+  trendWrap.className = "card p-1.5 max-w-[240px] mx-auto";
+  trendWrap.innerHTML = buildCategoryTrendChartSvg(data.attendanceRecords, start, end);
+  col2.appendChild(trendWrap);
 
   body.appendChild(col2);
 
@@ -476,7 +638,7 @@ function buildPlayerPage(player, data, scope) {
   const commentTitle = document.createElement("h4");
   commentTitle.className = "text-xs font-semibold pl-2 mb-1";
   commentTitle.style.borderLeft = `3px solid ${accent}`;
-  commentTitle.textContent = "คำเห็นและข้อเสนอแนะจากโค้ช";
+  commentTitle.textContent = "ข้อเสนอแนะจากโค้ช";
   footerWrap.appendChild(commentTitle);
 
   const commentRow = document.createElement("div");
@@ -487,7 +649,7 @@ function buildPlayerPage(player, data, scope) {
   const commentTextarea = document.createElement("textarea");
   commentTextarea.className = "field-input w-full no-print text-sm";
   commentTextarea.rows = 2;
-  commentTextarea.placeholder = "เขียนคำเห็น/ข้อเสนอแนะสำหรับนักกีฬาคนนี้...";
+  commentTextarea.placeholder = "เขียนข้อเสนอแนะสำหรับนักกีฬาคนนี้...";
   commentTextarea.value = data.comment || "";
   commentPrintText.textContent = data.comment || "-";
   const commentIndicator = document.createElement("p");
@@ -618,7 +780,9 @@ async function loadReportCards(team, ageGroup, start, end) {
       overallAvg,
       matchReports: myMatches,
       injuryReports: myInjuries,
-      comment: existingComment?.comment || "",
+      // ถ้าแอดมินยังไม่เคยเขียน/บันทึกข้อเสนอแนะเองสำหรับรอบนี้ ให้ดึงข้อสังเกตจากการประเมิน MASC ล่าสุดมาใส่
+      // เป็นค่าเริ่มต้นแทนช่องว่างเปล่าๆ (ยังแก้ไข/บันทึกทับเป็นของตัวเองได้ตามปกติ — ไม่ได้ล็อกไว้)
+      comment: existingComment?.comment || mascEvaluation?.observations || "",
       mascEvaluation
     }, { team, start, end });
     reportCardPages.appendChild(page);

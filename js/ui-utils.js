@@ -263,8 +263,8 @@ export function buildCategoryRadarSvg(records, size = 340) {
   `;
 }
 
-// ค่าเฉลี่ยแต่ละหมวด (SCORE_CATEGORIES) จาก records ที่ให้มา — ตัวช่วยกลางใช้ทั้งใน buildCategoryRadarComparisonSvg
-// และตารางเปรียบเทียบก่อน/หลังในสมุดพกนักกีฬา (report-card.js) เพื่อไม่ให้คำนวณค่าเฉลี่ยเพี้ยนกันคนละจุด
+// ค่าเฉลี่ยแต่ละหมวด (SCORE_CATEGORIES) จาก records ที่ให้มา — ตัวช่วยกลางใช้ในสมุดพกนักกีฬา (report-card.js)
+// สำหรับสรุปประเด็นสำคัญ (key takeaways) เพื่อไม่ให้คำนวณค่าเฉลี่ยเพี้ยนกันคนละจุด
 function categoryAveragesFromRecords(records) {
   const sums = {};
   const counts = {};
@@ -290,77 +290,15 @@ function categoryAveragesFromRecords(records) {
 }
 export { categoryAveragesFromRecords };
 
-// กราฟเรดาร์เปรียบเทียบ 2 ช่วงเวลาซ้อนกันในรูปเดียว (แดง = รอบก่อนหน้า, น้ำเงิน = รอบปัจจุบัน) ใช้ในสมุดพก
-// นักกีฬาสำหรับพิมพ์ (report-card.js) ให้เห็นพัฒนาการเทียบรอบต่อรอบได้ในภาพเดียว ต่างจาก buildCategoryRadarSvg
-// ที่แสดงแค่ช่วงเดียว — หมวดที่ไม่มีข้อมูลของรอบใดรอบหนึ่งจะไม่ลากเส้นในรอบนั้น (จุดที่ไม่มีค่าเว้นไว้ที่ 0)
-export function buildCategoryRadarComparisonSvg(prevRecords, currentRecords, size = 260) {
-  const prevAverages = categoryAveragesFromRecords(prevRecords);
-  const currentAverages = categoryAveragesFromRecords(currentRecords);
-  const hasAnyData = currentAverages.some((c) => c.avg !== null) || prevAverages.some((c) => c.avg !== null);
-  if (!hasAnyData) {
-    return '<p class="text-xs text-slate-400 text-center py-6">ยังไม่มีข้อมูลคะแนนเพียงพอสำหรับแสดงกราฟ</p>';
-  }
-
-  const n = SCORE_CATEGORIES.length;
-  const maxScore = 4;
-  const cx = size / 2;
-  const cy = size / 2 - 4;
-  const R = size * 0.29;
-  const angles = SCORE_CATEGORIES.map((_, i) => -Math.PI / 2 + (i * 2 * Math.PI) / n);
-  const point = (angle, fraction) => ({
-    x: cx + R * fraction * Math.cos(angle),
-    y: cy + R * fraction * Math.sin(angle)
-  });
-
-  const gridRings = [0.25, 0.5, 0.75, 1]
-    .map((fraction) => {
-      const pts = angles
-        .map((a) => point(a, fraction))
-        .map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`)
-        .join(" ");
-      return `<polygon points="${pts}" fill="none" stroke="#e2e8f0" stroke-width="1" />`;
-    })
-    .join("");
-
-  const spokes = angles
-    .map((a) => {
-      const p = point(a, 1);
-      return `<line x1="${cx}" y1="${cy}" x2="${p.x.toFixed(1)}" y2="${p.y.toFixed(1)}" stroke="#e2e8f0" stroke-width="1" />`;
-    })
-    .join("");
-
-  const polygonFor = (averages, color) => {
-    const pts = angles.map((a, i) => point(a, (averages[i].avg ?? 0) / maxScore));
-    const polygon = pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
-    const dots = pts
-      .map((p, i) => (averages[i].avg === null ? "" : `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="${color}" />`))
-      .join("");
-    return `<polygon points="${polygon}" fill="${color}" fill-opacity="0.1" stroke="${color}" stroke-width="2" />${dots}`;
-  };
-
-  const labelR = R + 30;
-  const labels = angles
-    .map((a, i) => {
-      const p = point(a, labelR / R);
-      const anchor = Math.cos(a) > 0.3 ? "start" : Math.cos(a) < -0.3 ? "end" : "middle";
-      return `<text x="${p.x.toFixed(1)}" y="${(p.y + 3).toFixed(1)}" font-size="9" font-weight="600" fill="#334155" text-anchor="${anchor}">${SCORE_CATEGORIES[i].short}</text>`;
-    })
-    .join("");
-
-  return `
-    <svg viewBox="0 0 ${size} ${size + 18}" width="100%" style="max-width:${size}px; margin:0 auto; display:block">
-      ${gridRings}
-      ${spokes}
-      ${polygonFor(prevAverages, "#ef4444")}
-      ${polygonFor(currentAverages, "#2563eb")}
-      ${labels}
-      <g transform="translate(${cx - 60}, ${size + 8})" font-size="9" fill="#64748b">
-        <circle cx="0" cy="-3" r="3" fill="#ef4444" /><text x="6" y="0">รอบก่อน</text>
-        <circle cx="60" cy="-3" r="3" fill="#2563eb" /><text x="66" y="0">รอบนี้</text>
-      </g>
-    </svg>
-  `;
-}
+// สีประจำแต่ละหมวดคะแนน (4 หมวด = 4 สี) ใช้ในกราฟแนวโน้มคะแนนรายวันของสมุดพกนักกีฬา (report-card.js) เพื่อให้
+// แยกแต่ละด้านออกจากกันได้ด้วยสีทันทีโดยไม่ต้องอ่าน label — ไม่ผูกกับสีทีม (TEAM_COLORS) เพราะเป็นคนละมิติกัน
+// (นี่คือมิติของ "ด้านการประเมิน" ไม่ใช่ทีม)
+export const SCORE_CATEGORY_COLORS = {
+  physical: "#16a34a",
+  ballSkill: "#0ea5e9",
+  gameReading: "#f59e0b",
+  attitude: "#ec4899"
+};
 
 // ---------- ความเป็นเจ้าของนักกีฬาของโค้ชแต่ละคน (ใช้ร่วมกันทุกจุดที่ต้องแยกสถิติรายบุคคลของโค้ช) ----------
 // เฉพาะรุ่นอายุที่ตัวเองดูแล และถ้าเป็น GK Coach นับเฉพาะตำแหน่ง GK ส่วน Head/Assistant Coach ไม่นับตำแหน่ง
