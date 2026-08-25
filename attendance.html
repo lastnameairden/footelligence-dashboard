@@ -771,6 +771,11 @@
               </optgroup>
             </select>
           </div>
+          <div class="sm:col-span-2">
+            <label class="field-label">รูปนักกีฬา (ถ้ามี ไม่เกิน 5MB)</label>
+            <input id="player-photo-input" type="file" accept="image/*" class="field-input" />
+            <p id="player-photo-status" class="text-sm text-slate-500 mt-1"></p>
+          </div>
           <div class="sm:col-span-2 flex items-center gap-4">
             <button type="submit" id="add-player-submit-btn" class="btn btn-primary">เพิ่มนักกีฬา</button>
             <button type="button" id="cancel-edit-player-btn" class="btn btn-secondary hidden">ยกเลิกการแก้ไข</button>

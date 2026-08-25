@@ -232,6 +232,8 @@ const addPlayerForm = document.getElementById("add-player-form");
 const addPlayerStatus = document.getElementById("add-player-status");
 const addPlayerSubmitBtn = document.getElementById("add-player-submit-btn");
 const cancelEditPlayerBtn = document.getElementById("cancel-edit-player-btn");
+const playerPhotoInput = document.getElementById("player-photo-input");
+const playerPhotoStatus = document.getElementById("player-photo-status");
 const playerListBody = document.getElementById("player-list-body");
 const coachDirectoryGroups = document.getElementById("coach-directory-groups");
 const editCoachOverlay = document.getElementById("edit-coach-overlay");
@@ -294,6 +296,59 @@ let players = [];
 let editingPlayerId = null;
 let currentIsAdmin = false;
 let currentReportId = null;
+
+const MAX_PLAYER_PHOTO_SIZE = 5 * 1024 * 1024; // ต้องตรงกับ storage.rules
+// รูปนักกีฬาของแถวที่กำลังแก้ไขอยู่ (ถ้ามี) — เก็บแยกจาก input[type=file] เพราะเลือกรูปใหม่แล้วยังต้องรู้ว่า
+// ของเดิมคืออะไร (โชว์รูปเดิมไว้จนกว่าจะอัปโหลดรูปใหม่ทับหรือกดลบ) เหมือนแพทเทิร์นไฟล์แนบแผนการฝึกซ้อม
+let playerExistingPhotoUrl = null;
+let playerExistingPhotoPath = null;
+let playerRemoveExistingPhoto = false;
+
+// อัปโหลดรูปนักกีฬาขึ้น Storage แล้วคืน {url, path} — path ใช้ team+timestamp กันชื่อไฟล์ชนกัน ไม่ใช้ playerId
+// เพราะตอนเพิ่มนักกีฬาใหม่ยังไม่มี id จนกว่าจะบันทึกเอกสารสำเร็จ (เหมือนแพทเทิร์น uploadTrainingPlanFile)
+async function uploadPlayerPhoto(file, team) {
+  const safeName = file.name.replace(/[^\w.\-ก-๙]/g, "_");
+  const filePath = `players/${team}/${Date.now()}_${safeName}`;
+  const fileRef = storageRef(storage, filePath);
+  await uploadBytes(fileRef, file);
+  const url = await getDownloadURL(fileRef);
+  return { url, path: filePath };
+}
+
+// แสดงสถานะรูปนักกีฬาปัจจุบันใต้ช่องเลือกไฟล์ — ของเดิม (ถ้ามีและยังไม่ถูกลบ) จะมีรูปตัวอย่าง + ปุ่ม "ลบรูป"
+// เลือกรูปใหม่แล้วจะถือว่าใช้รูปใหม่แทนตอนบันทึก โดยไม่ต้องกดลบของเดิมก่อน
+function renderPlayerPhotoStatus() {
+  playerPhotoStatus.innerHTML = "";
+  if (playerPhotoInput.files[0]) {
+    playerPhotoStatus.textContent = `เลือกรูปใหม่: ${playerPhotoInput.files[0].name}`;
+    return;
+  }
+  if (playerExistingPhotoUrl && !playerRemoveExistingPhoto) {
+    const wrap = document.createElement("div");
+    wrap.className = "flex items-center gap-2";
+    const img = document.createElement("img");
+    img.src = playerExistingPhotoUrl;
+    img.alt = "รูปนักกีฬา";
+    img.className = "w-12 h-12 object-cover rounded-full border border-slate-200";
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "btn btn-ghost-danger btn-sm";
+    removeBtn.textContent = "ลบรูป";
+    removeBtn.addEventListener("click", () => {
+      playerRemoveExistingPhoto = true;
+      renderPlayerPhotoStatus();
+    });
+    wrap.append(img, removeBtn);
+    playerPhotoStatus.appendChild(wrap);
+    return;
+  }
+  playerPhotoStatus.textContent = playerExistingPhotoUrl ? "รูปเดิมจะถูกลบเมื่อบันทึก" : "ยังไม่มีรูป";
+}
+
+playerPhotoInput.addEventListener("change", () => {
+  playerRemoveExistingPhoto = false;
+  renderPlayerPhotoStatus();
+});
 
 function setAttendanceStatus(message, isError = false) {
   attendanceStatus.textContent = message;
@@ -2791,6 +2846,11 @@ function startEditPlayer(p) {
   document.getElementById("player-age-group").value = p.ageGroup ?? "";
   document.getElementById("player-position").value = p.position ?? "";
   applyAgeGroupLock();
+  playerPhotoInput.value = "";
+  playerExistingPhotoUrl = p.photoUrl ?? null;
+  playerExistingPhotoPath = p.photoPath ?? null;
+  playerRemoveExistingPhoto = false;
+  renderPlayerPhotoStatus();
   addPlayerSubmitBtn.textContent = "บันทึกการแก้ไข";
   cancelEditPlayerBtn.classList.remove("hidden");
   addPlayerStatus.textContent = `กำลังแก้ไข "${p.nickname ?? p.fullName}"`;
@@ -2802,6 +2862,10 @@ function stopEditPlayer() {
   editingPlayerId = null;
   addPlayerForm.reset();
   applyAgeGroupLock();
+  playerExistingPhotoUrl = null;
+  playerExistingPhotoPath = null;
+  playerRemoveExistingPhoto = false;
+  renderPlayerPhotoStatus();
   addPlayerSubmitBtn.textContent = "เพิ่มนักกีฬา";
   cancelEditPlayerBtn.classList.add("hidden");
 }
@@ -2816,6 +2880,8 @@ async function deletePlayer(p) {
   if (!ok) return;
   try {
     await deleteDoc(doc(db, "players", p.id));
+    // ลบรูปนักกีฬาใน Storage ทิ้งด้วยแบบ best-effort กันไฟล์ค้าง (ไม่บล็อกการลบเอกสารหลักถ้าลบรูปไม่สำเร็จ)
+    await deleteStorageFileBestEffort(p.photoPath);
     if (editingPlayerId === p.id) stopEditPlayer();
     addPlayerStatus.textContent = `ลบ "${p.nickname ?? p.fullName}" แล้ว`;
     addPlayerStatus.className = "text-sm text-slate-500";
@@ -2861,6 +2927,20 @@ addPlayerForm.addEventListener("submit", async (e) => {
     }
   }
 
+  const selectedPhoto = playerPhotoInput.files[0] || null;
+  if (selectedPhoto) {
+    if (selectedPhoto.size > MAX_PLAYER_PHOTO_SIZE) {
+      addPlayerStatus.textContent = "รูปใหญ่เกินไป (จำกัดไม่เกิน 5MB)";
+      addPlayerStatus.className = "text-sm text-red-600";
+      return;
+    }
+    if (!selectedPhoto.type.startsWith("image/")) {
+      addPlayerStatus.textContent = "รองรับเฉพาะไฟล์รูปภาพเท่านั้น";
+      addPlayerStatus.className = "text-sm text-red-600";
+      return;
+    }
+  }
+
   const payload = {
     number: numberNum,
     nickname,
@@ -2871,7 +2951,22 @@ addPlayerForm.addEventListener("submit", async (e) => {
     team: myTeam
   };
 
+  addPlayerSubmitBtn.disabled = true;
+  const oldPhotoPath = playerExistingPhotoPath;
   try {
+    if (selectedPhoto) {
+      addPlayerStatus.textContent = "กำลังอัปโหลดรูป...";
+      addPlayerStatus.className = "text-sm text-slate-500";
+      const uploaded = await uploadPlayerPhoto(selectedPhoto, myTeam);
+      payload.photoUrl = uploaded.url;
+      payload.photoPath = uploaded.path;
+    } else if (playerRemoveExistingPhoto) {
+      payload.photoUrl = null;
+      payload.photoPath = null;
+    }
+    // ถ้าไม่ได้เลือกรูปใหม่และไม่ได้กดลบรูปเดิม จะไม่ใส่ photoUrl/photoPath ใน payload เลย — updateDoc เป็น
+    // partial update จึงไม่แตะฟิลด์เดิม รูปที่เพิ่มไว้ก่อนหน้ายังอยู่ครบตามเดิม
+
     addPlayerStatus.textContent = "กำลังบันทึก...";
     addPlayerStatus.className = "text-sm text-slate-500";
 
@@ -2884,8 +2979,17 @@ addPlayerForm.addEventListener("submit", async (e) => {
       await addDoc(collection(db, "players"), { ...payload, createdAt: serverTimestamp() });
       addPlayerForm.reset();
       applyAgeGroupLock();
+      playerExistingPhotoUrl = null;
+      playerExistingPhotoPath = null;
+      playerRemoveExistingPhoto = false;
+      renderPlayerPhotoStatus();
       addPlayerStatus.textContent = `เพิ่ม "${nickname}" สำเร็จ ✓`;
       addPlayerStatus.className = "text-sm text-emerald-600";
+    }
+
+    // ลบรูปเก่าทิ้งแบบ best-effort หลังบันทึกสำเร็จแล้วเท่านั้น (เฉพาะตอนถูกแทนที่ด้วยรูปใหม่ หรือถูกลบทิ้ง)
+    if (oldPhotoPath && (selectedPhoto || payload.photoPath === null)) {
+      await deleteStorageFileBestEffort(oldPhotoPath);
     }
 
     await loadPlayers();
@@ -2898,6 +3002,8 @@ addPlayerForm.addEventListener("submit", async (e) => {
     console.error(err);
     addPlayerStatus.textContent = "บันทึกไม่สำเร็จ: " + err.message;
     addPlayerStatus.className = "text-sm text-red-600";
+  } finally {
+    addPlayerSubmitBtn.disabled = false;
   }
 });
 

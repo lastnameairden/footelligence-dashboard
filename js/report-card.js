@@ -500,7 +500,7 @@ function buildPlayerPage(player, data, scope) {
   sidebar.innerHTML = `
     <p class="text-[9px] font-semibold tracking-wide uppercase" style="color:${accent}">Player Profile</p>
     <div class="w-14 h-14 rounded-full flex items-center justify-center overflow-hidden bg-slate-50 mx-auto" style="border:2px solid ${accent}">
-      ${teamLogoImg(team, "w-9 h-9 object-contain")}
+      ${player.photoUrl ? `<img src="${player.photoUrl}" alt="รูปนักกีฬา" class="w-full h-full object-cover" />` : teamLogoImg(team, "w-9 h-9 object-contain")}
     </div>
     <div class="text-[10px] text-slate-600 space-y-0.5 pt-1 border-t border-slate-100">
       <p class="flex justify-between"><span class="text-slate-400">รุ่น</span><span class="font-medium">${player.ageGroup || UNASSIGNED_AGE_GROUP}</span></p>

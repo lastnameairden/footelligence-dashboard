@@ -28,6 +28,7 @@ const statusEl = document.getElementById("status-message");
 const accessGate = document.getElementById("access-gate");
 const accessGateMessage = document.getElementById("access-gate-message");
 const playerContent = document.getElementById("player-content");
+const playerPhotoBadge = document.getElementById("player-photo-badge");
 const playerNameHeading = document.getElementById("player-name-heading");
 const playerSubheading = document.getElementById("player-subheading");
 const playerStatCards = document.getElementById("player-stat-cards");
@@ -55,6 +56,10 @@ function showAccessGate(message) {
 
 function renderPlayerInfo(player) {
   const age = calcAge(player.birthday);
+  // มีรูปจริงก็แสดงแทนไอคอน 👤 เริ่มต้น (เพิ่มรูปได้จากขั้นตอนแก้ไขข้อมูลนักกีฬาในหน้าเช็คชื่อ)
+  playerPhotoBadge.innerHTML = player.photoUrl
+    ? `<img src="${player.photoUrl}" alt="รูปนักกีฬา" class="w-full h-full object-cover" />`
+    : "👤";
   playerNameHeading.textContent = player.nickname || player.fullName || "-";
   const parts = [
     player.fullName ?? "-",
