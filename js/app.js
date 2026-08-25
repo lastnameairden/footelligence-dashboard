@@ -1468,11 +1468,13 @@ function renderDrawerItems() {
     // redirect "attendance.html" ไปเป็น "attendance" และตัด query string ทิ้งระหว่างทาง แต่ไม่ตัด hash
     navDrawerItems.appendChild(drawerSectionLabel("ผู้ดูแลระบบ"));
     navDrawerItems.appendChild(drawerItem("👥", "รายชื่อโค้ชในระบบ", "./attendance.html#admin=coaches"));
+    navDrawerItems.appendChild(drawerItem("🧐", "ตรวจสอบข้อมูลนักกีฬาที่ผิดปกติ", "./attendance.html#admin=player-audit"));
     navDrawerItems.appendChild(drawerItem("📈", "ความคืบหน้าการประเมินรายวัน", "./attendance.html#admin=progress"));
     navDrawerItems.appendChild(drawerItem("📝", "คำขอลงทะเบียนที่รอการอนุมัติ", "./attendance.html#admin=approvals"));
     navDrawerItems.appendChild(drawerItem("⚽", "รายงานผลการแข่งขันทั้งหมด", "./attendance.html#admin=matches"));
     navDrawerItems.appendChild(drawerItem("🩹", "รายงานอาการบาดเจ็บทั้งหมด", "./attendance.html#admin=injuries"));
     navDrawerItems.appendChild(drawerItem("🖨️", "พิมพ์สรุป Dashboard", "./attendance.html#admin=print"));
+    navDrawerItems.appendChild(drawerItem("📔", "สมุดพกนักกีฬา", "./attendance.html#admin=report-card"));
     navDrawerItems.appendChild(drawerItem("📈", "พัฒนาการนักกีฬา", "./development.html"));
     navDrawerItems.appendChild(drawerDivider());
     navDrawerItems.appendChild(drawerItem("🔄", "เลือกทีมอื่น (Dashboard)", "/"));
