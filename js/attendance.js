@@ -2909,7 +2909,22 @@ addPlayerForm.addEventListener("submit", async (e) => {
   const numberVal = document.getElementById("player-number").value;
   const nickname = document.getElementById("player-nickname").value.trim();
   const fullName = document.getElementById("player-fullname").value.trim();
-  const birthday = document.getElementById("player-birthday").value;
+  let birthday = document.getElementById("player-birthday").value;
+  // ช่อง input[type=date] ของเบราว์เซอร์เก็บค่าเป็น ค.ศ. เสมอ แต่โค้ชบางคนพิมพ์ปี พ.ศ. เข้าไปตรงๆ (เช่น 2560
+  // แทนที่จะเป็น 2017) ทำให้อายุคำนวณผิดเพี้ยน — เช็คทันทีตอนกรอก ไม่ต้องรอให้ผู้ดูแลระบบมาตรวจพบทีหลังผ่าน
+  // เครื่องมือ "ตรวจสอบข้อมูลนักกีฬาที่ผิดปกติ" (ใช้ตรรกะเดียวกัน: ลองลบ 543 ออกจากปี ถ้าอายุที่ได้สมเหตุสมผล
+  // ค่อยแก้ให้อัตโนมัติ ไม่ต้องรอโค้ชพิมพ์ใหม่เอง)
+  let birthdayCorrectedNote = "";
+  if (birthday) {
+    const enteredAge = calcAge(birthday);
+    if (enteredAge === null || enteredAge < PLAYER_AUDIT_MIN_AGE || enteredAge > PLAYER_AUDIT_MAX_AGE) {
+      const fixed = suggestedBirthdayFix(birthday, enteredAge);
+      if (fixed) {
+        birthdayCorrectedNote = ` (ปรับปีเกิดจาก พ.ศ. ${birthday.slice(0, 4)} เป็น ค.ศ. ${fixed.slice(0, 4)} ให้อัตโนมัติ)`;
+        birthday = fixed;
+      }
+    }
+  }
   const ageGroup = document.getElementById("player-age-group").value;
   const position = document.getElementById("player-position").value.trim();
   const numberNum = numberVal ? Number(numberVal) : null;
@@ -2972,7 +2987,7 @@ addPlayerForm.addEventListener("submit", async (e) => {
 
     if (editingPlayerId) {
       await updateDoc(doc(db, "players", editingPlayerId), payload);
-      addPlayerStatus.textContent = `บันทึกการแก้ไข "${nickname}" สำเร็จ ✓`;
+      addPlayerStatus.textContent = `บันทึกการแก้ไข "${nickname}" สำเร็จ ✓${birthdayCorrectedNote}`;
       addPlayerStatus.className = "text-sm text-emerald-600";
       stopEditPlayer();
     } else {
@@ -2983,7 +2998,7 @@ addPlayerForm.addEventListener("submit", async (e) => {
       playerExistingPhotoPath = null;
       playerRemoveExistingPhoto = false;
       renderPlayerPhotoStatus();
-      addPlayerStatus.textContent = `เพิ่ม "${nickname}" สำเร็จ ✓`;
+      addPlayerStatus.textContent = `เพิ่ม "${nickname}" สำเร็จ ✓${birthdayCorrectedNote}`;
       addPlayerStatus.className = "text-sm text-emerald-600";
     }
 
