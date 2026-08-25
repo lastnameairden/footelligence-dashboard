@@ -202,6 +202,13 @@ const adminReportCardStartSelect = document.getElementById("admin-report-card-st
 const adminReportCardEndSelect = document.getElementById("admin-report-card-end-select");
 const adminGenerateReportCardBtn = document.getElementById("admin-generate-report-card-btn");
 const adminReportCardStatus = document.getElementById("admin-report-card-status");
+const adminMascRoundsSection = document.getElementById("admin-masc-rounds-section");
+const adminMascRoundPeriodSelect = document.getElementById("admin-masc-round-period-select");
+const adminMascRoundStartInput = document.getElementById("admin-masc-round-start-input");
+const adminMascRoundEndInput = document.getElementById("admin-masc-round-end-input");
+const adminMascRoundStartBtn = document.getElementById("admin-masc-round-start-btn");
+const adminMascRoundStatus = document.getElementById("admin-masc-round-status");
+const adminMascRoundListBody = document.getElementById("admin-masc-round-list-body");
 const adminPrintStatus = document.getElementById("admin-print-status");
 const adminStatus = document.getElementById("admin-status");
 const hamburgerBtn = document.getElementById("hamburger-btn");
@@ -528,6 +535,7 @@ function hideAllScreens() {
   adminDashboardSection.classList.add("hidden");
   adminPrintSection.classList.add("hidden");
   adminReportCardSection.classList.add("hidden");
+  adminMascRoundsSection.classList.add("hidden");
   adminPlayerAuditSection.classList.add("hidden");
   addPlayerSection.classList.add("hidden");
   checkinSection.classList.add("hidden");
@@ -745,6 +753,7 @@ function renderDrawerItems() {
       navDrawerItems.appendChild(drawerItem("📊", "ดู Dashboard ทีม", openAdminDashboardSection));
       navDrawerItems.appendChild(drawerItem("🖨️", "พิมพ์สรุป Dashboard", openAdminPrintSection));
       navDrawerItems.appendChild(drawerItem("📔", "สมุดพกนักกีฬา", openAdminReportCardSection));
+      navDrawerItems.appendChild(drawerItem("🧬", "กำหนดรอบการประเมิน MASC", openAdminMascRoundsSection));
       navDrawerItems.appendChild(drawerItem("📈", "พัฒนาการนักกีฬา", () => (window.location.href = "./development.html")));
       navDrawerItems.appendChild(drawerDivider());
       navDrawerItems.appendChild(drawerItem("🏠", "หน้า Dashboard หลัก", goToDashboard));
@@ -1001,6 +1010,129 @@ adminGenerateReportCardBtn.addEventListener("click", () => {
   window.location.href =
     `${window.location.origin}/report-card.html#team=${encodeURIComponent(team)}` +
     `&ageGroup=${encodeURIComponent(ageGroup)}&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+});
+
+// ---------- ผู้ดูแลระบบ: กำหนดรอบการประเมิน MASC (ช่วงวันที่ + แจ้งเตือนโค้ชทุกทีม) ----------
+// รอบเดียวใช้ทั้งองค์กรพร้อมกันทุกทีม (ไม่แยกทีม) ตามที่ตกลงกันไว้ — สถานะคำนวณสดจากวันที่ปัจจุบันเทียบกับ
+// startDate/endDate ที่บันทึกไว้ ไม่ต้องมีฟิลด์สถานะแยกเก็บเอง (กันข้อมูลเพี้ยนถ้าเปิดแอปข้ามวันไป)
+function mascRoundStatus(round) {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  if (todayStr < round.startDate) return { label: "ยังไม่เริ่ม", className: "badge-neutral" };
+  if (todayStr > round.endDate) return { label: "สิ้นสุดแล้ว", className: "badge-neutral" };
+  return { label: "กำลังดำเนินการ", className: "badge-success" };
+}
+
+function openAdminMascRoundsSection() {
+  hideAllScreens();
+  adminMascRoundsSection.classList.remove("hidden");
+  adminMascRoundPeriodSelect.value = "";
+  adminMascRoundStartInput.value = "";
+  adminMascRoundEndInput.value = "";
+  adminMascRoundStatus.textContent = "";
+  loadMascRounds();
+}
+
+async function loadMascRounds() {
+  adminMascRoundListBody.innerHTML =
+    '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>';
+  try {
+    const snap = await getDocs(collection(db, "mascRounds"));
+    const rounds = [];
+    snap.forEach((d) => rounds.push({ id: d.id, ...d.data() }));
+    rounds.sort((a, b) => (b.startDate || "").localeCompare(a.startDate || ""));
+    renderMascRoundList(rounds);
+  } catch (err) {
+    console.error(err);
+    adminMascRoundListBody.innerHTML =
+      `<tr><td colspan="6" class="px-4 py-6 text-center text-red-600">โหลดไม่สำเร็จ: ${err.message}</td></tr>`;
+  }
+}
+
+function renderMascRoundList(rounds) {
+  if (rounds.length === 0) {
+    adminMascRoundListBody.innerHTML =
+      '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">ยังไม่เคยกำหนดรอบการประเมิน</td></tr>';
+    return;
+  }
+  adminMascRoundListBody.innerHTML = rounds
+    .map((r) => {
+      const status = mascRoundStatus(r);
+      return `
+        <tr>
+          <td class="emphasis">${r.label ?? "-"}</td>
+          <td>${r.startDate ?? "-"}</td>
+          <td>${r.endDate ?? "-"}</td>
+          <td><span class="badge ${status.className}">${status.label}</span></td>
+          <td>${r.createdBy ?? "-"}</td>
+          <td><button type="button" class="btn btn-ghost-danger btn-sm" data-masc-round-delete="${r.id}">ลบ</button></td>
+        </tr>`;
+    })
+    .join("");
+  applyDataLabels(adminMascRoundListBody);
+  adminMascRoundListBody.querySelectorAll("[data-masc-round-delete]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("ยืนยันลบรอบการประเมินนี้? การลบนี้ไม่แจ้งเตือนโค้ชว่ายกเลิก และไม่สามารถย้อนกลับได้")) return;
+      try {
+        await deleteDoc(doc(db, "mascRounds", btn.dataset.mascRoundDelete));
+        await loadMascRounds();
+      } catch (err) {
+        console.error(err);
+        alert("ลบไม่สำเร็จ: " + err.message);
+      }
+    });
+  });
+}
+
+adminMascRoundStartBtn.addEventListener("click", async () => {
+  const label = adminMascRoundPeriodSelect.value;
+  const startDate = adminMascRoundStartInput.value;
+  const endDate = adminMascRoundEndInput.value;
+  if (!label) {
+    adminMascRoundStatus.textContent = "กรุณาเลือกช่วงที่ประเมิน";
+    return;
+  }
+  if (!startDate || !endDate) {
+    adminMascRoundStatus.textContent = "กรุณาเลือกวันที่เริ่มและวันที่สิ้นสุด";
+    return;
+  }
+  if (startDate > endDate) {
+    adminMascRoundStatus.textContent = "วันที่เริ่มต้องอยู่ก่อนหรือเท่ากับวันที่สิ้นสุด";
+    return;
+  }
+  adminMascRoundStartBtn.disabled = true;
+  adminMascRoundStatus.textContent = "กำลังบันทึก...";
+  adminMascRoundStatus.className = "text-sm text-slate-500 w-full";
+  try {
+    const startLabel = new Date(`${startDate}T00:00:00`).toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" });
+    const endLabel = new Date(`${endDate}T00:00:00`).toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" });
+    const createdBy = myCoachName || auth.currentUser?.email || "-";
+    const newDoc = await addDoc(collection(db, "mascRounds"), {
+      label,
+      startDate,
+      endDate,
+      createdBy,
+      createdAt: serverTimestamp()
+    });
+    // แจ้งเตือนทุกทีมพร้อมกัน (ใช้ executiveNotes ที่มีอยู่แล้ว — โค้ชเห็นข้อความนี้ในหน้า Daily ของตัวเองทันที)
+    const message = `เริ่มรอบประเมิน MASC ${label} แล้ว ตั้งแต่วันที่ ${startLabel} ถึง ${endLabel} กรุณาดำเนินการให้แล้วเสร็จภายในกำหนด`;
+    await Promise.all(
+      TEAMS.map((team) =>
+        sendExecutiveNote({ team, type: "masc_round", refId: newDoc.id, refLabel: label, message, createdBy })
+      )
+    );
+    adminMascRoundStatus.textContent = `เริ่มรอบประเมิน ${label} และแจ้งเตือนทุกทีมแล้ว ✓`;
+    adminMascRoundStatus.className = "text-sm text-emerald-600 w-full";
+    adminMascRoundPeriodSelect.value = "";
+    adminMascRoundStartInput.value = "";
+    adminMascRoundEndInput.value = "";
+    await loadMascRounds();
+  } catch (err) {
+    console.error(err);
+    adminMascRoundStatus.textContent = "บันทึกไม่สำเร็จ: " + err.message;
+    adminMascRoundStatus.className = "text-sm text-red-600 w-full";
+  } finally {
+    adminMascRoundStartBtn.disabled = false;
+  }
 });
 
 // หน้าแผงควบคุมแบบการ์ด (admin-menu-section) ถูกยกเลิกไปแล้ว — ปุ่ม "← กลับหน้า Dashboard" ในแต่ละ
@@ -2723,7 +2855,8 @@ onAuthStateChanged(auth, async (user) => {
         dashboard: openAdminDashboardSection,
         print: openAdminPrintSection,
         "player-audit": openAdminPlayerAuditSection,
-        "report-card": openAdminReportCardSection
+        "report-card": openAdminReportCardSection,
+        "masc-rounds": openAdminMascRoundsSection
       };
       const adminDeepLink = new URLSearchParams(window.location.hash.replace(/^#/, "")).get("admin");
       if (adminDeepLink && adminDeepLinks[adminDeepLink]) {

@@ -20,6 +20,7 @@ const accessGate = document.getElementById("access-gate");
 const accessGateMessage = document.getElementById("access-gate-message");
 const mascContent = document.getElementById("masc-content");
 
+const mascRoundBanner = document.getElementById("masc-round-banner");
 const ageFilterSelect = document.getElementById("masc-age-filter-select");
 const playerSelect = document.getElementById("masc-player-select");
 const periodSelect = document.getElementById("masc-period-select");
@@ -91,6 +92,9 @@ function ageGroupToBracket(ageGroup) {
 let myTeam = null;
 let myCoachDoc = null;
 let isReadOnly = false;
+// ช่วงที่ของรอบประเมิน MASC ที่กำลังดำเนินการอยู่ตอนนี้ (ผู้ดูแลระบบกำหนดผ่านเมนู "กำหนดรอบการประเมิน MASC")
+// ใช้ตั้งค่าเริ่มต้นให้ช่อง "ช่วงที่ประเมิน" ตอนเริ่มประเมินรอบใหม่ กันโค้ชลืมว่าตอนนี้คือช่วงไหน
+let activeMascRoundLabel = null;
 let players = [];
 let currentPlayer = null;
 let currentEvaluationId = null;
@@ -106,6 +110,58 @@ let curRoles = new Set();
 function setStatus(message, isError = false) {
   mascStatus.textContent = message;
   mascStatus.className = isError ? "text-sm text-red-600" : "text-sm text-slate-500";
+}
+
+// จำนวนวันเต็มระหว่างสอง date string "YYYY-MM-DD" (a - b) — ใช้คำนวณ "เหลืออีกกี่วัน"/"เลยมากี่วัน"
+function daysBetween(a, b) {
+  return Math.round((new Date(`${a}T00:00:00`) - new Date(`${b}T00:00:00`)) / 86400000);
+}
+
+// โหลดรอบการประเมิน MASC ที่ผู้ดูแลระบบกำหนดไว้ (collection mascRounds) แล้วแสดงแบนเนอร์บอกรอบปัจจุบัน — ถ้า
+// กำลังอยู่ในช่วง ขึ้นแบบปกติพร้อมจำนวนวันที่เหลือ ถ้าเลยกำหนดมาไม่เกิน 30 วัน (แต่ยังไม่มีรอบใหม่มาแทน) ขึ้นเป็น
+// คำเตือนสีเหลืองว่าเลยกำหนดแล้ว (ยังกรอกข้อมูลย้อนหลังได้ตามปกติ ไม่ได้บล็อก) — ไม่โชว์อะไรถ้าไม่มีรอบที่เกี่ยวข้อง
+async function loadMascRoundBanner() {
+  activeMascRoundLabel = null;
+  try {
+    const snap = await getDocs(collection(db, "mascRounds"));
+    const rounds = [];
+    snap.forEach((d) => rounds.push(d.data()));
+    if (rounds.length === 0) {
+      mascRoundBanner.classList.add("hidden");
+      return;
+    }
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const active = rounds.find((r) => r.startDate <= todayStr && todayStr <= r.endDate);
+    if (active) {
+      activeMascRoundLabel = active.label;
+      const daysLeft = daysBetween(active.endDate, todayStr);
+      mascRoundBanner.className = "card card-pad no-print bg-emerald-50 border-emerald-200";
+      mascRoundBanner.innerHTML = `
+        <p class="font-semibold text-emerald-800">🔔 รอบประเมิน MASC ปัจจุบัน: ${active.label} (${active.startDate} – ${active.endDate})</p>
+        <p class="text-sm text-emerald-700 mt-1">${daysLeft > 0 ? `เหลือเวลาอีก ${daysLeft} วัน` : "หมดเขตวันนี้"}</p>
+      `;
+      mascRoundBanner.classList.remove("hidden");
+      return;
+    }
+    // ไม่มีรอบที่กำลังดำเนินการ — หารอบที่เพิ่งหมดเขตล่าสุด (เลยมาไม่เกิน 30 วัน) มาเตือนเผื่อยังทำไม่เสร็จ
+    const pastRounds = rounds.filter((r) => r.endDate < todayStr).sort((a, b) => b.endDate.localeCompare(a.endDate));
+    const mostRecentPast = pastRounds[0];
+    if (mostRecentPast && daysBetween(todayStr, mostRecentPast.endDate) <= 30) {
+      const overdueDays = daysBetween(todayStr, mostRecentPast.endDate);
+      mascRoundBanner.className = "card card-pad no-print bg-amber-50 border-amber-200";
+      mascRoundBanner.innerHTML = `
+        <p class="font-semibold text-amber-800">⚠️ เลยกำหนดรอบประเมิน MASC ${mostRecentPast.label} มาแล้ว ${overdueDays} วัน (สิ้นสุด ${mostRecentPast.endDate})</p>
+        <p class="text-sm text-amber-700 mt-1">ยังกรอก/แก้ไขข้อมูลย้อนหลังได้ตามปกติ — รบกวนดำเนินการให้แล้วเสร็จโดยเร็ว</p>
+      `;
+      mascRoundBanner.classList.remove("hidden");
+      return;
+    }
+    mascRoundBanner.classList.add("hidden");
+  } catch (err) {
+    console.error(err);
+    // แบนเนอร์เป็นแค่ตัวเตือนเสริม โหลดไม่สำเร็จไม่ควรบล็อกการใช้งานหน้า MASC หลัก
+    mascRoundBanner.classList.add("hidden");
+  }
 }
 
 // ---------- ตัวสร้าง UI ทั่วไป (segmented แบบเลือกได้ค่าเดียว หรือกดซ้ำเพื่อยกเลิกเลือก) ----------
@@ -378,6 +434,9 @@ function startNewEvaluationForCurrentPlayer() {
   curAgeBracket = ageGroupToBracket(currentPlayer.ageGroup);
   playerTitle.textContent = currentPlayer.nickname || currentPlayer.fullName || "-";
   resetFormFields();
+  // ตั้งค่าเริ่มต้นเป็นรอบที่กำลังดำเนินการอยู่ตอนนี้ (ถ้าผู้ดูแลระบบกำหนดไว้) กันโค้ชลืมว่าตอนนี้คือช่วงไหน
+  // ยังแก้เป็นช่วงอื่นเองได้ตามปกติถ้าตั้งใจประเมินย้อนหลัง
+  periodSelect.value = activeMascRoundLabel || "";
   renderPositionSelectors();
   renderForm();
   formWrap.classList.remove("hidden");
@@ -576,6 +635,7 @@ onAuthStateChanged(auth, async (user) => {
     printBtn.classList.remove("hidden");
     if (isReadOnly) setStatus("บัญชีนี้ดูข้อมูลได้อย่างเดียว (ผู้บริหารทีม) ไม่สามารถบันทึกการประเมินได้");
 
+    await loadMascRoundBanner();
     await loadPlayers();
   } catch (err) {
     console.error(err);

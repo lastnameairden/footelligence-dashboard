@@ -1475,6 +1475,7 @@ function renderDrawerItems() {
     navDrawerItems.appendChild(drawerItem("🩹", "รายงานอาการบาดเจ็บทั้งหมด", "./attendance.html#admin=injuries"));
     navDrawerItems.appendChild(drawerItem("🖨️", "พิมพ์สรุป Dashboard", "./attendance.html#admin=print"));
     navDrawerItems.appendChild(drawerItem("📔", "สมุดพกนักกีฬา", "./attendance.html#admin=report-card"));
+    navDrawerItems.appendChild(drawerItem("🧬", "กำหนดรอบการประเมิน MASC", "./attendance.html#admin=masc-rounds"));
     navDrawerItems.appendChild(drawerItem("📈", "พัฒนาการนักกีฬา", "./development.html"));
     navDrawerItems.appendChild(drawerDivider());
     navDrawerItems.appendChild(drawerItem("🔄", "เลือกทีมอื่น (Dashboard)", "/"));

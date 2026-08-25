@@ -699,6 +699,62 @@
       </div>
     </section>
 
+    <!-- กำหนดรอบการประเมิน MASC (ช่วงวันที่ + แจ้งเตือนโค้ชทุกทีม) -->
+    <section id="admin-masc-rounds-section" class="hidden space-y-6">
+      <button data-admin-back class="btn btn-ghost px-0">← กลับหน้า Dashboard</button>
+      <div class="page-heading">
+        <div class="icon-badge icon-badge-lg">🧬</div>
+        <div>
+          <h2>กำหนดรอบการประเมิน MASC</h2>
+          <p>ตั้งช่วงวันที่ให้โค้ชดำเนินการประเมิน MASC — เริ่มรอบแล้วระบบจะแจ้งเตือนไปยังทุกทีมโดยอัตโนมัติ</p>
+        </div>
+      </div>
+      <div class="card card-pad space-y-3 max-w-sm">
+        <div>
+          <label class="field-label">ช่วงที่ประเมิน</label>
+          <select id="admin-masc-round-period-select" class="field-input w-full">
+            <option value="">-- เลือกช่วงที่ --</option>
+            <option>ช่วงที่ 1</option>
+            <option>ช่วงที่ 2</option>
+            <option>ช่วงที่ 3</option>
+            <option>ช่วงที่ 4</option>
+          </select>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="field-label">วันที่เริ่ม</label>
+            <input id="admin-masc-round-start-input" type="date" class="field-input w-full" />
+          </div>
+          <div>
+            <label class="field-label">วันที่สิ้นสุด</label>
+            <input id="admin-masc-round-end-input" type="date" class="field-input w-full" />
+          </div>
+        </div>
+        <button id="admin-masc-round-start-btn" class="btn btn-primary btn-block">เริ่มรอบประเมิน (แจ้งเตือนทุกทีม)</button>
+        <p id="admin-masc-round-status" class="text-sm text-red-600 w-full"></p>
+      </div>
+      <div>
+        <h2 class="section-title mb-3"><span class="icon-badge">📋</span> ประวัติรอบการประเมิน</h2>
+        <div class="card table-wrap">
+          <table class="pro-table">
+            <thead>
+              <tr>
+                <th>ช่วงที่</th>
+                <th>วันที่เริ่ม</th>
+                <th>วันที่สิ้นสุด</th>
+                <th>สถานะ</th>
+                <th>กำหนดโดย</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="admin-masc-round-list-body">
+              <tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
     <!-- หน้าจอเพิ่มนักกีฬา -->
     <section id="add-player-section" class="hidden space-y-6">
       <button data-back class="btn btn-ghost px-0">← กลับหน้า Daily</button>

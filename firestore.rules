@@ -133,5 +133,12 @@ service cloud.firestore {
     match /playerReportCards/{id} {
       allow read, write: if isAdmin();
     }
+
+    // รอบการประเมิน MASC ที่ผู้ดูแลระบบกำหนด (ช่วงวันที่เริ่ม-สิ้นสุด ใช้ทั้งองค์กรพร้อมกันทุกทีม) — โค้ช/
+    // ผู้บริหารทีมทุกคนต้องอ่านได้เพื่อเห็นรอบปัจจุบันในหน้า MASC ของตัวเอง แก้ไข/สร้างได้เฉพาะผู้ดูแลระบบ
+    match /mascRounds/{id} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
   }
 }
