@@ -95,6 +95,10 @@ let isReadOnly = false;
 // ช่วงที่ของรอบประเมิน MASC ที่กำลังดำเนินการอยู่ตอนนี้ (ผู้ดูแลระบบกำหนดผ่านเมนู "กำหนดรอบการประเมิน MASC")
 // ใช้ตั้งค่าเริ่มต้นให้ช่อง "ช่วงที่ประเมิน" ตอนเริ่มประเมินรอบใหม่ กันโค้ชลืมว่าตอนนี้คือช่วงไหน
 let activeMascRoundLabel = null;
+// ต้องมีรอบที่ผู้ดูแลระบบกำหนดไว้และกำลังดำเนินการอยู่จริง (วันนี้อยู่ในช่วง startDate-endDate) เท่านั้นถึงจะ
+// เริ่ม/บันทึกการประเมินได้ — ถ้าไม่มีรอบเลย หรือรอบล่าสุดหมดเขตไปแล้ว ถือว่าปิดรับการประเมินจนกว่าจะมีรอบใหม่
+// (เดิมยังให้กรอกย้อนหลังได้ แต่ผู้ใช้แจ้งให้เปลี่ยนเป็นบังคับต้องมีรอบก่อนเท่านั้น)
+let hasActiveMascRound = false;
 let players = [];
 let currentPlayer = null;
 let currentEvaluationId = null;
@@ -117,23 +121,22 @@ function daysBetween(a, b) {
   return Math.round((new Date(`${a}T00:00:00`) - new Date(`${b}T00:00:00`)) / 86400000);
 }
 
-// โหลดรอบการประเมิน MASC ที่ผู้ดูแลระบบกำหนดไว้ (collection mascRounds) แล้วแสดงแบนเนอร์บอกรอบปัจจุบัน — ถ้า
-// กำลังอยู่ในช่วง ขึ้นแบบปกติพร้อมจำนวนวันที่เหลือ ถ้าเลยกำหนดมาไม่เกิน 30 วัน (แต่ยังไม่มีรอบใหม่มาแทน) ขึ้นเป็น
-// คำเตือนสีเหลืองว่าเลยกำหนดแล้ว (ยังกรอกข้อมูลย้อนหลังได้ตามปกติ ไม่ได้บล็อก) — ไม่โชว์อะไรถ้าไม่มีรอบที่เกี่ยวข้อง
+// โหลดรอบการประเมิน MASC ที่ผู้ดูแลระบบกำหนดไว้ (collection mascRounds) แล้วแสดงแบนเนอร์บอกสถานะ — ถ้ากำลัง
+// อยู่ในช่วงของรอบใดรอบหนึ่ง เปิดให้ประเมินได้ตามปกติ (hasActiveMascRound = true) ถ้าไม่มีรอบเลย หรือทุกรอบที่
+// เคยกำหนดไว้หมดเขตไปแล้ว ปิดการเริ่ม/บันทึกการประเมินทันที จนกว่าผู้ดูแลระบบจะเปิดรอบใหม่ — โหลดไม่สำเร็จก็ถือ
+// เป็น "ไม่มีรอบ" เช่นกัน (fail-closed) เพราะยืนยันไม่ได้ว่ามีรอบที่เปิดอยู่จริงหรือไม่
 async function loadMascRoundBanner() {
   activeMascRoundLabel = null;
+  hasActiveMascRound = false;
   try {
     const snap = await getDocs(collection(db, "mascRounds"));
     const rounds = [];
     snap.forEach((d) => rounds.push(d.data()));
-    if (rounds.length === 0) {
-      mascRoundBanner.classList.add("hidden");
-      return;
-    }
     const todayStr = new Date().toISOString().slice(0, 10);
     const active = rounds.find((r) => r.startDate <= todayStr && todayStr <= r.endDate);
     if (active) {
       activeMascRoundLabel = active.label;
+      hasActiveMascRound = true;
       const daysLeft = daysBetween(active.endDate, todayStr);
       mascRoundBanner.className = "card card-pad no-print bg-emerald-50 border-emerald-200";
       mascRoundBanner.innerHTML = `
@@ -143,24 +146,17 @@ async function loadMascRoundBanner() {
       mascRoundBanner.classList.remove("hidden");
       return;
     }
-    // ไม่มีรอบที่กำลังดำเนินการ — หารอบที่เพิ่งหมดเขตล่าสุด (เลยมาไม่เกิน 30 วัน) มาเตือนเผื่อยังทำไม่เสร็จ
-    const pastRounds = rounds.filter((r) => r.endDate < todayStr).sort((a, b) => b.endDate.localeCompare(a.endDate));
-    const mostRecentPast = pastRounds[0];
-    if (mostRecentPast && daysBetween(todayStr, mostRecentPast.endDate) <= 30) {
-      const overdueDays = daysBetween(todayStr, mostRecentPast.endDate);
-      mascRoundBanner.className = "card card-pad no-print bg-amber-50 border-amber-200";
-      mascRoundBanner.innerHTML = `
-        <p class="font-semibold text-amber-800">⚠️ เลยกำหนดรอบประเมิน MASC ${mostRecentPast.label} มาแล้ว ${overdueDays} วัน (สิ้นสุด ${mostRecentPast.endDate})</p>
-        <p class="text-sm text-amber-700 mt-1">ยังกรอก/แก้ไขข้อมูลย้อนหลังได้ตามปกติ — รบกวนดำเนินการให้แล้วเสร็จโดยเร็ว</p>
-      `;
-      mascRoundBanner.classList.remove("hidden");
-      return;
-    }
-    mascRoundBanner.classList.add("hidden");
+    mascRoundBanner.className = "card card-pad no-print bg-slate-100 border-slate-200";
+    mascRoundBanner.innerHTML = `
+      <p class="font-semibold text-slate-700">🔒 ยังไม่มีรอบการประเมิน MASC ที่กำลังดำเนินการอยู่ในขณะนี้</p>
+      <p class="text-sm text-slate-500 mt-1">ต้องรอผู้ดูแลระบบกำหนดรอบก่อน จึงจะเริ่ม/บันทึกการประเมินได้</p>
+    `;
+    mascRoundBanner.classList.remove("hidden");
   } catch (err) {
     console.error(err);
-    // แบนเนอร์เป็นแค่ตัวเตือนเสริม โหลดไม่สำเร็จไม่ควรบล็อกการใช้งานหน้า MASC หลัก
-    mascRoundBanner.classList.add("hidden");
+    mascRoundBanner.className = "card card-pad no-print bg-red-50 border-red-200";
+    mascRoundBanner.innerHTML = `<p class="font-semibold text-red-700">โหลดข้อมูลรอบการประเมินไม่สำเร็จ — ปิดการบันทึกไว้ก่อนเพื่อความปลอดภัย: ${err.message}</p>`;
+    mascRoundBanner.classList.remove("hidden");
   }
 }
 
@@ -428,6 +424,12 @@ function resetFormFields() {
 
 function startNewEvaluationForCurrentPlayer() {
   if (!currentPlayer) return;
+  // ปุ่ม "+ ประเมินรอบใหม่" ถูก disabled ไว้แล้วเมื่อไม่มีรอบที่กำลังดำเนินการ แต่กันไว้อีกชั้นเผื่อถูกเรียกจาก
+  // ที่อื่น (เช่นอนาคตมีทางเข้าอื่นนอกจากคลิกปุ่ม)
+  if (isReadOnly || !hasActiveMascRound) {
+    setStatus("ยังไม่มีรอบการประเมิน MASC ที่กำลังดำเนินการอยู่ในขณะนี้ — ต้องรอผู้ดูแลระบบกำหนดรอบก่อน", true);
+    return;
+  }
   currentEvaluationId = null;
   deleteBtn.classList.add("hidden");
   curPosition = POSITION_TO_MASC[currentPlayer.position] || "CB";
@@ -445,7 +447,7 @@ function startNewEvaluationForCurrentPlayer() {
 
 function loadEvaluationIntoForm(ev) {
   currentEvaluationId = ev.id;
-  deleteBtn.classList.toggle("hidden", isReadOnly);
+  deleteBtn.classList.toggle("hidden", isReadOnly || !hasActiveMascRound);
   curPosition = ev.position || "CB";
   curAgeBracket = ev.ageBracket || "U13-14";
   playerTitle.textContent = currentPlayer.nickname || currentPlayer.fullName || "-";
@@ -507,6 +509,13 @@ function collectPayload() {
 
 saveBtn.addEventListener("click", async () => {
   if (!currentPlayer) return;
+  // กันไว้อีกชั้นเผื่อรอบหมดเขตพอดีระหว่างที่โค้ชกำลังกรอกฟอร์มอยู่ (ปุ่มนี้ถูกซ่อนไปแล้วตามปกติเมื่อไม่มีรอบ
+  // ที่กำลังดำเนินการ แต่ยังอาจกดผ่านมาได้ถ้าเปิดหน้าค้างไว้นาน)
+  if (!hasActiveMascRound) {
+    saveStatus.textContent = "ไม่สามารถบันทึกได้ — ยังไม่มีรอบการประเมิน MASC ที่กำลังดำเนินการอยู่ในขณะนี้";
+    saveStatus.className = "text-sm text-red-600";
+    return;
+  }
   saveStatus.textContent = "กำลังบันทึก...";
   saveStatus.className = "text-sm text-slate-500";
   try {
@@ -573,10 +582,23 @@ playerSelect.addEventListener("change", async () => {
   }
   currentPlayer = players.find((p) => p.id === id);
   periodSelect.disabled = false;
-  newBtn.disabled = false;
+  // เริ่มประเมินรอบใหม่ได้เฉพาะตอนมีรอบที่กำลังดำเนินการอยู่จริงเท่านั้น (ดูประวัติเดิมได้เสมอไม่ว่าจะมีรอบหรือไม่)
+  newBtn.disabled = isReadOnly || !hasActiveMascRound;
   setStatus("กำลังโหลดประวัติการประเมิน...");
   await loadHistoryForPlayer(id);
-  setStatus(evaluationsForPlayer.length > 0 ? `พบการประเมิน ${evaluationsForPlayer.length} รอบก่อนหน้า — คลิกเพื่อดู หรือกด "+ ประเมินรอบใหม่"` : "ยังไม่มีการประเมินของนักกีฬาคนนี้ — กด \"+ ประเมินรอบใหม่\" เพื่อเริ่ม");
+  if (evaluationsForPlayer.length > 0) {
+    setStatus(
+      hasActiveMascRound
+        ? `พบการประเมิน ${evaluationsForPlayer.length} รอบก่อนหน้า — คลิกเพื่อดู หรือกด "+ ประเมินรอบใหม่"`
+        : `พบการประเมิน ${evaluationsForPlayer.length} รอบก่อนหน้า — คลิกเพื่อดู (เริ่มรอบใหม่ไม่ได้จนกว่าผู้ดูแลระบบจะกำหนดรอบ)`
+    );
+  } else {
+    setStatus(
+      hasActiveMascRound
+        ? 'ยังไม่มีการประเมินของนักกีฬาคนนี้ — กด "+ ประเมินรอบใหม่" เพื่อเริ่ม'
+        : "ยังไม่มีการประเมินของนักกีฬาคนนี้ — ต้องรอผู้ดูแลระบบกำหนดรอบก่อนจึงจะเริ่มประเมินได้"
+    );
+  }
 });
 
 newBtn.addEventListener("click", startNewEvaluationForCurrentPlayer);
@@ -631,11 +653,18 @@ onAuthStateChanged(auth, async (user) => {
     accessGate.classList.add("hidden");
     mascContent.classList.remove("hidden");
     statusEl.textContent = "";
-    saveBtn.classList.toggle("hidden", isReadOnly);
     printBtn.classList.remove("hidden");
-    if (isReadOnly) setStatus("บัญชีนี้ดูข้อมูลได้อย่างเดียว (ผู้บริหารทีม) ไม่สามารถบันทึกการประเมินได้");
 
+    // ต้องรู้ก่อนว่ามีรอบที่กำลังดำเนินการอยู่หรือไม่ ถึงจะตัดสินใจได้ว่าปุ่ม "บันทึก" ควรโชว์หรือไม่ (isReadOnly
+    // เดิมมาจากบทบาทผู้บริหารทีมอย่างเดียว ตอนนี้ต้องรวมเงื่อนไขรอบการประเมินเข้าไปด้วย)
     await loadMascRoundBanner();
+    saveBtn.classList.toggle("hidden", isReadOnly || !hasActiveMascRound);
+    if (isReadOnly) {
+      setStatus("บัญชีนี้ดูข้อมูลได้อย่างเดียว (ผู้บริหารทีม) ไม่สามารถบันทึกการประเมินได้");
+    } else if (!hasActiveMascRound) {
+      setStatus("ยังไม่มีรอบการประเมิน MASC ที่กำลังดำเนินการอยู่ในขณะนี้ — ดูประวัติย้อนหลังได้ตามปกติ แต่จะเริ่ม/บันทึกการประเมินใหม่ไม่ได้จนกว่าผู้ดูแลระบบจะกำหนดรอบ");
+    }
+
     await loadPlayers();
   } catch (err) {
     console.error(err);

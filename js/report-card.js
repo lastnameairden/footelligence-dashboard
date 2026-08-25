@@ -230,6 +230,17 @@ function mascGradesFor(evaluation) {
   }));
 }
 
+// ค่าเริ่มต้นของช่อง "ข้อเสนอแนะจากโค้ช" — รวมจุดเด่น/จุดที่ต้องพัฒนา/ข้อสังเกตจากการประเมิน MASC ล่าสุดเข้าด้วยกัน
+// (เดิมดึงมาแค่ข้อสังเกตอย่างเดียว) ข้ามฟิลด์ที่ไม่มีข้อมูลไปเฉยๆ ไม่ใส่บรรทัดว่างเปล่า
+function buildDefaultCoachSuggestion(evaluation) {
+  if (!evaluation) return "";
+  const parts = [];
+  if (evaluation.talent) parts.push(`จุดเด่น: ${evaluation.talent}`);
+  if (evaluation.limitations) parts.push(`จุดที่ต้องพัฒนา: ${evaluation.limitations}`);
+  if (evaluation.observations) parts.push(`ข้อสังเกต: ${evaluation.observations}`);
+  return parts.join("\n");
+}
+
 // กราฟเรดาร์ของเกรด MASC (M/A/S/C) 4 แกน สเกล 1-9 (ค่าที่ระบบให้จริงมีแค่ 1/3/7/9) แทนที่ป้ายตัวเลขเดิมในแถบซ้าย
 // ให้เห็นรูปทรงจุดแข็ง/จุดที่ต้องพัฒนาได้ในภาพเดียว เหมือนกับที่ Profile Radar เคยทำกับคะแนนรายวัน (ซึ่งย้ายไป
 // เป็นกราฟแนวโน้มในคอลัมน์กลางแทนแล้ว — ดู buildCategoryTrendChartSvg)
@@ -780,9 +791,10 @@ async function loadReportCards(team, ageGroup, start, end) {
       overallAvg,
       matchReports: myMatches,
       injuryReports: myInjuries,
-      // ถ้าแอดมินยังไม่เคยเขียน/บันทึกข้อเสนอแนะเองสำหรับรอบนี้ ให้ดึงข้อสังเกตจากการประเมิน MASC ล่าสุดมาใส่
-      // เป็นค่าเริ่มต้นแทนช่องว่างเปล่าๆ (ยังแก้ไข/บันทึกทับเป็นของตัวเองได้ตามปกติ — ไม่ได้ล็อกไว้)
-      comment: existingComment?.comment || mascEvaluation?.observations || "",
+      // ถ้าแอดมินยังไม่เคยเขียน/บันทึกข้อเสนอแนะเองสำหรับรอบนี้ ให้ดึงจุดเด่น/จุดที่ต้องพัฒนา/ข้อสังเกตจากการ
+      // ประเมิน MASC ล่าสุดมาใส่เป็นค่าเริ่มต้นแทนช่องว่างเปล่าๆ (ยังแก้ไข/บันทึกทับเป็นของตัวเองได้ตามปกติ —
+      // ไม่ได้ล็อกไว้) ดู buildDefaultCoachSuggestion
+      comment: existingComment?.comment || buildDefaultCoachSuggestion(mascEvaluation),
       mascEvaluation
     }, { team, start, end });
     reportCardPages.appendChild(page);
