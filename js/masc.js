@@ -377,8 +377,12 @@ async function loadPlayers() {
 }
 
 // ---------- ประวัติการประเมินของนักกีฬาที่เลือก ----------
+// ต้องกรองด้วย where("team", "==", myTeam) เสมอ เพราะ read rule ของ playerEvaluations เช็ค resource.data.team
+// ด้วย (ownsTeam()) — query ที่กรองแค่ playerId เฉยๆ โดยไม่กรอง team จะถูก Firestore ปฏิเสธทั้ง query ทันทีด้วย
+// "Missing or insufficient permissions" สำหรับบัญชีโค้ช/ผู้บริหารทีม (ไม่เกิดกับผู้ดูแลระบบเพราะ isAdmin() ไม่ผูก
+// กับ resource.data เลย) เคยพบปัญหานี้แล้วกับ collection อื่นในระบบ จึงต้องกรอง team ทุกครั้งที่ query แบบนี้
 async function loadHistoryForPlayer(playerId) {
-  const snap = await getDocs(query(collection(db, "playerEvaluations"), where("playerId", "==", playerId)));
+  const snap = await getDocs(query(collection(db, "playerEvaluations"), where("playerId", "==", playerId), where("team", "==", myTeam)));
   evaluationsForPlayer = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
   evaluationsForPlayer.sort((a, b) => {
     const ta = a.createdAt && a.createdAt.toDate ? a.createdAt.toDate() : new Date(0);
@@ -585,7 +589,13 @@ playerSelect.addEventListener("change", async () => {
   // เริ่มประเมินรอบใหม่ได้เฉพาะตอนมีรอบที่กำลังดำเนินการอยู่จริงเท่านั้น (ดูประวัติเดิมได้เสมอไม่ว่าจะมีรอบหรือไม่)
   newBtn.disabled = isReadOnly || !hasActiveMascRound;
   setStatus("กำลังโหลดประวัติการประเมิน...");
-  await loadHistoryForPlayer(id);
+  try {
+    await loadHistoryForPlayer(id);
+  } catch (err) {
+    console.error(err);
+    setStatus("โหลดประวัติการประเมินไม่สำเร็จ: " + err.message, true);
+    return;
+  }
   if (evaluationsForPlayer.length > 0) {
     setStatus(
       hasActiveMascRound
