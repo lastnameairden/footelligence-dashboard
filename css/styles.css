@@ -197,6 +197,53 @@ table.pro-table td.emphasis { font-weight: 600; color: #0f172a; }
 .badge-neutral { background: #f1f5f9; color: #475569; }
 .badge-danger { background: #fee2e2; color: #b91c1c; }
 
+/* ---------- ความคืบหน้าการประเมิน MASC รายรุ่น (การ์ดเปิด/ปิดได้ ทีละรุ่นอายุ) ---------- */
+.masc-progress-group {
+  border: 1px solid #e5e7eb;
+  border-radius: 0.9rem;
+  overflow: hidden;
+  background: #fff;
+}
+.masc-progress-group + .masc-progress-group { margin-top: 0.6rem; }
+.masc-progress-group summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1.1rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+.masc-progress-group summary::-webkit-details-marker { display: none; }
+.masc-progress-group summary::after {
+  content: "▾";
+  color: #94a3b8;
+  font-size: 0.75rem;
+  transition: transform 0.15s;
+}
+.masc-progress-group[open] summary::after { transform: rotate(180deg); }
+.masc-progress-group summary:hover { background: #f8fafc; }
+.masc-progress-columns {
+  padding: 0 1.1rem 1.1rem;
+  border-top: 1px solid #f1f5f9;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem 1.25rem;
+}
+.masc-progress-col-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #64748b;
+  margin: 0.85rem 0 0.5rem;
+}
+.masc-progress-names { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.masc-progress-empty { font-size: 0.8125rem; color: #94a3b8; }
+@media (max-width: 640px) {
+  .masc-progress-columns { grid-template-columns: 1fr; }
+}
+
 /* ---------- Inputs ---------- */
 .field-label { display: block; font-size: 0.8125rem; font-weight: 500; color: #475569; margin-bottom: 0.35rem; }
 .field-input {

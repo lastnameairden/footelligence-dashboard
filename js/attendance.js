@@ -50,6 +50,7 @@ import {
   coachPositionAllowsMultipleAgeGroups,
   sendExecutiveNote
 } from "./ui-utils.js";
+import { categoryRawScore } from "./masc-data.js";
 
 const STATUS_OPTIONS = ["A", "I", "R", "P"];
 const SCORE_OPTIONS = [1, 2, 3, 4];
@@ -209,6 +210,9 @@ const adminMascRoundEndInput = document.getElementById("admin-masc-round-end-inp
 const adminMascRoundStartBtn = document.getElementById("admin-masc-round-start-btn");
 const adminMascRoundStatus = document.getElementById("admin-masc-round-status");
 const adminMascRoundListBody = document.getElementById("admin-masc-round-list-body");
+const mascProgressRoundSelect = document.getElementById("masc-progress-round-select");
+const mascProgressTeamTabs = document.getElementById("masc-progress-team-tabs");
+const mascProgressBody = document.getElementById("masc-progress-body");
 const adminPrintStatus = document.getElementById("admin-print-status");
 const adminStatus = document.getElementById("admin-status");
 const hamburgerBtn = document.getElementById("hamburger-btn");
@@ -1032,6 +1036,9 @@ function openAdminMascRoundsSection() {
   loadMascRounds();
 }
 
+// เก็บรอบทั้งหมดที่โหลดล่าสุดไว้ใช้ร่วมกับ dropdown "ดูความคืบหน้าของรอบ" ด้านล่าง กันไม่ต้อง query ซ้ำ
+let mascRoundsCache = [];
+
 async function loadMascRounds() {
   adminMascRoundListBody.innerHTML =
     '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>';
@@ -1040,12 +1047,150 @@ async function loadMascRounds() {
     const rounds = [];
     snap.forEach((d) => rounds.push({ id: d.id, ...d.data() }));
     rounds.sort((a, b) => (b.startDate || "").localeCompare(a.startDate || ""));
+    mascRoundsCache = rounds;
     renderMascRoundList(rounds);
+    populateMascProgressRoundSelect(rounds);
   } catch (err) {
     console.error(err);
     adminMascRoundListBody.innerHTML =
       `<tr><td colspan="6" class="px-4 py-6 text-center text-red-600">โหลดไม่สำเร็จ: ${err.message}</td></tr>`;
   }
+}
+
+// ---------- ผู้ดูแลระบบ: ความคืบหน้าการประเมิน MASC แยกทีม/รุ่น สำหรับรอบที่เลือก ----------
+function isEvaluationComplete(ev) {
+  return ["M", "A", "S", "C"].every((cat) => categoryRawScore(ev.scores?.[cat]) !== null);
+}
+function isEvaluationStarted(ev) {
+  return ["M", "A", "S", "C"].some((cat) => (ev.scores?.[cat] || []).some((v) => v !== null && v !== undefined));
+}
+
+function populateMascProgressRoundSelect(rounds) {
+  if (rounds.length === 0) {
+    mascProgressRoundSelect.innerHTML = '<option value="">— ยังไม่มีรอบ —</option>';
+    mascProgressTeamTabs.innerHTML = "";
+    mascProgressBody.innerHTML = '<p class="text-sm text-slate-400 py-2">ยังไม่เคยกำหนดรอบการประเมิน MASC</p>';
+    return;
+  }
+  mascProgressRoundSelect.innerHTML = rounds
+    .map((r) => `<option value="${r.id}">${r.label} (${r.startDate} – ${r.endDate}) · ${mascRoundStatus(r).label}</option>`)
+    .join("");
+  // ค่าเริ่มต้น: รอบที่ "กำลังดำเนินการ" อยู่ตอนนี้ถ้ามี ไม่งั้นใช้รอบล่าสุด (rounds เรียงจากใหม่ไปเก่าอยู่แล้ว)
+  const activeRound = rounds.find((r) => mascRoundStatus(r).label === "กำลังดำเนินการ");
+  mascProgressRoundSelect.value = (activeRound || rounds[0]).id;
+  loadMascProgressBreakdown();
+}
+
+mascProgressRoundSelect.addEventListener("change", loadMascProgressBreakdown);
+
+async function loadMascProgressBreakdown() {
+  const round = mascRoundsCache.find((r) => r.id === mascProgressRoundSelect.value);
+  if (!round) {
+    mascProgressTeamTabs.innerHTML = "";
+    mascProgressBody.innerHTML = "";
+    return;
+  }
+  mascProgressTeamTabs.innerHTML = "";
+  mascProgressBody.innerHTML = '<p class="text-sm text-slate-400 py-4 text-center">กำลังโหลด...</p>';
+  try {
+    const [playersSnap, evalSnap] = await Promise.all([
+      getDocs(collection(db, "players")),
+      // กรองด้วย assessmentPeriod (ค่าเป็น label ของรอบ ไม่ใช่ id) ตามโครงสร้างข้อมูลเดิมของ playerEvaluations —
+      // ถ้าเคยตั้ง label ซ้ำกันข้ามรอบ (เช่นปีถัดไปใช้ "ช่วงที่ 1" ซ้ำ) การประเมินจากรอบเก่าจะปนมาด้วย เป็น
+      // ข้อจำกัดเดิมของระบบเพราะ playerEvaluations ผูกกับ label ไม่ได้ผูกกับ id ของรอบโดยตรง
+      getDocs(query(collection(db, "playerEvaluations"), where("assessmentPeriod", "==", round.label)))
+    ]);
+    const players = playersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+    const rank = { complete: 2, partial: 1, none: 0 };
+    const statusByPlayerId = new Map();
+    evalSnap.forEach((d) => {
+      const ev = d.data();
+      if (!ev.playerId) return;
+      const status = isEvaluationComplete(ev) ? "complete" : isEvaluationStarted(ev) ? "partial" : "none";
+      const existing = statusByPlayerId.get(ev.playerId);
+      if (!existing || rank[status] > rank[existing]) statusByPlayerId.set(ev.playerId, status);
+    });
+
+    const byTeam = new Map();
+    for (const p of players) {
+      if (!p.team) continue;
+      if (!byTeam.has(p.team)) byTeam.set(p.team, []);
+      byTeam.get(p.team).push(p);
+    }
+    const teamsPresent = TEAMS.filter((t) => byTeam.has(t));
+    if (teamsPresent.length === 0) {
+      mascProgressBody.innerHTML = '<p class="text-sm text-slate-400 py-4 text-center">ยังไม่มีนักกีฬาในระบบ</p>';
+      return;
+    }
+
+    function showTeam(team, btn) {
+      for (const tabBtn of mascProgressTeamTabs.children) {
+        tabBtn.classList.toggle("btn-primary", tabBtn === btn);
+        tabBtn.classList.toggle("btn-secondary", tabBtn !== btn);
+      }
+      renderMascProgressBody(byTeam.get(team) || [], statusByPlayerId);
+    }
+
+    for (const team of teamsPresent) {
+      const tabBtn = document.createElement("button");
+      tabBtn.type = "button";
+      tabBtn.className = "btn btn-secondary btn-sm";
+      tabBtn.innerHTML = `${teamLogoImg(team)}${team}`;
+      tabBtn.addEventListener("click", () => showTeam(team, tabBtn));
+      mascProgressTeamTabs.appendChild(tabBtn);
+    }
+    showTeam(teamsPresent[0], mascProgressTeamTabs.children[0]);
+  } catch (err) {
+    console.error(err);
+    mascProgressBody.innerHTML = `<p class="text-sm text-red-600 py-4 text-center">โหลดไม่สำเร็จ: ${err.message}</p>`;
+  }
+}
+
+// การ์ดแบบเปิด/ปิดได้ (details/summary) หนึ่งใบต่อหนึ่งรุ่นอายุของทีมที่เลือก — เปิดรุ่นแรกให้อัตโนมัติ
+// ที่เหลือพับไว้ก่อนกันหน้ายาวเกินไปถ้าทีมมีหลายรุ่น คลิกหัวข้อเพื่อเปิด/ปิดดูรายชื่อได้ทีละรุ่น
+function renderMascProgressBody(teamPlayers, statusByPlayerId) {
+  const ageGroups = Array.from(new Set(teamPlayers.map((p) => p.ageGroup).filter(Boolean))).sort(
+    (a, b) => ageGroupNumber(a) - ageGroupNumber(b)
+  );
+  if (ageGroups.length === 0) {
+    mascProgressBody.innerHTML = '<p class="text-sm text-slate-400 py-4 text-center">ทีมนี้ยังไม่มีนักกีฬา</p>';
+    return;
+  }
+  const nameChip = (p, cls) => `<span class="badge ${cls}">${p.nickname || p.fullName || "-"}</span>`;
+  mascProgressBody.innerHTML = ageGroups
+    .map((ag, i) => {
+      const groupPlayers = teamPlayers
+        .filter((p) => p.ageGroup === ag)
+        .sort((a, b) => (a.nickname || a.fullName || "").localeCompare(b.nickname || b.fullName || ""));
+      const done = groupPlayers.filter((p) => statusByPlayerId.get(p.id) === "complete");
+      const partial = groupPlayers.filter((p) => statusByPlayerId.get(p.id) === "partial");
+      const notStarted = groupPlayers.filter((p) => (statusByPlayerId.get(p.id) ?? "none") === "none");
+      const total = groupPlayers.length;
+      const badgeClass = total > 0 && done.length === total ? "badge-success" : done.length > 0 ? "badge-info" : "badge-neutral";
+      const doneChips = done.map((p) => nameChip(p, "badge-success")).join("") || '<span class="masc-progress-empty">— ไม่มี —</span>';
+      const pendingChips =
+        [...partial.map((p) => nameChip(p, "badge-warning")), ...notStarted.map((p) => nameChip(p, "badge-neutral"))].join("") ||
+        '<span class="masc-progress-empty">— ไม่มี —</span>';
+      return `
+        <details class="masc-progress-group"${i === 0 ? " open" : ""}>
+          <summary>
+            <span>รุ่น ${ag}</span>
+            <span class="badge ${badgeClass}">${done.length}/${total} คน</span>
+          </summary>
+          <div class="masc-progress-columns">
+            <div>
+              <p class="masc-progress-col-title">✅ ประเมินครบแล้ว (${done.length})</p>
+              <div class="masc-progress-names">${doneChips}</div>
+            </div>
+            <div>
+              <p class="masc-progress-col-title">⏳ ยังไม่ประเมิน / ยังไม่ครบ (${partial.length + notStarted.length})</p>
+              <div class="masc-progress-names">${pendingChips}</div>
+            </div>
+          </div>
+        </details>`;
+    })
+    .join("");
 }
 
 function renderMascRoundList(rounds) {
