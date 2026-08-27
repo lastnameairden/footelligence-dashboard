@@ -21,6 +21,7 @@ const accessGateMessage = document.getElementById("access-gate-message");
 const mascContent = document.getElementById("masc-content");
 
 const mascRoundBanner = document.getElementById("masc-round-banner");
+const progressWrap = document.getElementById("masc-progress-wrap");
 const ageFilterSelect = document.getElementById("masc-age-filter-select");
 const playerSelect = document.getElementById("masc-player-select");
 const periodSelect = document.getElementById("masc-period-select");
@@ -376,6 +377,7 @@ async function loadPlayers() {
   const ageGroups = Array.from(new Set(players.map((p) => p.ageGroup).filter(Boolean))).sort((a, b) => ageGroupNumber(a) - ageGroupNumber(b));
   ageFilterSelect.innerHTML = ageGroups.map((ag) => `<option value="${ag}">${ag}</option>`).join("");
   renderPlayerOptions(ageGroups[0] || "");
+  renderProgressSummary();
 }
 
 // ประเมินครบสมบูรณ์ = ให้คะแนนครบทั้ง 4 ข้อในทุกหมวด M/A/S/C แล้ว (categoryRawScore คืนค่า null ถ้ายังไม่ครบ)
@@ -406,6 +408,33 @@ async function loadCompletedEvaluationsForActiveRound() {
     // ที่ต้องปิดกั้นไว้ก่อนเมื่อไม่แน่ใจ ต่างจาก hasActiveMascRound ที่ต้อง fail-closed
     console.error(err);
   }
+}
+
+// สรุปความคืบหน้าการประเมินแยกตามรุ่นอายุ (กี่คนประเมินครบแล้ว จากทั้งหมดกี่คนในรุ่นนั้น) ให้เห็นภาพรวมทุกรุ่น
+// พร้อมกันโดยไม่ต้องสลับ dropdown ไปทีละรุ่น — นับจาก players/completedPlayerIds ที่โหลดไว้แล้ว ไม่ query เพิ่ม
+// แสดงเฉพาะตอนมีรอบที่กำลังดำเนินการอยู่เท่านั้น เพราะ completedPlayerIds มีความหมายก็ต่อเมื่อผูกกับรอบปัจจุบัน
+function renderProgressSummary() {
+  if (!hasActiveMascRound) {
+    progressWrap.classList.add("hidden");
+    progressWrap.innerHTML = "";
+    return;
+  }
+  const ageGroups = Array.from(new Set(players.map((p) => p.ageGroup).filter(Boolean))).sort((a, b) => ageGroupNumber(a) - ageGroupNumber(b));
+  if (ageGroups.length === 0) {
+    progressWrap.classList.add("hidden");
+    progressWrap.innerHTML = "";
+    return;
+  }
+  progressWrap.innerHTML = ageGroups
+    .map((ag) => {
+      const groupPlayers = players.filter((p) => p.ageGroup === ag);
+      const done = groupPlayers.filter((p) => completedPlayerIds.has(p.id)).length;
+      const total = groupPlayers.length;
+      const badgeClass = total > 0 && done === total ? "badge-success" : done > 0 ? "badge-info" : "badge-neutral";
+      return `<span class="badge ${badgeClass}">${ag}: ${done}/${total} คน</span>`;
+    })
+    .join("");
+  progressWrap.classList.remove("hidden");
 }
 
 // ---------- ประวัติการประเมินของนักกีฬาที่เลือก ----------
@@ -572,6 +601,7 @@ saveBtn.addEventListener("click", async () => {
       if (isEvaluationComplete(payload)) completedPlayerIds.add(currentPlayer.id);
       else completedPlayerIds.delete(currentPlayer.id);
       renderPlayerOptions(ageFilterSelect.value);
+      renderProgressSummary();
     }
     await loadHistoryForPlayer(currentPlayer.id);
   } catch (err) {
@@ -590,6 +620,7 @@ deleteBtn.addEventListener("click", async () => {
     // นักกีฬาได้ตามปกติ ไม่ต้องรอโหลดหน้าใหม่
     completedPlayerIds.delete(currentPlayer.id);
     renderPlayerOptions(ageFilterSelect.value);
+    renderProgressSummary();
     await loadHistoryForPlayer(currentPlayer.id);
     startNewEvaluationForCurrentPlayer();
     setStatus("ลบการประเมินแล้ว");
