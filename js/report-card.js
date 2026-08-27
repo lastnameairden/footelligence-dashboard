@@ -221,6 +221,14 @@ function colorStatCard(label, value, hex) {
 const ROLE_LABELS = { important: "ตัวหลัก", rotation: "ตัวหมุนเวียน", reserve: "ตัวสำรอง" };
 const MASC_COLORS = { M: "#0ea5e9", A: "#8b5cf6", S: "#f59e0b", C: "#ec4899" };
 
+// ถือว่า "ประเมินสำเร็จ" ก็ต่อเมื่อให้คะแนนครบทั้ง 4 ข้อในทุกหมวด M/A/S/C จนคำนวณเกรดได้ครบทุกหมวด (เกณฑ์เดียวกับ
+// isEvaluationComplete ในหน้า masc.html/masc.js) — เอกสารที่เพิ่งกด "+ ประเมินรอบใหม่" แล้วยังไม่ได้ให้คะแนนเลย
+// (หรือให้ไม่ครบ) จะมีเกรดเป็น "-" ทุกหมวด ไม่ควรถูกดึงมาแสดงเป็น "MASC ล่าสุด" ของนักกีฬาเพราะดูเหมือนมีข้อมูล
+// ทั้งที่จริงว่างเปล่า
+function isEvaluationComplete(evaluation) {
+  return !!evaluation && ["M", "A", "S", "C"].every((cat) => categoryRawScore(evaluation.scores?.[cat]) !== null);
+}
+
 // เกรด M/A/S/C (1/3/7/9) จากการประเมิน MASC ล่าสุด — คืนค่า null ทั้งหมดถ้ายังไม่เคยประเมิน (ใช้ทั้งในป้ายเล็กๆ
 // ใต้ Profile Radar และเนื้อหาข้อความในคอลัมน์ผลประเมิน แยกฟังก์ชันไว้กันคำนวณเพี้ยนกันคนละจุด)
 function mascGradesFor(evaluation) {
@@ -774,8 +782,11 @@ async function loadReportCards(team, ageGroup, start, end) {
     const existingComment = commentsByPlayerId.get(player.id);
 
     // เลือกการประเมิน MASC ล่าสุดของนักกีฬาคนนี้ (เรียงตามเวลาบันทึกล่าสุด) ไม่ได้กรองตามช่วงเวลาของสมุดพก
-    // เพราะรอบประเมิน MASC ("ช่วงที่ 1-4") เป็นคนละระบบ ไม่ได้ผูกกับเดือนปฏิทินแบบเดียวกับสมุดพก
-    const myEvaluations = evaluations.filter((e) => e.playerId === player.id);
+    // เพราะรอบประเมิน MASC ("ช่วงที่ 1-4") เป็นคนละระบบ ไม่ได้ผูกกับเดือนปฏิทินแบบเดียวกับสมุดพก — กรองเอาเฉพาะ
+    // รอบที่ "ประเมินสำเร็จ" แล้วเท่านั้น (ให้คะแนนครบจนมีเกรดทุกหมวด) ไม่งั้นถ้าโค้ชเพิ่งเริ่มรอบใหม่แล้วยังไม่ได้
+    // ให้คะแนนเลย รอบที่ว่างเปล่านั้นจะถูกดึงมาแสดงเป็น "MASC ล่าสุด" ทั้งที่ทุกหมวดเป็น "-" หมด ดูเหมือนมีข้อมูล
+    // ทั้งที่จริงยังไม่มี — ถ้าไม่มีรอบไหนประเมินสำเร็จเลยสักรอบ ถือว่ายังไม่มีข้อมูล MASC เหมือนเดิม
+    const myEvaluations = evaluations.filter((e) => e.playerId === player.id && isEvaluationComplete(e));
     const mascEvaluation =
       myEvaluations.length > 0
         ? myEvaluations
