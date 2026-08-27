@@ -356,9 +356,11 @@ function ageGroupNumber(ageGroup) {
 }
 
 // แสดงตัวเลือกนักกีฬาเฉพาะรุ่นอายุที่เลือกอยู่เท่านั้น (ไม่รวมทุกรุ่นไว้ในลิสต์เดียวกัน เพราะโค้ชบางตำแหน่ง
-// เช่น GK Coach/Fitness Coach ดูแลได้หลายรุ่นพร้อมกัน รายชื่อจะยาวปนกันจนหาคนที่ต้องการยาก)
+// เช่น GK Coach/Fitness Coach ดูแลได้หลายรุ่นพร้อมกัน รายชื่อจะยาวปนกันจนหาคนที่ต้องการยาก) — ซ่อนนักกีฬาที่
+// ประเมินครบสมบูรณ์แล้วสำหรับรอบที่กำลังดำเนินการอยู่ตอนนี้ (completedPlayerIds) ออกจากลิสต์ กันโค้ชเผลอเลือกซ้ำ
+// นักกีฬาที่ประเมินไม่สมบูรณ์ (ยังให้คะแนนไม่ครบ) จะยังคงแสดงในลิสต์ตามปกติเพื่อให้กลับเข้าไปทำต่อได้
 function renderPlayerOptions(ageGroup) {
-  const filtered = ageGroup ? players.filter((p) => p.ageGroup === ageGroup) : players;
+  const filtered = (ageGroup ? players.filter((p) => p.ageGroup === ageGroup) : players).filter((p) => !completedPlayerIds.has(p.id));
   playerSelect.innerHTML =
     '<option value="">-- เลือกนักกีฬา --</option>' + filtered.map((p) => `<option value="${p.id}">${p.nickname || p.fullName || "-"}</option>`).join("");
 }
@@ -374,6 +376,36 @@ async function loadPlayers() {
   const ageGroups = Array.from(new Set(players.map((p) => p.ageGroup).filter(Boolean))).sort((a, b) => ageGroupNumber(a) - ageGroupNumber(b));
   ageFilterSelect.innerHTML = ageGroups.map((ag) => `<option value="${ag}">${ag}</option>`).join("");
   renderPlayerOptions(ageGroups[0] || "");
+}
+
+// ประเมินครบสมบูรณ์ = ให้คะแนนครบทั้ง 4 ข้อในทุกหมวด M/A/S/C แล้ว (categoryRawScore คืนค่า null ถ้ายังไม่ครบ)
+// ไม่เช็คพฤติกรรมในโรงเรียน/จุดเด่น-จุดด้อย เพราะ 3 หมวดนั้นไม่มีผลต่อเกรดและไม่ได้บังคับกรอกในฟอร์ม
+function isEvaluationComplete(ev) {
+  return ["M", "A", "S", "C"].every((cat) => categoryRawScore(ev.scores?.[cat]) !== null);
+}
+
+// รายชื่อนักกีฬาที่ถูกประเมินครบสมบูรณ์แล้ว "สำหรับรอบที่กำลังดำเนินการอยู่ตอนนี้โดยเฉพาะ" (assessmentPeriod
+// ตรงกับ activeMascRoundLabel) — ขอบเขตแค่รอบปัจจุบันเท่านั้น พอผู้ดูแลระบบเปิดรอบใหม่ (label เปลี่ยน) นักกีฬา
+// คนเดิมจะกลับมาแสดงในลิสต์ได้อีกครั้งโดยอัตโนมัติตามที่ผู้ใช้ต้องการ ("จนกว่าจะมีการกำหนดให้ประเมินรอบใหม่")
+// ถ้าไม่มีรอบที่กำลังดำเนินการอยู่ ไม่ต้องซ่อนใครเลย (ปุ่มเริ่ม/บันทึกก็ถูกบล็อกอยู่แล้วจากเงื่อนไขอื่น)
+let completedPlayerIds = new Set();
+
+async function loadCompletedEvaluationsForActiveRound() {
+  completedPlayerIds = new Set();
+  if (!hasActiveMascRound || !activeMascRoundLabel) return;
+  try {
+    const snap = await getDocs(
+      query(collection(db, "playerEvaluations"), where("team", "==", myTeam), where("assessmentPeriod", "==", activeMascRoundLabel))
+    );
+    snap.forEach((d) => {
+      const ev = d.data();
+      if (isEvaluationComplete(ev)) completedPlayerIds.add(ev.playerId);
+    });
+  } catch (err) {
+    // โหลดไม่สำเร็จ = ไม่ซ่อนใครเลย (fail-open) เพราะการซ่อนเป็นแค่ทางลัดสะดวก ไม่ใช่ด่านความปลอดภัย
+    // ที่ต้องปิดกั้นไว้ก่อนเมื่อไม่แน่ใจ ต่างจาก hasActiveMascRound ที่ต้อง fail-closed
+    console.error(err);
+  }
 }
 
 // ---------- ประวัติการประเมินของนักกีฬาที่เลือก ----------
@@ -534,6 +566,13 @@ saveBtn.addEventListener("click", async () => {
     }
     saveStatus.textContent = "บันทึกสำเร็จ ✓";
     saveStatus.className = "text-sm text-emerald-600";
+    // อัปเดตลิสต์ "ประเมินครบสมบูรณ์แล้ว" ทันทีในหน้าเดียวกัน ไม่ต้องรอโหลดหน้าใหม่ — เช็คเทียบกับรอบที่กำลัง
+    // ดำเนินการอยู่ตอนนี้เท่านั้น เผื่อโค้ชแก้ assessmentPeriod เป็นรอบอื่นเอง (ไม่ควรไปกระทบสถานะของรอบปัจจุบัน)
+    if (hasActiveMascRound && payload.assessmentPeriod === activeMascRoundLabel) {
+      if (isEvaluationComplete(payload)) completedPlayerIds.add(currentPlayer.id);
+      else completedPlayerIds.delete(currentPlayer.id);
+      renderPlayerOptions(ageFilterSelect.value);
+    }
     await loadHistoryForPlayer(currentPlayer.id);
   } catch (err) {
     console.error(err);
@@ -547,6 +586,10 @@ deleteBtn.addEventListener("click", async () => {
   if (!confirm("ยืนยันลบการประเมินนี้? การลบนี้ไม่สามารถย้อนกลับได้")) return;
   try {
     await deleteDoc(doc(db, "playerEvaluations", currentEvaluationId));
+    // ลบเอกสารทิ้งแล้วไม่มีทางประเมินครบสมบูรณ์อีก (ถ้าเคยอยู่ในลิสต์นี้) — เอาออกแล้วให้กลับมาแสดงในลิสต์เลือก
+    // นักกีฬาได้ตามปกติ ไม่ต้องรอโหลดหน้าใหม่
+    completedPlayerIds.delete(currentPlayer.id);
+    renderPlayerOptions(ageFilterSelect.value);
     await loadHistoryForPlayer(currentPlayer.id);
     startNewEvaluationForCurrentPlayer();
     setStatus("ลบการประเมินแล้ว");
@@ -675,6 +718,9 @@ onAuthStateChanged(auth, async (user) => {
       setStatus("ยังไม่มีรอบการประเมิน MASC ที่กำลังดำเนินการอยู่ในขณะนี้ — ดูประวัติย้อนหลังได้ตามปกติ แต่จะเริ่ม/บันทึกการประเมินใหม่ไม่ได้จนกว่าผู้ดูแลระบบจะกำหนดรอบ");
     }
 
+    // ต้องรู้ว่าใครประเมินครบสมบูรณ์แล้วในรอบนี้ก่อน renderPlayerOptions() (เรียกจาก loadPlayers()) จะได้ซ่อน
+    // นักกีฬาคนนั้นออกจากลิสต์ตั้งแต่ครั้งแรกที่แสดงผล
+    await loadCompletedEvaluationsForActiveRound();
     await loadPlayers();
   } catch (err) {
     console.error(err);
