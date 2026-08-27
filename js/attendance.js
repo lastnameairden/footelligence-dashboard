@@ -1041,7 +1041,7 @@ let mascRoundsCache = [];
 
 async function loadMascRounds() {
   adminMascRoundListBody.innerHTML =
-    '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>';
+    '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>';
   try {
     const snap = await getDocs(collection(db, "mascRounds"));
     const rounds = [];
@@ -1053,7 +1053,7 @@ async function loadMascRounds() {
   } catch (err) {
     console.error(err);
     adminMascRoundListBody.innerHTML =
-      `<tr><td colspan="6" class="px-4 py-6 text-center text-red-600">โหลดไม่สำเร็จ: ${err.message}</td></tr>`;
+      `<tr><td colspan="5" class="px-4 py-6 text-center text-red-600">โหลดไม่สำเร็จ: ${err.message}</td></tr>`;
   }
 }
 
@@ -1196,7 +1196,7 @@ function renderMascProgressBody(teamPlayers, statusByPlayerId) {
 function renderMascRoundList(rounds) {
   if (rounds.length === 0) {
     adminMascRoundListBody.innerHTML =
-      '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">ยังไม่เคยกำหนดรอบการประเมิน</td></tr>';
+      '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">ยังไม่เคยกำหนดรอบการประเมิน</td></tr>';
     return;
   }
   adminMascRoundListBody.innerHTML = rounds
@@ -1208,7 +1208,6 @@ function renderMascRoundList(rounds) {
           <td>${r.startDate ?? "-"}</td>
           <td>${r.endDate ?? "-"}</td>
           <td><span class="badge ${status.className}">${status.label}</span></td>
-          <td>${r.createdBy ?? "-"}</td>
           <td><button type="button" class="btn btn-ghost-danger btn-sm" data-masc-round-delete="${r.id}">ลบ</button></td>
         </tr>`;
     })
