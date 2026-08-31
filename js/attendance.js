@@ -210,6 +210,11 @@ const adminMascRoundEndInput = document.getElementById("admin-masc-round-end-inp
 const adminMascRoundStartBtn = document.getElementById("admin-masc-round-start-btn");
 const adminMascRoundStatus = document.getElementById("admin-masc-round-status");
 const adminMascRoundListBody = document.getElementById("admin-masc-round-list-body");
+const adminMascRoundCreateCard = document.getElementById("admin-masc-round-create-card");
+const adminMascRoundCorrectionNote = document.getElementById("admin-masc-round-correction-note");
+const adminMascRoundCorrectionLabel = document.getElementById("admin-masc-round-correction-label");
+const adminMascRoundCorrectionSummary = document.getElementById("admin-masc-round-correction-summary");
+const adminMascRoundCorrectionCancelBtn = document.getElementById("admin-masc-round-correction-cancel");
 const mascProgressRoundSelect = document.getElementById("masc-progress-round-select");
 const mascProgressTeamTabs = document.getElementById("masc-progress-team-tabs");
 const mascProgressBody = document.getElementById("masc-progress-body");
@@ -1036,12 +1041,69 @@ function mascRoundStatus(round) {
   return { label: "กำลังดำเนินการ", className: "badge-success" };
 }
 
-function openAdminMascRoundsSection() {
-  hideAllScreens();
-  adminMascRoundsSection.classList.remove("hidden");
+// ---------- "รอบแก้ไข" — เปิดรอบเดิมซ้ำ (label เดิม) อีกครั้งด้วยวันที่ใหม่ สำหรับทีม/รุ่นที่ยังประเมินไม่ครบ
+// หลังรอบเดิมหมดเขตแล้ว ไม่ต้องมี field แยกในสคีมา เพราะ playerEvaluations ผูกกับ label อยู่แล้ว การเปิดรอบใหม่
+// ด้วย label เดิมก็ทำให้ hasActiveMascRound ในหน้า masc.html กลับมาเป็นจริงสำหรับ "ช่วงที่ N" นั้นได้ทันที โดยไม่
+// กระทบข้อมูลที่ประเมินครบไปแล้ว (isCorrectionRound เป็นแค่ flag ไว้แสดงผลในตารางประวัติเท่านั้น) ----------
+let mascCorrectionRoundLabel = null;
+
+function updateMascRoundStartBtnLabel() {
+  adminMascRoundStartBtn.textContent = mascCorrectionRoundLabel
+    ? "เปิดรอบแก้ไข (แจ้งเตือนเฉพาะทีม/รุ่นที่ยังค้าง)"
+    : "เริ่มรอบประเมิน (แจ้งเตือนทุกทีม)";
+}
+
+async function enterMascCorrectionMode(round) {
+  mascCorrectionRoundLabel = round.label;
+  adminMascRoundPeriodSelect.value = round.label;
+  adminMascRoundPeriodSelect.disabled = true;
+  adminMascRoundStartInput.value = "";
+  adminMascRoundEndInput.value = "";
+  adminMascRoundStatus.textContent = "";
+  updateMascRoundStartBtnLabel();
+  adminMascRoundCorrectionLabel.textContent = round.label;
+  adminMascRoundCorrectionSummary.innerHTML = '<p class="text-slate-500">กำลังตรวจสอบว่ารุ่นไหนยังประเมินไม่ครบ...</p>';
+  adminMascRoundCorrectionNote.classList.remove("hidden");
+  adminMascRoundCreateCard.scrollIntoView({ behavior: "smooth", block: "center" });
+  try {
+    const groups = await computeIncompleteGroupsForLabel(round.label);
+    if (groups.length === 0) {
+      adminMascRoundCorrectionSummary.innerHTML =
+        '<p class="text-emerald-700">ทุกทีมประเมินครบแล้วสำหรับช่วงนี้ — อาจไม่จำเป็นต้องเปิดรอบแก้ไขก็ได้</p>';
+      return;
+    }
+    adminMascRoundCorrectionSummary.innerHTML =
+      '<p class="font-medium mb-1.5">รุ่นที่ยังประเมินไม่ครบ:</p><div class="flex flex-wrap gap-1.5">' +
+      groups.map((g) => `<span class="badge badge-warning">${teamLogoImg(g.team)}${g.team} · ${g.ageGroup}: ${g.done}/${g.total}</span>`).join("") +
+      "</div>";
+  } catch (err) {
+    console.error(err);
+    adminMascRoundCorrectionSummary.innerHTML = `<p class="text-red-600">ตรวจสอบไม่สำเร็จ: ${err.message}</p>`;
+  }
+}
+
+// หมายเหตุ: ตั้งใจไม่ล้าง adminMascRoundStatus ในนี้ — ตอนบันทึกรอบสำเร็จ ต้องเรียกฟังก์ชันนี้ก่อนตั้งข้อความ
+// "บันทึกสำเร็จ ✓" ทีหลัง ถ้ามาล้างในนี้ด้วยจะเผลอลบข้อความสำเร็จทิ้งไปพร้อมกัน จุดที่ต้องล้างสถานะเอง (เปิดหน้าใหม่/
+// กดยกเลิก) จึงเซ็ตให้ตรงๆ ที่ตัวเรียกแทน
+function exitMascCorrectionMode() {
+  mascCorrectionRoundLabel = null;
+  adminMascRoundPeriodSelect.disabled = false;
   adminMascRoundPeriodSelect.value = "";
   adminMascRoundStartInput.value = "";
   adminMascRoundEndInput.value = "";
+  adminMascRoundCorrectionNote.classList.add("hidden");
+  updateMascRoundStartBtnLabel();
+}
+
+adminMascRoundCorrectionCancelBtn.addEventListener("click", () => {
+  exitMascCorrectionMode();
+  adminMascRoundStatus.textContent = "";
+});
+
+function openAdminMascRoundsSection() {
+  hideAllScreens();
+  adminMascRoundsSection.classList.remove("hidden");
+  exitMascCorrectionMode();
   adminMascRoundStatus.textContent = "";
   loadMascRounds();
 }
@@ -1093,6 +1155,49 @@ function populateMascProgressRoundSelect(rounds) {
 
 mascProgressRoundSelect.addEventListener("change", loadMascProgressBreakdown);
 
+// ดึงรายชื่อนักกีฬาทั้งหมด + สถานะการประเมิน (complete/partial/none) สำหรับ assessmentPeriod หนึ่ง — ใช้ร่วมกัน
+// ทั้งตัวแสดงความคืบหน้ารายทีม (loadMascProgressBreakdown) และตัวสรุปรุ่นที่ยังค้างตอนสร้างรอบแก้ไข
+// (computeIncompleteGroupsForLabel) กันเขียน query + logic คำนวณสถานะซ้ำสองที่
+async function fetchPlayerEvaluationStatusForLabel(label) {
+  const [playersSnap, evalSnap] = await Promise.all([
+    getDocs(collection(db, "players")),
+    // กรองด้วย assessmentPeriod (ค่าเป็น label ของรอบ ไม่ใช่ id) ตามโครงสร้างข้อมูลเดิมของ playerEvaluations —
+    // ถ้าเคยตั้ง label ซ้ำกันข้ามรอบ (เช่นปีถัดไปใช้ "ช่วงที่ 1" ซ้ำ) การประเมินจากรอบเก่าจะปนมาด้วย เป็น
+    // ข้อจำกัดเดิมของระบบเพราะ playerEvaluations ผูกกับ label ไม่ได้ผูกกับ id ของรอบโดยตรง
+    getDocs(query(collection(db, "playerEvaluations"), where("assessmentPeriod", "==", label)))
+  ]);
+  const players = playersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+  const rank = { complete: 2, partial: 1, none: 0 };
+  const statusByPlayerId = new Map();
+  evalSnap.forEach((d) => {
+    const ev = d.data();
+    if (!ev.playerId) return;
+    const status = isEvaluationComplete(ev) ? "complete" : isEvaluationStarted(ev) ? "partial" : "none";
+    const existing = statusByPlayerId.get(ev.playerId);
+    if (!existing || rank[status] > rank[existing]) statusByPlayerId.set(ev.playerId, status);
+  });
+  return { players, statusByPlayerId };
+}
+
+// สรุปรุ่นอายุของแต่ละทีมที่ "ยังประเมินไม่ครบ" สำหรับ assessmentPeriod ที่กำหนด — ใช้ตอนผู้ดูแลระบบกำลังจะสร้าง
+// รอบแก้ไข เพื่อให้เห็นก่อนตัดสินใจว่ายังจำเป็นต้องเปิดรอบแก้ไขจริงไหม และแจ้งเตือนเฉพาะทีมที่เกี่ยวข้องเท่านั้น
+async function computeIncompleteGroupsForLabel(label) {
+  const { players, statusByPlayerId } = await fetchPlayerEvaluationStatusForLabel(label);
+  const byTeamAgeGroup = new Map();
+  for (const p of players) {
+    if (!p.team || !p.ageGroup) continue;
+    const key = `${p.team}__${p.ageGroup}`;
+    if (!byTeamAgeGroup.has(key)) byTeamAgeGroup.set(key, { team: p.team, ageGroup: p.ageGroup, done: 0, total: 0 });
+    const entry = byTeamAgeGroup.get(key);
+    entry.total += 1;
+    if (statusByPlayerId.get(p.id) === "complete") entry.done += 1;
+  }
+  return Array.from(byTeamAgeGroup.values())
+    .filter((g) => g.done < g.total)
+    .sort((a, b) => TEAMS.indexOf(a.team) - TEAMS.indexOf(b.team) || ageGroupNumber(a.ageGroup) - ageGroupNumber(b.ageGroup));
+}
+
 async function loadMascProgressBreakdown() {
   const round = mascRoundsCache.find((r) => r.id === mascProgressRoundSelect.value);
   if (!round) {
@@ -1103,24 +1208,7 @@ async function loadMascProgressBreakdown() {
   mascProgressTeamTabs.innerHTML = "";
   mascProgressBody.innerHTML = '<p class="text-sm text-slate-400 py-4 text-center">กำลังโหลด...</p>';
   try {
-    const [playersSnap, evalSnap] = await Promise.all([
-      getDocs(collection(db, "players")),
-      // กรองด้วย assessmentPeriod (ค่าเป็น label ของรอบ ไม่ใช่ id) ตามโครงสร้างข้อมูลเดิมของ playerEvaluations —
-      // ถ้าเคยตั้ง label ซ้ำกันข้ามรอบ (เช่นปีถัดไปใช้ "ช่วงที่ 1" ซ้ำ) การประเมินจากรอบเก่าจะปนมาด้วย เป็น
-      // ข้อจำกัดเดิมของระบบเพราะ playerEvaluations ผูกกับ label ไม่ได้ผูกกับ id ของรอบโดยตรง
-      getDocs(query(collection(db, "playerEvaluations"), where("assessmentPeriod", "==", round.label)))
-    ]);
-    const players = playersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-
-    const rank = { complete: 2, partial: 1, none: 0 };
-    const statusByPlayerId = new Map();
-    evalSnap.forEach((d) => {
-      const ev = d.data();
-      if (!ev.playerId) return;
-      const status = isEvaluationComplete(ev) ? "complete" : isEvaluationStarted(ev) ? "partial" : "none";
-      const existing = statusByPlayerId.get(ev.playerId);
-      if (!existing || rank[status] > rank[existing]) statusByPlayerId.set(ev.playerId, status);
-    });
+    const { players, statusByPlayerId } = await fetchPlayerEvaluationStatusForLabel(round.label);
 
     const byTeam = new Map();
     for (const p of players) {
@@ -1212,17 +1300,27 @@ function renderMascRoundList(rounds) {
   adminMascRoundListBody.innerHTML = rounds
     .map((r) => {
       const status = mascRoundStatus(r);
+      const isEnded = status.label === "สิ้นสุดแล้ว";
       return `
         <tr>
-          <td class="emphasis">${r.label ?? "-"}</td>
+          <td class="emphasis">${r.label ?? "-"}${r.isCorrectionRound ? ' <span class="badge badge-warning">รอบแก้ไข</span>' : ""}</td>
           <td>${r.startDate ?? "-"}</td>
           <td>${r.endDate ?? "-"}</td>
           <td><span class="badge ${status.className}">${status.label}</span></td>
-          <td><button type="button" class="btn btn-ghost-danger btn-sm" data-masc-round-delete="${r.id}">ลบ</button></td>
+          <td class="whitespace-nowrap">
+            ${isEnded ? `<button type="button" class="btn btn-secondary btn-sm" data-masc-round-fix="${r.id}">สร้างรอบแก้ไข</button>` : ""}
+            <button type="button" class="btn btn-ghost-danger btn-sm" data-masc-round-delete="${r.id}">ลบ</button>
+          </td>
         </tr>`;
     })
     .join("");
   applyDataLabels(adminMascRoundListBody);
+  adminMascRoundListBody.querySelectorAll("[data-masc-round-fix]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const round = rounds.find((r) => r.id === btn.dataset.mascRoundFix);
+      if (round) enterMascCorrectionMode(round);
+    });
+  });
   adminMascRoundListBody.querySelectorAll("[data-masc-round-delete]").forEach((btn) => {
     btn.addEventListener("click", async () => {
       if (!confirm("ยืนยันลบรอบการประเมินนี้? การลบนี้ไม่แจ้งเตือนโค้ชว่ายกเลิก และไม่สามารถย้อนกลับได้")) return;
@@ -1256,6 +1354,9 @@ adminMascRoundStartBtn.addEventListener("click", async () => {
   adminMascRoundStartBtn.disabled = true;
   adminMascRoundStatus.textContent = "กำลังบันทึก...";
   adminMascRoundStatus.className = "text-sm text-slate-500 w-full";
+  // โหมด "รอบแก้ไข" ต้องยังตรงกับช่วงที่ล็อกไว้ตอนกดปุ่ม "สร้างรอบแก้ไข" เท่านั้น (กันกรณีแปลกๆ ที่ dropdown ถูก
+  // เปิด disabled ไว้แต่ค่าเปลี่ยนไปได้ทางอื่น) — ถ้าไม่ตรงถือว่าเป็นการสร้างรอบใหม่ปกติ
+  const isCorrection = mascCorrectionRoundLabel !== null && mascCorrectionRoundLabel === label;
   try {
     const startLabel = new Date(`${startDate}T00:00:00`).toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" });
     const endLabel = new Date(`${endDate}T00:00:00`).toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" });
@@ -1265,20 +1366,39 @@ adminMascRoundStartBtn.addEventListener("click", async () => {
       startDate,
       endDate,
       createdBy,
-      createdAt: serverTimestamp()
+      createdAt: serverTimestamp(),
+      ...(isCorrection ? { isCorrectionRound: true } : {})
     });
-    // แจ้งเตือนทุกทีมพร้อมกัน (ใช้ executiveNotes ที่มีอยู่แล้ว — โค้ชเห็นข้อความนี้ในหน้า Daily ของตัวเองทันที)
-    const message = `เริ่มรอบประเมิน MASC ${label} แล้ว ตั้งแต่วันที่ ${startLabel} ถึง ${endLabel} กรุณาดำเนินการให้แล้วเสร็จภายในกำหนด`;
-    await Promise.all(
-      TEAMS.map((team) =>
-        sendExecutiveNote({ team, type: "masc_round", refId: newDoc.id, refLabel: label, message, createdBy })
-      )
-    );
-    adminMascRoundStatus.textContent = `เริ่มรอบประเมิน ${label} และแจ้งเตือนทุกทีมแล้ว ✓`;
+    // แจ้งเตือน (ใช้ executiveNotes ที่มีอยู่แล้ว — โค้ชเห็นข้อความนี้ในหน้า Daily ของตัวเองทันที) — รอบใหม่ปกติ
+    // แจ้งทุกทีมเหมือนเดิม ส่วนรอบแก้ไขแจ้งเฉพาะทีมที่ยังมีรุ่นค้างอยู่จริง พร้อมระบุรุ่นที่ค้างของทีมนั้นในข้อความ
+    // เพื่อไม่ให้ทีมที่ประเมินครบไปแล้วโดนแจ้งเตือนซ้ำแบบไม่จำเป็น
+    let notifiedTeams;
+    if (isCorrection) {
+      const incompleteGroups = await computeIncompleteGroupsForLabel(label);
+      notifiedTeams = Array.from(new Set(incompleteGroups.map((g) => g.team)));
+      await Promise.all(
+        notifiedTeams.map((team) => {
+          const teamGroups = incompleteGroups
+            .filter((g) => g.team === team)
+            .map((g) => g.ageGroup)
+            .join(", ");
+          const message = `เปิดรอบแก้ไข MASC ${label} อีกครั้ง (รุ่น ${teamGroups} ยังประเมินไม่ครบ) ตั้งแต่วันที่ ${startLabel} ถึง ${endLabel} กรุณาดำเนินการให้แล้วเสร็จภายในกำหนด`;
+          return sendExecutiveNote({ team, type: "masc_round", refId: newDoc.id, refLabel: label, message, createdBy });
+        })
+      );
+    } else {
+      notifiedTeams = TEAMS;
+      const message = `เริ่มรอบประเมิน MASC ${label} แล้ว ตั้งแต่วันที่ ${startLabel} ถึง ${endLabel} กรุณาดำเนินการให้แล้วเสร็จภายในกำหนด`;
+      await Promise.all(
+        TEAMS.map((team) => sendExecutiveNote({ team, type: "masc_round", refId: newDoc.id, refLabel: label, message, createdBy }))
+      );
+    }
+    adminMascRoundStatus.textContent =
+      notifiedTeams.length > 0
+        ? `${isCorrection ? "เปิดรอบแก้ไข" : "เริ่มรอบประเมิน"} ${label} และแจ้งเตือน ${notifiedTeams.length} ทีมแล้ว ✓`
+        : `${isCorrection ? "เปิดรอบแก้ไข" : "เริ่มรอบประเมิน"} ${label} แล้ว (ไม่มีทีมที่ต้องแจ้งเตือนเพิ่ม)`;
     adminMascRoundStatus.className = "text-sm text-emerald-600 w-full";
-    adminMascRoundPeriodSelect.value = "";
-    adminMascRoundStartInput.value = "";
-    adminMascRoundEndInput.value = "";
+    exitMascCorrectionMode();
     await loadMascRounds();
   } catch (err) {
     console.error(err);

@@ -709,7 +709,14 @@
           <p>ตั้งช่วงวันที่ให้โค้ชดำเนินการประเมิน MASC — เริ่มรอบแล้วระบบจะแจ้งเตือนไปยังทุกทีมโดยอัตโนมัติ</p>
         </div>
       </div>
-      <div class="card card-pad space-y-3 max-w-sm">
+      <div id="admin-masc-round-create-card" class="card card-pad space-y-3 max-w-md">
+        <!-- โหมด "สร้างรอบแก้ไข" — ล็อกช่วงที่ไว้กับรอบเดิมที่เลือกจากตารางประวัติด้านล่าง พร้อมสรุปว่ารุ่นไหนของทีม
+             ไหนยังประเมินไม่ครบ ให้ผู้ดูแลระบบตัดสินใจก่อนกำหนดวันที่ใหม่ (ซ่อนไว้ปกติ แสดงเมื่อกด "สร้างรอบแก้ไข") -->
+        <div id="admin-masc-round-correction-note" class="hidden card card-warning card-pad text-sm space-y-2">
+          <p class="font-semibold text-amber-800">🔁 กำลังสร้างรอบแก้ไขสำหรับ <span id="admin-masc-round-correction-label"></span></p>
+          <div id="admin-masc-round-correction-summary" class="text-xs text-amber-800"></div>
+          <button type="button" id="admin-masc-round-correction-cancel" class="btn btn-ghost btn-sm px-0">ยกเลิก กลับไปสร้างรอบใหม่ตามปกติ</button>
+        </div>
         <div>
           <label class="field-label">ช่วงที่ประเมิน</label>
           <select id="admin-masc-round-period-select" class="field-input w-full">
