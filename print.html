@@ -14,13 +14,18 @@
       * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
       .no-print { display: none !important; }
       body { background: #fff; }
-      .card { box-shadow: none; border-color: #cbd5e1; page-break-inside: avoid; }
+      .card { box-shadow: none; border-color: #cbd5e1; page-break-inside: avoid; break-inside: avoid; }
 
       /* แต่ละหัวข้อ (แผนการฝึกซ้อม / ผลการแข่งขัน / อาการบาดเจ็บ) ขึ้นหน้าใหม่เสมอ ไม่ต่อกันจนอ่านสับสนว่า
          ตารางไหนเป็นของหัวข้อไหน — การ์ดภาพรวม+ตารางเช็คชื่อหลักที่อยู่ก่อนหน้านี้ (ไม่มีคลาสนี้) ไม่มีตัวบังคับ
          ขึ้นหน้าใหม่มาก่อน จึงยังอยู่หน้าแรกตามเดิม */
       .print-page-section { page-break-before: always; break-before: page; }
-      tr { page-break-inside: avoid; }
+      tr { page-break-inside: avoid; break-inside: avoid; }
+
+      /* ครอบคู่การ์ดที่ต้องอยู่หน้าเดียวกันเสมอ (เช่นกราฟแยกรายโค้ช + กราฟวงกลม) — แค่ page-break-inside: avoid
+         บน .card แต่ละใบไม่พอ เพราะทั้งคู่อยู่ใน grid ร่วมกัน เบราว์เซอร์ยังตัดกลาง grid ได้ถ้าไม่ครอบ container
+         ด้วย ทำให้ครึ่งบนของการ์ดค้างอยู่ท้ายหน้าเดิม ครึ่งล่างหลุดไปหน้าถัดไป */
+      .print-keep-together { page-break-inside: avoid; break-inside: avoid; }
 
       /* ย่อตารางให้พอดีความกว้าง A4 แนวตั้ง (ลบ margin ออกแล้วเหลือ ~18cm) กันคอลัมน์ล้นขอบกระดาษ โดยเฉพาะ
          ตารางเช็คชื่อหลักที่มีถึง 9 คอลัมน์ */
@@ -101,7 +106,7 @@
             </tbody>
           </table>
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 print-keep-together">
           <div class="card card-pad">
             <h3 class="text-sm font-semibold mb-2">จำนวนครั้งที่ส่งตรงเวลา/สาย/ไม่ส่ง แยกรายโค้ช</h3>
             <div id="print-training-plan-coach-chart"></div>
