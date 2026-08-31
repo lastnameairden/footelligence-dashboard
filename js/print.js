@@ -114,6 +114,11 @@ async function loadPrintSummary(team, ageGroup, month) {
   const overallPercent = overall.total > 0 ? Math.round((overall.attended / overall.total) * 100) : 0;
   const overallAvgScore = overall.scoreCount > 0 ? (overall.scoreSum / overall.scoreCount).toFixed(1) : "-";
 
+  // ตัดนักกีฬาที่ไม่มีบันทึกการฝึกซ้อมเลยในเดือนนี้ออกจากสรุปสำหรับพิมพ์ (ทั้งการ์ดจำนวนคนและตาราง) — เป็นสรุปผล
+  // การฝึกซ้อมรายเดือน แถวที่ไม่มีข้อมูลอะไรเลย (0 ครั้ง, 0%, ไม่มีคะแนน) มีแต่จะทำให้สรุปดูรกและเข้าใจผิดว่ามี
+  // ปัญหา ทั้งที่จริงแค่ยังไม่เคยถูกเช็คชื่อในเดือนนี้เท่านั้น (เช่น เพิ่งเพิ่มเข้าระบบ ยังไม่ได้ระบุรุ่นอายุ)
+  players = players.filter((p) => (statsByPlayer.get(p.id)?.total ?? 0) > 0);
+
   const monthLabel = new Date(`${month}-01T00:00:00`).toLocaleDateString("th-TH", { year: "numeric", month: "long" });
   const scopeText =
     ageGroup === "__ALL__" ? `ทีม ${team} — ทุกรุ่นอายุ — เดือน${monthLabel}` : `ทีม ${team} — รุ่นอายุ ${ageGroup} — เดือน${monthLabel}`;
