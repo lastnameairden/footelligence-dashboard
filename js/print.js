@@ -228,21 +228,21 @@ function buildCoachQuotaBarChartSvg(coachRows) {
   if (coachRows.length === 0) {
     return '<p class="text-xs text-slate-400 text-center py-4">ไม่มีข้อมูล</p>';
   }
-  const rowH = 20;
-  const padTop = 4;
-  const padBottom = 4;
-  const labelW = 120;
-  const barAreaW = 300;
-  const width = labelW + barAreaW + 8;
+  const rowH = 23;
+  const padTop = 6;
+  const padBottom = 6;
+  const labelW = 108;
+  const barAreaW = 336;
+  const width = labelW + barAreaW + 12;
   const height = padTop + padBottom + coachRows.length * rowH;
   const maxTotal = Math.max(...coachRows.map((r) => r.onTime + r.late + r.missing), TRAINING_PLAN_MONTHLY_QUOTA);
 
   const rows = coachRows
     .map((r, i) => {
       const y = padTop + i * rowH;
-      const midY = (y + rowH / 2 + 3).toFixed(1);
+      const midY = (y + rowH / 2 + 3.5).toFixed(1);
       const name = r.coach.name ?? "-";
-      const label = name.length > 16 ? `${name.slice(0, 15)}…` : name;
+      const label = name.length > 14 ? `${name.slice(0, 13)}…` : name;
       const segs = [
         { count: r.onTime, color: "#10b981", segLabel: "ตรงเวลา" },
         { count: r.late, color: "#f59e0b", segLabel: "สาย" },
@@ -253,19 +253,19 @@ function buildCoachQuotaBarChartSvg(coachRows) {
       for (const seg of segs) {
         if (seg.count <= 0) continue;
         const w = (seg.count / maxTotal) * barAreaW;
-        rects += `<rect x="${x.toFixed(1)}" y="${(y + 3).toFixed(1)}" width="${w.toFixed(1)}" height="${rowH - 8}" fill="${seg.color}"><title>${name} ${seg.segLabel}: ${seg.count}</title></rect>`;
+        rects += `<rect x="${x.toFixed(1)}" y="${(y + 3).toFixed(1)}" width="${w.toFixed(1)}" height="${rowH - 6}" rx="1.5" fill="${seg.color}"><title>${name} ${seg.segLabel}: ${seg.count}</title></rect>`;
         x += w;
       }
-      return `<text x="${labelW - 6}" y="${midY}" font-size="9" fill="#334155" text-anchor="end">${label}<title>${name}</title></text>${rects}`;
+      return `<text x="${labelW - 8}" y="${midY}" font-size="10" fill="#334155" text-anchor="end">${label}<title>${name}</title></text>${rects}`;
     })
     .join("");
 
   return `
-    <svg viewBox="0 0 ${width} ${height}" width="100%" style="max-width:${width}px; display:block;">${rows}</svg>
-    <div class="text-[10px] text-slate-500 flex flex-wrap justify-center gap-x-3 gap-y-1 mt-1">
-      <span class="inline-flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-full" style="background:#10b981"></span>ตรงเวลา</span>
-      <span class="inline-flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-full" style="background:#f59e0b"></span>สาย</span>
-      <span class="inline-flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-full" style="background:#cbd5e1"></span>ไม่ส่ง</span>
+    <svg viewBox="0 0 ${width} ${height}" width="100%" style="max-width:${width}px; display:block; margin:0 auto;">${rows}</svg>
+    <div class="text-xs text-slate-500 flex flex-wrap justify-center gap-x-4 gap-y-1 mt-2">
+      <span class="inline-flex items-center gap-1"><span class="inline-block w-2.5 h-2.5 rounded-full" style="background:#10b981"></span>ตรงเวลา</span>
+      <span class="inline-flex items-center gap-1"><span class="inline-block w-2.5 h-2.5 rounded-full" style="background:#f59e0b"></span>สาย</span>
+      <span class="inline-flex items-center gap-1"><span class="inline-block w-2.5 h-2.5 rounded-full" style="background:#cbd5e1"></span>ไม่ส่ง</span>
     </div>
   `;
 }
@@ -282,9 +282,9 @@ function buildQuotaPieChartSvg(totalOnTime, totalLate, totalMissing) {
     { value: totalLate, color: "#f59e0b", label: "สาย" },
     { value: totalMissing, color: "#cbd5e1", label: "ไม่ส่ง" }
   ];
-  const cx = 70;
-  const cy = 70;
-  const r = 62;
+  const cx = 100;
+  const cy = 100;
+  const r = 90;
   const nonZero = slices.filter((s) => s.value > 0);
 
   let svgBody;
@@ -312,13 +312,13 @@ function buildQuotaPieChartSvg(totalOnTime, totalLate, totalMissing) {
   const legend = slices
     .map((s) => {
       const pct = Math.round((s.value / total) * 100);
-      return `<span class="inline-flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-full" style="background:${s.color}"></span>${s.label} ${pct}% (${s.value})</span>`;
+      return `<span class="inline-flex items-center gap-1.5"><span class="inline-block w-2.5 h-2.5 rounded-full" style="background:${s.color}"></span>${s.label} ${pct}% (${s.value})</span>`;
     })
     .join("");
 
   return `
-    <svg viewBox="0 0 140 140" width="100%" style="max-width:150px; display:block; margin:0 auto;">${svgBody}</svg>
-    <div class="text-[10px] text-slate-500 flex flex-wrap justify-center gap-x-3 gap-y-1 mt-2">${legend}</div>
+    <svg viewBox="0 0 200 200" width="100%" style="max-width:220px; display:block; margin:0 auto;">${svgBody}</svg>
+    <div class="text-xs text-slate-500 flex flex-wrap justify-center gap-x-4 gap-y-1.5 mt-3">${legend}</div>
   `;
 }
 
