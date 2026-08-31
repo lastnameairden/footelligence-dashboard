@@ -14,6 +14,8 @@ import {
   applyDataLabels,
   isTrainingPlanLate,
   TRAINING_PLAN_LATE_WARNING_THRESHOLD,
+  TRAINING_PLAN_MONTHLY_QUOTA,
+  CHECKIN_MONTHLY_QUOTA,
   matchResultBadge,
   injurySeverityBadge,
   injuryStatusBadge,
@@ -206,11 +208,11 @@ async function loadPrintExtras(team, ageGroup, month) {
   playersSnap.forEach((d) => allPlayers.push({ id: d.id, ...d.data() }));
   const scopedPlayers = ageGroup === "__ALL__" ? allPlayers : allPlayers.filter((p) => p.ageGroup === ageGroup);
 
-  // ---------- สรุปการส่งแผนการฝึกซ้อมรายวัน แยกรายโค้ช (ตรงเวลา/สาย/วันฝึกซ้อมที่ต้องส่ง/% ตรงตามวันฝึกซ้อม) ----------
+  // ---------- สรุปการส่งแผนการฝึกซ้อมรายวัน แยกรายโค้ช (ตรงเวลา/สาย/เกณฑ์ที่ต้องส่ง/% ตรงเวลา) ----------
   // จับคู่แผนกับโค้ชด้วยชื่อ (coachName) ไม่ใช่ coachId เพราะถ้าผู้ดูแลระบบสวมบทบาทส่งแทนโค้ช coachId จะกลายเป็น
-  // uid ของผู้ดูแลระบบเอง (หลักการเดียวกับ computeCoachMonthlySummaryRows ในหน้า attendance.html) — "จำนวนทั้งหมด
-  // ที่ต้องส่ง" คือจำนวนวันฝึกซ้อมจริง (monthSessions) ไม่ใช่เกณฑ์คงที่อีกต่อไป เพราะวันที่ฝึกซ้อมต้องตรงกับวันที่
-  // ส่งแผนการฝึกซ้อม — นับว่า "ส่งตรงวันฝึกซ้อม" ถ้าโค้ชคนนั้นส่งแผนของวันที่ตรงกับวันฝึกซ้อมวันนั้นพอดี
+  // uid ของผู้ดูแลระบบเอง (หลักการเดียวกับ computeCoachMonthlySummaryRows ในหน้า attendance.html) — คอลัมน์
+  // "จำนวนทั้งหมดที่ต้องส่ง" แสดงเกณฑ์คงที่ TRAINING_PLAN_MONTHLY_QUOTA (ทุกคนเท่ากัน) ไม่ใช่จำนวนวันฝึกซ้อมจริง
+  // ส่วน % ตรงเวลา เทียบกับจำนวนที่ส่งจริง (onTime/(onTime+late)) วัดคุณภาพความตรงเวลาของสิ่งที่ส่งมาแล้ว
   let plans = [];
   trainingPlanSnap.forEach((d) => plans.push(d.data()));
   plans = plans.filter((p) => (p.date || "").startsWith(month));
@@ -221,9 +223,9 @@ async function loadPrintExtras(team, ageGroup, month) {
   const lateCount = plans.filter((p) => isTrainingPlanLate(p)).length;
   const onTimeCount = plans.length - lateCount;
   printTrainingPlanCards.innerHTML =
-    statCard("วันฝึกซ้อมทั้งหมด", monthSessions.length) +
-    statCard("ส่งแผนตรงเวลา", onTimeCount) +
-    statCard("ส่งแผนสาย", lateCount) +
+    statCard("จำนวนแผนที่ส่ง", plans.length) +
+    statCard("ตรงเวลา", onTimeCount) +
+    statCard("สาย", lateCount) +
     statCard(
       "สถานะ",
       lateCount > TRAINING_PLAN_LATE_WARNING_THRESHOLD ? "⚠️ ต้องปรับปรุง" : "ปกติ"
@@ -231,17 +233,11 @@ async function loadPrintExtras(team, ageGroup, month) {
 
   const coachRows = coaches.map((c) => {
     const myPlans = plans.filter((p) => p.coachName === c.name);
-    let matchDays = 0;
-    let onTime = 0;
-    for (const s of monthSessions) {
-      const dayPlans = myPlans.filter((p) => p.date === s.date);
-      if (dayPlans.length === 0) continue;
-      matchDays += 1;
-      if (dayPlans.some((p) => !isTrainingPlanLate(p))) onTime += 1;
-    }
-    const late = matchDays - onTime;
-    const matchPercent = monthSessions.length > 0 ? Math.round((matchDays / monthSessions.length) * 100) : null;
-    return { coach: c, matchDays, onTime, late, matchPercent };
+    const late = myPlans.filter((p) => isTrainingPlanLate(p)).length;
+    const total = myPlans.length;
+    const onTime = total - late;
+    const onTimePercent = total > 0 ? Math.round((onTime / total) * 100) : null;
+    return { coach: c, onTime, late, onTimePercent };
   });
 
   if (coachRows.length === 0) {
@@ -249,14 +245,14 @@ async function loadPrintExtras(team, ageGroup, month) {
       '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">ไม่มีโค้ชในขอบเขตที่เลือก</td></tr>';
   } else {
     printTrainingPlanBody.innerHTML = coachRows
-      .map(({ coach, onTime, late, matchPercent }) => {
-        const percentText = matchPercent === null ? "-" : `${matchPercent}%`;
-        const percentBadgeClass = matchPercent === null ? "badge-neutral" : matchPercent >= 80 ? "badge-success" : matchPercent >= 50 ? "badge-warning" : "badge-danger";
+      .map(({ coach, onTime, late, onTimePercent }) => {
+        const percentText = onTimePercent === null ? "-" : `${onTimePercent}%`;
+        const percentBadgeClass = onTimePercent === null ? "badge-neutral" : onTimePercent >= 80 ? "badge-success" : onTimePercent >= 50 ? "badge-warning" : "badge-danger";
         return `
           <tr>
             <td class="emphasis">${coach.name ?? "-"}</td>
             <td>${(coach.ageGroups || []).join(", ") || "-"}</td>
-            <td>${monthSessions.length}</td>
+            <td>${TRAINING_PLAN_MONTHLY_QUOTA}</td>
             <td class="text-emerald-600 font-medium">${onTime}</td>
             <td class="text-red-500 font-medium">${late}</td>
             <td><span class="badge ${percentBadgeClass}">${percentText}</span></td>
@@ -266,6 +262,7 @@ async function loadPrintExtras(team, ageGroup, month) {
     applyDataLabels(printTrainingPlanBody);
   }
 
+  // กราฟแนวโน้มยังอิงวันฝึกซ้อมจริง (monthSessions) เพื่อให้แกน X ตรงกับกราฟเช็คชื่อด้านล่าง ไม่ใช่ทุกวันปฏิทิน
   const planDailyCounts = monthSessions.map((s) => {
     let dOnTime = 0;
     let dLate = 0;
@@ -298,14 +295,17 @@ async function loadPrintExtras(team, ageGroup, month) {
       if (isCoachSubmissionOnTime(s, myAttendanceForSession)) onTime += 1;
     }
     const late = checkinDays - onTime;
-    const matchPercent = monthSessions.length > 0 ? Math.round((checkinDays / monthSessions.length) * 100) : null;
+    // เกณฑ์ "ต้องเช็คชื่อ" เป็นตัวเลขคงที่ CHECKIN_MONTHLY_QUOTA เหมือนแผนการฝึกซ้อม ไม่ใช่จำนวนวันฝึกซ้อมจริง —
+    // checkinDays ยังนับจากวันฝึกซ้อมจริง (monthSessions) เหมือนเดิม เพราะเช็คชื่อได้เฉพาะวันที่มี session จริง
+    // เท่านั้น แต่ % เทียบกับเกณฑ์คงที่นี้แทน
+    const matchPercent = Math.round((checkinDays / CHECKIN_MONTHLY_QUOTA) * 100);
     return { coach: c, checkinDays, onTime, late, matchPercent };
   });
 
   const totalCheckinDays = checkinRows.reduce((sum, r) => sum + r.checkinDays, 0);
   const totalOnTime = checkinRows.reduce((sum, r) => sum + r.onTime, 0);
   printCheckinCards.innerHTML =
-    statCard("วันฝึกซ้อมทั้งหมด", monthSessions.length) +
+    statCard("จำนวนที่ต้องเช็คชื่อ", CHECKIN_MONTHLY_QUOTA) +
     statCard("เช็คชื่อตรงวันฝึกซ้อม (รวม)", totalCheckinDays) +
     statCard("ตรงเวลา (รวม)", totalOnTime) +
     statCard("สาย (รวม)", totalCheckinDays - totalOnTime);
@@ -316,14 +316,13 @@ async function loadPrintExtras(team, ageGroup, month) {
   } else {
     printCheckinBody.innerHTML = checkinRows
       .map(({ coach, checkinDays, onTime, late, matchPercent }) => {
-        const percentText = matchPercent === null ? "-" : `${matchPercent}%`;
-        const percentBadgeClass =
-          matchPercent === null ? "badge-neutral" : matchPercent >= 80 ? "badge-success" : matchPercent >= 50 ? "badge-warning" : "badge-danger";
+        const percentText = `${matchPercent}%`;
+        const percentBadgeClass = matchPercent >= 80 ? "badge-success" : matchPercent >= 50 ? "badge-warning" : "badge-danger";
         return `
           <tr>
             <td class="emphasis">${coach.name ?? "-"}</td>
             <td>${(coach.ageGroups || []).join(", ") || "-"}</td>
-            <td>${monthSessions.length}</td>
+            <td>${CHECKIN_MONTHLY_QUOTA}</td>
             <td>${checkinDays}</td>
             <td class="text-emerald-600 font-medium">${onTime}</td>
             <td class="text-red-500 font-medium">${late}</td>

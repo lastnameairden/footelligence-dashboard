@@ -355,6 +355,12 @@ export function calcAge(birthday) {
 export const TRAINING_PLAN_DEADLINE_HOUR = 14;
 // สายเกินกี่ครั้งต่อเดือนถึงต้องแจ้งเตือนให้โค้ชปรับปรุงมาตรฐานการส่งแผน
 export const TRAINING_PLAN_LATE_WARNING_THRESHOLD = 3;
+// เกณฑ์จำนวนแผนที่โค้ชแต่ละคนต้องส่งต่อเดือน (ทุกคนเท่ากันไม่ว่าจะดูแลกี่รุ่นอายุ) ใช้แสดงเป็น "จำนวนทั้งหมดที่
+// ต้องส่ง" ในสรุปการทำงานของโค้ช (print.js) — เป็นตัวเลขคงที่ ไม่ได้อิงจำนวนวันฝึกซ้อมจริงจาก sessions
+export const TRAINING_PLAN_MONTHLY_QUOTA = 20;
+// เกณฑ์จำนวนวันที่โค้ชแต่ละคนต้องเช็คชื่อ+ให้คะแนนนักกีฬาต่อเดือน — แยกจาก TRAINING_PLAN_MONTHLY_QUOTA เพราะเป็น
+// คนละกิจกรรมกัน แม้ปัจจุบันจะตั้งไว้เท่ากันก็ตาม (เผื่ออนาคตค่าอาจต่างกัน)
+export const CHECKIN_MONTHLY_QUOTA = 20;
 
 export function isTrainingPlanLate(plan) {
   const ts = plan.updatedAt && typeof plan.updatedAt.toDate === "function" ? plan.updatedAt.toDate() : null;
