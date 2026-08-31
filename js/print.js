@@ -231,9 +231,10 @@ function buildCoachQuotaBarChartSvg(coachRows) {
   const rowH = 23;
   const padTop = 6;
   const padBottom = 6;
-  const labelW = 108;
-  const barAreaW = 336;
-  const width = labelW + barAreaW + 12;
+  const labelW = 100;
+  const barAreaW = 268;
+  const numbersW = 66;
+  const width = labelW + barAreaW + numbersW + 8;
   const height = padTop + padBottom + coachRows.length * rowH;
   const maxTotal = Math.max(...coachRows.map((r) => r.onTime + r.late + r.missing), TRAINING_PLAN_MONTHLY_QUOTA);
 
@@ -242,7 +243,7 @@ function buildCoachQuotaBarChartSvg(coachRows) {
       const y = padTop + i * rowH;
       const midY = (y + rowH / 2 + 3.5).toFixed(1);
       const name = r.coach.name ?? "-";
-      const label = name.length > 14 ? `${name.slice(0, 13)}…` : name;
+      const label = name.length > 13 ? `${name.slice(0, 12)}…` : name;
       const segs = [
         { count: r.onTime, color: "#10b981", segLabel: "ตรงเวลา" },
         { count: r.late, color: "#f59e0b", segLabel: "สาย" },
@@ -256,7 +257,11 @@ function buildCoachQuotaBarChartSvg(coachRows) {
         rects += `<rect x="${x.toFixed(1)}" y="${(y + 3).toFixed(1)}" width="${w.toFixed(1)}" height="${rowH - 6}" rx="1.5" fill="${seg.color}"><title>${name} ${seg.segLabel}: ${seg.count}</title></rect>`;
         x += w;
       }
-      return `<text x="${labelW - 8}" y="${midY}" font-size="10" fill="#334155" text-anchor="end">${label}<title>${name}</title></text>${rects}`;
+      // ตัวเลขจำนวนครั้งแยกสีตามหมวด วางไว้ตำแหน่งคงที่ท้ายแท่งเสมอ (ไม่ใช่ต่อท้ายความยาวแท่งจริงที่ไม่เท่ากัน
+      // แต่ละแถว) เพื่อให้อ่านเป็นคอลัมน์ตรงกันทุกแถวเหมือนตาราง แทนที่จะต้อง hover ดู tooltip ซึ่งพิมพ์ออกมาไม่ได้
+      const numbersX = labelW + barAreaW + 6;
+      const numbers = `<text x="${numbersX}" y="${midY}" font-size="9.5" font-weight="600"><tspan fill="#059669">${r.onTime}</tspan><tspan fill="#94a3b8" font-weight="400"> / </tspan><tspan fill="#d97706">${r.late}</tspan><tspan fill="#94a3b8" font-weight="400"> / </tspan><tspan fill="#64748b">${r.missing}</tspan></text>`;
+      return `<text x="${labelW - 8}" y="${midY}" font-size="10" fill="#334155" text-anchor="end">${label}<title>${name}</title></text>${rects}${numbers}`;
     })
     .join("");
 
