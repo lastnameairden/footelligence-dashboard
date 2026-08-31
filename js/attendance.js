@@ -743,7 +743,17 @@ function renderDrawerItems() {
       navDrawerItems.appendChild(drawerItem("⚽", "รายงานผลการแข่งขัน", openMatchReportSection));
       navDrawerItems.appendChild(drawerItem("🩹", "รายงานอาการบาดเจ็บ", openInjuryReportSection));
       navDrawerItems.appendChild(drawerItem("📋", "แผนการฝึกซ้อมรายวัน", openTrainingPlanSection));
-      navDrawerItems.appendChild(drawerItem("🧬", "การประเมิน MASC", () => (window.location.href = `./masc.html#team=${encodeURIComponent(myTeam)}`)));
+      navDrawerItems.appendChild(
+        drawerItem("🧬", "การประเมิน MASC", () => {
+          // แนบ ageGroups/coachPosition ไปด้วยถ้ากำลังสวมบทบาทเป็นโค้ชคนใดคนหนึ่งอยู่ (myAgeGroups มีค่า) เพื่อให้
+          // masc.html กรองรายชื่อนักกีฬาให้ตรงกับที่โค้ชคนนั้นเห็นจริง เหมือนกับทุกเมนูอื่นในโหมดนี้ — ถ้าเป็นการ
+          // จัดการทีมแบบกว้าง (ไม่เจาะจงโค้ช) myAgeGroups จะว่างอยู่แล้ว จึงไม่แนบพารามิเตอร์เพิ่ม เห็นทุกรุ่นเหมือนเดิม
+          const params = new URLSearchParams({ team: myTeam });
+          if (myAgeGroups.length > 0) params.set("ageGroups", myAgeGroups.join(","));
+          if (myCoachPosition) params.set("coachPosition", myCoachPosition);
+          window.location.href = `./masc.html#${params.toString()}`;
+        })
+      );
       navDrawerItems.appendChild(drawerDivider());
       navDrawerItems.appendChild(drawerItem("🛡️", "กลับแผงควบคุมผู้ดูแลระบบ", exitTeamManagementToAdminPanel));
     } else {

@@ -369,9 +369,15 @@ function renderPlayerOptions(ageGroup) {
 async function loadPlayers() {
   const snap = await getDocs(query(collection(db, "players"), where("team", "==", myTeam)));
   const allPlayers = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  // จำกัดเฉพาะนักกีฬาที่โค้ชคนนี้รับผิดชอบจริง (ตามรุ่นอายุ+ตำแหน่งของโค้ช) — ผู้ดูแลระบบที่จัดการทีมแบบกว้าง
-  // (ไม่ได้เจาะจงเป็นโค้ชคนใดคนหนึ่ง) ยังเห็นนักกีฬาทุกรุ่นของทีมเหมือนเดิม
-  players = myCoachDoc && myCoachDoc.role === "coach" ? allPlayers.filter((p) => getCoachPlayerIds(myCoachDoc, allPlayers).has(p.id)) : allPlayers;
+  // จำกัดเฉพาะนักกีฬาที่โค้ชคนนี้รับผิดชอบจริง (ตามรุ่นอายุ+ตำแหน่งของโค้ช) — เช็คจาก "มี ageGroups ระบุมาไหม"
+  // แทนการเช็ค role === "coach" ตรงๆ เพราะผู้ดูแลระบบที่สวมบทบาทเป็นโค้ชคนใดคนหนึ่ง (คลิกชื่อโค้ชโดยตรงจากหน้า
+  // attendance) ก็ต้องกรองแบบเดียวกันนี้ด้วยแม้ myCoachDoc.role จะยังเป็น "admin" อยู่ก็ตาม (ดู onAuthStateChanged
+  // ด้านล่างที่แนบ ageGroups/coachPosition มาจาก URL ให้) — ผู้บริหารทีมไม่มี ageGroups เลย (ดูได้ทั้งทีม) และ
+  // ผู้ดูแลระบบที่จัดการทีมแบบกว้าง (ไม่เจาะจงโค้ช) ก็ไม่มี ageGroups เช่นกัน ทั้งสองกรณีนี้จึงยังเห็นทุกรุ่นเหมือนเดิม
+  players =
+    myCoachDoc && myCoachDoc.ageGroups && myCoachDoc.ageGroups.length > 0
+      ? allPlayers.filter((p) => getCoachPlayerIds(myCoachDoc, allPlayers).has(p.id))
+      : allPlayers;
   players.sort((a, b) => (a.nickname || "").localeCompare(b.nickname || ""));
 
   const ageGroups = Array.from(new Set(players.map((p) => p.ageGroup).filter(Boolean))).sort((a, b) => ageGroupNumber(a) - ageGroupNumber(b));
@@ -707,7 +713,8 @@ onAuthStateChanged(auth, async (user) => {
     }
 
     if (data.role === "admin") {
-      const teamParam = new URLSearchParams(window.location.hash.replace(/^#/, "")).get("team");
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+      const teamParam = hashParams.get("team");
       if (!teamParam) {
         accessGate.classList.remove("hidden");
         accessGateMessage.innerHTML = 'ผู้ดูแลระบบต้องระบุทีมก่อน — เข้าผ่านลิงก์ <code>masc.html#team=ชื่อทีม</code> จากหน้ารายชื่อโค้ช';
@@ -715,7 +722,18 @@ onAuthStateChanged(auth, async (user) => {
         return;
       }
       myTeam = teamParam;
-      myCoachDoc = { role: "admin", name: data.name || user.email, team: teamParam };
+      // ถ้าเข้ามาจากโหมด "สวมบทบาทเป็นโค้ชคนใดคนหนึ่ง" ในหน้า attendance (คลิกชื่อโค้ชคนนั้นโดยตรง) จะมี
+      // ageGroups/coachPosition แนบมาใน URL ด้วย — ใช้จำกัดรายชื่อนักกีฬาให้ตรงกับที่โค้ชคนนั้นเห็นจริง 100%
+      // เหมือนกับทุกเมนูอื่นในโหมดสวมบทบาท ถ้าเข้าแบบ "จัดการทีมนี้" แบบกว้าง (ไม่เจาะจงโค้ช) จะไม่มี 2 พารามิเตอร์
+      // นี้มา จึงเห็นนักกีฬาทุกรุ่น/ทุกตำแหน่งของทีมเหมือนเดิม (ดู loadPlayers() ด้านล่างที่กรองตาม ageGroups)
+      const scopedAgeGroups = hashParams.get("ageGroups");
+      myCoachDoc = {
+        role: "admin",
+        name: data.name || user.email,
+        team: teamParam,
+        ageGroups: scopedAgeGroups ? scopedAgeGroups.split(",").filter(Boolean) : [],
+        coachPosition: hashParams.get("coachPosition") || null
+      };
       isReadOnly = false;
     } else if (data.role === "executive") {
       myTeam = data.team;
