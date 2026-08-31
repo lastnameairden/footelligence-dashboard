@@ -368,13 +368,14 @@ async function loadPrintExtras(team, ageGroup, month) {
 
   if (matches.length === 0) {
     printMatchBody.innerHTML =
-      '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">ยังไม่มีรายการแข่งขันในเดือนนี้</td></tr>';
+      '<tr><td colspan="7" class="px-4 py-6 text-center text-slate-400">ยังไม่มีรายการแข่งขันในเดือนนี้</td></tr>';
   } else {
     printMatchBody.innerHTML = matches
       .map(
         (m) => `
         <tr>
           <td class="emphasis">${m.date ?? "-"}</td>
+          <td>${m.ageGroup ?? "-"}</td>
           <td>${m.opponent ?? "-"}</td>
           <td>${m.competitionType ?? "-"}</td>
           <td>${matchResultBadge(m.result)}</td>
