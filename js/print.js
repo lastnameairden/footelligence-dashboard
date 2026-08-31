@@ -9,7 +9,6 @@ import {
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import { db, auth } from "./firebase-init.js";
 import {
-  computeAvgScore,
   teamLogoImg,
   statCard,
   applyDataLabels,
@@ -20,16 +19,12 @@ import {
   injuryStatusBadge
 } from "./ui-utils.js";
 
-const UNASSIGNED_AGE_GROUP = "ไม่ระบุรุ่นอายุ";
-
 const statusEl = document.getElementById("status-message");
 const accessGate = document.getElementById("access-gate");
 const accessGateMessage = document.getElementById("access-gate-message");
 const printContent = document.getElementById("print-content");
 const printScopeLabel = document.getElementById("print-scope-label");
 const printGeneratedAt = document.getElementById("print-generated-at");
-const overviewCardsEl = document.getElementById("overview-cards");
-const printTableBody = document.getElementById("print-table-body");
 const printBtn = document.getElementById("print-btn");
 const printMonthSelect = document.getElementById("print-month-select");
 const printMonthLoadBtn = document.getElementById("print-month-load-btn");
@@ -64,60 +59,14 @@ printMonthLoadBtn.addEventListener("click", () => {
   loadPrintSummary(currentPrintTeam, currentPrintAgeGroup, printMonthSelect.value);
 });
 
+// สรุปนี้เดิมมีตารางรายชื่อนักกีฬา+สถิติการเข้าซ้อมรายบุคคลด้วย แต่ผู้ใช้แจ้งให้ตัดออก เพราะหน้านี้ตั้งใจให้เป็น
+// สรุป "การทำงานของโค้ช" (ส่งแผนการฝึกซ้อม/รายงานผลการแข่งขัน ตรงเวลาหรือไม่) และ "รายชื่อนักกีฬาที่บาดเจ็บ"
+// เท่านั้น ไม่ใช่สรุปข้อมูลรายบุคคลของนักกีฬาทุกคน — ดู loadPrintExtras() ด้านล่างสำหรับ 3 หัวข้อที่เหลือ
 async function loadPrintSummary(team, ageGroup, month) {
   setStatus("กำลังโหลดข้อมูล...");
   currentPrintTeam = team;
   currentPrintAgeGroup = ageGroup;
   printMonthSelect.value = month;
-
-  const playersSnap = await getDocs(query(collection(db, "players"), where("team", "==", team)));
-  let players = [];
-  playersSnap.forEach((d) => players.push({ id: d.id, ...d.data() }));
-  if (ageGroup !== "__ALL__") {
-    players = players.filter((p) => (p.ageGroup || UNASSIGNED_AGE_GROUP) === ageGroup);
-  }
-  players.sort((a, b) => (a.number ?? 0) - (b.number ?? 0));
-
-  const attendanceSnap = await getDocs(query(collection(db, "attendance"), where("team", "==", team)));
-  const attendanceRecords = [];
-  attendanceSnap.forEach((d) => attendanceRecords.push(d.data()));
-  // จำกัดเฉพาะบันทึกของเดือนที่เลือก (สรุปนี้เป็นสรุปรายเดือน ไม่ใช่สรุปสะสมทั้งหมดเหมือนเดิมอีกต่อไป)
-  const monthRecords = attendanceRecords.filter((r) => (r.date || "").startsWith(month));
-
-  const playerIds = new Set(players.map((p) => p.id));
-  const scopedRecords = monthRecords.filter((r) => playerIds.has(r.playerId));
-
-  const statsByPlayer = new Map();
-  for (const p of players) {
-    statsByPlayer.set(p.id, { attended: 0, missed: 0, total: 0, scoreSum: 0, scoreCount: 0 });
-  }
-  for (const r of scopedRecords) {
-    const stat = statsByPlayer.get(r.playerId);
-    if (!stat) continue;
-    stat.total += 1;
-    if (r.status === "A") stat.attended += 1;
-    else stat.missed += 1;
-    const avgScore = computeAvgScore(r.scores);
-    if (avgScore !== null) {
-      stat.scoreSum += avgScore;
-      stat.scoreCount += 1;
-    }
-  }
-
-  const overall = { attended: 0, total: 0, scoreSum: 0, scoreCount: 0 };
-  for (const s of statsByPlayer.values()) {
-    overall.attended += s.attended;
-    overall.total += s.total;
-    overall.scoreSum += s.scoreSum;
-    overall.scoreCount += s.scoreCount;
-  }
-  const overallPercent = overall.total > 0 ? Math.round((overall.attended / overall.total) * 100) : 0;
-  const overallAvgScore = overall.scoreCount > 0 ? (overall.scoreSum / overall.scoreCount).toFixed(1) : "-";
-
-  // ตัดนักกีฬาที่ไม่มีบันทึกการฝึกซ้อมเลยในเดือนนี้ออกจากสรุปสำหรับพิมพ์ (ทั้งการ์ดจำนวนคนและตาราง) — เป็นสรุปผล
-  // การฝึกซ้อมรายเดือน แถวที่ไม่มีข้อมูลอะไรเลย (0 ครั้ง, 0%, ไม่มีคะแนน) มีแต่จะทำให้สรุปดูรกและเข้าใจผิดว่ามี
-  // ปัญหา ทั้งที่จริงแค่ยังไม่เคยถูกเช็คชื่อในเดือนนี้เท่านั้น (เช่น เพิ่งเพิ่มเข้าระบบ ยังไม่ได้ระบุรุ่นอายุ)
-  players = players.filter((p) => (statsByPlayer.get(p.id)?.total ?? 0) > 0);
 
   const monthLabel = new Date(`${month}-01T00:00:00`).toLocaleDateString("th-TH", { year: "numeric", month: "long" });
   const scopeText =
@@ -126,39 +75,9 @@ async function loadPrintSummary(team, ageGroup, month) {
   printGeneratedAt.textContent = `สร้างสรุปเมื่อ ${new Date().toLocaleString("th-TH", { dateStyle: "long", timeStyle: "short" })}`;
   document.title = `FOOTELLIGENCE DATA — สรุป ${scopeText}`;
 
-  overviewCardsEl.innerHTML =
-    statCard("จำนวนนักกีฬา", players.length) +
-    statCard("% เข้าร่วมฝึกซ้อมรวม", `${overallPercent}%`) +
-    statCard("คะแนนเฉลี่ยรวม", overallAvgScore);
-
-  if (players.length === 0) {
-    printTableBody.innerHTML =
-      '<tr><td colspan="9" class="px-4 py-6 text-center text-slate-400">ไม่มีนักกีฬาในขอบเขตที่เลือก</td></tr>';
-  } else {
-    printTableBody.innerHTML = players
-      .map((p) => {
-        const s = statsByPlayer.get(p.id);
-        const percent = s.total > 0 ? Math.round((s.attended / s.total) * 100) : 0;
-        const avgScore = s.scoreCount > 0 ? (s.scoreSum / s.scoreCount).toFixed(1) : "-";
-        return `
-          <tr>
-            <td>${p.number ?? "-"}</td>
-            <td class="emphasis">${p.nickname ?? "-"}</td>
-            <td>${p.fullName ?? "-"}</td>
-            <td>${p.ageGroup ?? "-"}</td>
-            <td>${s.total}</td>
-            <td class="text-emerald-600 font-medium">${s.attended}</td>
-            <td class="text-red-500 font-medium">${s.missed}</td>
-            <td>${percent}%</td>
-            <td>${avgScore}</td>
-          </tr>`;
-      })
-      .join("");
-  }
-
   await loadPrintExtras(team, ageGroup, month);
 
-  setStatus(`โหลดข้อมูลสำเร็จ • ผู้เล่น ${players.length} คน`);
+  setStatus("โหลดข้อมูลสำเร็จ");
 }
 
 // สรุปแผนการฝึกซ้อม/ผลการแข่งขัน/อาการบาดเจ็บ ของทีม+เดือน+รุ่นอายุเดียวกับตารางผู้เล่นด้านบน — ให้สรุป
