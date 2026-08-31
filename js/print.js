@@ -14,6 +14,7 @@ import {
   applyDataLabels,
   isTrainingPlanLate,
   TRAINING_PLAN_LATE_WARNING_THRESHOLD,
+  TRAINING_PLAN_MONTHLY_QUOTA,
   matchResultBadge,
   injurySeverityBadge,
   injuryStatusBadge,
@@ -91,9 +92,12 @@ async function loadPrintExtras(team, ageGroup, month) {
     getDocs(query(collection(db, "coaches"), where("team", "==", team), where("role", "==", "coach")))
   ]);
 
-  // ---------- สรุปการส่งแผนการฝึกซ้อมรายวัน แยกรายโค้ช (ตรงเวลา/สาย/ทั้งหมด/% ตรงเวลา) ----------
+  // ---------- สรุปการส่งแผนการฝึกซ้อมรายวัน แยกรายโค้ช (ตรงเวลา/สาย/เกณฑ์ที่ต้องส่ง/% ตรงเวลา) ----------
   // จับคู่แผนกับโค้ชด้วยชื่อ (coachName) ไม่ใช่ coachId เพราะถ้าผู้ดูแลระบบสวมบทบาทส่งแทนโค้ช coachId จะกลายเป็น
-  // uid ของผู้ดูแลระบบเอง (หลักการเดียวกับ computeCoachMonthlySummaryRows ในหน้า attendance.html)
+  // uid ของผู้ดูแลระบบเอง (หลักการเดียวกับ computeCoachMonthlySummaryRows ในหน้า attendance.html) — คอลัมน์
+  // "จำนวนทั้งหมดที่ต้องส่ง" แสดงเกณฑ์คงที่ TRAINING_PLAN_MONTHLY_QUOTA (ทุกคนเท่ากัน) ไม่ใช่จำนวนที่ส่งจริง ซึ่ง
+  // ดูได้จากผลรวมของ "ส่งตรงเวลา" + "ส่งสาย" อยู่แล้ว ส่วน % ตรงเวลา ยังคงเทียบกับจำนวนที่ส่งจริง (ไม่ใช่เกณฑ์)
+  // เพราะวัดคุณภาพความตรงเวลาของสิ่งที่ส่งมาแล้ว แยกจากปริมาณว่าส่งครบเกณฑ์หรือไม่
   let plans = [];
   trainingPlanSnap.forEach((d) => plans.push(d.data()));
   plans = plans.filter((p) => (p.date || "").startsWith(month));
@@ -135,7 +139,7 @@ async function loadPrintExtras(team, ageGroup, month) {
       '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">ไม่มีโค้ชในขอบเขตที่เลือก</td></tr>';
   } else {
     printTrainingPlanBody.innerHTML = coachRows
-      .map(({ coach, total, onTime, late, onTimePercent }) => {
+      .map(({ coach, onTime, late, onTimePercent }) => {
         const percentText = onTimePercent === null ? "-" : `${onTimePercent}%`;
         const percentBadgeClass = onTimePercent === null ? "badge-neutral" : onTimePercent >= 80 ? "badge-success" : onTimePercent >= 50 ? "badge-warning" : "badge-danger";
         return `
@@ -143,7 +147,7 @@ async function loadPrintExtras(team, ageGroup, month) {
             <td class="emphasis">${coach.name ?? "-"}</td>
             <td class="text-emerald-600 font-medium">${onTime}</td>
             <td class="text-red-500 font-medium">${late}</td>
-            <td>${total}</td>
+            <td>${TRAINING_PLAN_MONTHLY_QUOTA}</td>
             <td><span class="badge ${percentBadgeClass}">${percentText}</span></td>
           </tr>`;
       })
