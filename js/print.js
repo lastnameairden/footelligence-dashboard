@@ -36,6 +36,8 @@ const printMonthLoadBtn = document.getElementById("print-month-load-btn");
 const printTrainingPlanCards = document.getElementById("print-training-plan-cards");
 const printTrainingPlanBody = document.getElementById("print-training-plan-body");
 const printTrainingPlanTrend = document.getElementById("print-training-plan-trend");
+const printTrainingPlanTopicsPlayer = document.getElementById("print-training-plan-topics-player");
+const printTrainingPlanTopicsGk = document.getElementById("print-training-plan-topics-gk");
 const printCheckinCards = document.getElementById("print-checkin-cards");
 const printCheckinBody = document.getElementById("print-checkin-body");
 const printCheckinTrend = document.getElementById("print-checkin-trend");
@@ -170,6 +172,52 @@ function buildCoachDailyTrendSvg(dailyCounts, totalCoaches, options = {}) {
   `;
 }
 
+// นับจำนวนครั้งที่แต่ละหัวข้อหลัก (mainPart) ถูกใช้ในแผนการฝึกซ้อม เรียงจากใช้บ่อยไปหาน้อย — ข้าม "-"/ว่างเปล่า
+// (บางแผนของผู้รักษาประตูไม่ได้ระบุหัวข้อหลัก) เพราะไม่ใช่หัวข้อจริง นับรวมแล้วจะดูเหมือนหัวข้อยอดฮิตผิดๆ
+function countPlanTopics(planList) {
+  const counts = new Map();
+  for (const p of planList) {
+    const topic = (p.mainPart || "").trim();
+    if (!topic || topic === "-") continue;
+    counts.set(topic, (counts.get(topic) || 0) + 1);
+  }
+  return Array.from(counts.entries())
+    .map(([topic, count]) => ({ topic, count }))
+    .sort((a, b) => b.count - a.count || a.topic.localeCompare(b.topic));
+}
+
+// กราฟแท่งแนวนอน 1 แท่งต่อ 1 หัวข้อ — เลือกแนวนอนเพราะชื่อหัวข้อฝึกซ้อมมักยาว (เช่น "Build up (Playing
+// through high press)") ขึ้นป้ายแนวตั้งใต้แท่งจะอ่านไม่ออก
+function buildTopicBarChartSvg(topics, color) {
+  if (topics.length === 0) {
+    return '<p class="text-xs text-slate-400 text-center py-4">ไม่มีข้อมูลหัวข้อการฝึกซ้อม</p>';
+  }
+  const rowH = 20;
+  const padTop = 4;
+  const padBottom = 4;
+  const labelW = 175;
+  const barAreaW = 230;
+  const countW = 26;
+  const width = labelW + barAreaW + countW;
+  const height = padTop + padBottom + topics.length * rowH;
+  const maxCount = Math.max(...topics.map((t) => t.count));
+
+  const rows = topics
+    .map((t, i) => {
+      const y = padTop + i * rowH;
+      const midY = (y + rowH / 2 + 3).toFixed(1);
+      const barW = Math.max((t.count / maxCount) * barAreaW, 2);
+      const label = t.topic.length > 32 ? `${t.topic.slice(0, 31)}…` : t.topic;
+      return `
+        <text x="${labelW - 6}" y="${midY}" font-size="9" fill="#334155" text-anchor="end">${label}<title>${t.topic}</title></text>
+        <rect x="${labelW}" y="${(y + 3).toFixed(1)}" width="${barW.toFixed(1)}" height="${rowH - 8}" rx="2" fill="${color}"><title>${t.topic}: ${t.count} ครั้ง</title></rect>
+        <text x="${(labelW + barW + 4).toFixed(1)}" y="${midY}" font-size="9" fill="#475569">${t.count}</text>`;
+    })
+    .join("");
+
+  return `<svg viewBox="0 0 ${width} ${height}" width="100%" style="max-width:${width}px; display:block;">${rows}</svg>`;
+}
+
 // สรุปแผนการฝึกซ้อม/ผลการแข่งขัน/อาการบาดเจ็บ ของทีม+เดือน+รุ่นอายุเดียวกับตารางผู้เล่นด้านบน — ให้สรุป
 // สำหรับพิมพ์มีข้อมูลครบรูปแบบเดียวกับหน้า Dashboard
 async function loadPrintExtras(team, ageGroup, month) {
@@ -279,6 +327,17 @@ async function loadPrintExtras(team, ageGroup, month) {
     return { date: s.date, onTime: dOnTime, late: dLate, none: dNone };
   });
   printTrainingPlanTrend.innerHTML = buildCoachDailyTrendSvg(planDailyCounts, coaches.length);
+
+  // หัวข้อการฝึกซ้อมที่ใช้ในเดือนนี้ แยกผู้เล่น/ผู้รักษาประตู (trainingType) — ไม่รวมประเภท "Circuit training"
+  // เพราะไม่ใช่ทั้งฝั่งผู้เล่นหรือผู้รักษาประตูโดยเฉพาะ
+  printTrainingPlanTopicsPlayer.innerHTML = buildTopicBarChartSvg(
+    countPlanTopics(plans.filter((p) => p.trainingType === "Player")),
+    "#2563eb"
+  );
+  printTrainingPlanTopicsGk.innerHTML = buildTopicBarChartSvg(
+    countPlanTopics(plans.filter((p) => p.trainingType === "Goalkeeper")),
+    "#f59e0b"
+  );
 
   // ---------- สรุปการเช็คชื่อ + ให้คะแนนนักกีฬารายวัน แยกรายโค้ช ----------
   // เกณฑ์เดียวกับสรุปแผนการฝึกซ้อมด้านบน คือวันฝึกซ้อมจริง (monthSessions) — วัดว่าโค้ชเช็คชื่อ+ให้คะแนน "ตรงกับ
