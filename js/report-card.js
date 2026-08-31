@@ -37,6 +37,7 @@ const accessGate = document.getElementById("access-gate");
 const accessGateMessage = document.getElementById("access-gate-message");
 const reportCardContent = document.getElementById("report-card-content");
 const reportCardScopeLabel = document.getElementById("report-card-scope-label");
+const reportCardExcludedWrap = document.getElementById("report-card-excluded-wrap");
 const reportCardPages = document.getElementById("report-card-pages");
 const printBtn = document.getElementById("print-btn");
 
@@ -730,6 +731,8 @@ async function loadReportCards(team, ageGroup, start, end) {
   players.sort((a, b) => (a.number ?? 0) - (b.number ?? 0));
 
   if (players.length === 0) {
+    reportCardExcludedWrap.classList.add("hidden");
+    reportCardExcludedWrap.innerHTML = "";
     reportCardPages.innerHTML =
       '<p class="text-sm text-slate-400 no-print">ไม่พบนักกีฬาในทีม/รุ่นอายุที่เลือก</p>';
     setStatus("ไม่พบนักกีฬาในทีม/รุ่นอายุที่เลือก");
@@ -766,6 +769,10 @@ async function loadReportCards(team, ageGroup, start, end) {
   document.title = `FOOTELLIGENCE DATA — สมุดพก ${scopeText}`;
 
   reportCardPages.innerHTML = "";
+  // ออกสมุดพกได้เฉพาะนักกีฬาที่ผ่านการประเมิน MASC ครบทุกหมวดแล้วเท่านั้น (ตามที่ผู้ใช้ระบุ) — คนที่ยังไม่มีรอบ
+  // ประเมิน MASC ที่สมบูรณ์เลยสักรอบ ข้ามการสร้างหน้าสมุดพกไปเลย แล้วรวบรวมชื่อไว้แจ้งแอดมินแยกต่างหากด้านบน
+  // แทน กันแอดมินพิมพ์ส่งสมุดพกที่ยังไม่มีผลประเมิน MASC ให้ผู้ปกครองไปโดยไม่รู้ตัว
+  const excludedPlayers = [];
   for (const player of players) {
     const myAttendance = periodAttendance.filter((r) => r.playerId === player.id);
     const myPrevAttendance = prevPeriodAttendance.filter((r) => r.playerId === player.id);
@@ -794,6 +801,11 @@ async function loadReportCards(team, ageGroup, start, end) {
             .sort((a, b) => (b.updatedAt?.toDate?.().getTime() ?? 0) - (a.updatedAt?.toDate?.().getTime() ?? 0))[0]
         : null;
 
+    if (!mascEvaluation) {
+      excludedPlayers.push(player);
+      continue;
+    }
+
     const page = buildPlayerPage(player, {
       attendanceRecords: myAttendance,
       prevAttendanceRecords: myPrevAttendance,
@@ -811,7 +823,30 @@ async function loadReportCards(team, ageGroup, start, end) {
     reportCardPages.appendChild(page);
   }
 
-  setStatus(`โหลดข้อมูลสำเร็จ • สมุดพกทั้งหมด ${players.length} คน`);
+  if (excludedPlayers.length > 0) {
+    excludedPlayers.sort((a, b) => (a.nickname || a.fullName || "").localeCompare(b.nickname || b.fullName || ""));
+    const names = excludedPlayers.map((p) => `<span class="badge badge-neutral">${p.nickname || p.fullName || "-"}</span>`).join("");
+    reportCardExcludedWrap.innerHTML = `
+      <p class="font-semibold text-amber-800">⚠️ ยังไม่มีสมุดพกให้ ${excludedPlayers.length} คน — เพราะยังไม่ผ่านการประเมิน MASC ครบทุกหมวด</p>
+      <div class="flex flex-wrap gap-1.5 mt-2">${names}</div>
+      <p class="text-xs text-amber-700 mt-2">ให้โค้ชของนักกีฬากลุ่มนี้เข้าไปประเมิน MASC ให้ครบก่อน แล้วกลับมาสร้างสมุดพกอีกครั้ง</p>
+    `;
+    reportCardExcludedWrap.classList.remove("hidden");
+  } else {
+    reportCardExcludedWrap.classList.add("hidden");
+    reportCardExcludedWrap.innerHTML = "";
+  }
+
+  if (reportCardPages.children.length === 0) {
+    reportCardPages.innerHTML =
+      '<p class="text-sm text-slate-400 no-print">ยังไม่มีนักกีฬาคนไหนผ่านการประเมิน MASC ครบสำหรับทีม/รุ่นอายุนี้ จึงยังสร้างสมุดพกไม่ได้เลยสักคน</p>';
+  }
+
+  setStatus(
+    excludedPlayers.length > 0
+      ? `โหลดข้อมูลสำเร็จ • แสดงสมุดพก ${players.length - excludedPlayers.length} คน • ยังไม่ผ่านการประเมิน MASC อีก ${excludedPlayers.length} คน`
+      : `โหลดข้อมูลสำเร็จ • สมุดพกทั้งหมด ${players.length} คน`
+  );
 }
 
 onAuthStateChanged(auth, async (user) => {
