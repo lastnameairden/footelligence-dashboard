@@ -16,7 +16,8 @@ import {
   TRAINING_PLAN_LATE_WARNING_THRESHOLD,
   matchResultBadge,
   injurySeverityBadge,
-  injuryStatusBadge
+  injuryStatusBadge,
+  ageGroupSortKey
 } from "./ui-utils.js";
 
 const statusEl = document.getElementById("status-message");
@@ -83,20 +84,22 @@ async function loadPrintSummary(team, ageGroup, month) {
 // สรุปแผนการฝึกซ้อม/ผลการแข่งขัน/อาการบาดเจ็บ ของทีม+เดือน+รุ่นอายุเดียวกับตารางผู้เล่นด้านบน — ให้สรุป
 // สำหรับพิมพ์มีข้อมูลครบรูปแบบเดียวกับหน้า Dashboard
 async function loadPrintExtras(team, ageGroup, month) {
-  const [trainingPlanSnap, matchSnap, injurySnap] = await Promise.all([
+  const [trainingPlanSnap, matchSnap, injurySnap, coachSnap] = await Promise.all([
     getDocs(query(collection(db, "trainingPlans"), where("team", "==", team))),
     getDocs(query(collection(db, "matchReports"), where("team", "==", team))),
-    getDocs(query(collection(db, "injuryReports"), where("team", "==", team)))
+    getDocs(query(collection(db, "injuryReports"), where("team", "==", team))),
+    getDocs(query(collection(db, "coaches"), where("team", "==", team), where("role", "==", "coach")))
   ]);
 
-  // ---------- สรุปการส่งแผนการฝึกซ้อมรายวัน ----------
+  // ---------- สรุปการส่งแผนการฝึกซ้อมรายวัน แยกรายโค้ช (ตรงเวลา/สาย/ทั้งหมด/% ตรงเวลา) ----------
+  // จับคู่แผนกับโค้ชด้วยชื่อ (coachName) ไม่ใช่ coachId เพราะถ้าผู้ดูแลระบบสวมบทบาทส่งแทนโค้ช coachId จะกลายเป็น
+  // uid ของผู้ดูแลระบบเอง (หลักการเดียวกับ computeCoachMonthlySummaryRows ในหน้า attendance.html)
   let plans = [];
   trainingPlanSnap.forEach((d) => plans.push(d.data()));
   plans = plans.filter((p) => (p.date || "").startsWith(month));
   if (ageGroup !== "__ALL__") {
     plans = plans.filter((p) => (p.ageGroups || []).includes(ageGroup));
   }
-  plans.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
 
   const lateCount = plans.filter((p) => isTrainingPlanLate(p)).length;
   const onTimeCount = plans.length - lateCount;
@@ -109,21 +112,39 @@ async function loadPrintExtras(team, ageGroup, month) {
       lateCount > TRAINING_PLAN_LATE_WARNING_THRESHOLD ? "⚠️ ต้องปรับปรุง" : "ปกติ"
     );
 
-  if (plans.length === 0) {
+  let coaches = [];
+  coachSnap.forEach((d) => coaches.push({ id: d.id, ...d.data() }));
+  if (ageGroup !== "__ALL__") {
+    coaches = coaches.filter((c) => (c.ageGroups || []).includes(ageGroup));
+  }
+  coaches.sort(
+    (a, b) => ageGroupSortKey(a.ageGroups) - ageGroupSortKey(b.ageGroups) || (a.name ?? "").localeCompare(b.name ?? "")
+  );
+
+  const coachRows = coaches.map((c) => {
+    const myPlans = plans.filter((p) => p.coachName === c.name);
+    const late = myPlans.filter((p) => isTrainingPlanLate(p)).length;
+    const total = myPlans.length;
+    const onTime = total - late;
+    const onTimePercent = total > 0 ? Math.round((onTime / total) * 100) : null;
+    return { coach: c, total, onTime, late, onTimePercent };
+  });
+
+  if (coachRows.length === 0) {
     printTrainingPlanBody.innerHTML =
-      '<tr><td colspan="4" class="px-4 py-6 text-center text-slate-400">ยังไม่มีการส่งแผนการฝึกซ้อมในเดือนนี้</td></tr>';
+      '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">ไม่มีโค้ชในขอบเขตที่เลือก</td></tr>';
   } else {
-    printTrainingPlanBody.innerHTML = plans
-      .map((p) => {
-        const lateBadge = isTrainingPlanLate(p)
-          ? '<span class="badge badge-warning">⏱ เลท</span>'
-          : '<span class="badge badge-success">✅ ตรงเวลา</span>';
+    printTrainingPlanBody.innerHTML = coachRows
+      .map(({ coach, total, onTime, late, onTimePercent }) => {
+        const percentText = onTimePercent === null ? "-" : `${onTimePercent}%`;
+        const percentBadgeClass = onTimePercent === null ? "badge-neutral" : onTimePercent >= 80 ? "badge-success" : onTimePercent >= 50 ? "badge-warning" : "badge-danger";
         return `
           <tr>
-            <td class="emphasis">${p.date ?? "-"}</td>
-            <td>${p.trainingType ?? "-"}</td>
-            <td>${p.mainPart ?? "-"}</td>
-            <td>${lateBadge}</td>
+            <td class="emphasis">${coach.name ?? "-"}</td>
+            <td class="text-emerald-600 font-medium">${onTime}</td>
+            <td class="text-red-500 font-medium">${late}</td>
+            <td>${total}</td>
+            <td><span class="badge ${percentBadgeClass}">${percentText}</span></td>
           </tr>`;
       })
       .join("");
