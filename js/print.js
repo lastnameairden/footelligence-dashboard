@@ -21,7 +21,8 @@ import {
   ageGroupSortKey,
   ageGroupNumber,
   getCoachPlayerIds,
-  isCoachSubmissionOnTime
+  isCoachSubmissionOnTime,
+  isReportLate
 } from "./ui-utils.js";
 
 const statusEl = document.getElementById("status-message");
@@ -43,11 +44,16 @@ const printTrainingPlanTopicsGk = document.getElementById("print-training-plan-t
 const printCheckinCards = document.getElementById("print-checkin-cards");
 const printCheckinBody = document.getElementById("print-checkin-body");
 const printCheckinTrend = document.getElementById("print-checkin-trend");
+const printReportCards = document.getElementById("print-report-cards");
+const printReportBody = document.getElementById("print-report-body");
+const printReportTrend = document.getElementById("print-report-trend");
+const printConsistencyBody = document.getElementById("print-consistency-body");
 const printMatchCards = document.getElementById("print-match-cards");
 const printMatchChart = document.getElementById("print-match-chart");
 const printMatchGoalChart = document.getElementById("print-match-goal-chart");
 const printMatchBody = document.getElementById("print-match-body");
 const printInjuryCards = document.getElementById("print-injury-cards");
+const printInjuryChart = document.getElementById("print-injury-chart");
 const printInjuryBody = document.getElementById("print-injury-body");
 
 let currentPrintTeam = null;
@@ -486,18 +492,102 @@ function buildGoalDiffChartSvg(matches) {
   `;
 }
 
+// กราฟแท่งกลุ่มความรุนแรงของอาการบาดเจ็บ (เล็กน้อย/ปานกลาง/รุนแรง) แยกตามรุ่นอายุ — โครงสร้างเดียวกับ
+// buildMatchResultChartSvg เปลี่ยนแค่หมวดหมู่และสี ให้เห็นว่ารุ่นไหนมีนักกีฬาบาดเจ็บรุนแรงสะสมมากกว่ากัน
+function buildInjurySeverityChartSvg(injuries) {
+  if (injuries.length === 0) {
+    return '<p class="text-xs text-slate-400 text-center py-6">ไม่มีข้อมูลอาการบาดเจ็บ</p>';
+  }
+  const groups = new Map();
+  for (const i of injuries) {
+    const ag = i.ageGroup || "ไม่ระบุรุ่น";
+    if (!groups.has(ag)) groups.set(ag, { mild: 0, moderate: 0, severe: 0 });
+    const g = groups.get(ag);
+    if (i.severity === "รุนแรง") g.severe += 1;
+    else if (i.severity === "ปานกลาง") g.moderate += 1;
+    else g.mild += 1;
+  }
+  const ageGroups = Array.from(groups.keys()).sort((a, b) => ageGroupNumber(a) - ageGroupNumber(b));
+
+  const width = 700;
+  const height = 190;
+  const padTop = 10;
+  const padBottom = 24;
+  const padLeft = 24;
+  const padRight = 8;
+  const chartW = width - padLeft - padRight;
+  const chartH = height - padTop - padBottom;
+  const n = ageGroups.length;
+  const groupW = chartW / n;
+  const groupGap = groupW * 0.18;
+  const series = ["mild", "moderate", "severe"];
+  const barW = (groupW - groupGap) / series.length;
+  const seriesColor = { mild: "#94a3b8", moderate: "#f59e0b", severe: "#ef4444" };
+  const maxY = Math.max(...ageGroups.map((ag) => Math.max(groups.get(ag).mild, groups.get(ag).moderate, groups.get(ag).severe)), 1);
+  const baselineY = padTop + chartH;
+
+  const gridLines = [0.5, 1]
+    .map((frac) => {
+      const y = padTop + chartH - frac * chartH;
+      return `<line x1="${padLeft}" y1="${y.toFixed(1)}" x2="${width - padRight}" y2="${y.toFixed(1)}" stroke="#e2e8f0" stroke-width="1"/>
+              <text x="${padLeft - 4}" y="${(y + 2.5).toFixed(1)}" font-size="7" fill="#94a3b8" text-anchor="end">${Math.round(frac * maxY)}</text>`;
+    })
+    .join("");
+
+  const bars = ageGroups
+    .map((ag, gi) => {
+      const g = groups.get(ag);
+      const groupX = padLeft + gi * groupW + groupGap / 2;
+      return series
+        .map((key, si) => {
+          const val = g[key];
+          if (val === 0) return "";
+          const barH = (val / maxY) * chartH;
+          const x = groupX + si * barW;
+          const y = baselineY - barH;
+          const label = key === "mild" ? "เล็กน้อย" : key === "moderate" ? "ปานกลาง" : "รุนแรง";
+          return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${Math.max(barW - 1, 1).toFixed(1)}" height="${barH.toFixed(1)}" rx="1" fill="${seriesColor[key]}"><title>${ag} ${label}: ${val} ราย</title></rect>`;
+        })
+        .join("");
+    })
+    .join("");
+
+  const groupLabels = ageGroups
+    .map((ag, gi) => {
+      const x = padLeft + gi * groupW + groupW / 2;
+      return `<text x="${x.toFixed(1)}" y="${height - 6}" font-size="8" fill="#64748b" text-anchor="middle">${ag}</text>`;
+    })
+    .join("");
+
+  return `
+    <svg viewBox="0 0 ${width} ${height}" width="100%" style="max-width:${width}px; display:block; margin:0 auto;">
+      ${gridLines}
+      <line x1="${padLeft}" y1="${baselineY.toFixed(1)}" x2="${width - padRight}" y2="${baselineY.toFixed(1)}" stroke="#cbd5e1" stroke-width="1"/>
+      ${bars}
+      ${groupLabels}
+    </svg>
+    <div class="text-[10px] text-slate-500 flex flex-wrap justify-center gap-x-3 gap-y-1 mt-1">
+      <span class="inline-flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-full" style="background:#94a3b8"></span>เล็กน้อย</span>
+      <span class="inline-flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-full" style="background:#f59e0b"></span>ปานกลาง</span>
+      <span class="inline-flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-full" style="background:#ef4444"></span>รุนแรง</span>
+    </div>
+  `;
+}
+
 // สรุปแผนการฝึกซ้อม/ผลการแข่งขัน/อาการบาดเจ็บ ของทีม+เดือน+รุ่นอายุเดียวกับตารางผู้เล่นด้านบน — ให้สรุป
 // สำหรับพิมพ์มีข้อมูลครบรูปแบบเดียวกับหน้า Dashboard
 async function loadPrintExtras(team, ageGroup, month) {
-  const [trainingPlanSnap, matchSnap, injurySnap, coachSnap, sessionSnap, attendanceSnap, playersSnap] = await Promise.all([
-    getDocs(query(collection(db, "trainingPlans"), where("team", "==", team))),
-    getDocs(query(collection(db, "matchReports"), where("team", "==", team))),
-    getDocs(query(collection(db, "injuryReports"), where("team", "==", team))),
-    getDocs(query(collection(db, "coaches"), where("team", "==", team), where("role", "==", "coach"))),
-    getDocs(query(collection(db, "sessions"), where("team", "==", team))),
-    getDocs(query(collection(db, "attendance"), where("team", "==", team))),
-    getDocs(query(collection(db, "players"), where("team", "==", team)))
-  ]);
+  const [trainingPlanSnap, matchSnap, injurySnap, coachSnap, sessionSnap, attendanceSnap, playersSnap, trainingReportSnap] =
+    await Promise.all([
+      getDocs(query(collection(db, "trainingPlans"), where("team", "==", team))),
+      getDocs(query(collection(db, "matchReports"), where("team", "==", team))),
+      getDocs(query(collection(db, "injuryReports"), where("team", "==", team))),
+      getDocs(query(collection(db, "coaches"), where("team", "==", team), where("role", "==", "coach"))),
+      getDocs(query(collection(db, "sessions"), where("team", "==", team))),
+      getDocs(query(collection(db, "attendance"), where("team", "==", team))),
+      getDocs(query(collection(db, "players"), where("team", "==", team))),
+      getDocs(query(collection(db, "trainingReports"), where("team", "==", team)))
+    ]);
 
   let coaches = [];
   coachSnap.forEach((d) => coaches.push({ id: d.id, ...d.data() }));
@@ -685,6 +775,117 @@ async function loadPrintExtras(team, ageGroup, month) {
   });
   printCheckinTrend.innerHTML = buildCoachDailyTrendSvg(checkinDailyCounts, coaches.length, { noneLabel: "ยังไม่เช็คชื่อ", verb: "เช็คชื่อ" });
 
+  // ---------- สรุปการส่งรายงานการฝึกซ้อม แยกรายโค้ช ----------
+  // คนละอย่างกับ "แผนการฝึกซ้อม" (ส่งก่อนซ้อม) — รายงานนี้ส่งหลังซ้อมจบ และไม่มีฟิลด์ ageGroups ในตัวเอง (1
+  // รายงานต่อโค้ชต่อวัน ไม่แยกตามรุ่นอายุ) จึงกรองตามรายชื่อโค้ชในขอบเขต (coaches) แทนการกรองตัวรายงานเอง — เกณฑ์
+  // "ต้องส่ง" เป็นวันฝึกซ้อมจริงเหมือนการเช็คชื่อ ไม่ใช่ตัวเลขคงที่ (ไม่มีการระบุเกณฑ์คงที่สำหรับรายงานนี้)
+  let reports = [];
+  trainingReportSnap.forEach((d) => reports.push(d.data()));
+  reports = reports.filter((r) => (r.date || "").startsWith(month));
+
+  const reportRows = coaches.map((c) => {
+    const myReports = reports.filter((r) => r.coachName === c.name);
+    let matchDays = 0;
+    let onTime = 0;
+    for (const s of monthSessions) {
+      const dayReports = myReports.filter((r) => r.date === s.date);
+      if (dayReports.length === 0) continue;
+      matchDays += 1;
+      if (dayReports.some((r) => !isReportLate(r))) onTime += 1;
+    }
+    const late = matchDays - onTime;
+    const matchPercent = monthSessions.length > 0 ? Math.round((matchDays / monthSessions.length) * 100) : null;
+    return { coach: c, matchDays, onTime, late, matchPercent };
+  });
+
+  printReportCards.innerHTML =
+    statCard("วันฝึกซ้อมทั้งหมด", monthSessions.length) +
+    statCard("ส่งตรงวันฝึกซ้อม (รวม)", reportRows.reduce((sum, r) => sum + r.matchDays, 0)) +
+    statCard("ตรงเวลา (รวม)", reportRows.reduce((sum, r) => sum + r.onTime, 0)) +
+    statCard("สาย (รวม)", reportRows.reduce((sum, r) => sum + r.late, 0));
+
+  if (reportRows.length === 0) {
+    printReportBody.innerHTML =
+      '<tr><td colspan="7" class="px-4 py-6 text-center text-slate-400">ไม่มีโค้ชในขอบเขตที่เลือก</td></tr>';
+  } else {
+    printReportBody.innerHTML = reportRows
+      .map(({ coach, matchDays, onTime, late, matchPercent }) => {
+        const percentText = matchPercent === null ? "-" : `${matchPercent}%`;
+        const percentBadgeClass = matchPercent === null ? "badge-neutral" : matchPercent >= 80 ? "badge-success" : matchPercent >= 50 ? "badge-warning" : "badge-danger";
+        return `
+          <tr>
+            <td class="emphasis">${coach.name ?? "-"}</td>
+            <td>${(coach.ageGroups || []).join(", ") || "-"}</td>
+            <td>${monthSessions.length}</td>
+            <td>${matchDays}</td>
+            <td class="text-emerald-600 font-medium">${onTime}</td>
+            <td class="text-red-500 font-medium">${late}</td>
+            <td><span class="badge ${percentBadgeClass}">${percentText}</span></td>
+          </tr>`;
+      })
+      .join("");
+    applyDataLabels(printReportBody);
+  }
+
+  const reportDailyCounts = monthSessions.map((s) => {
+    let dOnTime = 0;
+    let dLate = 0;
+    let dNone = 0;
+    for (const c of coaches) {
+      const dayReports = reports.filter((r) => r.date === s.date && r.coachName === c.name);
+      if (dayReports.length === 0) {
+        dNone += 1;
+        continue;
+      }
+      if (dayReports.some((r) => !isReportLate(r))) dOnTime += 1;
+      else dLate += 1;
+    }
+    return { date: s.date, onTime: dOnTime, late: dLate, none: dNone };
+  });
+  printReportTrend.innerHTML = buildCoachDailyTrendSvg(reportDailyCounts, coaches.length, { noneLabel: "ยังไม่ส่งรายงาน" });
+
+  // ---------- ความสอดคล้องของการทำงานประจำวัน (แผน + เช็คชื่อ + รายงาน) แยกรายโค้ช ----------
+  // นับเฉพาะวันฝึกซ้อมจริง (monthSessions) ที่โค้ชคนนั้นส่งครบทั้ง 3 อย่าง (ไม่สนว่าตรงเวลาหรือสาย เพราะความ
+  // ตรงเวลาแยกดูได้แล้วในแต่ละส่วนด้านบน — ส่วนนี้วัดแค่ "ทำครบหรือไม่" ในวันเดียวกัน)
+  const consistencyRows = coaches.map((c) => {
+    const myPlayerIds = getCoachPlayerIds(c, scopedPlayers);
+    const myPlans = plans.filter((p) => p.coachName === c.name);
+    const myReports = reports.filter((r) => r.coachName === c.name);
+    let complete = 0;
+    for (const s of monthSessions) {
+      const hasPlan = myPlans.some((p) => p.date === s.date);
+      const hasCheckin = attendanceRecords.some((a) => a.sessionId === s.id && myPlayerIds.has(a.playerId));
+      const hasReport = myReports.some((r) => r.date === s.date);
+      if (hasPlan && hasCheckin && hasReport) complete += 1;
+    }
+    const incomplete = monthSessions.length - complete;
+    const completePercent = monthSessions.length > 0 ? Math.round((complete / monthSessions.length) * 100) : null;
+    return { coach: c, complete, incomplete, completePercent };
+  });
+
+  if (consistencyRows.length === 0) {
+    printConsistencyBody.innerHTML =
+      '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">ไม่มีโค้ชในขอบเขตที่เลือก</td></tr>';
+  } else {
+    printConsistencyBody.innerHTML = consistencyRows
+      .map(({ coach, complete, incomplete, completePercent }) => {
+        const percentText = completePercent === null ? "-" : `${completePercent}%`;
+        const percentBadgeClass =
+          completePercent === null ? "badge-neutral" : completePercent >= 80 ? "badge-success" : completePercent >= 50 ? "badge-warning" : "badge-danger";
+        return `
+          <tr>
+            <td class="emphasis">${coach.name ?? "-"}</td>
+            <td>${(coach.ageGroups || []).join(", ") || "-"}</td>
+            <td>${monthSessions.length}</td>
+            <td class="text-emerald-600 font-medium">${complete}</td>
+            <td class="text-red-500 font-medium">${incomplete}</td>
+            <td><span class="badge ${percentBadgeClass}">${percentText}</span></td>
+          </tr>`;
+      })
+      .join("");
+    applyDataLabels(printConsistencyBody);
+  }
+
   // ---------- รายงานผลการแข่งขัน ----------
   let matches = [];
   matchSnap.forEach((d) => matches.push(d.data()));
@@ -738,6 +939,8 @@ async function loadPrintExtras(team, ageGroup, month) {
     statCard("ยังไม่หาย", injuries.filter((i) => i.status !== "หายแล้ว").length) +
     statCard("หายแล้ว", injuries.filter((i) => i.status === "หายแล้ว").length) +
     statCard("รุนแรง", injuries.filter((i) => i.severity === "รุนแรง").length);
+
+  printInjuryChart.innerHTML = buildInjurySeverityChartSvg(injuries);
 
   if (injuries.length === 0) {
     printInjuryBody.innerHTML =

@@ -392,6 +392,12 @@ export function isCoachSubmissionOnTime(session, myAttendanceForSession) {
   if (!latest) return false;
   return latest <= submissionDeadlineFor(session.date);
 }
+// รายงานการฝึกซ้อมต้องส่งภายในเวลาเดียวกับการเช็คชื่อ (23:59 น.) — ย้ายมาไว้ที่นี่ด้วยเหตุผลเดียวกับข้างบน
+export function isReportLate(report) {
+  const ts = report.updatedAt && typeof report.updatedAt.toDate === "function" ? report.updatedAt.toDate() : null;
+  if (!ts || !report.date) return false;
+  return ts > submissionDeadlineFor(report.date);
+}
 
 // ---------- ป้ายสถานะผลการแข่งขัน/อาการบาดเจ็บ ----------
 // ใช้ร่วมกันทั้งหน้าโค้ช (attendance.js), Dashboard (app.js), และหน้าข้อมูลนักกีฬา (player.js)

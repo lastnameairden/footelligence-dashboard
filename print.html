@@ -159,6 +159,59 @@
         </div>
       </div>
 
+      <!-- รายงานการฝึกซ้อม (trainingReports) — คนละอย่างกับ "แผนการฝึกซ้อม" ด้านบน (ส่งก่อนซ้อม) เป็นรายงานที่ส่ง
+           หลังซ้อมจบ ไม่มีฟิลด์ ageGroups ในตัวเอง (1 รายงานต่อโค้ชต่อวัน) จึงกรองตามรายชื่อโค้ชในขอบเขตแทน -->
+      <div class="print-page-section">
+        <h2 class="section-title mb-3"><span class="icon-badge">📝</span> สรุปการส่งรายงานการฝึกซ้อม</h2>
+        <div id="print-report-cards" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-3"></div>
+        <div class="card table-wrap">
+          <table class="pro-table">
+            <thead>
+              <tr>
+                <th>โค้ช</th>
+                <th>รุ่นอายุที่ดูแล</th>
+                <th>วันฝึกซ้อมทั้งหมด</th>
+                <th>ส่งตรงวันฝึกซ้อม</th>
+                <th>ตรงเวลา</th>
+                <th>สาย</th>
+                <th>% ตรงตามวันฝึกซ้อม</th>
+              </tr>
+            </thead>
+            <tbody id="print-report-body">
+              <tr><td colspan="7" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card card-pad mt-3">
+          <h3 class="text-sm font-semibold mb-2">แนวโน้มการส่งรายงานของโค้ชรายวันฝึกซ้อม</h3>
+          <div id="print-report-trend"></div>
+        </div>
+      </div>
+
+      <!-- ความสอดคล้องของการทำงานประจำวัน — เทียบว่าวันฝึกซ้อมเดียวกัน โค้ชส่งครบทั้ง 3 อย่างไหม (แผน + เช็คชื่อ +
+           รายงาน) ไม่ใช่ดูแยกส่วนทีละหัวข้อเหมือน 3 ส่วนด้านบน -->
+      <div class="print-page-section">
+        <h2 class="section-title mb-3"><span class="icon-badge">🔗</span> ความสอดคล้องของการทำงานประจำวัน (แผน + เช็คชื่อ + รายงาน)</h2>
+        <p class="text-xs text-slate-400 mb-3">นับเฉพาะวันฝึกซ้อมจริงที่โค้ชส่งครบทั้ง 3 อย่าง (แผนการฝึกซ้อม, เช็คชื่อ+ให้คะแนน, รายงานการฝึกซ้อม) เทียบกับวันฝึกซ้อมทั้งหมด</p>
+        <div class="card table-wrap">
+          <table class="pro-table">
+            <thead>
+              <tr>
+                <th>โค้ช</th>
+                <th>รุ่นอายุที่ดูแล</th>
+                <th>วันฝึกซ้อมทั้งหมด</th>
+                <th>ทำครบทั้ง 3 อย่าง</th>
+                <th>ขาดอย่างน้อย 1 อย่าง</th>
+                <th>% ครบถ้วน</th>
+              </tr>
+            </thead>
+            <tbody id="print-consistency-body">
+              <tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- รายงานผลการแข่งขัน -->
       <div class="print-page-section">
         <h2 class="section-title mb-3"><span class="icon-badge">🏆</span> รายงานผลการแข่งขัน</h2>
@@ -195,6 +248,10 @@
       <div class="print-page-section">
         <h2 class="section-title mb-3"><span class="icon-badge">🩹</span> รายงานอาการบาดเจ็บ</h2>
         <div id="print-injury-cards" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-3"></div>
+        <div class="card card-pad mb-3">
+          <h3 class="text-sm font-semibold mb-2">ความรุนแรงของอาการบาดเจ็บแยกรุ่นอายุ</h3>
+          <div id="print-injury-chart"></div>
+        </div>
         <div class="card table-wrap">
           <table class="pro-table">
             <thead>

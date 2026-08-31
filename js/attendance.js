@@ -36,6 +36,7 @@ import {
   TRAINING_PLAN_LATE_WARNING_THRESHOLD,
   submissionDeadlineFor,
   isCoachSubmissionOnTime,
+  isReportLate,
   statCard,
   matchResultBadge,
   injurySeverityBadge,
@@ -1582,15 +1583,8 @@ async function rejectCoach(coachId) {
 // เกณฑ์: แต่ละ session (วัน) ที่โค้ชคนนี้มีนักกีฬาของตัวเองบันทึกไว้ ถือว่า "ตรงเวลา" ถ้าเวลาแก้ไขล่าสุดของ
 // บันทึกนักกีฬาที่ตัวเองดูแล (ไม่รวมของโค้ชอื่นในเซสชันเดียวกัน) อยู่ก่อน 23:59 น. ของวันนั้น — คำนวณแยกรายคน
 // เพราะ 1 เซสชันใช้ร่วมกันได้หลายโค้ช (คนละรุ่นอายุ) การแก้ไขของโค้ชอื่นไม่ควรกระทบผลของโค้ชคนนี้ (ย้าย
-// isCoachSubmissionOnTime/submissionDeadlineFor ไป ui-utils.js แล้ว เพราะ print.js ต้องใช้กฎเดียวกันนี้ด้วย)
-
-// รายงานการฝึกซ้อมต้องส่งภายในเวลาเดียวกับการเช็คชื่อ (23:59 น.) — เดิมไม่มีเกณฑ์ "สาย" สำหรับรายงานนี้เลย
-function isReportLate(report) {
-  const ts = report.updatedAt && typeof report.updatedAt.toDate === "function" ? report.updatedAt.toDate() : null;
-  if (!ts || !report.date) return false;
-  return ts > submissionDeadlineFor(report.date);
-}
-
+// isCoachSubmissionOnTime/submissionDeadlineFor/isReportLate ไป ui-utils.js แล้ว เพราะ print.js ต้องใช้กฎ
+// เดียวกันนี้ด้วย)
 function buildCoachRow(c, sessions, attendanceRecords, players) {
   const teamSessions = sessions.filter((s) => s.team === c.team);
   const myPlayerIds = getCoachPlayerIds(c, players);
