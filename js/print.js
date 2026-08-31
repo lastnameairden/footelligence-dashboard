@@ -14,7 +14,6 @@ import {
   applyDataLabels,
   isTrainingPlanLate,
   TRAINING_PLAN_LATE_WARNING_THRESHOLD,
-  TRAINING_PLAN_MONTHLY_QUOTA,
   matchResultBadge,
   injurySeverityBadge,
   injuryStatusBadge,
@@ -86,34 +85,6 @@ async function loadPrintSummary(team, ageGroup, month) {
   await loadPrintExtras(team, ageGroup, month);
 
   setStatus("โหลดข้อมูลสำเร็จ");
-}
-
-function daysInMonthOf(month) {
-  const [y, m] = month.split("-").map(Number);
-  return new Date(y, m, 0).getDate();
-}
-
-// นับจำนวนโค้ช (ในขอบเขตรุ่นอายุที่เลือก) ที่ส่งตรงเวลา/ส่งสาย/ยังไม่ส่ง แยกตามวันตลอดทั้งเดือน — ถ้าโค้ชคนหนึ่ง
-// ส่งหลายแผนในวันเดียวกัน (ปกติไม่ควรมี แต่กันไว้เผื่อ) ถือว่า "ตรงเวลา" ถ้ามีอย่างน้อยหนึ่งแผนของวันนั้นตรงเวลา
-// (หลักการเดียวกับ planStatusByDate ใน computeCoachMonthlySummaryRows ที่ attendance.js)
-function buildCoachDailyTrend(plans, coaches, month) {
-  const totalDays = daysInMonthOf(month);
-  const dates = Array.from({ length: totalDays }, (_, i) => `${month}-${String(i + 1).padStart(2, "0")}`);
-  return dates.map((date) => {
-    let onTime = 0;
-    let late = 0;
-    let none = 0;
-    for (const c of coaches) {
-      const dayPlans = plans.filter((p) => p.date === date && p.coachName === c.name);
-      if (dayPlans.length === 0) {
-        none += 1;
-        continue;
-      }
-      if (dayPlans.some((p) => !isTrainingPlanLate(p))) onTime += 1;
-      else late += 1;
-    }
-    return { date, onTime, late, none };
-  });
 }
 
 // กราฟแท่งซ้อน (stacked bar) แสดงสัดส่วนโค้ชที่ตรงเวลา/สาย/ไม่ได้ทำในแต่ละวัน — ความสูงรวมของทุกแท่งเท่ากันเสมอ
@@ -210,30 +181,6 @@ async function loadPrintExtras(team, ageGroup, month) {
     getDocs(query(collection(db, "players"), where("team", "==", team)))
   ]);
 
-  // ---------- สรุปการส่งแผนการฝึกซ้อมรายวัน แยกรายโค้ช (ตรงเวลา/สาย/เกณฑ์ที่ต้องส่ง/% ตรงเวลา) ----------
-  // จับคู่แผนกับโค้ชด้วยชื่อ (coachName) ไม่ใช่ coachId เพราะถ้าผู้ดูแลระบบสวมบทบาทส่งแทนโค้ช coachId จะกลายเป็น
-  // uid ของผู้ดูแลระบบเอง (หลักการเดียวกับ computeCoachMonthlySummaryRows ในหน้า attendance.html) — คอลัมน์
-  // "จำนวนทั้งหมดที่ต้องส่ง" แสดงเกณฑ์คงที่ TRAINING_PLAN_MONTHLY_QUOTA (ทุกคนเท่ากัน) ไม่ใช่จำนวนที่ส่งจริง ซึ่ง
-  // ดูได้จากผลรวมของ "ส่งตรงเวลา" + "ส่งสาย" อยู่แล้ว ส่วน % ตรงเวลา ยังคงเทียบกับจำนวนที่ส่งจริง (ไม่ใช่เกณฑ์)
-  // เพราะวัดคุณภาพความตรงเวลาของสิ่งที่ส่งมาแล้ว แยกจากปริมาณว่าส่งครบเกณฑ์หรือไม่
-  let plans = [];
-  trainingPlanSnap.forEach((d) => plans.push(d.data()));
-  plans = plans.filter((p) => (p.date || "").startsWith(month));
-  if (ageGroup !== "__ALL__") {
-    plans = plans.filter((p) => (p.ageGroups || []).includes(ageGroup));
-  }
-
-  const lateCount = plans.filter((p) => isTrainingPlanLate(p)).length;
-  const onTimeCount = plans.length - lateCount;
-  printTrainingPlanCards.innerHTML =
-    statCard("จำนวนแผนที่ส่ง", plans.length) +
-    statCard("ตรงเวลา", onTimeCount) +
-    statCard("สาย", lateCount) +
-    statCard(
-      "สถานะ",
-      lateCount > TRAINING_PLAN_LATE_WARNING_THRESHOLD ? "⚠️ ต้องปรับปรุง" : "ปกติ"
-    );
-
   let coaches = [];
   coachSnap.forEach((d) => coaches.push({ id: d.id, ...d.data() }));
   if (ageGroup !== "__ALL__") {
@@ -243,44 +190,9 @@ async function loadPrintExtras(team, ageGroup, month) {
     (a, b) => ageGroupSortKey(a.ageGroups) - ageGroupSortKey(b.ageGroups) || (a.name ?? "").localeCompare(b.name ?? "")
   );
 
-  const coachRows = coaches.map((c) => {
-    const myPlans = plans.filter((p) => p.coachName === c.name);
-    const late = myPlans.filter((p) => isTrainingPlanLate(p)).length;
-    const total = myPlans.length;
-    const onTime = total - late;
-    const onTimePercent = total > 0 ? Math.round((onTime / total) * 100) : null;
-    return { coach: c, total, onTime, late, onTimePercent };
-  });
-
-  if (coachRows.length === 0) {
-    printTrainingPlanBody.innerHTML =
-      '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">ไม่มีโค้ชในขอบเขตที่เลือก</td></tr>';
-  } else {
-    printTrainingPlanBody.innerHTML = coachRows
-      .map(({ coach, onTime, late, onTimePercent }) => {
-        const percentText = onTimePercent === null ? "-" : `${onTimePercent}%`;
-        const percentBadgeClass = onTimePercent === null ? "badge-neutral" : onTimePercent >= 80 ? "badge-success" : onTimePercent >= 50 ? "badge-warning" : "badge-danger";
-        return `
-          <tr>
-            <td class="emphasis">${coach.name ?? "-"}</td>
-            <td>${(coach.ageGroups || []).join(", ") || "-"}</td>
-            <td>${TRAINING_PLAN_MONTHLY_QUOTA}</td>
-            <td class="text-emerald-600 font-medium">${onTime}</td>
-            <td class="text-red-500 font-medium">${late}</td>
-            <td><span class="badge ${percentBadgeClass}">${percentText}</span></td>
-          </tr>`;
-      })
-      .join("");
-    applyDataLabels(printTrainingPlanBody);
-  }
-
-  printTrainingPlanTrend.innerHTML = buildCoachDailyTrendSvg(buildCoachDailyTrend(plans, coaches, month), coaches.length);
-
-  // ---------- สรุปการเช็คชื่อ + ให้คะแนนนักกีฬารายวัน แยกรายโค้ช ----------
-  // ต่างจากสรุปแผนการฝึกซ้อมตรงที่เกณฑ์ "ต้องส่ง" ที่นี่ไม่ใช่ตัวเลขคงที่ แต่คือจำนวนวันฝึกซ้อมจริงของเดือนนั้น
-  // (sessions ที่ team สร้างไว้ และไม่ได้ถูกทำเครื่องหมาย noTraining) — วัดว่าโค้ชเช็คชื่อ+ให้คะแนน "ตรงกับวันที่
-  // ทีมฝึกซ้อมจริง" กี่วันจากทั้งหมด ไม่ใช่แค่ดูอัตราตรงเวลาของที่เช็คชื่อมาแล้วเฉยๆ (เกณฑ์เดียวกับ checkinDays/
-  // isCoachSubmissionOnTime ใน computeCoachMonthlySummaryRows ของ attendance.js)
+  // จำนวนวันฝึกซ้อมจริงของเดือนนั้น (sessions ที่ team สร้างไว้ และไม่ได้ถูกทำเครื่องหมาย noTraining) — ใช้เป็น
+  // เกณฑ์ "ต้องส่ง/ต้องเช็คชื่อ" ร่วมกันทั้งสรุปแผนการฝึกซ้อมและสรุปการเช็คชื่อด้านล่าง เพราะวันที่ฝึกซ้อมต้องตรงกับ
+  // วันที่ส่งแผนการฝึกซ้อม (ไม่ใช่เกณฑ์คงที่ต่อเดือนแบบเดิมอีกต่อไป)
   let sessions = [];
   sessionSnap.forEach((d) => sessions.push({ id: d.id, ...d.data() }));
   const monthSessions = sessions
@@ -294,6 +206,87 @@ async function loadPrintExtras(team, ageGroup, month) {
   playersSnap.forEach((d) => allPlayers.push({ id: d.id, ...d.data() }));
   const scopedPlayers = ageGroup === "__ALL__" ? allPlayers : allPlayers.filter((p) => p.ageGroup === ageGroup);
 
+  // ---------- สรุปการส่งแผนการฝึกซ้อมรายวัน แยกรายโค้ช (ตรงเวลา/สาย/วันฝึกซ้อมที่ต้องส่ง/% ตรงตามวันฝึกซ้อม) ----------
+  // จับคู่แผนกับโค้ชด้วยชื่อ (coachName) ไม่ใช่ coachId เพราะถ้าผู้ดูแลระบบสวมบทบาทส่งแทนโค้ช coachId จะกลายเป็น
+  // uid ของผู้ดูแลระบบเอง (หลักการเดียวกับ computeCoachMonthlySummaryRows ในหน้า attendance.html) — "จำนวนทั้งหมด
+  // ที่ต้องส่ง" คือจำนวนวันฝึกซ้อมจริง (monthSessions) ไม่ใช่เกณฑ์คงที่อีกต่อไป เพราะวันที่ฝึกซ้อมต้องตรงกับวันที่
+  // ส่งแผนการฝึกซ้อม — นับว่า "ส่งตรงวันฝึกซ้อม" ถ้าโค้ชคนนั้นส่งแผนของวันที่ตรงกับวันฝึกซ้อมวันนั้นพอดี
+  let plans = [];
+  trainingPlanSnap.forEach((d) => plans.push(d.data()));
+  plans = plans.filter((p) => (p.date || "").startsWith(month));
+  if (ageGroup !== "__ALL__") {
+    plans = plans.filter((p) => (p.ageGroups || []).includes(ageGroup));
+  }
+
+  const lateCount = plans.filter((p) => isTrainingPlanLate(p)).length;
+  const onTimeCount = plans.length - lateCount;
+  printTrainingPlanCards.innerHTML =
+    statCard("วันฝึกซ้อมทั้งหมด", monthSessions.length) +
+    statCard("ส่งแผนตรงเวลา", onTimeCount) +
+    statCard("ส่งแผนสาย", lateCount) +
+    statCard(
+      "สถานะ",
+      lateCount > TRAINING_PLAN_LATE_WARNING_THRESHOLD ? "⚠️ ต้องปรับปรุง" : "ปกติ"
+    );
+
+  const coachRows = coaches.map((c) => {
+    const myPlans = plans.filter((p) => p.coachName === c.name);
+    let matchDays = 0;
+    let onTime = 0;
+    for (const s of monthSessions) {
+      const dayPlans = myPlans.filter((p) => p.date === s.date);
+      if (dayPlans.length === 0) continue;
+      matchDays += 1;
+      if (dayPlans.some((p) => !isTrainingPlanLate(p))) onTime += 1;
+    }
+    const late = matchDays - onTime;
+    const matchPercent = monthSessions.length > 0 ? Math.round((matchDays / monthSessions.length) * 100) : null;
+    return { coach: c, matchDays, onTime, late, matchPercent };
+  });
+
+  if (coachRows.length === 0) {
+    printTrainingPlanBody.innerHTML =
+      '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">ไม่มีโค้ชในขอบเขตที่เลือก</td></tr>';
+  } else {
+    printTrainingPlanBody.innerHTML = coachRows
+      .map(({ coach, onTime, late, matchPercent }) => {
+        const percentText = matchPercent === null ? "-" : `${matchPercent}%`;
+        const percentBadgeClass = matchPercent === null ? "badge-neutral" : matchPercent >= 80 ? "badge-success" : matchPercent >= 50 ? "badge-warning" : "badge-danger";
+        return `
+          <tr>
+            <td class="emphasis">${coach.name ?? "-"}</td>
+            <td>${(coach.ageGroups || []).join(", ") || "-"}</td>
+            <td>${monthSessions.length}</td>
+            <td class="text-emerald-600 font-medium">${onTime}</td>
+            <td class="text-red-500 font-medium">${late}</td>
+            <td><span class="badge ${percentBadgeClass}">${percentText}</span></td>
+          </tr>`;
+      })
+      .join("");
+    applyDataLabels(printTrainingPlanBody);
+  }
+
+  const planDailyCounts = monthSessions.map((s) => {
+    let dOnTime = 0;
+    let dLate = 0;
+    let dNone = 0;
+    for (const c of coaches) {
+      const dayPlans = plans.filter((p) => p.date === s.date && p.coachName === c.name);
+      if (dayPlans.length === 0) {
+        dNone += 1;
+        continue;
+      }
+      if (dayPlans.some((p) => !isTrainingPlanLate(p))) dOnTime += 1;
+      else dLate += 1;
+    }
+    return { date: s.date, onTime: dOnTime, late: dLate, none: dNone };
+  });
+  printTrainingPlanTrend.innerHTML = buildCoachDailyTrendSvg(planDailyCounts, coaches.length);
+
+  // ---------- สรุปการเช็คชื่อ + ให้คะแนนนักกีฬารายวัน แยกรายโค้ช ----------
+  // เกณฑ์เดียวกับสรุปแผนการฝึกซ้อมด้านบน คือวันฝึกซ้อมจริง (monthSessions) — วัดว่าโค้ชเช็คชื่อ+ให้คะแนน "ตรงกับ
+  // วันที่ทีมฝึกซ้อมจริง" กี่วันจากทั้งหมด ไม่ใช่แค่ดูอัตราตรงเวลาของที่เช็คชื่อมาแล้วเฉยๆ (เกณฑ์เดียวกับ
+  // checkinDays/isCoachSubmissionOnTime ใน computeCoachMonthlySummaryRows ของ attendance.js)
   const checkinRows = coaches.map((c) => {
     const myPlayerIds = getCoachPlayerIds(c, scopedPlayers);
     let checkinDays = 0;
