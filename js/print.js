@@ -44,6 +44,7 @@ const printCheckinBody = document.getElementById("print-checkin-body");
 const printCheckinTrend = document.getElementById("print-checkin-trend");
 const printMatchCards = document.getElementById("print-match-cards");
 const printMatchChart = document.getElementById("print-match-chart");
+const printMatchGoalChart = document.getElementById("print-match-goal-chart");
 const printMatchBody = document.getElementById("print-match-body");
 const printInjuryCards = document.getElementById("print-injury-cards");
 const printInjuryBody = document.getElementById("print-injury-body");
@@ -302,6 +303,83 @@ function buildMatchResultChartSvg(matches) {
   `;
 }
 
+// กราฟแท่งกลุ่มประตูได้/เสีย (scoreUs/scoreThem รวมทั้งเดือน) แยกตามรุ่นอายุ พร้อมป้ายผลต่างประตู (+/-) เหนือแต่ละ
+// กลุ่ม ให้เห็นว่ารุ่นไหนรุกดี/รับดีกว่ากัน ไม่ใช่แค่ผลแพ้ชนะเฉยๆ
+function buildGoalDiffChartSvg(matches) {
+  if (matches.length === 0) {
+    return '<p class="text-xs text-slate-400 text-center py-6">ไม่มีข้อมูลผลการแข่งขัน</p>';
+  }
+  const groups = new Map();
+  for (const m of matches) {
+    const ag = m.ageGroup || "ไม่ระบุรุ่น";
+    if (!groups.has(ag)) groups.set(ag, { for: 0, against: 0 });
+    const g = groups.get(ag);
+    g.for += Number(m.scoreUs) || 0;
+    g.against += Number(m.scoreThem) || 0;
+  }
+  const ageGroups = Array.from(groups.keys()).sort((a, b) => ageGroupNumber(a) - ageGroupNumber(b));
+
+  const width = 700;
+  const height = 200;
+  const padTop = 20;
+  const padBottom = 24;
+  const padLeft = 24;
+  const padRight = 8;
+  const chartW = width - padLeft - padRight;
+  const chartH = height - padTop - padBottom;
+  const n = ageGroups.length;
+  const groupW = chartW / n;
+  const groupGap = groupW * 0.24;
+  const barW = (groupW - groupGap) / 2;
+  const maxY = Math.max(...ageGroups.map((ag) => Math.max(groups.get(ag).for, groups.get(ag).against)), 1);
+  const baselineY = padTop + chartH;
+
+  const gridLines = [0.5, 1]
+    .map((frac) => {
+      const y = padTop + chartH - frac * chartH;
+      return `<line x1="${padLeft}" y1="${y.toFixed(1)}" x2="${width - padRight}" y2="${y.toFixed(1)}" stroke="#e2e8f0" stroke-width="1"/>
+              <text x="${padLeft - 4}" y="${(y + 2.5).toFixed(1)}" font-size="7" fill="#94a3b8" text-anchor="end">${Math.round(frac * maxY)}</text>`;
+    })
+    .join("");
+
+  const bars = ageGroups
+    .map((ag, gi) => {
+      const g = groups.get(ag);
+      const groupX = padLeft + gi * groupW + groupGap / 2;
+      const diff = g.for - g.against;
+      const diffText = diff > 0 ? `+${diff}` : `${diff}`;
+      const diffColor = diff > 0 ? "#059669" : diff < 0 ? "#dc2626" : "#64748b";
+      const forH = (g.for / maxY) * chartH;
+      const againstH = (g.against / maxY) * chartH;
+      return `
+        <text x="${(groupX + (groupW - groupGap) / 2).toFixed(1)}" y="${(padTop - 8).toFixed(1)}" font-size="8" font-weight="700" fill="${diffColor}" text-anchor="middle">${diffText}</text>
+        <rect x="${groupX.toFixed(1)}" y="${(baselineY - forH).toFixed(1)}" width="${Math.max(barW - 1, 1).toFixed(1)}" height="${forH.toFixed(1)}" rx="1" fill="#2563eb"><title>${ag} ยิงได้: ${g.for} ประตู</title></rect>
+        <rect x="${(groupX + barW).toFixed(1)}" y="${(baselineY - againstH).toFixed(1)}" width="${Math.max(barW - 1, 1).toFixed(1)}" height="${againstH.toFixed(1)}" rx="1" fill="#f97316"><title>${ag} เสีย: ${g.against} ประตู</title></rect>`;
+    })
+    .join("");
+
+  const groupLabels = ageGroups
+    .map((ag, gi) => {
+      const x = padLeft + gi * groupW + groupW / 2;
+      return `<text x="${x.toFixed(1)}" y="${height - 6}" font-size="8" fill="#64748b" text-anchor="middle">${ag}</text>`;
+    })
+    .join("");
+
+  return `
+    <svg viewBox="0 0 ${width} ${height}" width="100%" style="max-width:${width}px; display:block; margin:0 auto;">
+      ${gridLines}
+      <line x1="${padLeft}" y1="${baselineY.toFixed(1)}" x2="${width - padRight}" y2="${baselineY.toFixed(1)}" stroke="#cbd5e1" stroke-width="1"/>
+      ${bars}
+      ${groupLabels}
+    </svg>
+    <div class="text-[10px] text-slate-500 flex flex-wrap justify-center gap-x-3 gap-y-1 mt-1">
+      <span class="inline-flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-full" style="background:#2563eb"></span>ยิงได้</span>
+      <span class="inline-flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-full" style="background:#f97316"></span>เสีย</span>
+      <span class="text-slate-400">ตัวเลขเหนือกราฟ = ผลต่างประตู</span>
+    </div>
+  `;
+}
+
 // สรุปแผนการฝึกซ้อม/ผลการแข่งขัน/อาการบาดเจ็บ ของทีม+เดือน+รุ่นอายุเดียวกับตารางผู้เล่นด้านบน — ให้สรุป
 // สำหรับพิมพ์มีข้อมูลครบรูปแบบเดียวกับหน้า Dashboard
 async function loadPrintExtras(team, ageGroup, month) {
@@ -513,6 +591,7 @@ async function loadPrintExtras(team, ageGroup, month) {
     statCard("เสมอ", matches.filter((m) => m.result === "เสมอ").length);
 
   printMatchChart.innerHTML = buildMatchResultChartSvg(matches);
+  printMatchGoalChart.innerHTML = buildGoalDiffChartSvg(matches);
 
   if (matches.length === 0) {
     printMatchBody.innerHTML =
