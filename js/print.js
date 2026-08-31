@@ -18,7 +18,9 @@ import {
   matchResultBadge,
   injurySeverityBadge,
   injuryStatusBadge,
-  ageGroupSortKey
+  ageGroupSortKey,
+  getCoachPlayerIds,
+  isCoachSubmissionOnTime
 } from "./ui-utils.js";
 
 const statusEl = document.getElementById("status-message");
@@ -33,6 +35,9 @@ const printMonthLoadBtn = document.getElementById("print-month-load-btn");
 const printTrainingPlanCards = document.getElementById("print-training-plan-cards");
 const printTrainingPlanBody = document.getElementById("print-training-plan-body");
 const printTrainingPlanTrend = document.getElementById("print-training-plan-trend");
+const printCheckinCards = document.getElementById("print-checkin-cards");
+const printCheckinBody = document.getElementById("print-checkin-body");
+const printCheckinTrend = document.getElementById("print-checkin-trend");
 const printMatchCards = document.getElementById("print-match-cards");
 const printMatchBody = document.getElementById("print-match-body");
 const printInjuryCards = document.getElementById("print-injury-cards");
@@ -111,10 +116,15 @@ function buildCoachDailyTrend(plans, coaches, month) {
   });
 }
 
-// กราฟแท่งซ้อน (stacked bar) แสดงสัดส่วนโค้ชที่ส่งตรงเวลา/ส่งสาย/ยังไม่ส่งในแต่ละวัน — ความสูงรวมของทุกแท่ง
-// เท่ากันเสมอ (=จำนวนโค้ชทั้งหมดในขอบเขต) เพราะโค้ชแต่ละคนอยู่ในสถานะใดสถานะหนึ่งเสมอ กราฟนี้จึงแสดง "สัดส่วน"
-// ที่เปลี่ยนไปในแต่ละวัน ไม่ใช่ปริมาณรวม — ใช้ดูภาพรวมว่าช่วงไหนของเดือนทีมโค้ชส่งงานดี/แย่กว่ากัน
-function buildCoachDailyTrendSvg(dailyCounts, totalCoaches) {
+// กราฟแท่งซ้อน (stacked bar) แสดงสัดส่วนโค้ชที่ตรงเวลา/สาย/ไม่ได้ทำในแต่ละวัน — ความสูงรวมของทุกแท่งเท่ากันเสมอ
+// (=จำนวนโค้ชทั้งหมดในขอบเขต) เพราะโค้ชแต่ละคนอยู่ในสถานะใดสถานะหนึ่งเสมอ กราฟนี้จึงแสดง "สัดส่วน" ที่เปลี่ยนไป
+// ในแต่ละวัน ไม่ใช่ปริมาณรวม — ใช้ดูภาพรวมว่าช่วงไหนของเดือนทีมโค้ชทำงานดี/แย่กว่ากัน
+// รับ dailyCounts เป็น array ของ {date, onTime, late, none} ตามลำดับวันที่ต้องการแสดง — ไม่จำเป็นต้องครบทุกวันที่
+// ในเดือน (เช่นกราฟเช็คชื่อจะมีแค่วันที่มีวันฝึกซ้อมจริงเท่านั้น) label วันที่ดึงจากท้าย date string ของแต่ละ
+// entry เองเสมอ ไม่ได้อิงตำแหน่ง index+1 = วันที่ กันป้ายวันที่เพี้ยนเมื่อข้อมูลไม่ครบทุกวัน
+function buildCoachDailyTrendSvg(dailyCounts, totalCoaches, options = {}) {
+  const noneLabel = options.noneLabel || "ยังไม่ส่ง";
+  const verb = options.verb || "ส่ง";
   if (totalCoaches === 0 || dailyCounts.length === 0) {
     return '<p class="text-xs text-slate-400 text-center py-6">ไม่มีข้อมูลสำหรับแสดงกราฟ</p>';
   }
@@ -155,17 +165,20 @@ function buildCoachDailyTrendSvg(dailyCounts, totalCoaches) {
           const segH = (seg.count / maxY) * chartH;
           const y = yCursor - segH;
           yCursor = y;
-          return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barWidth.toFixed(1)}" height="${segH.toFixed(1)}" fill="${seg.color}"><title>${d.date}: ตรงเวลา ${d.onTime} · สาย ${d.late} · ยังไม่ส่ง ${d.none}</title></rect>`;
+          return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barWidth.toFixed(1)}" height="${segH.toFixed(1)}" fill="${seg.color}"><title>${d.date}: ${verb}ตรงเวลา ${d.onTime} · ${verb}สาย ${d.late} · ${noneLabel} ${d.none}</title></rect>`;
         })
         .join("");
     })
     .join("");
 
-  const labelDays = Array.from(new Set([1, 6, 11, 16, 21, 26, n].filter((day) => day <= n)));
-  const dayLabels = labelDays
-    .map((day) => {
-      const x = padLeft + (day - 1) * slotW + slotW / 2;
-      return `<text x="${x.toFixed(1)}" y="${height - 6}" font-size="7" fill="#64748b" text-anchor="middle">${day}</text>`;
+  // ป้ายวันที่: เว้นระยะให้เหลือไม่เกิน ~10 ป้าย ไม่ว่า n จะมากหรือน้อย กันป้ายทับกันตอนมีหลายแท่ง
+  const labelEvery = Math.max(1, Math.ceil(n / 10));
+  const dayLabels = dailyCounts
+    .map((d, i) => {
+      if (i % labelEvery !== 0 && i !== n - 1) return "";
+      const x = padLeft + i * slotW + slotW / 2;
+      const dayText = (d.date || "").slice(-2).replace(/^0/, "");
+      return `<text x="${x.toFixed(1)}" y="${height - 6}" font-size="7" fill="#64748b" text-anchor="middle">${dayText}</text>`;
     })
     .join("");
 
@@ -177,9 +190,9 @@ function buildCoachDailyTrendSvg(dailyCounts, totalCoaches) {
       ${dayLabels}
     </svg>
     <div class="text-[10px] text-slate-500 flex flex-wrap justify-center gap-x-3 gap-y-1 mt-1">
-      <span class="inline-flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-full" style="background:#10b981"></span>ส่งตรงเวลา</span>
-      <span class="inline-flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-full" style="background:#f59e0b"></span>ส่งสาย</span>
-      <span class="inline-flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-full" style="background:#cbd5e1"></span>ยังไม่ส่ง</span>
+      <span class="inline-flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-full" style="background:#10b981"></span>${verb}ตรงเวลา</span>
+      <span class="inline-flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-full" style="background:#f59e0b"></span>${verb}สาย</span>
+      <span class="inline-flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-full" style="background:#cbd5e1"></span>${noneLabel}</span>
     </div>
   `;
 }
@@ -187,11 +200,14 @@ function buildCoachDailyTrendSvg(dailyCounts, totalCoaches) {
 // สรุปแผนการฝึกซ้อม/ผลการแข่งขัน/อาการบาดเจ็บ ของทีม+เดือน+รุ่นอายุเดียวกับตารางผู้เล่นด้านบน — ให้สรุป
 // สำหรับพิมพ์มีข้อมูลครบรูปแบบเดียวกับหน้า Dashboard
 async function loadPrintExtras(team, ageGroup, month) {
-  const [trainingPlanSnap, matchSnap, injurySnap, coachSnap] = await Promise.all([
+  const [trainingPlanSnap, matchSnap, injurySnap, coachSnap, sessionSnap, attendanceSnap, playersSnap] = await Promise.all([
     getDocs(query(collection(db, "trainingPlans"), where("team", "==", team))),
     getDocs(query(collection(db, "matchReports"), where("team", "==", team))),
     getDocs(query(collection(db, "injuryReports"), where("team", "==", team))),
-    getDocs(query(collection(db, "coaches"), where("team", "==", team), where("role", "==", "coach")))
+    getDocs(query(collection(db, "coaches"), where("team", "==", team), where("role", "==", "coach"))),
+    getDocs(query(collection(db, "sessions"), where("team", "==", team))),
+    getDocs(query(collection(db, "attendance"), where("team", "==", team))),
+    getDocs(query(collection(db, "players"), where("team", "==", team)))
   ]);
 
   // ---------- สรุปการส่งแผนการฝึกซ้อมรายวัน แยกรายโค้ช (ตรงเวลา/สาย/เกณฑ์ที่ต้องส่ง/% ตรงเวลา) ----------
@@ -259,6 +275,89 @@ async function loadPrintExtras(team, ageGroup, month) {
   }
 
   printTrainingPlanTrend.innerHTML = buildCoachDailyTrendSvg(buildCoachDailyTrend(plans, coaches, month), coaches.length);
+
+  // ---------- สรุปการเช็คชื่อ + ให้คะแนนนักกีฬารายวัน แยกรายโค้ช ----------
+  // ต่างจากสรุปแผนการฝึกซ้อมตรงที่เกณฑ์ "ต้องส่ง" ที่นี่ไม่ใช่ตัวเลขคงที่ แต่คือจำนวนวันฝึกซ้อมจริงของเดือนนั้น
+  // (sessions ที่ team สร้างไว้ และไม่ได้ถูกทำเครื่องหมาย noTraining) — วัดว่าโค้ชเช็คชื่อ+ให้คะแนน "ตรงกับวันที่
+  // ทีมฝึกซ้อมจริง" กี่วันจากทั้งหมด ไม่ใช่แค่ดูอัตราตรงเวลาของที่เช็คชื่อมาแล้วเฉยๆ (เกณฑ์เดียวกับ checkinDays/
+  // isCoachSubmissionOnTime ใน computeCoachMonthlySummaryRows ของ attendance.js)
+  let sessions = [];
+  sessionSnap.forEach((d) => sessions.push({ id: d.id, ...d.data() }));
+  const monthSessions = sessions
+    .filter((s) => (s.date || "").startsWith(month) && !s.noTraining)
+    .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+
+  let attendanceRecords = [];
+  attendanceSnap.forEach((d) => attendanceRecords.push(d.data()));
+
+  let allPlayers = [];
+  playersSnap.forEach((d) => allPlayers.push({ id: d.id, ...d.data() }));
+  const scopedPlayers = ageGroup === "__ALL__" ? allPlayers : allPlayers.filter((p) => p.ageGroup === ageGroup);
+
+  const checkinRows = coaches.map((c) => {
+    const myPlayerIds = getCoachPlayerIds(c, scopedPlayers);
+    let checkinDays = 0;
+    let onTime = 0;
+    for (const s of monthSessions) {
+      const myAttendanceForSession = attendanceRecords.filter((a) => a.sessionId === s.id && myPlayerIds.has(a.playerId));
+      if (myAttendanceForSession.length === 0) continue;
+      checkinDays += 1;
+      if (isCoachSubmissionOnTime(s, myAttendanceForSession)) onTime += 1;
+    }
+    const late = checkinDays - onTime;
+    const matchPercent = monthSessions.length > 0 ? Math.round((checkinDays / monthSessions.length) * 100) : null;
+    return { coach: c, checkinDays, onTime, late, matchPercent };
+  });
+
+  const totalCheckinDays = checkinRows.reduce((sum, r) => sum + r.checkinDays, 0);
+  const totalOnTime = checkinRows.reduce((sum, r) => sum + r.onTime, 0);
+  printCheckinCards.innerHTML =
+    statCard("วันฝึกซ้อมทั้งหมด", monthSessions.length) +
+    statCard("เช็คชื่อตรงวันฝึกซ้อม (รวม)", totalCheckinDays) +
+    statCard("ตรงเวลา (รวม)", totalOnTime) +
+    statCard("สาย (รวม)", totalCheckinDays - totalOnTime);
+
+  if (checkinRows.length === 0) {
+    printCheckinBody.innerHTML =
+      '<tr><td colspan="7" class="px-4 py-6 text-center text-slate-400">ไม่มีโค้ชในขอบเขตที่เลือก</td></tr>';
+  } else {
+    printCheckinBody.innerHTML = checkinRows
+      .map(({ coach, checkinDays, onTime, late, matchPercent }) => {
+        const percentText = matchPercent === null ? "-" : `${matchPercent}%`;
+        const percentBadgeClass =
+          matchPercent === null ? "badge-neutral" : matchPercent >= 80 ? "badge-success" : matchPercent >= 50 ? "badge-warning" : "badge-danger";
+        return `
+          <tr>
+            <td class="emphasis">${coach.name ?? "-"}</td>
+            <td>${(coach.ageGroups || []).join(", ") || "-"}</td>
+            <td>${monthSessions.length}</td>
+            <td>${checkinDays}</td>
+            <td class="text-emerald-600 font-medium">${onTime}</td>
+            <td class="text-red-500 font-medium">${late}</td>
+            <td><span class="badge ${percentBadgeClass}">${percentText}</span></td>
+          </tr>`;
+      })
+      .join("");
+    applyDataLabels(printCheckinBody);
+  }
+
+  const checkinDailyCounts = monthSessions.map((s) => {
+    let dOnTime = 0;
+    let dLate = 0;
+    let dNone = 0;
+    for (const c of coaches) {
+      const myPlayerIds = getCoachPlayerIds(c, scopedPlayers);
+      const myAttendanceForSession = attendanceRecords.filter((a) => a.sessionId === s.id && myPlayerIds.has(a.playerId));
+      if (myAttendanceForSession.length === 0) {
+        dNone += 1;
+        continue;
+      }
+      if (isCoachSubmissionOnTime(s, myAttendanceForSession)) dOnTime += 1;
+      else dLate += 1;
+    }
+    return { date: s.date, onTime: dOnTime, late: dLate, none: dNone };
+  });
+  printCheckinTrend.innerHTML = buildCoachDailyTrendSvg(checkinDailyCounts, coaches.length, { noneLabel: "ยังไม่เช็คชื่อ", verb: "เช็คชื่อ" });
 
   // ---------- รายงานผลการแข่งขัน ----------
   let matches = [];

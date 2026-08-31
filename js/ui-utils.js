@@ -366,6 +366,30 @@ export function isTrainingPlanLate(plan) {
   return ts > deadline;
 }
 
+// ---------- เช็คชื่อ+ให้คะแนน / รายงานการฝึกซ้อม: กฎ "ส่งสาย" ----------
+// ต้องเช็คชื่อ+ให้คะแนน และส่งรายงานการฝึกซ้อม ภายใน 23:59 น. ของวันนั้น ใช้ deadline เดียวกันทั้งสองอย่าง — ย้าย
+// มาไว้ที่นี่ (เดิมอยู่ใน attendance.js เท่านั้น) เพราะสรุปสำหรับพิมพ์ (print.js) ต้องใช้กฎเดียวกันนี้ด้วย
+export const SUBMISSION_DEADLINE_HOUR = 23;
+export const SUBMISSION_DEADLINE_MINUTE = 59;
+export function submissionDeadlineFor(dateStr) {
+  return new Date(
+    `${dateStr}T${String(SUBMISSION_DEADLINE_HOUR).padStart(2, "0")}:${String(SUBMISSION_DEADLINE_MINUTE).padStart(2, "0")}:59`
+  );
+}
+// นับว่า "ตรงเวลา" ถ้าเวลาบันทึกล่าสุดของการเช็คชื่อ (จากบันทึกทั้งหมดของโค้ชคนนั้นในวันซ้อมนั้น) อยู่ก่อนเดดไลน์
+export function isCoachSubmissionOnTime(session, myAttendanceForSession) {
+  if (!session.date) return false;
+  let latest = null;
+  for (const a of myAttendanceForSession) {
+    if (a.updatedAt && typeof a.updatedAt.toDate === "function") {
+      const t = a.updatedAt.toDate();
+      if (!latest || t > latest) latest = t;
+    }
+  }
+  if (!latest) return false;
+  return latest <= submissionDeadlineFor(session.date);
+}
+
 // ---------- ป้ายสถานะผลการแข่งขัน/อาการบาดเจ็บ ----------
 // ใช้ร่วมกันทั้งหน้าโค้ช (attendance.js), Dashboard (app.js), และหน้าข้อมูลนักกีฬา (player.js)
 export function matchResultBadge(result) {

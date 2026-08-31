@@ -34,6 +34,8 @@ import {
   teamLogoImg,
   isTrainingPlanLate,
   TRAINING_PLAN_LATE_WARNING_THRESHOLD,
+  submissionDeadlineFor,
+  isCoachSubmissionOnTime,
   statCard,
   matchResultBadge,
   injurySeverityBadge,
@@ -274,16 +276,6 @@ const progressTableBody = document.getElementById("progress-table-body");
 const progressPie = document.getElementById("progress-pie");
 const progressLegend = document.getElementById("progress-legend");
 const progressTeamTabs = document.getElementById("progress-team-tabs");
-
-// ต้องเช็คชื่อ+ให้คะแนน และส่งรายงานการฝึกซ้อม ภายใน 23:59 น. ของวันนั้น ใช้ deadline เดียวกันทั้งสองอย่าง
-// (ดู isCoachSubmissionOnTime สำหรับเช็คชื่อ และ isReportLate สำหรับรายงานการฝึกซ้อม)
-const SUBMISSION_DEADLINE_HOUR = 23;
-const SUBMISSION_DEADLINE_MINUTE = 59;
-function submissionDeadlineFor(dateStr) {
-  return new Date(
-    `${dateStr}T${String(SUBMISSION_DEADLINE_HOUR).padStart(2, "0")}:${String(SUBMISSION_DEADLINE_MINUTE).padStart(2, "0")}:59`
-  );
-}
 
 let currentSessionId = null;
 let currentSessionData = null;
@@ -1589,19 +1581,8 @@ async function rejectCoach(coachId) {
 // ---------- ผู้ดูแลระบบ: รายชื่อโค้ช + % ส่งข้อมูลตรงเวลา ----------
 // เกณฑ์: แต่ละ session (วัน) ที่โค้ชคนนี้มีนักกีฬาของตัวเองบันทึกไว้ ถือว่า "ตรงเวลา" ถ้าเวลาแก้ไขล่าสุดของ
 // บันทึกนักกีฬาที่ตัวเองดูแล (ไม่รวมของโค้ชอื่นในเซสชันเดียวกัน) อยู่ก่อน 23:59 น. ของวันนั้น — คำนวณแยกรายคน
-// เพราะ 1 เซสชันใช้ร่วมกันได้หลายโค้ช (คนละรุ่นอายุ) การแก้ไขของโค้ชอื่นไม่ควรกระทบผลของโค้ชคนนี้
-function isCoachSubmissionOnTime(session, myAttendanceForSession) {
-  if (!session.date) return false;
-  let latest = null;
-  for (const a of myAttendanceForSession) {
-    if (a.updatedAt && typeof a.updatedAt.toDate === "function") {
-      const t = a.updatedAt.toDate();
-      if (!latest || t > latest) latest = t;
-    }
-  }
-  if (!latest) return false;
-  return latest <= submissionDeadlineFor(session.date);
-}
+// เพราะ 1 เซสชันใช้ร่วมกันได้หลายโค้ช (คนละรุ่นอายุ) การแก้ไขของโค้ชอื่นไม่ควรกระทบผลของโค้ชคนนี้ (ย้าย
+// isCoachSubmissionOnTime/submissionDeadlineFor ไป ui-utils.js แล้ว เพราะ print.js ต้องใช้กฎเดียวกันนี้ด้วย)
 
 // รายงานการฝึกซ้อมต้องส่งภายในเวลาเดียวกับการเช็คชื่อ (23:59 น.) — เดิมไม่มีเกณฑ์ "สาย" สำหรับรายงานนี้เลย
 function isReportLate(report) {
