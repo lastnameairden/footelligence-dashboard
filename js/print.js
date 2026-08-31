@@ -284,16 +284,18 @@ async function loadPrintExtras(team, ageGroup, month) {
     const late = myPlans.filter((p) => isTrainingPlanLate(p)).length;
     const total = myPlans.length;
     const onTime = total - late;
+    // ถ้าส่งเกินเกณฑ์ (total > quota) ถือว่าไม่มีจำนวนที่ "ไม่ส่ง" เหลือ ไม่ใช่ค่าติดลบ
+    const missing = Math.max(TRAINING_PLAN_MONTHLY_QUOTA - total, 0);
     const onTimePercent = total > 0 ? Math.round((onTime / total) * 100) : null;
-    return { coach: c, onTime, late, onTimePercent };
+    return { coach: c, onTime, late, missing, onTimePercent };
   });
 
   if (coachRows.length === 0) {
     printTrainingPlanBody.innerHTML =
-      '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">ไม่มีโค้ชในขอบเขตที่เลือก</td></tr>';
+      '<tr><td colspan="7" class="px-4 py-6 text-center text-slate-400">ไม่มีโค้ชในขอบเขตที่เลือก</td></tr>';
   } else {
     printTrainingPlanBody.innerHTML = coachRows
-      .map(({ coach, onTime, late, onTimePercent }) => {
+      .map(({ coach, onTime, late, missing, onTimePercent }) => {
         const percentText = onTimePercent === null ? "-" : `${onTimePercent}%`;
         const percentBadgeClass = onTimePercent === null ? "badge-neutral" : onTimePercent >= 80 ? "badge-success" : onTimePercent >= 50 ? "badge-warning" : "badge-danger";
         return `
@@ -303,6 +305,7 @@ async function loadPrintExtras(team, ageGroup, month) {
             <td>${TRAINING_PLAN_MONTHLY_QUOTA}</td>
             <td class="text-emerald-600 font-medium">${onTime}</td>
             <td class="text-red-500 font-medium">${late}</td>
+            <td class="text-slate-500 font-medium">${missing}</td>
             <td><span class="badge ${percentBadgeClass}">${percentText}</span></td>
           </tr>`;
       })
