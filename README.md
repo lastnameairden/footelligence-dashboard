@@ -61,6 +61,8 @@ npx tailwindcss@3.4.17 -c tailwind.config.js -i css/tailwind.input.css -o css/ta
 และ Firestore rules (เอกสารต้องมี `roundId` ชี้รอบนั้น) รอบแก้ไขสำหรับนักกีฬาที่ยังประเมินไม่ครบใช้ label เดิมของรอบเก่า
 นักกีฬาถือว่า "ประเมินครบ" เมื่อทั้ง 4 หมวด (M/A/S/C) มีคะแนนครบ 4 ข้อ (`categoryRawScore` ไม่เป็น null)
 
+**รีเฟรชแล้วอยู่หน้าเดิม** — attendance.html สลับหลายจอด้วยการซ่อน/แสดง จึงเก็บจอปัจจุบัน (และวันที่ทีเลือก, โหมดสวมบทบาทของแอดมิน) ไว้ใน URL hash ผ่าน `history.replaceState` (รูปแบบอยู่ที่ `js/screen-route.js`, ผูกกับหน้าที่ `ROUTE_SCREENS` ใน `attendance.js`) ถ้าเพิ่มจอ (section) ใหม่ต้องเพิ่มใน `ROUTE_SCREENS` ด้วย — เทสต์ตรวจให้ ส่วนหน้า MASC จำรุ่นอายุ/นักกีฬาที่เลือกไว้ใน hash (`age`, `player`) ข้อมูลที่กรอกค้างในฟอร์มยังไม่ถูกเก็บ
+
 **การจับคู่โค้ช** — ใช้ `coachName` ไม่ใช่ `coachId` เพราะตอนแอดมินสวมบทบาทเป็นโค้ช `coachId` จะเป็น uid ของแอดมิน
 
 ## รันในเครื่อง
@@ -103,6 +105,7 @@ node --import ./tests/setup.mjs --test "tests/*.test.mjs"
 | --- | --- |
 | `tests/ui-utils.test.mjs` | `escapeHtml`/`safeHttpUrl`, query รายเดือนต้องมี `team ==`, กฎ "ส่งสาย", ความเป็นเจ้าของนักกีฬา, ลำดับรุ่นอายุ, อายุ |
 | `tests/attendance-save.test.mjs` | บันทึกเช็คชื่อ/คะแนนแบบอัปเดตหน้าจอทันที: แตะเร็วๆ ไม่ทับกัน, คิวเขียนเรียงลำดับต่อนักกีฬา, นับรายการรอส่ง, ล้มเหลวแล้วไม่ค้างคิว |
+| `tests/screen-route.test.mjs` | รูปแบบ URL hash ที่จำหน้าจอปัจจุบัน (รีเฟรชแล้วกลับหน้าเดิม): สร้าง/อ่านกลับครบทุกฟิลด์ ตัดค่าที่ไม่ถูกต้องทิ้ง |
 | `tests/masc-data.test.mjs` | สูตรคะแนน MASC / เกรด / ข้อมูลเกณฑ์ครบทุกตำแหน่ง×ช่วงวัย×หมวด |
 | `tests/site-integrity.test.mjs` | ทุกหน้าลิงก์ Tailwind ที่ build แล้ว, ไม่มี inline handler (CSP), class ที่ใช้มี CSS ครบ (ลืม build), CSP ไม่หละหลวม, rules ไม่เปิดกว้าง, ไฟล์ index ถูกต้อง |
 

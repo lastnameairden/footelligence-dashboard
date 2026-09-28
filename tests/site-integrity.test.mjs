@@ -57,6 +57,18 @@ test("every getElementById id used by a page script exists in that page's HTML",
   }
 });
 
+// ทุกจอ (section) ใน attendance.html ต้องอยู่ใน ROUTE_SCREENS ของ attendance.js ไม่งั้นรีเฟรชแล้วกลับมาจอนั้นไม่ได้ (เพิ่มจอใหม่แล้วลืมลงทะเบียน)
+// ยกเว้นหน้าเข้าสู่ระบบ/รออนุมัติ ซึ่งเป็นสถานะก่อนเข้าระบบ ไม่ใช่จอที่ต้องจำ
+test("every screen section in attendance.html is registered for refresh restore", () => {
+  const html = read("attendance.html");
+  const js = read("js/attendance.js");
+  const sectionIds = [...html.matchAll(/<section id="([^"]+)"/g)].map((m) => m[1]).filter((id) => !["login-section", "pending-section"].includes(id));
+  const varToId = Object.fromEntries([...js.matchAll(/const (\w+) = document\.getElementById\("([^"]+)"\);/g)].map((m) => [m[1], m[2]]));
+  const block = js.slice(js.indexOf("const ROUTE_SCREENS = ["), js.indexOf("let routeSyncEnabled"));
+  const registered = [...block.matchAll(/el: (\w+),/g)].map((m) => varToId[m[1]]);
+  assert.ok(registered.length > 10, "could not read ROUTE_SCREENS");
+  assert.deepEqual([...registered].sort(), [...sectionIds].sort());
+});
 // "วันนี้/เดือนนี้" ต้องมาจาก todayBangkok()/thisMonthBangkok() ใน ui-utils.js เท่านั้น — new Date().toISOString() เป็นเวลา UTC
 // (00:00-07:00 น. เวลาไทยจะได้ "เมื่อวาน") เคยทำให้วันที่เริ่มต้นของเช็คชื่อ/รายงาน/แผนฝึกและรอบ MASC เพี้ยน
 test("no UTC-based today/this-month in the app code (use todayBangkok / thisMonthBangkok)", () => {

@@ -63,6 +63,7 @@ import {
 } from "./ui-utils.js";
 import { isEvaluationComplete } from "./masc-data.js";
 import { applyAttendanceChange, firestoreFieldsForChange, createSaveQueue, rosterLockState } from "./attendance-save.js";
+import { buildRouteHash, parseRouteHash, isValidRouteDate } from "./screen-route.js";
 
 const STATUS_OPTIONS = ["A", "I", "R", "P"];
 const SCORE_OPTIONS = [1, 2, 3, 4];
@@ -311,6 +312,8 @@ let adminReturnSection = null;
 // เป็น "coach" (จัดการข้อมูลทีมได้เต็มรูปแบบ) หรือ "executive" (ดูอย่างเดียวเหมือนผู้บริหารทีมจริง)
 // ใช้กำหนดว่า nav drawer ควรแสดงเมนูแบบไหน — เป็น null เมื่อไม่ได้อยู่ในโหมดสวมบทบาทใดๆ
 let adminViewingAs = null;
+// id ของโค้ช/ผู้บริหารทีมที่ผู้ดูแลระบบสวมบทบาทเป็นอยู่ (ถ้าเจาะจงตัวบุคคล) — เก็บไว้ใน URL hash เพื่อให้รีเฟรชแล้วกลับเข้าโหมดเดิม
+let adminViewingCoachId = null;
 let players = [];
 let editingPlayerId = null;
 let currentIsAdmin = false;
@@ -715,6 +718,7 @@ function exitTeamManagementToAdminPanel() {
   myCoachPosition = null;
   adminReturnSection = null;
   adminViewingAs = null;
+  adminViewingCoachId = null;
   // สลับป้ายบทบาท + ชื่อ/อีเมลกลับเป็นของผู้ดูแลระบบเองตามเดิม (ตรงข้ามกับที่เขียนทับด้วยข้อมูลของโค้ช/
   // ผู้บริหารทีมที่สวมบทบาทไว้ตอนเข้า enterTeamManagementMode / enterExecutiveViewMode)
   coachRoleBadgeEl.textContent = "ผู้ดูแลระบบ";
@@ -2801,9 +2805,11 @@ async function findCoachRecordForTeam(team, role) {
 // coachRecordOverride: ระบุได้เมื่อรู้ตัวโค้ชที่ต้องการสวมบทบาทแน่ชัดอยู่แล้ว (เช่น คลิกชื่อโค้ชคนใดคนหนึ่งใน
 // รายชื่อโค้ช) เพื่อไม่ให้ไปหลงเอาโค้ชคนแรกที่เจอในทีมมาแสดงผิดคน (ทีมหนึ่งมีโค้ชได้หลายคนคนละรุ่นอายุ) ถ้าไม่ระบุ
 // จะ fallback ไปหาโค้ชคนแรกของทีมเหมือนเดิม (ใช้ตอนกดจากปุ่ม "จัดการทีมนี้ →" ซึ่งไม่ได้เจาะจงคนใดคนหนึ่ง)
-async function enterTeamManagementMode(team, returnSection, coachRecordOverride) {
+// landing: ฟังก์ชันที่เปิดหน้าจอแรกหลังเข้าโหมด (ค่าเริ่มต้น Daily — ตอนรีเฟรชจะส่งฟังก์ชันที่เปิดหน้าจอเดิมมาแทน)
+async function enterTeamManagementMode(team, returnSection, coachRecordOverride, landing = showDaily) {
   myTeam = team;
   adminViewingAs = "coach";
+  adminViewingCoachId = coachRecordOverride?.id || null;
   const coachRecord = coachRecordOverride || (await findCoachRecordForTeam(team, "coach"));
   // ถ้าเจาะจงโค้ชคนใดคนหนึ่ง (coachRecordOverride — คลิกชื่อโค้ชคนนั้นมาโดยตรง) จำกัด myAgeGroups ตามรุ่นอายุ
   // ที่โค้ชคนนั้นรับผิดชอบจริง เพื่อให้เห็นเฉพาะนักกีฬารุ่นที่ดูแล ตรงกับหน้าจอที่โค้ชคนนั้นเห็นจริง 100% แต่ถ้าเป็น
@@ -2831,7 +2837,7 @@ async function enterTeamManagementMode(team, returnSection, coachRecordOverride)
   adminReturnSection = returnSection || adminManageTeamSection;
   await loadPlayers();
   renderDrawerItems();
-  showDaily();
+  landing();
 }
 
 // ผู้ดูแลระบบสวมบทบาทเป็น "ผู้บริหารทีม" (ดูอย่างเดียว) แทนที่จะเป็นโค้ชเต็มรูปแบบ — ใช้ตรวจสอบว่าหน้าจอ
@@ -2841,6 +2847,7 @@ async function enterExecutiveViewMode(team, returnSection, execRecordOverride) {
   myAgeGroups = [];
   myCoachPosition = null;
   adminViewingAs = "executive";
+  adminViewingCoachId = execRecordOverride?.id || null;
   const execRecord = execRecordOverride || (await findCoachRecordForTeam(team, "executive"));
   // แสดงชื่อ/อีเมล/สถานะของผู้บริหารทีมตัวจริง (ถ้าหาเจอ) แทนข้อมูลของผู้ดูแลระบบเอง เหมือนกับโหมดโค้ช
   coachNameEl.textContent = execRecord?.name || team;
@@ -3047,6 +3054,149 @@ function renderCoachProfile(user, data, teamText) {
   navDrawerEmailEl.textContent = coachEmailEl.textContent;
 }
 
+// ---------- จำหน้าจอปัจจุบันไว้ใน URL hash — กดรีเฟรชแล้วกลับมาอยู่หน้าเดิม ----------
+// หน้านี้สลับหลายจอด้วยการซ่อน/แสดง section โดยเดิมไม่มีอะไรใน URL บอกว่าอยู่จอไหน รีเฟรชแล้วโค้ชเด้งกลับ Daily ส่วนผู้ดูแลระบบ
+// ที่สวมบทบาทอยู่หลุดไป Dashboard ตอนนี้ทุกครั้งที่จอเปลี่ยน (สังเกตผ่าน MutationObserver ที่ตัว section ไม่ต้องแก้ทุกฟังก์ชันเปิดหน้า)
+// จะเขียนหน้าจอ/วันที่/บริบทการสวมบทบาทลง hash ด้วย replaceState (ไม่เพิ่มประวัติเบราว์เซอร์) แล้วตอนโหลดหน้าอ่านกลับมาเปิดจอเดิม
+// รูปแบบและการแปลงอยู่ที่ screen-route.js ที่นี่ผูกกับ DOM/สถานะของหน้า — ข้อมูลที่กรอกค้างในฟอร์มยังไม่ถูกเก็บ (กลับมาเป็นฟอร์มว่าง)
+const ROUTE_SCREENS = [
+  { el: dailySection, key: "daily", kind: "coach" },
+  { el: checkinSection, key: "checkin", kind: "coach" },
+  { el: reportSection, key: "report", kind: "coach" },
+  { el: matchReportSection, key: "match", kind: "coach" },
+  { el: injuryReportSection, key: "injury", kind: "coach" },
+  { el: trainingPlanSection, key: "plan", kind: "coach" },
+  { el: addPlayerSection, key: "players", kind: "coach" },
+  { el: executiveSection, key: "executive", kind: "executive" },
+  { el: adminCoachesSection, key: "coaches", kind: "admin" },
+  { el: adminPlayerAuditSection, key: "player-audit", kind: "admin" },
+  { el: adminProgressSection, key: "progress", kind: "admin" },
+  { el: adminApprovalsSection, key: "approvals", kind: "admin" },
+  { el: adminMatchesSection, key: "matches", kind: "admin" },
+  { el: adminInjuriesSection, key: "injuries", kind: "admin" },
+  { el: adminManageTeamSection, key: "manage-team", kind: "admin" },
+  { el: adminDashboardSection, key: "dashboard", kind: "admin" },
+  { el: adminPrintSection, key: "print", kind: "admin" },
+  { el: adminReportCardSection, key: "report-card", kind: "admin" },
+  { el: adminMascRoundsSection, key: "masc-rounds", kind: "admin" }
+];
+let routeSyncEnabled = false;
+
+function routeDateForScreen(key) {
+  const input = { daily: dailyDateInput, checkin: dateInput, report: reportDateInput, plan: trainingPlanDateInput }[key];
+  return input && isValidRouteDate(input.value) ? input.value : undefined;
+}
+
+function currentRouteFromScreen() {
+  const active = ROUTE_SCREENS.find((s) => !s.el.classList.contains("hidden"));
+  if (!active) return null;
+  if (currentIsAdmin && myTeam) {
+    const route = {
+      admin: "team",
+      team: myTeam,
+      as: adminViewingAs === "executive" ? "executive" : "coach",
+      coach: adminViewingCoachId || undefined,
+      ret: adminReturnSection === adminCoachesSection ? "coaches" : "manage-team"
+    };
+    if (active.kind === "coach") {
+      route.screen = active.key;
+      route.date = routeDateForScreen(active.key);
+    }
+    return route;
+  }
+  if (currentIsAdmin) return active.kind === "admin" ? { admin: active.key } : null;
+  return active.kind === "coach" ? { screen: active.key, date: routeDateForScreen(active.key) } : null;
+}
+
+function syncRouteToUrl() {
+  if (!routeSyncEnabled) return;
+  const route = currentRouteFromScreen();
+  if (!route) return;
+  const current = window.location.hash.replace(/^#/, "");
+  // hash ปัจจุบันบอกแผงผู้ดูแลระบบหน้านี้อยู่แล้ว (เช่น ลิงก์แจ้งเตือน #admin=progress&team=... ที่หน้าจอยังต้องอ่านค่า team ต่อ) ไม่เขียนทับ
+  if (route.admin && route.admin !== "team" && parseRouteHash(current).admin === route.admin) return;
+  const next = buildRouteHash(route);
+  if (next === current) return;
+  history.replaceState(null, "", `${window.location.pathname}${window.location.search}#${next}`);
+}
+
+function enableRouteSync() {
+  routeSyncEnabled = true;
+  syncRouteToUrl();
+}
+
+{
+  const routeObserver = new MutationObserver(() => syncRouteToUrl());
+  for (const s of ROUTE_SCREENS) routeObserver.observe(s.el, { attributes: true, attributeFilter: ["class"] });
+  for (const input of [dailyDateInput, dateInput, reportDateInput, trainingPlanDateInput]) {
+    input.addEventListener("change", syncRouteToUrl);
+  }
+}
+
+// เปิดหน้าจอของโค้ชตาม key ใน hash (ไม่รู้จัก key = Daily) และคืนวันที่ที่เลือกไว้ — เช็คชื่อใช้ "เรียกดู" (ไม่สร้างวันซ้อมใหม่)
+// เพื่อให้รีเฟรชไม่ไปสร้างเอกสารวันซ้อมเปล่าโดยไม่ตั้งใจ ถ้าวันซ้อมนั้นมีอยู่แล้วตารางจะขึ้นเหมือนเดิม
+function openCoachScreen(screen, date) {
+  const d = isValidRouteDate(date) ? date : null;
+  switch (screen) {
+    case "checkin":
+      openCheckinSection();
+      if (d) dateInput.value = d;
+      if (!dateInput.value) dateInput.value = todayBangkok();
+      viewSessionForDate(dateInput.value).catch((err) => {
+        console.error(err);
+        setAttendanceStatus("เรียกดูไม่สำเร็จ: " + err.message, true);
+      });
+      break;
+    case "report":
+      openReportSection();
+      if (d) reportDateInput.value = d;
+      reportLoadBtn.click();
+      break;
+    case "plan":
+      openTrainingPlanSection();
+      if (d) trainingPlanDateInput.value = d;
+      break;
+    case "match":
+      openMatchReportSection();
+      break;
+    case "injury":
+      openInjuryReportSection();
+      break;
+    case "players":
+      openAddPlayerSection();
+      break;
+    default:
+      if (d) dailyDateInput.value = d;
+      showDaily();
+  }
+}
+
+// ผู้ดูแลระบบรีเฟรชขณะสวมบทบาทจัดการทีมอยู่: เข้าโหมดเดิม (ทีม/โค้ชคนเดิม/ผู้บริหารทีม) แล้วเปิดจอเดิม — คืน false ถ้าข้อมูลใน hash
+// ใช้ไม่ได้ (ทีมไม่มีจริง) ให้ผู้เรียก fallback ไปทางเดิม
+async function restoreAdminTeamContext(route) {
+  if (!TEAMS.includes(route.team)) return false;
+  const wantedRole = route.as === "executive" ? "executive" : "coach";
+  let record = null;
+  if (route.coach) {
+    try {
+      const snap = await getDoc(doc(db, "coaches", route.coach));
+      if (snap.exists()) {
+        const data = { id: snap.id, ...snap.data() };
+        if (data.team === route.team && data.role === wantedRole && data.status === "approved") record = data;
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+  const returnSection = route.ret === "coaches" ? adminCoachesSection : adminManageTeamSection;
+  if (wantedRole === "executive") {
+    await enterExecutiveViewMode(route.team, returnSection, record);
+  } else {
+    await enterTeamManagementMode(route.team, returnSection, record, () => openCoachScreen(route.screen, route.date));
+  }
+  return true;
+}
+
 // ---------- ล็อกอิน: แยกเส้นทางตามบทบาท (ผู้ดูแลระบบ / โค้ชที่อนุมัติแล้ว / รอการอนุมัติ) ----------
 onAuthStateChanged(auth, async (user) => {
   const isCoachSession = !!user && !user.isAnonymous;
@@ -3056,6 +3206,7 @@ onAuthStateChanged(auth, async (user) => {
   hamburgerBtn.classList.add("hidden");
   notificationBellBtn.classList.add("hidden");
   if (!isCoachSession) {
+    routeSyncEnabled = false;
     hideAllScreens();
     closeDrawer();
     return;
@@ -3113,9 +3264,15 @@ onAuthStateChanged(auth, async (user) => {
         "report-card": openAdminReportCardSection,
         "masc-rounds": openAdminMascRoundsSection
       };
-      const adminDeepLink = new URLSearchParams(window.location.hash.replace(/^#/, "")).get("admin");
+      const route = parseRouteHash(window.location.hash);
+      if (route.admin === "team" && (await restoreAdminTeamContext(route))) {
+        enableRouteSync();
+        return;
+      }
+      const adminDeepLink = route.admin;
       if (adminDeepLink && adminDeepLinks[adminDeepLink]) {
         adminDeepLinks[adminDeepLink]();
+        enableRouteSync();
       } else {
         window.location.href = `${window.location.origin}/`;
       }
@@ -3156,7 +3313,10 @@ onAuthStateChanged(auth, async (user) => {
     }
     await loadPlayers();
     renderDrawerItems();
-    showDaily();
+    // รีเฟรชแล้วกลับมาจอเดิม (screen/d ใน hash) — ไม่มีหรือไม่รู้จักก็เปิด Daily เหมือนเดิม
+    const restored = parseRouteHash(window.location.hash);
+    openCoachScreen(restored.screen, restored.date);
+    enableRouteSync();
   } catch (err) {
     console.error(err);
     setAttendanceStatus("โหลดข้อมูลโค้ชไม่สำเร็จ: " + err.message, true);

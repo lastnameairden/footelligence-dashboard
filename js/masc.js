@@ -654,7 +654,18 @@ ageSelect.addEventListener("change", () => {
   renderForm();
 });
 
+// จำรุ่นอายุ/นักกีฬาที่เลือกไว้ใน URL hash (age=..., player=...) เพื่อให้กดรีเฟรชแล้วกลับมาที่นักกีฬาคนเดิม — อัปเดตเฉพาะสอง
+// พารามิเตอร์นี้ ไม่แตะ team/ageGroups/coachPosition ที่ผู้ดูแลระบบใช้เข้าหน้านี้ (replaceState ไม่เพิ่มประวัติเบราว์เซอร์)
+function setHashParam(name, value) {
+  const params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  if (value) params.set(name, value);
+  else params.delete(name);
+  const next = params.toString();
+  history.replaceState(null, "", `${window.location.pathname}${window.location.search}${next ? "#" + next : ""}`);
+}
+
 ageFilterSelect.addEventListener("change", () => {
+  setHashParam("age", ageFilterSelect.value);
   renderPlayerOptions(ageFilterSelect.value);
   playerSelect.value = "";
   playerSelect.dispatchEvent(new Event("change"));
@@ -662,6 +673,7 @@ ageFilterSelect.addEventListener("change", () => {
 
 playerSelect.addEventListener("change", async () => {
   const id = playerSelect.value;
+  setHashParam("player", id);
   formWrap.classList.add("hidden");
   historyWrap.classList.add("hidden");
   if (!id) {
@@ -698,6 +710,21 @@ playerSelect.addEventListener("change", async () => {
 });
 
 newBtn.addEventListener("click", startNewEvaluationForCurrentPlayer);
+
+// รีเฟรชแล้วกลับมาที่รุ่นอายุ/นักกีฬาเดิม (ถ้ายังอยู่ในรายการ — คนที่ประเมินครบสมบูรณ์แล้วจะไม่อยู่ในรายการแล้ว จึงกลับไปที่ตัวเลือกว่าง)
+function restoreSelectionFromHash() {
+  const params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  const age = params.get("age");
+  const playerId = params.get("player");
+  if (age && Array.from(ageFilterSelect.options).some((o) => o.value === age)) {
+    ageFilterSelect.value = age;
+    renderPlayerOptions(age);
+  }
+  if (playerId && Array.from(playerSelect.options).some((o) => o.value === playerId)) {
+    playerSelect.value = playerId;
+    playerSelect.dispatchEvent(new Event("change"));
+  }
+}
 
 // ---------- ล็อกอิน / สิทธิ์การเข้าถึง ----------
 onAuthStateChanged(auth, async (user) => {
@@ -777,6 +804,7 @@ onAuthStateChanged(auth, async (user) => {
     // นักกีฬาคนนั้นออกจากลิสต์ตั้งแต่ครั้งแรกที่แสดงผล
     await loadCompletedEvaluationsForActiveRound();
     await loadPlayers();
+    restoreSelectionFromHash();
   } catch (err) {
     console.error(err);
     statusEl.textContent = "โหลดข้อมูลไม่สำเร็จ: " + err.message;
