@@ -22,7 +22,8 @@ import {
   calcAge,
   buildScoreTrendChartSvg,
   buildCategoryRadarSvg,
-  escapeHtml
+  escapeHtml,
+  safeHttpUrl
 } from "./ui-utils.js";
 
 const statusEl = document.getElementById("status-message");
@@ -59,7 +60,7 @@ function renderPlayerInfo(player) {
   const age = calcAge(player.birthday);
   // มีรูปจริงก็แสดงแทนไอคอน 👤 เริ่มต้น (เพิ่มรูปได้จากขั้นตอนแก้ไขข้อมูลนักกีฬาในหน้าเช็คชื่อ)
   playerPhotoBadge.innerHTML = player.photoUrl
-    ? `<img src="${player.photoUrl}" alt="รูปนักกีฬา" class="w-full h-full object-cover" />`
+    ? `<img src="${safeHttpUrl(player.photoUrl)}" alt="รูปนักกีฬา" class="w-full h-full object-cover" />`
     : "👤";
   playerNameHeading.textContent = player.nickname || player.fullName || "-";
   const parts = [

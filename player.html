@@ -5,8 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FOOTELLIGENCE DATA — ข้อมูลนักกีฬา</title>
   <link rel="icon" href="./assets/logo.png" />
-  <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="./css/styles.css" />
+  <!-- Tailwind สร้างเป็นไฟล์ static (ดูวิธีสร้างที่ tailwind.config.js) — ต้องอยู่ท้ายสุดของ <head> (หลังทั้ง styles.css และ <style> ในหน้า)
+       เพื่อให้ cascade เหมือนตอนใช้ CDN ซึ่งฉีด <style> ต่อท้ายสุดของ head เสมอ (utility เช่น px-0 ต้องทับ .btn ได้) -->
+  <link rel="stylesheet" href="./css/tailwind.css" />
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-900">
   <header class="app-header text-white sticky top-0 z-10 shadow-sm">

@@ -1,0 +1,4 @@
+/* ต้นทางสำหรับสร้าง css/tailwind.css — ดูวิธีรันที่หัวไฟล์ tailwind.config.js */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

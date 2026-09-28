@@ -28,6 +28,12 @@ export function monthQuery(collectionName, scopeTeam, month) {
     : query(collection(db, collectionName), where("date", ">=", start), where("date", "<=", end));
 }
 
+// URL ที่มาจากข้อมูล (รูปนักกีฬา/รูปแนบรายงาน) ก่อนใส่ใน src/href — รับเฉพาะ https:// แล้ว escape ตัวอักษรพิเศษ ถ้าไม่ใช่
+// ให้เป็นสตริงว่าง กัน javascript:/data: หรือการปิดเครื่องหมายคำพูดเพื่อฉีด attribute อื่น (escapeHtml อย่างเดียวกัน scheme ไม่ได้)
+export function safeHttpUrl(url) {
+  return typeof url === "string" && /^https:\/\//i.test(url) ? escapeHtml(url) : "";
+}
+
 // ---------- กัน XSS: escape ข้อความจากผู้ใช้ก่อนใส่ลง innerHTML ----------
 // ข้อมูลในแอปนี้ (ชื่อโค้ช ชื่อนักกีฬา คู่แข่ง หมายเหตุ ฯลฯ) มาจากผู้ใช้ที่ล็อกอินแล้วเขียนลง Firestore ได้เอง แล้วผู้ดูแล
 // ระบบ/โค้ชคนอื่นเปิดดูผ่าน template string → innerHTML ถ้าไม่ escape ผู้ใช้คนหนึ่งใส่ <img onerror=...> เป็นชื่อได้

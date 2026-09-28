@@ -54,7 +54,8 @@ import {
   sendExecutiveNote,
   escapeHtml,
   monthDateRange,
-  teamDateRangeQuery
+  teamDateRangeQuery,
+  safeHttpUrl
 } from "./ui-utils.js";
 import { categoryRawScore } from "./masc-data.js";
 
@@ -3958,7 +3959,7 @@ function renderReportPhotoPreview() {
   for (const photo of reportExistingPhotos) {
     const wrap = document.createElement("div");
     wrap.className = "relative";
-    wrap.innerHTML = `<a href="${photo.url}" target="_blank" rel="noopener"><img src="${photo.url}" class="w-16 h-16 object-cover rounded border border-slate-200" /></a>`;
+    wrap.innerHTML = `<a href="${safeHttpUrl(photo.url)}" target="_blank" rel="noopener"><img src="${safeHttpUrl(photo.url)}" class="w-16 h-16 object-cover rounded border border-slate-200" /></a>`;
     const removeBtn = document.createElement("button");
     removeBtn.type = "button";
     removeBtn.className =
@@ -4020,7 +4021,7 @@ function renderReportSummary(dateStr, data, headline) {
   reportSummaryPhotos.innerHTML = (data.photos || [])
     .map(
       (photo) =>
-        `<a href="${photo.url}" target="_blank" rel="noopener"><img src="${photo.url}" class="w-16 h-16 object-cover rounded border border-slate-200" /></a>`
+        `<a href="${safeHttpUrl(photo.url)}" target="_blank" rel="noopener"><img src="${safeHttpUrl(photo.url)}" class="w-16 h-16 object-cover rounded border border-slate-200" /></a>`
     )
     .join("");
 }
