@@ -52,7 +52,9 @@ import {
   coachPositionLabel,
   coachPositionAllowsMultipleAgeGroups,
   sendExecutiveNote,
-  escapeHtml
+  escapeHtml,
+  monthDateRange,
+  teamDateRangeQuery
 } from "./ui-utils.js";
 import { categoryRawScore } from "./masc-data.js";
 
@@ -1782,13 +1784,15 @@ async function loadCoachDirectory() {
 // (ตามหลักการเดียวกับ loadTrainingPlanSummary ใน app.js)
 async function computeCoachMonthlySummaryRows(team) {
   const thisMonth = new Date().toISOString().slice(0, 7);
+  // สรุปนี้ดูเฉพาะ "เดือนนี้" อยู่แล้ว จึงดึงเฉพาะเดือนนี้ที่ query เลย ไม่ดึงของทีมทุกเดือนมากรองทีหลัง
+  const { start: monthStart, end: monthEnd } = monthDateRange(thisMonth);
   const [coachSnap, playerSnap, sessionSnap, attendanceSnap, reportSnap, planSnap] = await Promise.all([
     getDocs(query(collection(db, "coaches"), where("team", "==", team), where("role", "==", "coach"))),
     getDocs(query(collection(db, "players"), where("team", "==", team))),
-    getDocs(query(collection(db, "sessions"), where("team", "==", team))),
-    getDocs(query(collection(db, "attendance"), where("team", "==", team))),
-    getDocs(query(collection(db, "trainingReports"), where("team", "==", team))),
-    getDocs(query(collection(db, "trainingPlans"), where("team", "==", team)))
+    getDocs(teamDateRangeQuery("sessions", team, monthStart, monthEnd)),
+    getDocs(teamDateRangeQuery("attendance", team, monthStart, monthEnd)),
+    getDocs(teamDateRangeQuery("trainingReports", team, monthStart, monthEnd)),
+    getDocs(teamDateRangeQuery("trainingPlans", team, monthStart, monthEnd))
   ]);
 
   const coaches = [];
@@ -2866,10 +2870,11 @@ async function loadExecutiveSummary(team) {
   executiveLateWarning.classList.add("hidden");
   try {
     const thisMonth = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+    const { start: monthStart, end: monthEnd } = monthDateRange(thisMonth);
     const [playersSnap, attendanceSnap, trainingPlansSnap] = await Promise.all([
       getDocs(query(collection(db, "players"), where("team", "==", team))),
-      getDocs(query(collection(db, "attendance"), where("team", "==", team))),
-      getDocs(query(collection(db, "trainingPlans"), where("team", "==", team)))
+      getDocs(teamDateRangeQuery("attendance", team, monthStart, monthEnd)),
+      getDocs(teamDateRangeQuery("trainingPlans", team, monthStart, monthEnd))
     ]);
 
     const totalPlayers = playersSnap.size;

@@ -1,6 +1,33 @@
 import { addDoc, collection, doc, getDocs, query, serverTimestamp, setDoc, where } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 import { db } from "./firebase-init.js";
 
+// ---------- query ของทีมหนึ่งในช่วงวันที่ที่ต้องการ (แทนการดึงทั้ง collection มากรองฝั่ง client) ----------
+// attendance/sessions/รายงาน/แผนการฝึก โตขึ้นทุกวัน — เดิมหลายหน้าดึงของทั้งทีม "ทุกเดือนตั้งแต่เริ่มใช้" มาก่อนค่อยกรอง
+// เดือนที่ต้องการทีหลัง (Firestore คิดเงินตามจำนวนเอกสารที่อ่าน และหน้าจะช้าลงเรื่อยๆ) ที่นี่กรองที่ query เลย
+// ต้องมี composite index (team ASC + date ASC) ของ collection นั้นๆ ใน firestore.indexes.json เสมอ เพราะเป็น
+// equality บน team ร่วมกับ range บน date ส่วน where("team","==",...) ต้องอยู่ใน query เสมอตามกฎ rules (ownsTeam)
+// วันที่เก็บเป็นสตริง "YYYY-MM-DD" จึงเทียบแบบตัวอักษรได้ตรงกับเทียบวันที่
+export function monthDateRange(month) {
+  return { start: `${month}-01`, end: `${month}-31` };
+}
+export function teamDateRangeQuery(collectionName, team, startDate, endDate) {
+  return query(
+    collection(db, collectionName),
+    where("team", "==", team),
+    where("date", ">=", startDate),
+    where("date", "<=", endDate)
+  );
+}
+
+// ดึงทั้งเดือนของ "ทีมเดียว" (scopeTeam) หรือ "ทุกทีม" (scopeTeam ว่าง — ใช้ได้เฉพาะผู้ดูแลระบบ ซึ่ง rules ไม่ผูกกับ team)
+// กรณีทุกทีมเป็น range บนฟิลด์เดียว (date) ใช้ single-field index อัตโนมัติ ไม่ต้องมี composite index เพิ่ม
+export function monthQuery(collectionName, scopeTeam, month) {
+  const { start, end } = monthDateRange(month);
+  return scopeTeam
+    ? teamDateRangeQuery(collectionName, scopeTeam, start, end)
+    : query(collection(db, collectionName), where("date", ">=", start), where("date", "<=", end));
+}
+
 // ---------- กัน XSS: escape ข้อความจากผู้ใช้ก่อนใส่ลง innerHTML ----------
 // ข้อมูลในแอปนี้ (ชื่อโค้ช ชื่อนักกีฬา คู่แข่ง หมายเหตุ ฯลฯ) มาจากผู้ใช้ที่ล็อกอินแล้วเขียนลง Firestore ได้เอง แล้วผู้ดูแล
 // ระบบ/โค้ชคนอื่นเปิดดูผ่าน template string → innerHTML ถ้าไม่ escape ผู้ใช้คนหนึ่งใส่ <img onerror=...> เป็นชื่อได้
@@ -465,7 +492,9 @@ export async function loadAdminNotifications() {
   const [coachSnap, injurySnap, planSnap, sessionSnap] = await Promise.all([
     getDocs(collection(db, "coaches")),
     getDocs(collection(db, "injuryReports")),
-    getDocs(collection(db, "trainingPlans")),
+    // แผนที่ใช้ตรวจมีแค่ของวันนี้และเดือนนี้ (ส่งสาย/ยังไม่ส่ง) จึงไม่ต้องดึงทุกเดือน — injuryReports ยังดึงทั้งหมดเพราะ
+    // ต้องดูอาการที่ "ยังไม่หาย" ซึ่งอาจเกิดตั้งแต่เดือนก่อนๆ
+    getDocs(monthQuery("trainingPlans", null, thisMonth)),
     getDocs(query(collection(db, "sessions"), where("date", "==", todayStr)))
   ]);
 

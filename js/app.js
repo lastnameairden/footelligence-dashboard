@@ -29,7 +29,8 @@ import {
   ageGroupSortKey,
   ageGroupNumber,
   coachPositionLabel,
-  escapeHtml
+  escapeHtml,
+  monthQuery
 } from "./ui-utils.js";
 
 // สถานะที่นับว่า "มาซ้อม" ตาม legend ของ Logbook (A หรือค่าประเมิน 1-4)
@@ -814,7 +815,8 @@ async function loadTrainingReports(team) {
   trainingReportsBody.innerHTML =
     `<tr><td colspan="${colCount}" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>`;
 
-  const snap = await getDocs(query(collection(db, "trainingReports"), where("team", "==", team)));
+  // Dashboard แสดงเฉพาะเดือนปัจจุบัน จึงดึงเฉพาะเดือนนี้ที่ query เลย (ไม่ต้องดึงประวัติทุกเดือนมากรองทีหลัง)
+  const snap = await getDocs(monthQuery("trainingReports", team, CURRENT_MONTH_STR));
   const allReports = [];
   snap.forEach((d) => allReports.push({ id: d.id, ...d.data() }));
   // Dashboard หลักแสดงเฉพาะเดือนปัจจุบัน — ดูข้อมูลย้อนหลังได้ที่เมนู "พิมพ์สรุป Dashboard" แทน
@@ -1013,9 +1015,7 @@ async function loadTrainingPlanSummary(scopeTeam) {
   trainingPlanSummaryBody.innerHTML =
     `<tr><td colspan="${colCount}" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>`;
 
-  const snap = scopeTeam
-    ? await getDocs(query(collection(db, "trainingPlans"), where("team", "==", scopeTeam)))
-    : await getDocs(collection(db, "trainingPlans"));
+  const snap = await getDocs(monthQuery("trainingPlans", scopeTeam, new Date().toISOString().slice(0, 7)));
   const plans = [];
   snap.forEach((d) => plans.push(d.data()));
 
@@ -1108,12 +1108,8 @@ async function loadMatchAndInjuryReports(scopeTeam) {
     '<tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>';
 
   const [matchSnap, injurySnap] = await Promise.all([
-    scopeTeam
-      ? getDocs(query(collection(db, "matchReports"), where("team", "==", scopeTeam)))
-      : getDocs(collection(db, "matchReports")),
-    scopeTeam
-      ? getDocs(query(collection(db, "injuryReports"), where("team", "==", scopeTeam)))
-      : getDocs(collection(db, "injuryReports"))
+    getDocs(monthQuery("matchReports", scopeTeam, CURRENT_MONTH_STR)),
+    getDocs(monthQuery("injuryReports", scopeTeam, CURRENT_MONTH_STR))
   ]);
 
   // Dashboard หลักแสดงเฉพาะเดือนปัจจุบัน — ดูข้อมูลย้อนหลังได้ที่เมนู "พิมพ์สรุป Dashboard" แทน

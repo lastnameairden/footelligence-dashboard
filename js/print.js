@@ -23,7 +23,9 @@ import {
   getCoachPlayerIds,
   isCoachSubmissionOnTime,
   isReportLate,
-  escapeHtml
+  escapeHtml,
+  monthDateRange,
+  teamDateRangeQuery
 } from "./ui-utils.js";
 
 const statusEl = document.getElementById("status-message");
@@ -578,16 +580,19 @@ function buildInjurySeverityChartSvg(injuries) {
 // สรุปแผนการฝึกซ้อม/ผลการแข่งขัน/อาการบาดเจ็บ ของทีม+เดือน+รุ่นอายุเดียวกับตารางผู้เล่นด้านบน — ให้สรุป
 // สำหรับพิมพ์มีข้อมูลครบรูปแบบเดียวกับหน้า Dashboard
 async function loadPrintExtras(team, ageGroup, month) {
+  // ดึงเฉพาะเดือนที่เลือกที่ query เลย (เดิมดึงของทีมทุกเดือนมากรองทีหลัง — attendance โตทุกวันจึงช้าลง/แพงขึ้นเรื่อยๆ)
+  // ยกเว้น players/coaches ที่เป็นรายชื่อปัจจุบัน ไม่ผูกกับเดือน
+  const { start: monthStart, end: monthEnd } = monthDateRange(month);
   const [trainingPlanSnap, matchSnap, injurySnap, coachSnap, sessionSnap, attendanceSnap, playersSnap, trainingReportSnap] =
     await Promise.all([
-      getDocs(query(collection(db, "trainingPlans"), where("team", "==", team))),
-      getDocs(query(collection(db, "matchReports"), where("team", "==", team))),
-      getDocs(query(collection(db, "injuryReports"), where("team", "==", team))),
+      getDocs(teamDateRangeQuery("trainingPlans", team, monthStart, monthEnd)),
+      getDocs(teamDateRangeQuery("matchReports", team, monthStart, monthEnd)),
+      getDocs(teamDateRangeQuery("injuryReports", team, monthStart, monthEnd)),
       getDocs(query(collection(db, "coaches"), where("team", "==", team), where("role", "==", "coach"))),
-      getDocs(query(collection(db, "sessions"), where("team", "==", team))),
-      getDocs(query(collection(db, "attendance"), where("team", "==", team))),
+      getDocs(teamDateRangeQuery("sessions", team, monthStart, monthEnd)),
+      getDocs(teamDateRangeQuery("attendance", team, monthStart, monthEnd)),
       getDocs(query(collection(db, "players"), where("team", "==", team))),
-      getDocs(query(collection(db, "trainingReports"), where("team", "==", team)))
+      getDocs(teamDateRangeQuery("trainingReports", team, monthStart, monthEnd))
     ]);
 
   let coaches = [];

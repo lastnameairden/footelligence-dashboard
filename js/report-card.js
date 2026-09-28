@@ -23,7 +23,8 @@ import {
   TEAM_COLORS,
   SCORE_CATEGORIES,
   SCORE_CATEGORY_COLORS,
-  escapeHtml
+  escapeHtml,
+  teamDateRangeQuery
 } from "./ui-utils.js";
 import { CRITERIA, SECT, categoryRawScore, scoreToGrade } from "./masc-data.js";
 
@@ -702,17 +703,18 @@ async function loadReportCards(team, ageGroup, start, end) {
 
   const startDate = `${start}-01`;
   const endDate = lastDayOfMonth(end);
-  // รอบก่อนหน้ายาวเท่ากับรอบที่เลือก ใช้เทียบพัฒนาการในตารางเปรียบเทียบ/เรดาร์ซ้อนสองรอบ — ไม่ต้อง query
-  // Firestore เพิ่ม เพราะ attendanceSnap ด้านล่างดึงข้อมูลทั้งทีมมาแล้ว (ไม่ได้กรองด้วยเดือนที่ query level)
+  // รอบก่อนหน้ายาวเท่ากับรอบที่เลือก ใช้เทียบพัฒนาการในตารางเปรียบเทียบ/เรดาร์ซ้อนสองรอบ — attendanceSnap ด้านล่าง
+  // ดึงครอบคลุมตั้งแต่ต้นรอบก่อนหน้าถึงสิ้นรอบที่เลือก แล้วค่อยแยกสองรอบฝั่ง client
   const prevPeriod = previousPeriodRange(start, end);
   const prevStartDate = `${prevPeriod.start}-01`;
   const prevEndDate = lastDayOfMonth(prevPeriod.end);
 
   const [playersSnap, attendanceSnap, matchSnap, injurySnap, commentsSnap, evaluationsSnap] = await Promise.all([
     getDocs(query(collection(db, "players"), where("team", "==", team))),
-    getDocs(query(collection(db, "attendance"), where("team", "==", team))),
-    getDocs(query(collection(db, "matchReports"), where("team", "==", team))),
-    getDocs(query(collection(db, "injuryReports"), where("team", "==", team))),
+    // attendance ต้องครอบคลุมทั้งรอบที่เลือกและรอบก่อนหน้า (ใช้เทียบพัฒนาการ) ส่วนแข่งขัน/บาดเจ็บใช้เฉพาะรอบที่เลือก
+    getDocs(teamDateRangeQuery("attendance", team, prevStartDate, endDate)),
+    getDocs(teamDateRangeQuery("matchReports", team, startDate, endDate)),
+    getDocs(teamDateRangeQuery("injuryReports", team, startDate, endDate)),
     getDocs(
       query(
         collection(db, "playerReportCards"),

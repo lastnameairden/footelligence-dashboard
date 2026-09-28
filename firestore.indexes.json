@@ -1,0 +1,91 @@
+{
+    "indexes":  [
+                    {
+                        "collectionGroup":  "attendance",
+                        "queryScope":  "COLLECTION",
+                        "fields":  [
+                                       {
+                                           "fieldPath":  "team",
+                                           "order":  "ASCENDING"
+                                       },
+                                       {
+                                           "fieldPath":  "date",
+                                           "order":  "ASCENDING"
+                                       }
+                                   ]
+                    },
+                    {
+                        "collectionGroup":  "sessions",
+                        "queryScope":  "COLLECTION",
+                        "fields":  [
+                                       {
+                                           "fieldPath":  "team",
+                                           "order":  "ASCENDING"
+                                       },
+                                       {
+                                           "fieldPath":  "date",
+                                           "order":  "ASCENDING"
+                                       }
+                                   ]
+                    },
+                    {
+                        "collectionGroup":  "trainingPlans",
+                        "queryScope":  "COLLECTION",
+                        "fields":  [
+                                       {
+                                           "fieldPath":  "team",
+                                           "order":  "ASCENDING"
+                                       },
+                                       {
+                                           "fieldPath":  "date",
+                                           "order":  "ASCENDING"
+                                       }
+                                   ]
+                    },
+                    {
+                        "collectionGroup":  "trainingReports",
+                        "queryScope":  "COLLECTION",
+                        "fields":  [
+                                       {
+                                           "fieldPath":  "team",
+                                           "order":  "ASCENDING"
+                                       },
+                                       {
+                                           "fieldPath":  "date",
+                                           "order":  "ASCENDING"
+                                       }
+                                   ]
+                    },
+                    {
+                        "collectionGroup":  "matchReports",
+                        "queryScope":  "COLLECTION",
+                        "fields":  [
+                                       {
+                                           "fieldPath":  "team",
+                                           "order":  "ASCENDING"
+                                       },
+                                       {
+                                           "fieldPath":  "date",
+                                           "order":  "ASCENDING"
+                                       }
+                                   ]
+                    },
+                    {
+                        "collectionGroup":  "injuryReports",
+                        "queryScope":  "COLLECTION",
+                        "fields":  [
+                                       {
+                                           "fieldPath":  "team",
+                                           "order":  "ASCENDING"
+                                       },
+                                       {
+                                           "fieldPath":  "date",
+                                           "order":  "ASCENDING"
+                                       }
+                                   ]
+                    }
+                ],
+    "fieldOverrides":  [
+
+                       ]
+}
