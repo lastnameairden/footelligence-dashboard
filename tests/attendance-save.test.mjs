@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { applyAttendanceChange, firestoreFieldsForChange, createSaveQueue } from "../js/attendance-save.js";
+import { applyAttendanceChange, firestoreFieldsForChange, createSaveQueue, rosterLockState } from "../js/attendance-save.js";
 
 const fixedNow = () => new Date("2026-03-10T10:00:00Z");
 
@@ -111,4 +111,23 @@ test("save queue: onChange fires with 0 only after the last task and errors were
   q.enqueue("p1", async () => { throw new Error("x"); });
   await q.idle();
   assert.deepEqual(order, ["pending:1", "error", "pending:0"]);
+});
+
+test("rosterLockState: complete roster stays editable on the training day, locks from the next day", () => {
+  const base = { complete: true, isAdmin: false };
+  assert.equal(rosterLockState({ ...base, sessionDate: "2026-03-10", today: "2026-03-10" }), "complete-editable");
+  assert.equal(rosterLockState({ ...base, sessionDate: "2026-03-10", today: "2026-03-11" }), "locked");
+  assert.equal(rosterLockState({ ...base, sessionDate: "2026-03-10", today: "2026-04-01" }), "locked");
+  // วันที่ในอนาคต (ยังไม่ถึงวันซ้อม) ไม่ล็อก
+  assert.equal(rosterLockState({ ...base, sessionDate: "2026-03-12", today: "2026-03-10" }), "complete-editable");
+});
+
+test("rosterLockState: incomplete rosters and admins are never locked", () => {
+  assert.equal(rosterLockState({ complete: false, isAdmin: false, sessionDate: "2026-03-01", today: "2026-03-10" }), "editable");
+  assert.equal(rosterLockState({ complete: true, isAdmin: true, sessionDate: "2026-03-01", today: "2026-03-10" }), "editable");
+});
+
+test("rosterLockState: without a session date it does not lock", () => {
+  assert.equal(rosterLockState({ complete: true, isAdmin: false, sessionDate: "", today: "2026-03-10" }), "complete-editable");
+  assert.equal(rosterLockState({ complete: true, isAdmin: false, sessionDate: undefined, today: "2026-03-10" }), "complete-editable");
 });

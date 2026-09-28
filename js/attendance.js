@@ -61,7 +61,7 @@ import {
   monthsAgoBangkok
 } from "./ui-utils.js";
 import { isEvaluationComplete } from "./masc-data.js";
-import { applyAttendanceChange, firestoreFieldsForChange, createSaveQueue } from "./attendance-save.js";
+import { applyAttendanceChange, firestoreFieldsForChange, createSaveQueue, rosterLockState } from "./attendance-save.js";
 
 const STATUS_OPTIONS = ["A", "I", "R", "P"];
 const SCORE_OPTIONS = [1, 2, 3, 4];
@@ -253,6 +253,7 @@ const noTrainingBanner = document.getElementById("no-training-banner");
 const undoNoTrainingBtn = document.getElementById("undo-no-training-btn");
 const rosterWrap = document.getElementById("roster-wrap");
 const rosterLockedBanner = document.getElementById("roster-locked-banner");
+const rosterCompleteBanner = document.getElementById("roster-complete-banner");
 const rosterBody = document.getElementById("roster-table-body");
 const attendanceStatus = document.getElementById("attendance-status");
 const addPlayerForm = document.getElementById("add-player-form");
@@ -3489,8 +3490,15 @@ function isRosterComplete(existingMap) {
 
 function renderRoster(existingMap) {
   currentAttendanceMap = existingMap;
-  const locked = isRosterComplete(existingMap) && !currentIsAdmin;
+  const lockState = rosterLockState({
+    complete: isRosterComplete(existingMap),
+    sessionDate: (currentSessionData && currentSessionData.date) || dateInput.value,
+    today: todayBangkok(),
+    isAdmin: currentIsAdmin
+  });
+  const locked = lockState === "locked";
   rosterLockedBanner.classList.toggle("hidden", !locked);
+  rosterCompleteBanner.classList.toggle("hidden", lockState !== "complete-editable");
 
   rosterBody.innerHTML = "";
   if (players.length === 0) {
@@ -3655,6 +3663,7 @@ function showRosterView() {
 function showNoTrainingView() {
   noTrainingBanner.classList.remove("hidden");
   rosterLockedBanner.classList.add("hidden");
+  rosterCompleteBanner.classList.add("hidden");
   rosterWrap.classList.add("hidden");
 }
 
@@ -3663,6 +3672,7 @@ function showNoTrainingView() {
 function showNoSessionView() {
   noTrainingBanner.classList.add("hidden");
   rosterLockedBanner.classList.add("hidden");
+  rosterCompleteBanner.classList.add("hidden");
   rosterWrap.classList.add("hidden");
 }
 

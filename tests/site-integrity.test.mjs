@@ -36,6 +36,27 @@ test("no inline event-handler attributes or javascript: URLs (blocked by the CSP
   }
 });
 
+// getElementById("x") ที่หา id ไม่เจอจะได้ null แล้วสคริปต์พังทั้งหน้าตอนโหลด (เช่น เพิ่มตัวแปรใน JS แต่ลืมเพิ่ม element ใน HTML)
+// เช็คเฉพาะ id ที่ระบุเป็นสตริงตรงๆ — id ที่สร้างตอนรันผ่านเทมเพลต (innerHTML) ไม่นับ จึงใช้ได้กับ id ที่ประกาศตอนโหลดหน้า
+const PAGE_OF_SCRIPT = {
+  "js/attendance.js": "attendance.html",
+  "js/app.js": "index.html",
+  "js/masc.js": "masc.html",
+  "js/print.js": "print.html",
+  "js/report-card.js": "report-card.html",
+  "js/player.js": "player.html",
+  "js/development.js": "development.html"
+};
+test("every getElementById id used by a page script exists in that page's HTML", () => {
+  for (const [script, page] of Object.entries(PAGE_OF_SCRIPT)) {
+    const html = read(page);
+    const declared = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]));
+    const missing = [...new Set([...read(script).matchAll(/getElementById\(\s*"([^"]+)"\s*\)/g)].map((m) => m[1]))]
+      .filter((id) => !declared.has(id));
+    assert.deepEqual(missing, [], `${script} looks up ids that are not in ${page}`);
+  }
+});
+
 // "วันนี้/เดือนนี้" ต้องมาจาก todayBangkok()/thisMonthBangkok() ใน ui-utils.js เท่านั้น — new Date().toISOString() เป็นเวลา UTC
 // (00:00-07:00 น. เวลาไทยจะได้ "เมื่อวาน") เคยทำให้วันที่เริ่มต้นของเช็คชื่อ/รายงาน/แผนฝึกและรอบ MASC เพี้ยน
 test("no UTC-based today/this-month in the app code (use todayBangkok / thisMonthBangkok)", () => {

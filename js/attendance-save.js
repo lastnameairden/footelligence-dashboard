@@ -63,3 +63,12 @@ export function createSaveQueue({ onChange = () => {}, onError = () => {} } = {}
     idle: () => Promise.all([...chains.values()])
   };
 }
+
+// สถานะการล็อกตารางเช็คชื่อ: ประเมินครบทุกคนแล้ว "ในวันฝึกซ้อมนั้น" ยังแก้ไขได้จนสิ้นวัน (เวลาไทย) เพื่อให้โค้ชแก้ที่แตะพลาด
+// ได้ (เดิมล็อกทันทีที่แตะช่องสุดท้าย แก้เองไม่ได้ ต้องพึ่งผู้ดูแลระบบ) พ้นวันแล้วถึงล็อกเป็นดูอย่างเดียว — ผู้ดูแลระบบไม่ถูกล็อก
+// คืนค่า "editable" (ยังประเมินไม่ครบ/ผู้ดูแลระบบ) | "complete-editable" (ครบแล้วแต่ยังแก้ได้วันนี้) | "locked"
+// sessionDate/today เป็นสตริง "YYYY-MM-DD" เทียบแบบตัวอักษรได้
+export function rosterLockState({ complete, sessionDate, today, isAdmin }) {
+  if (isAdmin || !complete) return "editable";
+  return sessionDate && sessionDate < today ? "locked" : "complete-editable";
+}
