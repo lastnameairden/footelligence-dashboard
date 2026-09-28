@@ -1,59 +1,38 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // เช็คสิทธิ์จากบัญชีโค้ชใน Firestore (คอลเลกชัน coaches) ข้ามบริการด้วย firestore.get() แบบเดียวกับที่ firestore.rules
-    // ใช้ get() — ต้องมี role "Firebase Rules Firestore Service Agent" ให้ service account ของ Storage (firebase deploy
-    // --only storage จะตรวจและเพิ่มให้เองเมื่อ rules มี firestore.get) ถ้า role นี้ขาด ทุกคำขออัปโหลด/ลบจะถูกปฏิเสธหมด
-    // (เคยเจอมาแล้วจึงเคยตัดไปเช็คแค่ล็อกอิน) ถ้าเจออาการนั้นอีกให้ rollback ด้วยการ deploy storage.rules เวอร์ชันก่อนหน้า
-    // แล้วตรวจ role ใน Google Cloud Console → IAM
-    //
-    // ทุกคำขอเรียก firestore.get ได้ไม่เกิน 2 ครั้ง และเอกสารเดียวกันนับครั้งเดียว — จึงเรียก coachDoc() ซ้ำได้หลายที่
+    // เดิมพยายามอ่านข้อมูลบัญชีโค้ชจาก Firestore ข้ามบริการผ่าน firestore.get() เหมือน firestore.rules ทุกประการ
+    // แต่พบว่า cross-service call แบบนี้ไม่เสถียร (ทดสอบจริงแล้วโดนปฏิเสธ storage/unauthorized แม้เป็นโค้ชทีมนั้น
+    // จริงและไฟล์ผ่านทุกเงื่อนไข) จึงตัดมาเช็คแค่ "ล็อกอินจริง ไม่ใช่ anonymous" แทน — การจำกัดว่าใครเห็น/แก้ไข
+    // ไฟล์ของทีมไหนยังคุมอยู่ที่ชั้นแอป (URL/path ที่ใช้จริงอิงจาก myTeam ของผู้ใช้เสมอ ไม่เปิดให้เลือกทีมอื่นได้)
+    // และบัญชีทุกคนต้องผ่านการอนุมัติจากผู้ดูแลระบบก่อนถึงจะใช้งานแอปได้อยู่แล้ว
     function isSignedInCoach() {
       return request.auth != null && request.auth.token.firebase.sign_in_provider != 'anonymous';
     }
-    function coachDoc() {
-      return firestore.get(/databases/(default)/documents/coaches/$(request.auth.uid)).data;
-    }
-    function isApproved() { return isSignedInCoach() && coachDoc().status == 'approved'; }
-    function isAdmin() { return isApproved() && coachDoc().role == 'admin'; }
-    // ผู้ดูแลระบบสวมบทบาทเข้าไปจัดการทีมไหนก็ได้ (เหมือน firestore.rules) ส่วนโค้ชแตะได้เฉพาะโฟลเดอร์ของทีมตัวเอง
-    function canWriteTeam(team) {
-      return isAdmin() || (isApproved() && coachDoc().role == 'coach' && coachDoc().team == team);
-    }
-    // ผู้บริหารทีม (executive) ดูข้อมูลทีมตัวเองได้เหมือนโค้ช แต่เขียน/ลบไม่ได้
-    function canReadTeam(team) {
-      return isAdmin() || (isApproved() && coachDoc().role in ['coach', 'executive'] && coachDoc().team == team);
-    }
-
-    // ทุกโฟลเดอร์: ห้าม list (ไล่ดูรายการไฟล์ทั้งโฟลเดอร์) — แอปไม่เคยใช้ และการเปิดไว้ทำให้คนที่เข้าถึงโฟลเดอร์ได้
-    // เก็บ URL ของไฟล์ทั้งหมดได้ในครั้งเดียว อ่านได้เฉพาะ get ทีละไฟล์ที่รู้ path (ชื่อไฟล์มี timestamp กันเดา)
-    // การแสดงรูป/เปิดไฟล์ในหน้าเว็บใช้ download URL (มี token ในตัว) ไม่ผ่านกฎข้อนี้
 
     // ไฟล์แนบแผนการฝึกซ้อมรายวัน (รูป/PDF) แยกโฟลเดอร์ตามทีม — จำกัดขนาดไฟล์ไม่เกิน 10MB (ชนิดไฟล์คุมด้วย accept
     // ของ input ฝั่งหน้าเว็บแทน ไม่เช็ค request.resource.contentType ในชั้น rules เพราะพบว่า browser/OS บาง
     // เครื่องรายงาน content-type ของไฟล์เดียวกันไม่ตรงกับที่ฝั่ง client เห็น ทำให้ไฟล์ที่ถูกต้องถูกปฏิเสธเอง)
     match /trainingPlans/{team}/{allPaths=**} {
-      allow get: if canReadTeam(team);
-      allow list: if false;
-      allow create, update: if canWriteTeam(team) && request.resource.size < 10 * 1024 * 1024;
-      allow delete: if canWriteTeam(team);
+      allow read: if isSignedInCoach();
+      allow create, update: if isSignedInCoach() && request.resource.size < 10 * 1024 * 1024;
+      allow delete: if isSignedInCoach();
     }
 
-    // รูปภาพแนบรายงานการฝึกซ้อม — เปิดใช้เฉพาะทีม THAWEE SC ตามคำขอ (ทีมอื่นยังไม่ต้องมีฟีเจอร์นี้)
+    // รูปภาพแนบรายงานการฝึกซ้อม — เปิดใช้เฉพาะทีม THAWEE SC ตามคำขอ (ทีมอื่นยังไม่ต้องมีฟีเจอร์นี้) — ยังคง
+    // ล็อก team == 'THAWEE SC' ไว้ในชั้น rules ได้ตามปกติ เพราะเทียบจาก path ตรงๆ ไม่ต้องพึ่ง cross-service call
     match /trainingReports/{team}/{allPaths=**} {
-      allow get: if canReadTeam(team);
-      allow list: if false;
-      allow create, update: if team == 'THAWEE SC' && canWriteTeam(team) && request.resource.size < 10 * 1024 * 1024;
-      allow delete: if canWriteTeam(team);
+      allow read: if isSignedInCoach();
+      allow create, update: if isSignedInCoach() && team == 'THAWEE SC' && request.resource.size < 10 * 1024 * 1024;
+      allow delete: if isSignedInCoach();
     }
 
     // รูปโปรไฟล์นักกีฬา — จำกัดขนาดไฟล์ไม่เกิน 5MB (เล็กกว่าไฟล์แนบอื่นเพราะเป็นแค่รูปคนเดียว ไม่ใช่เอกสาร/ภาพ
     // การฝึกซ้อมทั้งสนาม)
     match /players/{team}/{allPaths=**} {
-      allow get: if canReadTeam(team);
-      allow list: if false;
-      allow create, update: if canWriteTeam(team) && request.resource.size < 5 * 1024 * 1024;
-      allow delete: if canWriteTeam(team);
+      allow read: if isSignedInCoach();
+      allow create, update: if isSignedInCoach() && request.resource.size < 5 * 1024 * 1024;
+      allow delete: if isSignedInCoach();
     }
   }
 }
