@@ -1,0 +1,10 @@
+# ไม่ต้อง deploy ขึ้นเว็บ (เป็นไฟล์สำหรับพัฒนา/Firebase CLI เท่านั้น)
+tests
+README.md
+tailwind.config.js
+css/tailwind.input.css
+firebase.json
+.firebaserc
+firestore.rules
+firestore.indexes.json
+storage.rules
