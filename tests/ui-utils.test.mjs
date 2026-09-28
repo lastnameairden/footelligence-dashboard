@@ -22,7 +22,8 @@ import {
   todayBangkok,
   thisMonthBangkok,
   bangkokHour,
-  monthsAgoBangkok
+  monthsAgoBangkok,
+  trainingPlanHasAttachment
 } from "../js/ui-utils.js";
 
 const ts = (date) => ({ toDate: () => date });
@@ -192,4 +193,15 @@ test("monthsAgoBangkok: steps back whole months, across year boundaries and shor
   assert.equal(monthsAgoBangkok(1, now), "2026-02");
   assert.equal(monthsAgoBangkok(3, now), "2025-12");
   assert.equal(monthsAgoBangkok(14, now), "2025-01");
+});
+
+test("trainingPlanHasAttachment: a plan needs a new file or a kept existing file", () => {
+  assert.equal(trainingPlanHasAttachment({ hasNewFile: false, existingFileUrl: null, removeExisting: false }), false);
+  assert.equal(trainingPlanHasAttachment({ hasNewFile: true, existingFileUrl: null, removeExisting: false }), true);
+  assert.equal(trainingPlanHasAttachment({ hasNewFile: false, existingFileUrl: "https://x/y.pdf", removeExisting: false }), true);
+  // ลบไฟล์เดิมแล้วยังไม่เลือกไฟล์ใหม่ = ไม่มีไฟล์ ส่งไม่ได้
+  assert.equal(trainingPlanHasAttachment({ hasNewFile: false, existingFileUrl: "https://x/y.pdf", removeExisting: true }), false);
+  // ลบไฟล์เดิมแต่เลือกไฟล์ใหม่ = ส่งได้
+  assert.equal(trainingPlanHasAttachment({ hasNewFile: true, existingFileUrl: "https://x/y.pdf", removeExisting: true }), true);
+  assert.equal(trainingPlanHasAttachment({ hasNewFile: false, existingFileUrl: "", removeExisting: false }), false);
 });

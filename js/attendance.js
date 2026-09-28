@@ -58,7 +58,8 @@ import {
   safeHttpUrl,
   todayBangkok,
   thisMonthBangkok,
-  monthsAgoBangkok
+  monthsAgoBangkok,
+  trainingPlanHasAttachment
 } from "./ui-utils.js";
 import { isEvaluationComplete } from "./masc-data.js";
 import { applyAttendanceChange, firestoreFieldsForChange, createSaveQueue, rosterLockState } from "./attendance-save.js";
@@ -5034,7 +5035,30 @@ function renderTrainingPlanPhaseSegmented() {
 
 // แสดงสถานะไฟล์แนบปัจจุบันใต้ช่องเลือกไฟล์ — ของเดิม (ถ้ามีและยังไม่ถูกลบ) จะมีลิงก์เปิดดู + ปุ่ม "ลบไฟล์แนบ"
 // เลือกไฟล์ใหม่แล้วจะถือว่าใช้ไฟล์ใหม่แทนตอนบันทึก โดยไม่ต้องกดลบของเดิมก่อน
+// ต้องแนบไฟล์ทุกครั้งที่ส่งแผน — ปุ่มส่งจะกดไม่ได้จนกว่าจะมีไฟล์ (เลือกไฟล์ใหม่ หรือมีไฟล์เดิมที่ยังไม่ถูกลบ) ทุกจุดที่ไฟล์แนบ
+// เปลี่ยน (เลือกไฟล์ / ลบไฟล์เดิม / เริ่มหรือยกเลิกการแก้ไข) เรียก renderTrainingPlanFileStatus ซึ่งเรียกฟังก์ชันนี้ต่อเสมอ
+let trainingPlanSubmitting = false;
+function trainingPlanCanSubmit() {
+  return trainingPlanHasAttachment({
+    hasNewFile: Boolean(trainingPlanFileInput.files[0]),
+    existingFileUrl: trainingPlanExistingFileUrl,
+    removeExisting: trainingPlanRemoveExistingFile
+  });
+}
+function updateTrainingPlanSubmitState() {
+  const hasFile = trainingPlanCanSubmit();
+  trainingPlanSubmitBtn.disabled = trainingPlanSubmitting || !hasFile;
+  trainingPlanSubmitBtn.title = hasFile ? "" : "ต้องแนบไฟล์แผนการฝึก (รูป/PDF) ก่อนจึงจะส่งได้";
+  trainingPlanFileStatus.classList.toggle("text-red-600", !hasFile);
+  trainingPlanFileStatus.classList.toggle("text-slate-500", hasFile);
+}
+
 function renderTrainingPlanFileStatus() {
+  renderTrainingPlanFileStatusText();
+  updateTrainingPlanSubmitState();
+}
+
+function renderTrainingPlanFileStatusText() {
   trainingPlanFileStatus.innerHTML = "";
   if (trainingPlanFileInput.files[0]) {
     trainingPlanFileStatus.textContent = `เลือกไฟล์ใหม่: ${trainingPlanFileInput.files[0].name}`;
@@ -5053,13 +5077,16 @@ function renderTrainingPlanFileStatus() {
     trainingPlanFileStatus.appendChild(removeBtn);
     return;
   }
-  trainingPlanFileStatus.textContent = trainingPlanExistingFileUrl ? "ไฟล์แนบเดิมจะถูกลบเมื่อบันทึก" : "ยังไม่ได้แนบไฟล์";
+  trainingPlanFileStatus.textContent = trainingPlanExistingFileUrl
+    ? "ลบไฟล์เดิมแล้ว — ต้องแนบไฟล์ใหม่ก่อนจึงจะบันทึกได้"
+    : "ยังไม่ได้แนบไฟล์ — ต้องแนบไฟล์แผนการฝึก (รูป/PDF) ก่อนจึงจะส่งแผนได้";
 }
 
 trainingPlanFileInput.addEventListener("change", () => {
   trainingPlanRemoveExistingFile = false;
   renderTrainingPlanFileStatus();
 });
+renderTrainingPlanFileStatus(); // ตั้งสถานะปุ่มส่ง (ปิดไว้จนกว่าจะแนบไฟล์) ตั้งแต่โหลดหน้า
 
 function stopEditTrainingPlan() {
   editingTrainingPlanId = null;
@@ -5261,6 +5288,12 @@ trainingPlanForm.addEventListener("submit", async (e) => {
   }
 
   const selectedFile = trainingPlanFileInput.files[0] || null;
+  // ปุ่มส่งถูกปิดอยู่แล้วเมื่อไม่มีไฟล์ — กันไว้อีกชั้นเผื่อฟอร์มถูกส่งโดยทางอื่น
+  if (!trainingPlanCanSubmit()) {
+    trainingPlanStatus.textContent = "กรุณาแนบไฟล์แผนการฝึก (รูป/PDF) ก่อนส่ง";
+    trainingPlanStatus.className = "text-sm text-red-600";
+    return;
+  }
   if (selectedFile) {
     if (selectedFile.size > MAX_ATTACHMENT_FILE_SIZE) {
       trainingPlanStatus.textContent = "ไฟล์ใหญ่เกินไป (จำกัดไม่เกิน 10MB)";
@@ -5291,7 +5324,8 @@ trainingPlanForm.addEventListener("submit", async (e) => {
     updatedAt: serverTimestamp()
   };
 
-  trainingPlanSubmitBtn.disabled = true;
+  trainingPlanSubmitting = true;
+  updateTrainingPlanSubmitState();
   const oldFilePath = trainingPlanExistingFilePath;
   try {
     if (selectedFile) {
@@ -5334,7 +5368,8 @@ trainingPlanForm.addEventListener("submit", async (e) => {
     trainingPlanStatus.textContent = "บันทึกไม่สำเร็จ: " + err.message;
     trainingPlanStatus.className = "text-sm text-red-600";
   } finally {
-    trainingPlanSubmitBtn.disabled = false;
+    trainingPlanSubmitting = false;
+    updateTrainingPlanSubmitState();
   }
 });
 

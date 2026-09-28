@@ -438,6 +438,11 @@ export const TRAINING_PLAN_MONTHLY_QUOTA = 20;
 // คนละกิจกรรมกัน แม้ปัจจุบันจะตั้งไว้เท่ากันก็ตาม (เผื่ออนาคตค่าอาจต่างกัน)
 export const CHECKIN_MONTHLY_QUOTA = 20;
 
+// แผนการฝึกซ้อมต้องมีไฟล์แนบ (รูป/PDF) ทุกครั้งที่ส่ง/บันทึกแก้ไข — นับว่ามีไฟล์เมื่อเลือกไฟล์ใหม่แล้ว หรือมีไฟล์เดิมที่ยังไม่ถูกสั่งลบ
+export function trainingPlanHasAttachment({ hasNewFile, existingFileUrl, removeExisting }) {
+  return Boolean(hasNewFile || (existingFileUrl && !removeExisting));
+}
+
 export function isTrainingPlanLate(plan) {
   const ts = plan.updatedAt && typeof plan.updatedAt.toDate === "function" ? plan.updatedAt.toDate() : null;
   if (!ts || !plan.date) return false;
