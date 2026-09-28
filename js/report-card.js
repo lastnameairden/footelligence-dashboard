@@ -27,7 +27,7 @@ import {
   teamDateRangeQuery,
   safeHttpUrl
 } from "./ui-utils.js";
-import { CRITERIA, SECT, categoryRawScore, scoreToGrade } from "./masc-data.js";
+import { CRITERIA, SECT, categoryRawScore, isEvaluationComplete, scoreToGrade } from "./masc-data.js";
 
 const UNASSIGNED_AGE_GROUP = "ไม่ระบุรุ่นอายุ";
 const DEFAULT_ACCENT = "#0f172a";
@@ -225,13 +225,9 @@ function colorStatCard(label, value, hex) {
 const ROLE_LABELS = { important: "ตัวหลัก", rotation: "ตัวหมุนเวียน", reserve: "ตัวสำรอง" };
 const MASC_COLORS = { M: "#0ea5e9", A: "#8b5cf6", S: "#f59e0b", C: "#ec4899" };
 
-// ถือว่า "ประเมินสำเร็จ" ก็ต่อเมื่อให้คะแนนครบทั้ง 4 ข้อในทุกหมวด M/A/S/C จนคำนวณเกรดได้ครบทุกหมวด (เกณฑ์เดียวกับ
-// isEvaluationComplete ในหน้า masc.html/masc.js) — เอกสารที่เพิ่งกด "+ ประเมินรอบใหม่" แล้วยังไม่ได้ให้คะแนนเลย
-// (หรือให้ไม่ครบ) จะมีเกรดเป็น "-" ทุกหมวด ไม่ควรถูกดึงมาแสดงเป็น "MASC ล่าสุด" ของนักกีฬาเพราะดูเหมือนมีข้อมูล
-// ทั้งที่จริงว่างเปล่า
-function isEvaluationComplete(evaluation) {
-  return !!evaluation && ["M", "A", "S", "C"].every((cat) => categoryRawScore(evaluation.scores?.[cat]) !== null);
-}
+// isEvaluationComplete (จาก masc-data.js): "ประเมินสำเร็จ" ก็ต่อเมื่อให้คะแนนครบทั้ง 4 ข้อในทุกหมวด M/A/S/C — เอกสารที่เพิ่ง
+// กด "+ ประเมินรอบใหม่" แล้วยังไม่ได้ให้คะแนนเลย (หรือให้ไม่ครบ) จะมีเกรดเป็น "-" ทุกหมวด ไม่ควรถูกดึงมาแสดงเป็น
+// "MASC ล่าสุด" ของนักกีฬาเพราะดูเหมือนมีข้อมูลทั้งที่จริงว่างเปล่า
 
 // เกรด M/A/S/C (1/3/7/9) จากการประเมิน MASC ล่าสุด — คืนค่า null ทั้งหมดถ้ายังไม่เคยประเมิน (ใช้ทั้งในป้ายเล็กๆ
 // ใต้ Profile Radar และเนื้อหาข้อความในคอลัมน์ผลประเมิน แยกฟังก์ชันไว้กันคำนวณเพี้ยนกันคนละจุด)

@@ -12,7 +12,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import { db, auth } from "./firebase-init.js";
-import { AGES, POS, SECT, SB, CRITERIA, SCORE_VALUES, categoryRawScore, scoreToGrade } from "./masc-data.js";
+import { AGES, POS, SECT, SB, CRITERIA, SCORE_VALUES, categoryRawScore, isEvaluationComplete, scoreToGrade } from "./masc-data.js";
 import { getCoachPlayerIds, escapeHtml } from "./ui-utils.js";
 
 const statusEl = document.getElementById("status-message");
@@ -391,11 +391,6 @@ async function loadPlayers() {
   renderProgressSummary();
 }
 
-// ประเมินครบสมบูรณ์ = ให้คะแนนครบทั้ง 4 ข้อในทุกหมวด M/A/S/C แล้ว (categoryRawScore คืนค่า null ถ้ายังไม่ครบ)
-// ไม่เช็คพฤติกรรมในโรงเรียน/จุดเด่น-จุดด้อย เพราะ 3 หมวดนั้นไม่มีผลต่อเกรดและไม่ได้บังคับกรอกในฟอร์ม
-function isEvaluationComplete(ev) {
-  return ["M", "A", "S", "C"].every((cat) => categoryRawScore(ev.scores?.[cat]) !== null);
-}
 
 // รายชื่อนักกีฬาที่ถูกประเมินครบสมบูรณ์แล้ว "สำหรับรอบที่กำลังดำเนินการอยู่ตอนนี้โดยเฉพาะ" (assessmentPeriod
 // ตรงกับ activeMascRoundLabel) — ขอบเขตแค่รอบปัจจุบันเท่านั้น พอผู้ดูแลระบบเปิดรอบใหม่ (label เปลี่ยน) นักกีฬา

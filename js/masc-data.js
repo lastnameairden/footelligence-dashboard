@@ -150,6 +150,14 @@ export function categoryRawScore(values) {
   return 0.4 * values[0] + 0.2 * (values[1] + values[2] + values[3]);
 }
 
+// ประเมินครบสมบูรณ์ = ให้คะแนนครบทั้ง 4 ข้อในทุกหมวด M/A/S/C แล้ว (categoryRawScore คืนค่า null ถ้ายังไม่ครบ) — ใช้
+// เกณฑ์เดียวกันทุกหน้า (masc.js ซ่อนนักกีฬาที่ประเมินครบ, attendance.js ความคืบหน้าของแอดมิน, report-card.js สมุดพก
+// ออกเฉพาะคนที่ประเมินครบ) กันแต่ละหน้าคิดไม่ตรงกัน ไม่เช็คพฤติกรรมในโรงเรียน/จุดเด่น-จุดด้อย เพราะ 3 หมวดนั้น
+// ไม่มีผลต่อเกรดและไม่ได้บังคับกรอกในฟอร์ม รับ null/undefined ได้ (ถือว่าไม่ครบ)
+export function isEvaluationComplete(evaluation) {
+  return !!evaluation && ["M", "A", "S", "C"].every((cat) => categoryRawScore(evaluation.scores?.[cat]) !== null);
+}
+
 // แปลงคะแนนถ่วงน้ำหนัก (1-9) เป็นเกรด 1/3/7/9: ≤2.00→1 · ≤5.00→3 · ≤8.00→7 · มากกว่านั้น→9
 export function scoreToGrade(rawScore) {
   if (rawScore == null) return null;

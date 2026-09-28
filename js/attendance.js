@@ -57,7 +57,7 @@ import {
   teamDateRangeQuery,
   safeHttpUrl
 } from "./ui-utils.js";
-import { categoryRawScore } from "./masc-data.js";
+import { isEvaluationComplete } from "./masc-data.js";
 
 const STATUS_OPTIONS = ["A", "I", "R", "P"];
 const SCORE_OPTIONS = [1, 2, 3, 4];
@@ -1127,9 +1127,6 @@ async function loadMascRounds() {
 }
 
 // ---------- ผู้ดูแลระบบ: ความคืบหน้าการประเมิน MASC แยกทีม/รุ่น สำหรับรอบที่เลือก ----------
-function isEvaluationComplete(ev) {
-  return ["M", "A", "S", "C"].every((cat) => categoryRawScore(ev.scores?.[cat]) !== null);
-}
 function isEvaluationStarted(ev) {
   return ["M", "A", "S", "C"].some((cat) => (ev.scores?.[cat] || []).some((v) => v !== null && v !== undefined));
 }
