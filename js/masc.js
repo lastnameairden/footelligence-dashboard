@@ -100,6 +100,9 @@ let activeMascRoundLabel = null;
 // เริ่ม/บันทึกการประเมินได้ — ถ้าไม่มีรอบเลย หรือรอบล่าสุดหมดเขตไปแล้ว ถือว่าปิดรับการประเมินจนกว่าจะมีรอบใหม่
 // (เดิมยังให้กรอกย้อนหลังได้ แต่ผู้ใช้แจ้งให้เปลี่ยนเป็นบังคับต้องมีรอบก่อนเท่านั้น)
 let hasActiveMascRound = false;
+// id ของเอกสารรอบที่กำลังดำเนินการ (mascRounds) — แนบไปกับทุกการบันทึก/ลบเป็นฟิลด์ roundId เพราะ firestore.rules
+// เช็คว่ารอบยังเปิดอยู่จริงผ่านเอกสารนี้ (ไม่ใช่แค่ปุ่มที่ถูกซ่อนฝั่งหน้าเว็บ)
+let activeMascRoundId = null;
 let players = [];
 let currentPlayer = null;
 let currentEvaluationId = null;
@@ -128,15 +131,17 @@ function daysBetween(a, b) {
 // เป็น "ไม่มีรอบ" เช่นกัน (fail-closed) เพราะยืนยันไม่ได้ว่ามีรอบที่เปิดอยู่จริงหรือไม่
 async function loadMascRoundBanner() {
   activeMascRoundLabel = null;
+  activeMascRoundId = null;
   hasActiveMascRound = false;
   try {
     const snap = await getDocs(collection(db, "mascRounds"));
     const rounds = [];
-    snap.forEach((d) => rounds.push(d.data()));
+    snap.forEach((d) => rounds.push({ id: d.id, ...d.data() }));
     const todayStr = new Date().toISOString().slice(0, 10);
     const active = rounds.find((r) => r.startDate <= todayStr && todayStr <= r.endDate);
     if (active) {
       activeMascRoundLabel = active.label;
+      activeMascRoundId = active.id;
       hasActiveMascRound = true;
       const daysLeft = daysBetween(active.endDate, todayStr);
       mascRoundBanner.className = "card card-pad no-print bg-emerald-50 border-emerald-200";
@@ -558,6 +563,7 @@ function collectPayload() {
     playerId: currentPlayer.id,
     playerName: currentPlayer.nickname || currentPlayer.fullName || "-",
     team: myTeam,
+    roundId: activeMascRoundId,
     ageGroup: currentPlayer.ageGroup || null,
     position: curPosition,
     ageBracket: curAgeBracket,
@@ -621,6 +627,11 @@ deleteBtn.addEventListener("click", async () => {
   if (!currentEvaluationId) return;
   if (!confirm("ยืนยันลบการประเมินนี้? การลบนี้ไม่สามารถย้อนกลับได้")) return;
   try {
+    // เอกสารที่บันทึกก่อนมี roundId ต้องประทับรอบปัจจุบันก่อน rules ถึงยอมให้ลบ (ทำได้เฉพาะตอนมีรอบเปิดอยู่)
+    const existing = evaluationsForPlayer.find((e) => e.id === currentEvaluationId);
+    if (existing && !existing.roundId) {
+      await updateDoc(doc(db, "playerEvaluations", currentEvaluationId), { roundId: activeMascRoundId });
+    }
     await deleteDoc(doc(db, "playerEvaluations", currentEvaluationId));
     // ลบเอกสารทิ้งแล้วไม่มีทางประเมินครบสมบูรณ์อีก (ถ้าเคยอยู่ในลิสต์นี้) — เอาออกแล้วให้กลับมาแสดงในลิสต์เลือก
     // นักกีฬาได้ตามปกติ ไม่ต้องรอโหลดหน้าใหม่
