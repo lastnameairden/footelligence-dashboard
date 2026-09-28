@@ -18,7 +18,11 @@ import {
   isTrainingPlanLate,
   submissionDeadlineFor,
   isCoachSubmissionOnTime,
-  isReportLate
+  isReportLate,
+  todayBangkok,
+  thisMonthBangkok,
+  bangkokHour,
+  monthsAgoBangkok
 } from "../js/ui-utils.js";
 
 const ts = (date) => ({ toDate: () => date });
@@ -125,37 +129,67 @@ test("age group ordering: numeric, not alphabetical; no number sorts last", () =
 });
 
 test("calcAge: birthday not yet reached this year subtracts one", (t) => {
-  t.mock.timers.enable({ apis: ["Date"], now: new Date("2026-06-15T12:00:00") });
+  t.mock.timers.enable({ apis: ["Date"], now: new Date("2026-06-15T12:00:00+07:00") });
   assert.equal(calcAge("2014-06-15"), 12);
   assert.equal(calcAge("2014-06-16"), 11);
   assert.equal(calcAge("2014-01-01"), 12);
+  assert.equal(calcAge("2014-06-15T00:00:00Z"), 12);
   assert.equal(calcAge(""), null);
   assert.equal(calcAge("not a date"), null);
 });
 
 test("isTrainingPlanLate: after 14:00 of the plan date is late", () => {
-  assert.equal(isTrainingPlanLate({ date: "2026-03-10", updatedAt: ts(new Date("2026-03-10T13:59:00")) }), false);
-  assert.equal(isTrainingPlanLate({ date: "2026-03-10", updatedAt: ts(new Date("2026-03-10T14:01:00")) }), true);
-  assert.equal(isTrainingPlanLate({ date: "2026-03-10", updatedAt: ts(new Date("2026-03-11T08:00:00")) }), true);
+  assert.equal(isTrainingPlanLate({ date: "2026-03-10", updatedAt: ts(new Date("2026-03-10T13:59:00+07:00")) }), false);
+  assert.equal(isTrainingPlanLate({ date: "2026-03-10", updatedAt: ts(new Date("2026-03-10T14:01:00+07:00")) }), true);
+  assert.equal(isTrainingPlanLate({ date: "2026-03-10", updatedAt: ts(new Date("2026-03-11T08:00:00+07:00")) }), true);
   assert.equal(isTrainingPlanLate({ date: "2026-03-10" }), false);
 });
 
 test("submission deadline is 23:59:59 local time on the session date", () => {
-  assert.deepEqual(submissionDeadlineFor("2026-03-10"), new Date("2026-03-10T23:59:59"));
+  assert.deepEqual(submissionDeadlineFor("2026-03-10"), new Date("2026-03-10T23:59:59+07:00"));
 });
 
 test("isReportLate: after 23:59:59 of the report date is late", () => {
-  assert.equal(isReportLate({ date: "2026-03-10", updatedAt: ts(new Date("2026-03-10T23:59:59")) }), false);
-  assert.equal(isReportLate({ date: "2026-03-10", updatedAt: ts(new Date("2026-03-11T00:00:01")) }), true);
+  assert.equal(isReportLate({ date: "2026-03-10", updatedAt: ts(new Date("2026-03-10T23:59:59+07:00")) }), false);
+  assert.equal(isReportLate({ date: "2026-03-10", updatedAt: ts(new Date("2026-03-11T00:00:01+07:00")) }), true);
   assert.equal(isReportLate({ date: "2026-03-10" }), false);
 });
 
 test("isCoachSubmissionOnTime: uses the latest attendance save; none means not on time", () => {
   const session = { date: "2026-03-10" };
-  const early = { updatedAt: ts(new Date("2026-03-10T18:00:00")) };
-  const late = { updatedAt: ts(new Date("2026-03-11T09:00:00")) };
+  const early = { updatedAt: ts(new Date("2026-03-10T18:00:00+07:00")) };
+  const late = { updatedAt: ts(new Date("2026-03-11T09:00:00+07:00")) };
   assert.equal(isCoachSubmissionOnTime(session, [early]), true);
   assert.equal(isCoachSubmissionOnTime(session, [early, late]), false);
   assert.equal(isCoachSubmissionOnTime(session, []), false);
   assert.equal(isCoachSubmissionOnTime({}, [early]), false);
+});
+
+// ---------- เวลาไทย (UTC+7): เดิมใช้วันที่ตาม UTC ทำให้ 00:00-07:00 น. ได้ "เมื่อวาน" ----------
+test("todayBangkok: 00:00-06:59 Thai time is already the new day (17:00-23:59 UTC of the previous day)", () => {
+  assert.equal(todayBangkok(new Date("2026-03-10T16:59:59Z")), "2026-03-10");
+  assert.equal(todayBangkok(new Date("2026-03-10T17:00:00Z")), "2026-03-11");
+  assert.equal(todayBangkok(new Date("2026-03-11T06:00:00+07:00")), "2026-03-11");
+  assert.equal(todayBangkok(new Date("2026-03-11T00:00:00+07:00")), "2026-03-11");
+  assert.equal(todayBangkok(new Date("2026-03-10T23:59:59+07:00")), "2026-03-10");
+});
+
+test("thisMonthBangkok: first minutes of the 1st in Thailand already belong to the new month", () => {
+  assert.equal(thisMonthBangkok(new Date("2026-02-28T17:00:00Z")), "2026-03");
+  assert.equal(thisMonthBangkok(new Date("2026-02-28T16:59:00Z")), "2026-02");
+  assert.equal(thisMonthBangkok(new Date("2025-12-31T17:00:00Z")), "2026-01");
+});
+
+test("bangkokHour: hour of day in Thailand regardless of machine timezone", () => {
+  assert.equal(bangkokHour(new Date("2026-03-10T07:00:00Z")), 14);
+  assert.equal(bangkokHour(new Date("2026-03-10T17:00:00Z")), 0);
+  assert.equal(bangkokHour(new Date("2026-03-10T16:59:00Z")), 23);
+});
+
+test("monthsAgoBangkok: steps back whole months, across year boundaries and short months", () => {
+  const now = new Date("2026-03-31T10:00:00+07:00");
+  assert.equal(monthsAgoBangkok(0, now), "2026-03");
+  assert.equal(monthsAgoBangkok(1, now), "2026-02");
+  assert.equal(monthsAgoBangkok(3, now), "2025-12");
+  assert.equal(monthsAgoBangkok(14, now), "2025-01");
 });

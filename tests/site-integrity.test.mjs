@@ -36,6 +36,15 @@ test("no inline event-handler attributes or javascript: URLs (blocked by the CSP
   }
 });
 
+// "วันนี้/เดือนนี้" ต้องมาจาก todayBangkok()/thisMonthBangkok() ใน ui-utils.js เท่านั้น — new Date().toISOString() เป็นเวลา UTC
+// (00:00-07:00 น. เวลาไทยจะได้ "เมื่อวาน") เคยทำให้วันที่เริ่มต้นของเช็คชื่อ/รายงาน/แผนฝึกและรอบ MASC เพี้ยน
+test("no UTC-based today/this-month in the app code (use todayBangkok / thisMonthBangkok)", () => {
+  for (const file of jsFiles.filter((f) => f !== "js/ui-utils.js")) {
+    const text = read(file);
+    assert.ok(!/toISOString\(\)\s*\.slice\(\s*0\s*,\s*(10|7)\s*\)/.test(text), `${file} derives a date/month from UTC — use todayBangkok()/thisMonthBangkok()`);
+  }
+});
+
 test("vercel.json CSP keeps scripts locked down", () => {
   const vj = JSON.parse(read("vercel.json"));
   const headers = Object.fromEntries(vj.headers[0].headers.map((h) => [h.key, h.value]));

@@ -1,6 +1,28 @@
 import { addDoc, collection, doc, getDocs, query, serverTimestamp, setDoc, where } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 import { db } from "./firebase-init.js";
 
+// ---------- วันที่/เวลาตามเขตเวลาไทย (Asia/Bangkok, UTC+7 ไม่มี DST) ----------
+// เดิมหลายหน้าหา "วันนี้" ด้วย new Date().toISOString().slice(0, 10) ซึ่งเป็นวันที่ตาม UTC — ช่วง 00:00–07:00 น. เวลาไทย
+// จึงได้ "เมื่อวาน" (ค่าเริ่มต้นของวันที่เช็คชื่อ/รายงาน/แผนฝึกเพี้ยน, รอบ MASC เริ่ม-หมดตอน 07:00 น.) และช่วงเที่ยงคืนวันที่ 1
+// ของเดือนได้เดือนก่อนหน้า — ทุกที่ที่ต้องการ "วันนี้/เดือนนี้/ชั่วโมงปัจจุบัน" ให้เรียกฟังก์ชันด้านล่างเสมอ ไม่ใช้ค่าจากนาฬิกา
+// เครื่อง/เขตเวลาของเครื่อง (มือถือที่ตั้งเขตเวลาผิดก็ยังได้วันที่ไทยถูก) ค่า now ใส่เองได้เพื่อใช้ทดสอบ
+// firestore.rules (isActiveMascRound) ใช้เกณฑ์เดียวกัน: request.time + 7 ชั่วโมง
+export const BANGKOK_UTC_OFFSET_MS = 7 * 60 * 60 * 1000;
+export function todayBangkok(now = new Date()) {
+  return new Date(now.getTime() + BANGKOK_UTC_OFFSET_MS).toISOString().slice(0, 10);
+}
+export function thisMonthBangkok(now = new Date()) {
+  return todayBangkok(now).slice(0, 7);
+}
+export function bangkokHour(now = new Date()) {
+  return new Date(now.getTime() + BANGKOK_UTC_OFFSET_MS).getUTCHours();
+}
+// เดือน "YYYY-MM" ย้อนหลัง n เดือนจากเดือนนี้ (ตามเวลาไทย)
+export function monthsAgoBangkok(n, now = new Date()) {
+  const [y, m] = thisMonthBangkok(now).split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1 - n, 1)).toISOString().slice(0, 7);
+}
+
 // ---------- query ของทีมหนึ่งในช่วงวันที่ที่ต้องการ (แทนการดึงทั้ง collection มากรองฝั่ง client) ----------
 // attendance/sessions/รายงาน/แผนการฝึก โตขึ้นทุกวัน — เดิมหลายหน้าดึงของทั้งทีม "ทุกเดือนตั้งแต่เริ่มใช้" มาก่อนค่อยกรอง
 // เดือนที่ต้องการทีหลัง (Firestore คิดเงินตามจำนวนเอกสารที่อ่าน และหน้าจะช้าลงเรื่อยๆ) ที่นี่กรองที่ query เลย
@@ -381,14 +403,24 @@ export function ageGroupSortKey(ageGroups) {
 // คำนวณอายุปัจจุบันจากวันเกิด (ค.ศ. เสมอ เพราะ input[type=date] ของเบราว์เซอร์เก็บค่าแบบเกรกอเรียนภายในอยู่แล้ว
 // ไม่ว่า locale ของเครื่องจะแสดงผลเป็นปฏิทินอะไรก็ตาม) คืนค่า null ถ้าวันเกิดว่างหรือ parse ไม่ได้ — ใช้ร่วมกัน
 // ทั้งหน้าข้อมูลนักกีฬารายบุคคลและเครื่องมือตรวจสอบข้อมูลนักกีฬาผิดปกติของผู้ดูแลระบบ
-export function calcAge(birthday) {
+export function calcAge(birthday, now = new Date()) {
   if (!birthday) return null;
-  const b = new Date(birthday);
-  if (isNaN(b.getTime())) return null;
-  const today = new Date();
-  let age = today.getFullYear() - b.getFullYear();
-  const m = today.getMonth() - b.getMonth();
-  if (m < 0 || (m === 0 && today.getDate() < b.getDate())) age--;
+  // วันเกิดรูปแบบ "YYYY-MM-DD" อ่านตรงๆ ไม่ผ่าน new Date() (ซึ่งตีความเป็น UTC แล้วเขตเวลาลบทำให้วันเกิดเลื่อนถอยหลังหนึ่งวัน)
+  // และเทียบกับ "วันนี้" ตามเวลาไทยเหมือนส่วนอื่นของแอป
+  const parts = typeof birthday === "string" ? birthday.match(/^(\d{4})-(\d{2})-(\d{2})/) : null;
+  let by, bm, bd;
+  if (parts) {
+    [by, bm, bd] = parts.slice(1).map(Number);
+  } else {
+    const b = new Date(birthday);
+    if (isNaN(b.getTime())) return null;
+    by = b.getFullYear();
+    bm = b.getMonth() + 1;
+    bd = b.getDate();
+  }
+  const [ty, tm, td] = todayBangkok(now).split("-").map(Number);
+  let age = ty - by;
+  if (tm < bm || (tm === bm && td < bd)) age--;
   return age;
 }
 
@@ -409,7 +441,7 @@ export const CHECKIN_MONTHLY_QUOTA = 20;
 export function isTrainingPlanLate(plan) {
   const ts = plan.updatedAt && typeof plan.updatedAt.toDate === "function" ? plan.updatedAt.toDate() : null;
   if (!ts || !plan.date) return false;
-  const deadline = new Date(`${plan.date}T${String(TRAINING_PLAN_DEADLINE_HOUR).padStart(2, "0")}:00:00`);
+  const deadline = new Date(`${plan.date}T${String(TRAINING_PLAN_DEADLINE_HOUR).padStart(2, "0")}:00:00+07:00`);
   return ts > deadline;
 }
 
@@ -420,7 +452,7 @@ export const SUBMISSION_DEADLINE_HOUR = 23;
 export const SUBMISSION_DEADLINE_MINUTE = 59;
 export function submissionDeadlineFor(dateStr) {
   return new Date(
-    `${dateStr}T${String(SUBMISSION_DEADLINE_HOUR).padStart(2, "0")}:${String(SUBMISSION_DEADLINE_MINUTE).padStart(2, "0")}:59`
+    `${dateStr}T${String(SUBMISSION_DEADLINE_HOUR).padStart(2, "0")}:${String(SUBMISSION_DEADLINE_MINUTE).padStart(2, "0")}:59+07:00`
   );
 }
 // นับว่า "ตรงเวลา" ถ้าเวลาบันทึกล่าสุดของการเช็คชื่อ (จากบันทึกทั้งหมดของโค้ชคนนั้นในวันซ้อมนั้น) อยู่ก่อนเดดไลน์
@@ -490,7 +522,7 @@ export function applyDataLabels(tbody) {
 // ครอบคลุม 6 เรื่องที่ผู้ดูแลระบบต้องรู้ (เรียงความสำคัญ): บัญชีรออนุมัติ, อาการบาดเจ็บที่ยังไม่หาย (แยกรุนแรง),
 // แผนการฝึกซ้อมวันนี้ที่ยังไม่ส่งหลังเลยเวลา, โค้ชที่ส่งแผนสายเกินเกณฑ์เดือนนี้, การประเมินนักกีฬาวันนี้ที่ยังไม่ครบ
 export async function loadAdminNotifications() {
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = todayBangkok();
   const thisMonth = todayStr.slice(0, 7);
   const teams = Object.keys(TEAM_LOGOS);
   const notifications = [];
@@ -553,7 +585,7 @@ export async function loadAdminNotifications() {
   // 3) แผนการฝึกซ้อมวันนี้ที่ยังไม่ส่ง (เตือนเฉพาะหลังเลยเวลาเส้นตายของวันนั้นแล้ว)
   const plans = [];
   planSnap.forEach((d) => plans.push(d.data()));
-  if (new Date().getHours() >= TRAINING_PLAN_DEADLINE_HOUR) {
+  if (bangkokHour() >= TRAINING_PLAN_DEADLINE_HOUR) {
     const teamsWithPlanToday = new Set(plans.filter((p) => p.date === todayStr).map((p) => p.team));
     const missingTeams = teams.filter((t) => !teamsWithPlanToday.has(t));
     if (missingTeams.length > 0) {

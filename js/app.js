@@ -30,7 +30,9 @@ import {
   ageGroupNumber,
   coachPositionLabel,
   escapeHtml,
-  monthQuery
+  monthQuery,
+  todayBangkok,
+  thisMonthBangkok
 } from "./ui-utils.js";
 
 // สถานะที่นับว่า "มาซ้อม" ตาม legend ของ Logbook (A หรือค่าประเมิน 1-4)
@@ -40,7 +42,7 @@ const TEAMS = ["KHAMPHEE FOOTBALL", "THAWEE SC", "THAMMASATHIT"];
 
 // Dashboard หลักแสดงเฉพาะข้อมูลเดือนปัจจุบันเท่านั้น (เช็คชื่อ/รายงานการฝึกซ้อม/ผลการแข่งขัน/อาการบาดเจ็บ)
 // ต้องการดูข้อมูลย้อนหลังเดือนอื่นให้ไปที่เมนู "พิมพ์สรุป Dashboard" ซึ่งมีตัวเลือกเดือนแยกต่างหากอยู่แล้ว
-const CURRENT_MONTH_STR = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+const CURRENT_MONTH_STR = thisMonthBangkok(); // "YYYY-MM"
 function isInCurrentMonth(dateStr) {
   return (dateStr || "").startsWith(CURRENT_MONTH_STR);
 }
@@ -1015,11 +1017,11 @@ async function loadTrainingPlanSummary(scopeTeam) {
   trainingPlanSummaryBody.innerHTML =
     `<tr><td colspan="${colCount}" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>`;
 
-  const snap = await getDocs(monthQuery("trainingPlans", scopeTeam, new Date().toISOString().slice(0, 7)));
+  const snap = await getDocs(monthQuery("trainingPlans", scopeTeam, thisMonthBangkok()));
   const plans = [];
   snap.forEach((d) => plans.push(d.data()));
 
-  const thisMonth = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+  const thisMonth = thisMonthBangkok(); // "YYYY-MM"
   const monthPlans = plans.filter((p) => (p.date || "").startsWith(thisMonth));
 
   // จัดกลุ่มตามโค้ช+ทีม (กันชื่อโค้ชซ้ำกันคนละทีม) เพราะเป้าหมายคือดูมาตรฐานการส่งของโค้ชแต่ละคน ไม่ใช่ทีม
@@ -1221,7 +1223,7 @@ async function loadDashboard(scopeTeam) {
     trainingReportsSection.classList.toggle("hidden", !scopeTeam);
     if (scopeTeam) {
       if (!ageProgressDateInput.value) {
-        ageProgressDateInput.value = new Date().toISOString().slice(0, 10);
+        ageProgressDateInput.value = todayBangkok();
       }
       await loadAgeGroupProgress(scopeTeam, ageProgressDateInput.value);
       await loadTrainingReports(scopeTeam);

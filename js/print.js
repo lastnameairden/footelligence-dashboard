@@ -25,7 +25,8 @@ import {
   isReportLate,
   escapeHtml,
   monthDateRange,
-  teamDateRangeQuery
+  teamDateRangeQuery,
+  thisMonthBangkok
 } from "./ui-utils.js";
 
 const statusEl = document.getElementById("status-message");
@@ -96,7 +97,7 @@ async function loadPrintSummary(team, ageGroup, month) {
   const scopeText =
     ageGroup === "__ALL__" ? `ทีม ${team} — ทุกรุ่นอายุ — เดือน${monthLabel}` : `ทีม ${team} — รุ่นอายุ ${ageGroup} — เดือน${monthLabel}`;
   printScopeLabel.innerHTML = `${teamLogoImg(team, "w-5 h-5 object-contain inline-block align-middle rounded mr-1")}${scopeText}`;
-  printGeneratedAt.textContent = `สร้างสรุปเมื่อ ${new Date().toLocaleString("th-TH", { dateStyle: "long", timeStyle: "short" })}`;
+  printGeneratedAt.textContent = `สร้างสรุปเมื่อ ${new Date().toLocaleString("th-TH", { dateStyle: "long", timeStyle: "short", timeZone: "Asia/Bangkok" })}`;
   document.title = `FOOTELLIGENCE DATA — สรุป ${scopeText}`;
 
   await loadPrintExtras(team, ageGroup, month);
@@ -991,7 +992,7 @@ onAuthStateChanged(auth, async (user) => {
     const params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
     const team = params.get("team");
     const ageGroup = params.get("ageGroup") || "__ALL__";
-    const month = params.get("month") || new Date().toISOString().slice(0, 7);
+    const month = params.get("month") || thisMonthBangkok();
 
     if (!team) {
       showAccessGate("ไม่พบทีมที่ต้องการสรุป กรุณาเลือกทีมจากหน้าเช็คชื่ออีกครั้ง");

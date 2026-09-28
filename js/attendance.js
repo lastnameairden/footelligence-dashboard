@@ -55,7 +55,10 @@ import {
   escapeHtml,
   monthDateRange,
   teamDateRangeQuery,
-  safeHttpUrl
+  safeHttpUrl,
+  todayBangkok,
+  thisMonthBangkok,
+  monthsAgoBangkok
 } from "./ui-utils.js";
 import { isEvaluationComplete } from "./masc-data.js";
 
@@ -557,7 +560,7 @@ function showDaily() {
   hideAllScreens();
   dailySection.classList.remove("hidden");
   if (!dailyDateInput.value) {
-    dailyDateInput.value = new Date().toISOString().slice(0, 10);
+    dailyDateInput.value = todayBangkok();
   }
   loadDailyData(dailyDateInput.value);
   checkTodayReminders();
@@ -569,7 +572,7 @@ function showDaily() {
 // เตือนย้อนหลัง ตรวจแค่ "เริ่มทำหรือยัง" ไม่ตรวจความครบถ้วน (มีระบบแจ้งเตือนของผู้ดูแลระบบดูแลส่วนนั้นอยู่แล้ว)
 async function checkTodayReminders() {
   if (!myTeam) return;
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = todayBangkok();
   dailyReminderBanner.classList.add("hidden");
   dailyReminderBanner.innerHTML = "";
   try {
@@ -844,7 +847,7 @@ function openAdminProgressSection() {
   hideAllScreens();
   adminProgressSection.classList.remove("hidden");
   if (!progressDateInput.value) {
-    progressDateInput.value = new Date().toISOString().slice(0, 10);
+    progressDateInput.value = todayBangkok();
   }
   loadDailyProgress(progressDateInput.value);
 }
@@ -956,7 +959,7 @@ function openAdminPrintSection() {
   populateTeamSelect(adminPrintTeamSelect, null);
   adminPrintAgeGroupSelect.value = "__ALL__";
   if (!adminPrintMonthSelect.value) {
-    adminPrintMonthSelect.value = new Date().toISOString().slice(0, 7); // "YYYY-MM" — ค่าเริ่มต้นเป็นเดือนนี้
+    adminPrintMonthSelect.value = thisMonthBangkok(); // "YYYY-MM" — ค่าเริ่มต้นเป็นเดือนนี้
   }
   adminPrintStatus.textContent = "";
 }
@@ -985,10 +988,7 @@ adminGeneratePrintBtn.addEventListener("click", () => {
 
 // เดือนก่อนหน้า n เดือน ในรูปแบบ "YYYY-MM" — ใช้ตั้งค่าเริ่มต้นของช่วงเวลาสมุดพก (3 เดือนล่าสุดนับถึงเดือนนี้)
 function monthsAgoStr(n) {
-  const d = new Date();
-  d.setDate(1); // กันวันที่ปัจจุบันเกินจำนวนวันของเดือนก่อนหน้า (เช่น 31 มี.ค. ย้อนไป ก.พ.)
-  d.setMonth(d.getMonth() - n);
-  return d.toISOString().slice(0, 7);
+  return monthsAgoBangkok(n);
 }
 
 function openAdminReportCardSection() {
@@ -1032,7 +1032,7 @@ adminGenerateReportCardBtn.addEventListener("click", () => {
 // รอบเดียวใช้ทั้งองค์กรพร้อมกันทุกทีม (ไม่แยกทีม) ตามที่ตกลงกันไว้ — สถานะคำนวณสดจากวันที่ปัจจุบันเทียบกับ
 // startDate/endDate ที่บันทึกไว้ ไม่ต้องมีฟิลด์สถานะแยกเก็บเอง (กันข้อมูลเพี้ยนถ้าเปิดแอปข้ามวันไป)
 function mascRoundStatus(round) {
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = todayBangkok();
   if (todayStr < round.startDate) return { label: "ยังไม่เริ่ม", className: "badge-neutral" };
   if (todayStr > round.endDate) return { label: "สิ้นสุดแล้ว", className: "badge-neutral" };
   return { label: "กำลังดำเนินการ", className: "badge-success" };
@@ -1454,7 +1454,7 @@ function openReportSection() {
   reportLoadStatus.textContent = "";
   updateReportPhotoWrapVisibility();
   if (!reportDateInput.value) {
-    reportDateInput.value = new Date().toISOString().slice(0, 10);
+    reportDateInput.value = todayBangkok();
   }
 }
 
@@ -1781,7 +1781,7 @@ async function loadCoachDirectory() {
 // (coachName) ไม่ใช่ coachId เพราะเวลาผู้ดูแลระบบสวมบทบาทส่งแทนโค้ช coachId จะกลายเป็น uid ของผู้ดูแลระบบเอง
 // (ตามหลักการเดียวกับ loadTrainingPlanSummary ใน app.js)
 async function computeCoachMonthlySummaryRows(team) {
-  const thisMonth = new Date().toISOString().slice(0, 7);
+  const thisMonth = thisMonthBangkok();
   // สรุปนี้ดูเฉพาะ "เดือนนี้" อยู่แล้ว จึงดึงเฉพาะเดือนนี้ที่ query เลย ไม่ดึงของทีมทุกเดือนมากรองทีหลัง
   const { start: monthStart, end: monthEnd } = monthDateRange(thisMonth);
   const [coachSnap, playerSnap, sessionSnap, attendanceSnap, reportSnap, planSnap] = await Promise.all([
@@ -1808,8 +1808,7 @@ async function computeCoachMonthlySummaryRows(team) {
   const plans = [];
   planSnap.forEach((d) => plans.push({ id: d.id, ...d.data() }));
   const monthPlans = plans.filter((p) => (p.date || "").startsWith(thisMonth));
-  const today = new Date();
-  const todayDay = today.getDate();
+  const todayDay = Number(todayBangkok().slice(8, 10));
 
   coaches.sort(
     (a, b) => ageGroupSortKey(a.ageGroups) - ageGroupSortKey(b.ageGroups) || (a.name ?? "").localeCompare(b.name ?? "")
@@ -2239,7 +2238,7 @@ function renderCoachActivitySummaryTable(containerEl, rows) {
 }
 
 function formatCoachActivitySummaryText(team, rows) {
-  const monthLabel = new Date().toLocaleDateString("th-TH", { year: "numeric", month: "long" });
+  const monthLabel = new Date().toLocaleDateString("th-TH", { year: "numeric", month: "long", timeZone: "Asia/Bangkok" });
   const lines = [`สรุปการทำงานของโค้ชทีม ${team} ประจำเดือน${monthLabel}:`, ""];
   for (const r of rows) {
     const onTimePercent = r.checkinDays > 0 ? Math.round((r.onTimeCount / r.checkinDays) * 100) : null;
@@ -2822,7 +2821,7 @@ async function enterTeamManagementMode(team, returnSection, coachRecordOverride)
   // ทีมหนึ่งมีนักกีฬาหลายรุ่น อาจไม่ตรงกับรุ่นที่โค้ชคนนี้รับผิดชอบจริง)
   coachAgeGroupsEl.textContent = coachRecord?.ageGroups?.length ? coachRecord.ageGroups.join(", ") : "-";
   if (!dateInput.value) {
-    dateInput.value = new Date().toISOString().slice(0, 10);
+    dateInput.value = todayBangkok();
   }
   // เมนูนี้ถูกเข้าถึงผ่านผู้ดูแลระบบ (ไม่ใช่โค้ชล็อกอินเอง) จึงต้องมีรายการ "กลับแผงควบคุมผู้ดูแลระบบ"
   // ใน nav drawer ที่ย้อนกลับไปจุดที่พามาที่นี่ทีละสเต็ป (ดู exitTeamManagementToAdminPanel)
@@ -2867,7 +2866,7 @@ async function loadExecutiveSummary(team) {
   executiveStatCards.innerHTML = "";
   executiveLateWarning.classList.add("hidden");
   try {
-    const thisMonth = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+    const thisMonth = thisMonthBangkok(); // "YYYY-MM"
     const { start: monthStart, end: monthEnd } = monthDateRange(thisMonth);
     const [playersSnap, attendanceSnap, trainingPlansSnap] = await Promise.all([
       getDocs(query(collection(db, "players"), where("team", "==", team))),
@@ -3150,7 +3149,7 @@ onAuthStateChanged(auth, async (user) => {
     coachAgeGroupsEl.textContent = myAgeGroups.length ? myAgeGroups.join(", ") : "-";
     adminReturnSection = null;
     if (!dateInput.value) {
-      dateInput.value = new Date().toISOString().slice(0, 10);
+      dateInput.value = todayBangkok();
     }
     await loadPlayers();
     renderDrawerItems();
@@ -5129,7 +5128,7 @@ function trainingPlanSubmissionStatus(plan) {
 
 // นับจำนวนครั้งที่ส่งสายในเดือนปัจจุบัน (ตามวันที่ในแผน ไม่ใช่วันที่ส่งจริง) ใช้เตือนโค้ชเมื่อเกินเกณฑ์
 function countLateTrainingPlansThisMonth(plans) {
-  const thisMonth = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+  const thisMonth = thisMonthBangkok(); // "YYYY-MM"
   return plans.filter((p) => (p.date || "").startsWith(thisMonth) && isTrainingPlanLate(p)).length;
 }
 
@@ -5197,7 +5196,7 @@ function openTrainingPlanSection() {
   hideAllScreens();
   trainingPlanSection.classList.remove("hidden");
   stopEditTrainingPlan();
-  trainingPlanDateInput.value = new Date().toISOString().slice(0, 10);
+  trainingPlanDateInput.value = todayBangkok();
   renderTrainingPlanList();
 }
 

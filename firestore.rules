@@ -127,20 +127,23 @@ service cloud.firestore {
     // ช่วงวัย เป็นระยะ (คนละระบบกับการประเมินรายวันใน attendance) โค้ชจัดการได้เฉพาะของทีมตัวเอง ผู้บริหารทีม
     // ดูได้อย่างเดียว
     //
-    // โค้ชสร้าง/แก้ไข/ลบได้เฉพาะตอนมีรอบที่ผู้ดูแลระบบกำหนดและกำลังดำเนินการอยู่จริง (วันนี้ตามเวลา UTC อยู่ในช่วง
-    // startDate–endDate — ตรงกับที่ masc.js เช็คด้วย toISOString) โดยเอกสารต้องอ้างรอบนั้นผ่านฟิลด์ roundId
+    // โค้ชสร้าง/แก้ไข/ลบได้เฉพาะตอนมีรอบที่ผู้ดูแลระบบกำหนดและกำลังดำเนินการอยู่จริง (วันนี้ตามเวลาไทย UTC+7 อยู่ในช่วง
+    // startDate–endDate — ตรงกับที่ masc.js เช็คด้วย todayBangkok()) โดยเอกสารต้องอ้างรอบนั้นผ่านฟิลด์ roundId
     // (id ของเอกสารใน mascRounds) เพราะ rules ค้นหารอบเองไม่ได้ ต้องรู้ id ก่อนถึงจะ get() ได้ — ไม่บังคับให้
     // assessmentPeriod ตรงกับ label ของรอบ เพื่อคงพฤติกรรมเดิมที่โค้ชประเมินย้อนหลังช่วงอื่นได้ตราบใดที่มีรอบเปิดอยู่
     // เอกสารเก่าก่อนมี roundId ลบไม่ได้จนกว่าจะบันทึกทับ (masc.js ประทับ roundId ให้ก่อนลบโดยอัตโนมัติ)
     function pad2(n) { return n < 10 ? '0' + string(n) : string(n); }
-    function todayUtc() {
-      return string(request.time.year()) + '-' + pad2(request.time.month()) + '-' + pad2(request.time.day());
+    // วันที่ตามเวลาไทย (UTC+7 ไม่มี DST) รูปแบบ "YYYY-MM-DD" — ต้องตรงกับ todayBangkok() ใน js/ui-utils.js
+    function todayBangkok() {
+      return string((request.time + duration.value(7, 'h')).year()) + '-'
+             + pad2((request.time + duration.value(7, 'h')).month()) + '-'
+             + pad2((request.time + duration.value(7, 'h')).day());
     }
     function isActiveMascRound(roundId) {
       return roundId is string
              && exists(/databases/$(database)/documents/mascRounds/$(roundId))
-             && get(/databases/$(database)/documents/mascRounds/$(roundId)).data.startDate <= todayUtc()
-             && todayUtc() <= get(/databases/$(database)/documents/mascRounds/$(roundId)).data.endDate;
+             && get(/databases/$(database)/documents/mascRounds/$(roundId)).data.startDate <= todayBangkok()
+             && todayBangkok() <= get(/databases/$(database)/documents/mascRounds/$(roundId)).data.endDate;
     }
     match /playerEvaluations/{id} {
       allow read: if isAdmin() || (canViewTeam() && ownsTeam());

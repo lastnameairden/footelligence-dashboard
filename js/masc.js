@@ -13,7 +13,7 @@ import {
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import { db, auth } from "./firebase-init.js";
 import { AGES, POS, SECT, SB, CRITERIA, SCORE_VALUES, categoryRawScore, isEvaluationComplete, scoreToGrade } from "./masc-data.js";
-import { getCoachPlayerIds, escapeHtml } from "./ui-utils.js";
+import { getCoachPlayerIds, escapeHtml, todayBangkok } from "./ui-utils.js";
 
 const statusEl = document.getElementById("status-message");
 const accessGate = document.getElementById("access-gate");
@@ -137,7 +137,7 @@ async function loadMascRoundBanner() {
     const snap = await getDocs(collection(db, "mascRounds"));
     const rounds = [];
     snap.forEach((d) => rounds.push({ id: d.id, ...d.data() }));
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = todayBangkok();
     const active = rounds.find((r) => r.startDate <= todayStr && todayStr <= r.endDate);
     if (active) {
       activeMascRoundLabel = active.label;

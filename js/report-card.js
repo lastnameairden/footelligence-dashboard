@@ -506,7 +506,7 @@ function buildPlayerPage(player, data, scope) {
         <p class="text-[10px] opacity-90 leading-tight">${escapeHtml(team)} • รอบการประเมิน ${monthRangeLabel(start, end)}</p>
       </div>
     </div>
-    <p class="text-[10px] opacity-90 whitespace-nowrap">ออกรายงาน ${new Date().toLocaleDateString("th-TH", { year: "numeric", month: "short", day: "numeric" })}</p>
+    <p class="text-[10px] opacity-90 whitespace-nowrap">ออกรายงาน ${new Date().toLocaleDateString("th-TH", { year: "numeric", month: "short", day: "numeric", timeZone: "Asia/Bangkok" })}</p>
   `;
   page.appendChild(header);
 
