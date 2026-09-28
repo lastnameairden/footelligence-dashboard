@@ -61,6 +61,7 @@ import {
   monthsAgoBangkok
 } from "./ui-utils.js";
 import { isEvaluationComplete } from "./masc-data.js";
+import { applyAttendanceChange, firestoreFieldsForChange, createSaveQueue } from "./attendance-save.js";
 
 const STATUS_OPTIONS = ["A", "I", "R", "P"];
 const SCORE_OPTIONS = [1, 2, 3, 4];
@@ -3568,64 +3569,84 @@ function renderRoster(existingMap) {
   applyDataLabels(rosterBody);
 }
 
-async function saveStatus(playerId, status) {
+// บันทึกการแตะสถานะ/คะแนน: อัปเดตหน้าจอทันทีจากสถานะปัจจุบัน แล้วต่อคิวเขียน Firestore เบื้องหลัง (ตรรกะอยู่ที่
+// attendance-save.js) — ค่า session/วันที่/ทีมจับไว้ตอนแตะ ไม่อ่านตอนเขียน กันสลับวันที่ระหว่างที่ยังรอส่งแล้วไปเขียนผิดวัน
+// ผลการเขียนที่ล้มเหลว (เช่น สิทธิ์ไม่พอ) จะโหลดข้อมูลล่าสุดกลับมาแสดงตอนคิวว่าง ส่วนตอนเน็ตหลุด Firestore ไม่ถือว่าล้มเหลว
+// แต่เก็บรอส่งเมื่อกลับมาออนไลน์ — ตัวบอกจำนวนรอส่งและคำเตือนตอนปิดหน้า (beforeunload) จึงสำคัญ
+let attendanceNeedsResync = false;
+let attendanceSlowSaveTimer = null;
+const ATTENDANCE_SLOW_SAVE_MS = 6000;
+
+function renderAttendanceSaveIndicator(pending) {
+  clearTimeout(attendanceSlowSaveTimer);
+  attendanceSlowSaveTimer = null;
+  if (pending > 0) {
+    setAttendanceStatus(`กำลังบันทึก… (${pending} รายการ)`);
+    attendanceSlowSaveTimer = setTimeout(() => {
+      if (attendanceSaveQueue.pending > 0) {
+        setAttendanceStatus(`สัญญาณอ่อน — ยังรอส่ง ${attendanceSaveQueue.pending} รายการ อย่าปิดหน้านี้จนกว่าจะขึ้น "บันทึกแล้ว ✓"`, true);
+      }
+    }, ATTENDANCE_SLOW_SAVE_MS);
+    return;
+  }
+  if (attendanceNeedsResync) {
+    attendanceNeedsResync = false;
+    resyncRosterAfterSaveError();
+    return;
+  }
+  setAttendanceStatus("บันทึกแล้ว ✓");
+}
+
+async function resyncRosterAfterSaveError() {
   if (!currentSessionId) return;
   try {
-    const docId = `${playerId}_${currentSessionId}`;
-    const payload = {
-      playerId,
-      sessionId: currentSessionId,
-      team: myTeam,
-      date: dateInput.value,
-      status,
-      updatedAt: serverTimestamp()
-    };
-    // ให้คะแนนได้เฉพาะสถานะ "มา (A)" เท่านั้น — ถ้าเปลี่ยนสถานะเป็นอย่างอื่น (I/R/P) ล้างคะแนนเก่าทิ้งไปด้วย
-    // เผื่อเคสที่โค้ชให้คะแนนไว้ก่อนแล้ว (ตอนยังเป็น A) แล้วค่อยเปลี่ยนสถานะทีหลัง ไม่ให้มีคะแนนที่ไม่มีความหมาย
-    // ค้างอยู่ในฐานข้อมูล (scores: {} แทนที่ทั้ง field เดิมเพราะ setDoc merge:true แทนที่ทั้งค่าของ field นี้)
-    if (status !== "A") {
-      payload.scores = {};
-    }
-    await setDoc(doc(db, "attendance", docId), payload, { merge: true });
-    const prev = currentAttendanceMap.get(playerId) || {};
-    const updated = { ...prev, status, updatedAt: { toDate: () => new Date() } };
-    if (status !== "A") updated.scores = {};
-    currentAttendanceMap.set(playerId, updated);
-    renderRoster(currentAttendanceMap);
-    setAttendanceStatus("บันทึกแล้ว ✓");
+    renderRoster(await loadExistingAttendance(currentSessionId));
+    setAttendanceStatus("บันทึกบางรายการไม่สำเร็จ — โหลดข้อมูลล่าสุดกลับมาแล้ว กรุณาตรวจสอบและแตะใหม่อีกครั้ง", true);
   } catch (err) {
     console.error(err);
-    setAttendanceStatus("บันทึกไม่สำเร็จ: " + err.message, true);
+    setAttendanceStatus("บันทึกบางรายการไม่สำเร็จ และโหลดข้อมูลล่าสุดไม่ได้: " + err.message, true);
   }
 }
 
-async function saveScoreCategory(playerId, categoryKey, value) {
+const attendanceSaveQueue = createSaveQueue({
+  onChange: renderAttendanceSaveIndicator,
+  onError: (err) => {
+    console.error(err);
+    attendanceNeedsResync = true;
+  }
+});
+
+// มีรายการรอส่งอยู่ = ปิดหน้าตอนนี้ข้อมูลที่แตะไว้จะหาย ให้เบราว์เซอร์ถามก่อน
+window.addEventListener("beforeunload", (e) => {
+  if (attendanceSaveQueue.pending > 0) {
+    e.preventDefault();
+    e.returnValue = "";
+  }
+});
+
+function commitAttendanceChange(playerId, change) {
   if (!currentSessionId) return;
-  try {
-    const prev = currentAttendanceMap.get(playerId) || {};
-    const newScores = { ...(prev.scores || {}), [categoryKey]: value };
-    const docId = `${playerId}_${currentSessionId}`;
-    await setDoc(
-      doc(db, "attendance", docId),
-      {
-        playerId,
-        sessionId: currentSessionId,
-        team: myTeam,
-        date: dateInput.value,
-        scores: newScores,
-        updatedAt: serverTimestamp()
-      },
+  const sessionId = currentSessionId;
+  const date = dateInput.value;
+  const team = myTeam;
+  currentAttendanceMap.set(playerId, applyAttendanceChange(currentAttendanceMap.get(playerId), change));
+  renderRoster(currentAttendanceMap);
+  attendanceSaveQueue.enqueue(`${sessionId}_${playerId}`, () =>
+    setDoc(
+      doc(db, "attendance", `${playerId}_${sessionId}`),
+      { playerId, sessionId, team, date, updatedAt: serverTimestamp(), ...firestoreFieldsForChange(change) },
       { merge: true }
-    );
-    currentAttendanceMap.set(playerId, { ...prev, scores: newScores, updatedAt: { toDate: () => new Date() } });
-    renderRoster(currentAttendanceMap);
-    setAttendanceStatus("บันทึกแล้ว ✓");
-  } catch (err) {
-    console.error(err);
-    setAttendanceStatus("บันทึกไม่สำเร็จ: " + err.message, true);
-  }
+    )
+  );
 }
 
+function saveStatus(playerId, status) {
+  commitAttendanceChange(playerId, { status });
+}
+
+function saveScoreCategory(playerId, categoryKey, value) {
+  commitAttendanceChange(playerId, { category: categoryKey, value });
+}
 function showRosterView() {
   noTrainingBanner.classList.add("hidden");
   rosterWrap.classList.remove("hidden");

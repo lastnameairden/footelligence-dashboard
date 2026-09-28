@@ -102,6 +102,7 @@ node --import ./tests/setup.mjs --test "tests/*.test.mjs"
 | ไฟล์ | ตรวจอะไร |
 | --- | --- |
 | `tests/ui-utils.test.mjs` | `escapeHtml`/`safeHttpUrl`, query รายเดือนต้องมี `team ==`, กฎ "ส่งสาย", ความเป็นเจ้าของนักกีฬา, ลำดับรุ่นอายุ, อายุ |
+| `tests/attendance-save.test.mjs` | บันทึกเช็คชื่อ/คะแนนแบบอัปเดตหน้าจอทันที: แตะเร็วๆ ไม่ทับกัน, คิวเขียนเรียงลำดับต่อนักกีฬา, นับรายการรอส่ง, ล้มเหลวแล้วไม่ค้างคิว |
 | `tests/masc-data.test.mjs` | สูตรคะแนน MASC / เกรด / ข้อมูลเกณฑ์ครบทุกตำแหน่ง×ช่วงวัย×หมวด |
 | `tests/site-integrity.test.mjs` | ทุกหน้าลิงก์ Tailwind ที่ build แล้ว, ไม่มี inline handler (CSP), class ที่ใช้มี CSS ครบ (ลืม build), CSP ไม่หละหลวม, rules ไม่เปิดกว้าง, ไฟล์ index ถูกต้อง |
 
