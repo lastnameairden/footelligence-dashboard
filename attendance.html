@@ -158,7 +158,7 @@
         </div>
         <div>
           <label class="field-label">ชื่อเล่น</label>
-          <input id="register-name" type="text" required class="field-input" />
+          <input id="register-name" type="text" required maxlength="60" pattern="[^<>]*" title="ไม่เกิน 60 ตัวอักษร และห้ามใช้เครื่องหมาย < หรือ >" class="field-input" />
         </div>
         <div>
           <label class="field-label">อีเมล</label>

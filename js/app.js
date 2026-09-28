@@ -28,7 +28,8 @@ import {
   getCoachPlayerIds,
   ageGroupSortKey,
   ageGroupNumber,
-  coachPositionLabel
+  coachPositionLabel,
+  escapeHtml
 } from "./ui-utils.js";
 
 // สถานะที่นับว่า "มาซ้อม" ตาม legend ของ Logbook (A หรือค่าประเมิน 1-4)
@@ -237,7 +238,7 @@ function renderPlayersGroups(playerGroups) {
 
     const wrapper = document.createElement("div");
     wrapper.innerHTML = `
-      <h3 class="section-title text-sm mb-2">${teamLogoImg(team)}${team}</h3>
+      <h3 class="section-title text-sm mb-2">${teamLogoImg(team)}${escapeHtml(team)}</h3>
       <div class="flex flex-wrap gap-2 mb-3"></div>
       <div class="card table-wrap">
         <table class="pro-table">
@@ -265,11 +266,11 @@ function renderPlayersGroups(playerGroups) {
       noun: "คน",
       renderRow: (p) => `
         <tr>
-          <td>${p.number ?? "-"}</td>
-          <td class="emphasis"><a href="./player.html#id=${p.id}" class="text-blue-600 hover:underline">${p.nickname ?? "-"}</a></td>
-          <td>${p.fullName ?? "-"}</td>
-          <td>${p.birthday ?? "-"}</td>
-          <td>${p.ageGroup ?? "-"}</td>
+          <td>${escapeHtml(p.number ?? "-")}</td>
+          <td class="emphasis"><a href="./player.html#id=${p.id}" class="text-blue-600 hover:underline">${escapeHtml(p.nickname ?? "-")}</a></td>
+          <td>${escapeHtml(p.fullName ?? "-")}</td>
+          <td>${escapeHtml(p.birthday ?? "-")}</td>
+          <td>${escapeHtml(p.ageGroup ?? "-")}</td>
         </tr>`
     });
 
@@ -389,7 +390,7 @@ function renderPlayersPie(playerGroups) {
       (e, i) => `
       <div class="flex items-center gap-2">
         <span class="w-3 h-3 rounded-full inline-block" style="background:${colors[i]}"></span>
-        <span class="text-slate-600">${e.team}: ${e.count} คน</span>
+        <span class="text-slate-600">${escapeHtml(e.team)}: ${e.count} คน</span>
       </div>`
     )
     .join("");
@@ -491,8 +492,8 @@ function renderOverview(groups, groupStats, mode, coachLookup) {
       const avgScore = totals.scoreCount > 0 ? (totals.scoreSum / totals.scoreCount).toFixed(1) : "-";
       const coachName = coachLookup(key) || "-";
       return {
-        nameCell: `<td class="emphasis">${key}</td>`,
-        subCell: `<td>${coachName}</td>`,
+        nameCell: `<td class="emphasis">${escapeHtml(key)}</td>`,
+        subCell: `<td>${escapeHtml(coachName)}</td>`,
         playerCount,
         percent,
         avgScore
@@ -523,7 +524,7 @@ function renderOverview(groups, groupStats, mode, coachLookup) {
           return {
             // ไม่ต้องมีคอลัมน์ทีมซ้ำ (ดูอยู่ในแท็บทีมเดียวกันหมดแล้ว) เริ่มตารางจากคอลัมน์โค้ชเลย
             nameCell: "",
-            subCell: `<td class="emphasis">${row.coachName} — ${coachPositionLabel(row.coachPosition)} (${row.ageGroups.join(", ") || "-"})</td>`,
+            subCell: `<td class="emphasis">${escapeHtml(row.coachName)} — ${coachPositionLabel(row.coachPosition)} (${row.ageGroups.join(", ") || "-"})</td>`,
             playerCount: row.playerCount,
             percent,
             avgScore
@@ -558,7 +559,7 @@ function renderAttendanceGroups(playerGroups, attendanceRecords) {
 
     const wrapper = document.createElement("div");
     wrapper.innerHTML = `
-      <h3 class="section-title text-sm mb-2">${teamLogoImg(team)}${team}</h3>
+      <h3 class="section-title text-sm mb-2">${teamLogoImg(team)}${escapeHtml(team)}</h3>
       <div class="flex flex-wrap gap-2 mb-3"></div>
       <div class="card table-wrap">
         <table class="pro-table">
@@ -590,7 +591,7 @@ function renderAttendanceGroups(playerGroups, attendanceRecords) {
         const avgScore = s.scoreCount > 0 ? (s.scoreSum / s.scoreCount).toFixed(1) : "-";
         return `
         <tr>
-          <td class="emphasis">${s.nickname ?? "-"}</td>
+          <td class="emphasis">${escapeHtml(s.nickname ?? "-")}</td>
           <td>${s.total}</td>
           <td class="text-emerald-600 font-medium">${s.attended}</td>
           <td class="text-red-500 font-medium">${s.missed}</td>
@@ -708,7 +709,7 @@ async function loadAgeGroupProgress(team, dateStr) {
       if (r.noTraining) {
         return `
           <tr>
-            <td class="emphasis">${r.ageGroup}</td>
+            <td class="emphasis">${escapeHtml(r.ageGroup)}</td>
             <td>${r.totalPlayers}</td>
             <td class="text-slate-400" colspan="2">ไม่มีฝึกซ้อม</td>
             <td>-</td>
@@ -719,7 +720,7 @@ async function loadAgeGroupProgress(team, dateStr) {
         : "-";
       return `
         <tr>
-          <td class="emphasis">${r.ageGroup}</td>
+          <td class="emphasis">${escapeHtml(r.ageGroup)}</td>
           <td>${r.totalPlayers}</td>
           <td class="text-emerald-600 font-medium">${r.evaluated}</td>
           <td class="text-red-500 font-medium">${notEvaluated}</td>
@@ -789,7 +790,9 @@ function formatReportPeriod(r) {
   if (!r.periodType) return "-";
   const label = r.periodType === "other" ? r.periodOtherText || "อื่นๆ" : PERIOD_TYPE_LABELS[r.periodType] || r.periodType;
   const timeRange = r.periodStartTime && r.periodEndTime ? `${r.periodStartTime} - ${r.periodEndTime} น.` : "";
-  return timeRange ? `${label} (${timeRange})` : label;
+  // ผลลัพธ์นี้ถูกใส่ลง innerHTML ตรงๆ (บรรทัด <td>${formatReportPeriod(r)}</td>) และ periodOtherText เป็นข้อความอิสระที่โค้ชพิมพ์เอง
+  const safeLabel = escapeHtml(label);
+  return timeRange ? `${safeLabel} (${escapeHtml(timeRange)})` : safeLabel;
 }
 
 function formatReportAttended(r) {
@@ -839,11 +842,11 @@ async function loadTrainingReports(team) {
         : "";
       return `
         <tr>
-          <td class="emphasis">${r.date ?? "-"}</td>
-          <td>${r.coachName ?? "-"}</td>
+          <td class="emphasis">${escapeHtml(r.date ?? "-")}</td>
+          <td>${escapeHtml(r.coachName ?? "-")}</td>
           <td>${formatReportPeriod(r)}</td>
           <td>${formatReportAttended(r)}</td>
-          <td>${r.notes ?? "-"}</td>
+          <td>${escapeHtml(r.notes ?? "-")}</td>
           <td>${postedAt}</td>
           ${mapCell}
         </tr>`;
@@ -952,7 +955,7 @@ const trainingPlanSummaryTable = createPaginatedTable({
       : "";
     return `
         <tr>
-          <td class="emphasis">${r.coachName}</td>
+          <td class="emphasis">${escapeHtml(r.coachName)}</td>
           <td>${r.total}</td>
           <td class="text-emerald-600 font-medium">${onTime}</td>
           <td class="text-red-500 font-medium">${r.late}</td>
@@ -970,14 +973,14 @@ const dashboardMatchTable = createPaginatedTable({
   noun: "รายการ",
   renderRow: (m) => `
         <tr>
-          <td class="emphasis">${teamLogoImg(m.team)}${m.team ?? "-"}</td>
-          <td>${m.date ?? "-"}</td>
-          <td>${m.opponent ?? "-"}</td>
-          <td>${m.competitionType ?? "-"}</td>
-          <td>${m.ageGroup ?? "-"}</td>
+          <td class="emphasis">${teamLogoImg(m.team)}${escapeHtml(m.team ?? "-")}</td>
+          <td>${escapeHtml(m.date ?? "-")}</td>
+          <td>${escapeHtml(m.opponent ?? "-")}</td>
+          <td>${escapeHtml(m.competitionType ?? "-")}</td>
+          <td>${escapeHtml(m.ageGroup ?? "-")}</td>
           <td>${matchResultBadge(m.result)}</td>
           <td class="emphasis">${m.scoreUs} - ${m.scoreThem}</td>
-          <td>${m.competition ?? "-"}</td>
+          <td>${escapeHtml(m.competition ?? "-")}</td>
         </tr>`
 });
 
@@ -989,14 +992,14 @@ const dashboardInjuryTable = createPaginatedTable({
   noun: "รายการ",
   renderRow: (inj) => `
         <tr>
-          <td class="emphasis">${teamLogoImg(inj.team)}${inj.team ?? "-"}</td>
-          <td>${inj.date ?? "-"}</td>
-          <td class="emphasis">${inj.playerName ?? "-"}</td>
-          <td>${inj.ageGroup ?? "-"}</td>
-          <td>${inj.description ?? "-"}</td>
+          <td class="emphasis">${teamLogoImg(inj.team)}${escapeHtml(inj.team ?? "-")}</td>
+          <td>${escapeHtml(inj.date ?? "-")}</td>
+          <td class="emphasis">${escapeHtml(inj.playerName ?? "-")}</td>
+          <td>${escapeHtml(inj.ageGroup ?? "-")}</td>
+          <td>${escapeHtml(inj.description ?? "-")}</td>
           <td>${injurySeverityBadge(inj.severity)}</td>
           <td>${injuryStatusBadge(inj.status)}</td>
-          <td>${inj.expectedReturn ?? "-"}</td>
+          <td>${escapeHtml(inj.expectedReturn ?? "-")}</td>
         </tr>`
 });
 
@@ -1400,7 +1403,7 @@ async function refreshNotifications() {
     notificationBadge.classList.toggle("hidden", unreadCount === 0);
   } catch (err) {
     console.error(err);
-    notificationList.innerHTML = `<p class="text-red-600 text-sm text-center py-6">โหลดการแจ้งเตือนไม่สำเร็จ: ${err.message}</p>`;
+    notificationList.innerHTML = `<p class="text-red-600 text-sm text-center py-6">โหลดการแจ้งเตือนไม่สำเร็จ: ${escapeHtml(err.message)}</p>`;
   }
 }
 

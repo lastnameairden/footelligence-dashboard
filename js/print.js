@@ -22,7 +22,8 @@ import {
   ageGroupNumber,
   getCoachPlayerIds,
   isCoachSubmissionOnTime,
-  isReportLate
+  isReportLate,
+  escapeHtml
 } from "./ui-utils.js";
 
 const statusEl = document.getElementById("status-message");
@@ -150,7 +151,7 @@ function buildCoachDailyTrendSvg(dailyCounts, totalCoaches, options = {}) {
           const segH = (seg.count / maxY) * chartH;
           const y = yCursor - segH;
           yCursor = y;
-          return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barWidth.toFixed(1)}" height="${segH.toFixed(1)}" fill="${seg.color}"><title>${d.date}: ${verb}ตรงเวลา ${d.onTime} · ${verb}สาย ${d.late} · ${noneLabel} ${d.none}</title></rect>`;
+          return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barWidth.toFixed(1)}" height="${segH.toFixed(1)}" fill="${seg.color}"><title>${escapeHtml(d.date)}: ${verb}ตรงเวลา ${d.onTime} · ${verb}สาย ${d.late} · ${noneLabel} ${d.none}</title></rect>`;
         })
         .join("");
     })
@@ -219,8 +220,8 @@ function buildTopicBarChartSvg(topics, color) {
       const barW = Math.max((t.count / maxCount) * barAreaW, 2);
       const label = t.topic.length > 32 ? `${t.topic.slice(0, 31)}…` : t.topic;
       return `
-        <text x="${labelW - 6}" y="${midY}" font-size="9" fill="#334155" text-anchor="end">${label}<title>${t.topic}</title></text>
-        <rect x="${labelW}" y="${(y + 3).toFixed(1)}" width="${barW.toFixed(1)}" height="${rowH - 8}" rx="2" fill="${color}"><title>${t.topic}: ${t.count} ครั้ง</title></rect>
+        <text x="${labelW - 6}" y="${midY}" font-size="9" fill="#334155" text-anchor="end">${escapeHtml(label)}<title>${escapeHtml(t.topic)}</title></text>
+        <rect x="${labelW}" y="${(y + 3).toFixed(1)}" width="${barW.toFixed(1)}" height="${rowH - 8}" rx="2" fill="${color}"><title>${escapeHtml(t.topic)}: ${t.count} ครั้ง</title></rect>
         <text x="${(labelW + barW + 4).toFixed(1)}" y="${midY}" font-size="9" fill="#475569">${t.count}</text>`;
     })
     .join("");
@@ -260,14 +261,14 @@ function buildCoachQuotaBarChartSvg(coachRows) {
       for (const seg of segs) {
         if (seg.count <= 0) continue;
         const w = (seg.count / maxTotal) * barAreaW;
-        rects += `<rect x="${x.toFixed(1)}" y="${(y + 3).toFixed(1)}" width="${w.toFixed(1)}" height="${rowH - 6}" rx="1.5" fill="${seg.color}"><title>${name} ${seg.segLabel}: ${seg.count}</title></rect>`;
+        rects += `<rect x="${x.toFixed(1)}" y="${(y + 3).toFixed(1)}" width="${w.toFixed(1)}" height="${rowH - 6}" rx="1.5" fill="${seg.color}"><title>${escapeHtml(name)} ${seg.segLabel}: ${seg.count}</title></rect>`;
         x += w;
       }
       // ตัวเลขจำนวนครั้งแยกสีตามหมวด วางไว้ตำแหน่งคงที่ท้ายแท่งเสมอ (ไม่ใช่ต่อท้ายความยาวแท่งจริงที่ไม่เท่ากัน
       // แต่ละแถว) เพื่อให้อ่านเป็นคอลัมน์ตรงกันทุกแถวเหมือนตาราง แทนที่จะต้อง hover ดู tooltip ซึ่งพิมพ์ออกมาไม่ได้
       const numbersX = labelW + barAreaW + 6;
       const numbers = `<text x="${numbersX}" y="${midY}" font-size="9.5" font-weight="600"><tspan fill="#059669">${r.onTime}</tspan><tspan fill="#94a3b8" font-weight="400"> / </tspan><tspan fill="#d97706">${r.late}</tspan><tspan fill="#94a3b8" font-weight="400"> / </tspan><tspan fill="#64748b">${r.missing}</tspan></text>`;
-      return `<text x="${labelW - 8}" y="${midY}" font-size="10" fill="#334155" text-anchor="end">${label}<title>${name}</title></text>${rects}${numbers}`;
+      return `<text x="${labelW - 8}" y="${midY}" font-size="10" fill="#334155" text-anchor="end">${escapeHtml(label)}<title>${escapeHtml(name)}</title></text>${rects}${numbers}`;
     })
     .join("");
 
@@ -387,7 +388,7 @@ function buildMatchResultChartSvg(matches) {
           const x = groupX + si * barW;
           const y = baselineY - barH;
           const label = key === "win" ? "ชนะ" : key === "draw" ? "เสมอ" : "แพ้";
-          return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${Math.max(barW - 1, 1).toFixed(1)}" height="${barH.toFixed(1)}" rx="1" fill="${seriesColor[key]}"><title>${ag} ${label}: ${val} นัด</title></rect>`;
+          return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${Math.max(barW - 1, 1).toFixed(1)}" height="${barH.toFixed(1)}" rx="1" fill="${seriesColor[key]}"><title>${escapeHtml(ag)} ${label}: ${val} นัด</title></rect>`;
         })
         .join("");
     })
@@ -396,7 +397,7 @@ function buildMatchResultChartSvg(matches) {
   const groupLabels = ageGroups
     .map((ag, gi) => {
       const x = padLeft + gi * groupW + groupW / 2;
-      return `<text x="${x.toFixed(1)}" y="${height - 6}" font-size="8" fill="#64748b" text-anchor="middle">${ag}</text>`;
+      return `<text x="${x.toFixed(1)}" y="${height - 6}" font-size="8" fill="#64748b" text-anchor="middle">${escapeHtml(ag)}</text>`;
     })
     .join("");
 
@@ -465,15 +466,15 @@ function buildGoalDiffChartSvg(matches) {
       const againstH = (g.against / maxY) * chartH;
       return `
         <text x="${(groupX + (groupW - groupGap) / 2).toFixed(1)}" y="${(padTop - 8).toFixed(1)}" font-size="8" font-weight="700" fill="${diffColor}" text-anchor="middle">${diffText}</text>
-        <rect x="${groupX.toFixed(1)}" y="${(baselineY - forH).toFixed(1)}" width="${Math.max(barW - 1, 1).toFixed(1)}" height="${forH.toFixed(1)}" rx="1" fill="#2563eb"><title>${ag} ยิงได้: ${g.for} ประตู</title></rect>
-        <rect x="${(groupX + barW).toFixed(1)}" y="${(baselineY - againstH).toFixed(1)}" width="${Math.max(barW - 1, 1).toFixed(1)}" height="${againstH.toFixed(1)}" rx="1" fill="#f97316"><title>${ag} เสีย: ${g.against} ประตู</title></rect>`;
+        <rect x="${groupX.toFixed(1)}" y="${(baselineY - forH).toFixed(1)}" width="${Math.max(barW - 1, 1).toFixed(1)}" height="${forH.toFixed(1)}" rx="1" fill="#2563eb"><title>${escapeHtml(ag)} ยิงได้: ${g.for} ประตู</title></rect>
+        <rect x="${(groupX + barW).toFixed(1)}" y="${(baselineY - againstH).toFixed(1)}" width="${Math.max(barW - 1, 1).toFixed(1)}" height="${againstH.toFixed(1)}" rx="1" fill="#f97316"><title>${escapeHtml(ag)} เสีย: ${g.against} ประตู</title></rect>`;
     })
     .join("");
 
   const groupLabels = ageGroups
     .map((ag, gi) => {
       const x = padLeft + gi * groupW + groupW / 2;
-      return `<text x="${x.toFixed(1)}" y="${height - 6}" font-size="8" fill="#64748b" text-anchor="middle">${ag}</text>`;
+      return `<text x="${x.toFixed(1)}" y="${height - 6}" font-size="8" fill="#64748b" text-anchor="middle">${escapeHtml(ag)}</text>`;
     })
     .join("");
 
@@ -546,7 +547,7 @@ function buildInjurySeverityChartSvg(injuries) {
           const x = groupX + si * barW;
           const y = baselineY - barH;
           const label = key === "mild" ? "เล็กน้อย" : key === "moderate" ? "ปานกลาง" : "รุนแรง";
-          return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${Math.max(barW - 1, 1).toFixed(1)}" height="${barH.toFixed(1)}" rx="1" fill="${seriesColor[key]}"><title>${ag} ${label}: ${val} ราย</title></rect>`;
+          return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${Math.max(barW - 1, 1).toFixed(1)}" height="${barH.toFixed(1)}" rx="1" fill="${seriesColor[key]}"><title>${escapeHtml(ag)} ${label}: ${val} ราย</title></rect>`;
         })
         .join("");
     })
@@ -555,7 +556,7 @@ function buildInjurySeverityChartSvg(injuries) {
   const groupLabels = ageGroups
     .map((ag, gi) => {
       const x = padLeft + gi * groupW + groupW / 2;
-      return `<text x="${x.toFixed(1)}" y="${height - 6}" font-size="8" fill="#64748b" text-anchor="middle">${ag}</text>`;
+      return `<text x="${x.toFixed(1)}" y="${height - 6}" font-size="8" fill="#64748b" text-anchor="middle">${escapeHtml(ag)}</text>`;
     })
     .join("");
 
@@ -662,7 +663,7 @@ async function loadPrintExtras(team, ageGroup, month) {
         const percentBadgeClass = onTimePercent === null ? "badge-neutral" : onTimePercent >= 80 ? "badge-success" : onTimePercent >= 50 ? "badge-warning" : "badge-danger";
         return `
           <tr>
-            <td class="emphasis">${coach.name ?? "-"}</td>
+            <td class="emphasis">${escapeHtml(coach.name ?? "-")}</td>
             <td>${(coach.ageGroups || []).join(", ") || "-"}</td>
             <td>${TRAINING_PLAN_MONTHLY_QUOTA}</td>
             <td class="text-emerald-600 font-medium">${onTime}</td>
@@ -744,7 +745,7 @@ async function loadPrintExtras(team, ageGroup, month) {
         const percentBadgeClass = matchPercent >= 80 ? "badge-success" : matchPercent >= 50 ? "badge-warning" : "badge-danger";
         return `
           <tr>
-            <td class="emphasis">${coach.name ?? "-"}</td>
+            <td class="emphasis">${escapeHtml(coach.name ?? "-")}</td>
             <td>${(coach.ageGroups || []).join(", ") || "-"}</td>
             <td>${CHECKIN_MONTHLY_QUOTA}</td>
             <td>${checkinDays}</td>
@@ -814,7 +815,7 @@ async function loadPrintExtras(team, ageGroup, month) {
         const percentBadgeClass = matchPercent === null ? "badge-neutral" : matchPercent >= 80 ? "badge-success" : matchPercent >= 50 ? "badge-warning" : "badge-danger";
         return `
           <tr>
-            <td class="emphasis">${coach.name ?? "-"}</td>
+            <td class="emphasis">${escapeHtml(coach.name ?? "-")}</td>
             <td>${(coach.ageGroups || []).join(", ") || "-"}</td>
             <td>${monthSessions.length}</td>
             <td>${matchDays}</td>
@@ -874,7 +875,7 @@ async function loadPrintExtras(team, ageGroup, month) {
           completePercent === null ? "badge-neutral" : completePercent >= 80 ? "badge-success" : completePercent >= 50 ? "badge-warning" : "badge-danger";
         return `
           <tr>
-            <td class="emphasis">${coach.name ?? "-"}</td>
+            <td class="emphasis">${escapeHtml(coach.name ?? "-")}</td>
             <td>${(coach.ageGroups || []).join(", ") || "-"}</td>
             <td>${monthSessions.length}</td>
             <td class="text-emerald-600 font-medium">${complete}</td>
@@ -912,13 +913,13 @@ async function loadPrintExtras(team, ageGroup, month) {
       .map(
         (m) => `
         <tr>
-          <td class="emphasis">${m.date ?? "-"}</td>
-          <td>${m.ageGroup ?? "-"}</td>
-          <td>${m.opponent ?? "-"}</td>
-          <td>${m.competitionType ?? "-"}</td>
+          <td class="emphasis">${escapeHtml(m.date ?? "-")}</td>
+          <td>${escapeHtml(m.ageGroup ?? "-")}</td>
+          <td>${escapeHtml(m.opponent ?? "-")}</td>
+          <td>${escapeHtml(m.competitionType ?? "-")}</td>
           <td>${matchResultBadge(m.result)}</td>
           <td class="emphasis">${m.scoreUs} - ${m.scoreThem}</td>
-          <td>${m.competition ?? "-"}</td>
+          <td>${escapeHtml(m.competition ?? "-")}</td>
         </tr>`
       )
       .join("");
@@ -950,12 +951,12 @@ async function loadPrintExtras(team, ageGroup, month) {
       .map(
         (inj) => `
         <tr>
-          <td class="emphasis">${inj.date ?? "-"}</td>
-          <td class="emphasis">${inj.playerName ?? "-"}</td>
-          <td>${inj.description ?? "-"}</td>
+          <td class="emphasis">${escapeHtml(inj.date ?? "-")}</td>
+          <td class="emphasis">${escapeHtml(inj.playerName ?? "-")}</td>
+          <td>${escapeHtml(inj.description ?? "-")}</td>
           <td>${injurySeverityBadge(inj.severity)}</td>
           <td>${injuryStatusBadge(inj.status)}</td>
-          <td>${inj.expectedReturn ?? "-"}</td>
+          <td>${escapeHtml(inj.expectedReturn ?? "-")}</td>
         </tr>`
       )
       .join("");

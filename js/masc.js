@@ -13,7 +13,7 @@ import {
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import { db, auth } from "./firebase-init.js";
 import { AGES, POS, SECT, SB, CRITERIA, SCORE_VALUES, categoryRawScore, scoreToGrade } from "./masc-data.js";
-import { getCoachPlayerIds } from "./ui-utils.js";
+import { getCoachPlayerIds, escapeHtml } from "./ui-utils.js";
 
 const statusEl = document.getElementById("status-message");
 const accessGate = document.getElementById("access-gate");
@@ -141,7 +141,7 @@ async function loadMascRoundBanner() {
       const daysLeft = daysBetween(active.endDate, todayStr);
       mascRoundBanner.className = "card card-pad no-print bg-emerald-50 border-emerald-200";
       mascRoundBanner.innerHTML = `
-        <p class="font-semibold text-emerald-800">🔔 รอบประเมิน MASC ปัจจุบัน: ${active.label} (${active.startDate} – ${active.endDate})</p>
+        <p class="font-semibold text-emerald-800">🔔 รอบประเมิน MASC ปัจจุบัน: ${active.label} (${escapeHtml(active.startDate)} – ${escapeHtml(active.endDate)})</p>
         <p class="text-sm text-emerald-700 mt-1">${daysLeft > 0 ? `เหลือเวลาอีก ${daysLeft} วัน` : "หมดเขตวันนี้"}</p>
       `;
       mascRoundBanner.classList.remove("hidden");
@@ -156,7 +156,7 @@ async function loadMascRoundBanner() {
   } catch (err) {
     console.error(err);
     mascRoundBanner.className = "card card-pad no-print bg-red-50 border-red-200";
-    mascRoundBanner.innerHTML = `<p class="font-semibold text-red-700">โหลดข้อมูลรอบการประเมินไม่สำเร็จ — ปิดการบันทึกไว้ก่อนเพื่อความปลอดภัย: ${err.message}</p>`;
+    mascRoundBanner.innerHTML = `<p class="font-semibold text-red-700">โหลดข้อมูลรอบการประเมินไม่สำเร็จ — ปิดการบันทึกไว้ก่อนเพื่อความปลอดภัย: ${escapeHtml(err.message)}</p>`;
     mascRoundBanner.classList.remove("hidden");
   }
 }
@@ -363,7 +363,7 @@ function ageGroupNumber(ageGroup) {
 function renderPlayerOptions(ageGroup) {
   const filtered = (ageGroup ? players.filter((p) => p.ageGroup === ageGroup) : players).filter((p) => !completedPlayerIds.has(p.id));
   playerSelect.innerHTML =
-    '<option value="">-- เลือกนักกีฬา --</option>' + filtered.map((p) => `<option value="${p.id}">${p.nickname || p.fullName || "-"}</option>`).join("");
+    '<option value="">-- เลือกนักกีฬา --</option>' + filtered.map((p) => `<option value="${p.id}">${escapeHtml(p.nickname || p.fullName || "-")}</option>`).join("");
 }
 
 async function loadPlayers() {
@@ -381,7 +381,7 @@ async function loadPlayers() {
   players.sort((a, b) => (a.nickname || "").localeCompare(b.nickname || ""));
 
   const ageGroups = Array.from(new Set(players.map((p) => p.ageGroup).filter(Boolean))).sort((a, b) => ageGroupNumber(a) - ageGroupNumber(b));
-  ageFilterSelect.innerHTML = ageGroups.map((ag) => `<option value="${ag}">${ag}</option>`).join("");
+  ageFilterSelect.innerHTML = ageGroups.map((ag) => `<option value="${escapeHtml(ag)}">${escapeHtml(ag)}</option>`).join("");
   renderPlayerOptions(ageGroups[0] || "");
   renderProgressSummary();
 }
@@ -437,7 +437,7 @@ function renderProgressSummary() {
       const done = groupPlayers.filter((p) => completedPlayerIds.has(p.id)).length;
       const total = groupPlayers.length;
       const badgeClass = total > 0 && done === total ? "badge-success" : done > 0 ? "badge-info" : "badge-neutral";
-      return `<span class="badge ${badgeClass}">${ag}: ${done}/${total} คน</span>`;
+      return `<span class="badge ${badgeClass}">${escapeHtml(ag)}: ${done}/${total} คน</span>`;
     })
     .join("");
   progressWrap.classList.remove("hidden");

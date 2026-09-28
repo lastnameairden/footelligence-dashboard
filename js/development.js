@@ -1,7 +1,7 @@
 import { collection, getDocs, getDoc, doc } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import { db, auth } from "./firebase-init.js";
-import { SCORE_CATEGORIES, computeAvgScore, applyDataLabels, teamLogoImg, sendExecutiveNote } from "./ui-utils.js";
+import { SCORE_CATEGORIES, computeAvgScore, applyDataLabels, teamLogoImg, sendExecutiveNote, escapeHtml } from "./ui-utils.js";
 
 const TEAMS = ["KHAMPHEE FOOTBALL", "THAWEE SC", "THAMMASATHIT"];
 // ต้องมีข้อมูลคะแนนอย่างน้อยเท่านี้ครั้งจึงจะคำนวณแนวโน้ม "ช่วงแรก vs ช่วงหลัง" ได้อย่างมีความหมาย
@@ -98,7 +98,7 @@ function renderDeltaBars(rows) {
       return `
       <div class="mb-3 last:mb-0">
         <div class="flex justify-between text-xs text-slate-500 mb-1">
-          <span>${label} (${teamLogoImg(r.player.team, "w-4 h-4 object-contain inline-block align-middle rounded mr-1")}${r.player.team ?? "-"})</span>
+          <span>${escapeHtml(label)} (${teamLogoImg(r.player.team, "w-4 h-4 object-contain inline-block align-middle rounded mr-1")}${escapeHtml(r.player.team ?? "-")})</span>
           <span>${sign}${r.delta.toFixed(2)}</span>
         </div>
         <div class="w-full bg-slate-100 rounded-full h-3">
@@ -144,9 +144,9 @@ function renderTable(rows) {
       return `
         <tr>
           <td class="emphasis">${i + 1}</td>
-          <td class="emphasis"><a href="./player.html#id=${r.player.id}" class="text-blue-600 hover:underline">${label}</a></td>
-          <td>${teamLogoImg(r.player.team)}${r.player.team ?? "-"}</td>
-          <td>${r.player.ageGroup ?? "-"}</td>
+          <td class="emphasis"><a href="./player.html#id=${r.player.id}" class="text-blue-600 hover:underline">${escapeHtml(label)}</a></td>
+          <td>${teamLogoImg(r.player.team)}${escapeHtml(r.player.team ?? "-")}</td>
+          <td>${escapeHtml(r.player.ageGroup ?? "-")}</td>
           <td>${r.earlyAvg.toFixed(2)}</td>
           <td>${r.lateAvg.toFixed(2)}</td>
           <td class="${deltaClass}">${sign}${r.delta.toFixed(2)}</td>

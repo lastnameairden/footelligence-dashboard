@@ -21,7 +21,8 @@ import {
   sendExecutiveNote,
   calcAge,
   buildScoreTrendChartSvg,
-  buildCategoryRadarSvg
+  buildCategoryRadarSvg,
+  escapeHtml
 } from "./ui-utils.js";
 
 const statusEl = document.getElementById("status-message");
@@ -96,8 +97,8 @@ function renderAttendanceHistory(records) {
       const avg = computeAvgScore(scores);
       return `
         <tr>
-          <td class="emphasis">${r.date ?? "-"}</td>
-          <td>${r.status ? `${r.status} (${STATUS_LABELS[r.status] ?? "-"})` : "-"}</td>
+          <td class="emphasis">${escapeHtml(r.date ?? "-")}</td>
+          <td>${r.status ? `${escapeHtml(r.status)} (${STATUS_LABELS[r.status] ?? "-"})` : "-"}</td>
           ${SCORE_CATEGORIES.map((c) => `<td>${scores[c.key] ?? "-"}</td>`).join("")}
           <td>${avg !== null ? avg.toFixed(2) : "-"}</td>
         </tr>`;
@@ -117,9 +118,9 @@ function renderMatchHistory(reports) {
     .map(
       (m) => `
       <tr>
-        <td class="emphasis">${m.date ?? "-"}</td>
-        <td>${m.opponent ?? "-"}</td>
-        <td>${m.competitionType ?? "-"}${m.competition ? ` (${m.competition})` : ""}</td>
+        <td class="emphasis">${escapeHtml(m.date ?? "-")}</td>
+        <td>${escapeHtml(m.opponent ?? "-")}</td>
+        <td>${escapeHtml(m.competitionType ?? "-")}${m.competition ? ` (${escapeHtml(m.competition)})` : ""}</td>
         <td>${matchResultBadge(m.result)}</td>
         <td class="emphasis">${m.scoreUs} - ${m.scoreThem}</td>
       </tr>`
@@ -140,11 +141,11 @@ function renderInjuryHistory(reports) {
     .map(
       (inj) => `
       <tr>
-        <td class="emphasis">${inj.date ?? "-"}</td>
-        <td>${inj.description ?? "-"}</td>
+        <td class="emphasis">${escapeHtml(inj.date ?? "-")}</td>
+        <td>${escapeHtml(inj.description ?? "-")}</td>
         <td>${injurySeverityBadge(inj.severity)}</td>
         <td>${injuryStatusBadge(inj.status)}</td>
-        <td>${inj.expectedReturn ?? "-"}</td>
+        <td>${escapeHtml(inj.expectedReturn ?? "-")}</td>
       </tr>`
     )
     .join("");

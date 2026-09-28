@@ -22,7 +22,8 @@ import {
   STATUS_LABELS,
   TEAM_COLORS,
   SCORE_CATEGORIES,
-  SCORE_CATEGORY_COLORS
+  SCORE_CATEGORY_COLORS,
+  escapeHtml
 } from "./ui-utils.js";
 import { CRITERIA, SECT, categoryRawScore, scoreToGrade } from "./masc-data.js";
 
@@ -370,7 +371,7 @@ function buildMascSection(evaluation) {
     .join("");
 
   return `
-    <p class="text-[10px] text-slate-400 mb-1">ประเมินล่าสุด: ${evaluation.assessmentPeriod || "-"} • อัปเดต ${updatedLabel} • ตำแหน่ง ${evaluation.position ?? "-"} (${evaluation.ageBracket ?? "-"}) • บทบาท: ${roleText}</p>
+    <p class="text-[10px] text-slate-400 mb-1">ประเมินล่าสุด: ${evaluation.assessmentPeriod || "-"} • อัปเดต ${updatedLabel} • ตำแหน่ง ${escapeHtml(evaluation.position ?? "-")} (${escapeHtml(evaluation.ageBracket ?? "-")}) • บทบาท: ${roleText}</p>
     <div class="grid grid-cols-2 gap-1.5">${categoryBlocks}</div>
     <div class="text-[10px] text-slate-600 space-y-0.5 mt-1.5">
       ${evaluation.talent ? `<p class="line-clamp-1"><span class="font-semibold text-slate-500">จุดเด่น:</span> ${evaluation.talent}</p>` : ""}
@@ -503,8 +504,8 @@ function buildPlayerPage(player, data, scope) {
         ${teamLogoImg(team, "w-6 h-6 object-contain")}
       </div>
       <div>
-        <p class="text-sm font-bold leading-tight">${player.nickname || player.fullName || "-"} <span class="font-normal opacity-80">• ${player.fullName ?? "-"}</span></p>
-        <p class="text-[10px] opacity-90 leading-tight">${team} • รอบการประเมิน ${monthRangeLabel(start, end)}</p>
+        <p class="text-sm font-bold leading-tight">${escapeHtml(player.nickname || player.fullName || "-")} <span class="font-normal opacity-80">• ${escapeHtml(player.fullName ?? "-")}</span></p>
+        <p class="text-[10px] opacity-90 leading-tight">${escapeHtml(team)} • รอบการประเมิน ${monthRangeLabel(start, end)}</p>
       </div>
     </div>
     <p class="text-[10px] opacity-90 whitespace-nowrap">ออกรายงาน ${new Date().toLocaleDateString("th-TH", { year: "numeric", month: "short", day: "numeric" })}</p>
@@ -523,10 +524,10 @@ function buildPlayerPage(player, data, scope) {
       ${player.photoUrl ? `<img src="${player.photoUrl}" alt="รูปนักกีฬา" class="w-full h-full object-cover" />` : teamLogoImg(team, "w-9 h-9 object-contain")}
     </div>
     <div class="text-[10px] text-slate-600 space-y-0.5 pt-1 border-t border-slate-100">
-      <p class="flex justify-between"><span class="text-slate-400">รุ่น</span><span class="font-medium">${player.ageGroup || UNASSIGNED_AGE_GROUP}</span></p>
+      <p class="flex justify-between"><span class="text-slate-400">รุ่น</span><span class="font-medium">${escapeHtml(player.ageGroup || UNASSIGNED_AGE_GROUP)}</span></p>
       <p class="flex justify-between"><span class="text-slate-400">อายุ</span><span class="font-medium">${age !== null ? `${age} ปี` : "-"}</span></p>
-      <p class="flex justify-between"><span class="text-slate-400">ตำแหน่ง</span><span class="font-medium">${player.position ?? "-"}</span></p>
-      <p class="flex justify-between"><span class="text-slate-400">เบอร์เสื้อ</span><span class="font-medium">${player.number ?? "-"}</span></p>
+      <p class="flex justify-between"><span class="text-slate-400">ตำแหน่ง</span><span class="font-medium">${escapeHtml(player.position ?? "-")}</span></p>
+      <p class="flex justify-between"><span class="text-slate-400">เบอร์เสื้อ</span><span class="font-medium">${escapeHtml(player.number ?? "-")}</span></p>
     </div>
     <p class="text-[9px] font-semibold tracking-wide uppercase pt-1 border-t border-slate-100" style="color:${accent}">MASC ล่าสุด</p>
     <div>${buildMascRadarSvg(mascGrades, 130)}</div>
@@ -597,8 +598,8 @@ function buildPlayerPage(player, data, scope) {
   const matchRows = cappedMatches.shown.map(
     (m) => `
       <tr>
-        <td class="emphasis">${m.date ?? "-"}</td>
-        <td>${m.opponent ?? "-"}</td>
+        <td class="emphasis">${escapeHtml(m.date ?? "-")}</td>
+        <td>${escapeHtml(m.opponent ?? "-")}</td>
         <td>${matchResultBadge(m.result)}</td>
         <td class="emphasis">${m.scoreUs} - ${m.scoreThem}</td>
       </tr>`
@@ -619,8 +620,8 @@ function buildPlayerPage(player, data, scope) {
   const injuryRows = cappedInjuries.shown.map(
     (inj) => `
       <tr>
-        <td class="emphasis">${inj.date ?? "-"}</td>
-        <td>${inj.description ?? "-"}</td>
+        <td class="emphasis">${escapeHtml(inj.date ?? "-")}</td>
+        <td>${escapeHtml(inj.description ?? "-")}</td>
         <td>${injurySeverityBadge(inj.severity)}</td>
         <td>${injuryStatusBadge(inj.status)}</td>
       </tr>`
@@ -825,7 +826,7 @@ async function loadReportCards(team, ageGroup, start, end) {
 
   if (excludedPlayers.length > 0) {
     excludedPlayers.sort((a, b) => (a.nickname || a.fullName || "").localeCompare(b.nickname || b.fullName || ""));
-    const names = excludedPlayers.map((p) => `<span class="badge badge-neutral">${p.nickname || p.fullName || "-"}</span>`).join("");
+    const names = excludedPlayers.map((p) => `<span class="badge badge-neutral">${escapeHtml(p.nickname || p.fullName || "-")}</span>`).join("");
     reportCardExcludedWrap.innerHTML = `
       <p class="font-semibold text-amber-800">⚠️ ยังไม่มีสมุดพกให้ ${excludedPlayers.length} คน — เพราะยังไม่ผ่านการประเมิน MASC ครบทุกหมวด</p>
       <div class="flex flex-wrap gap-1.5 mt-2">${names}</div>

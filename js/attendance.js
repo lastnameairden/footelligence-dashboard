@@ -51,7 +51,8 @@ import {
   COACH_POSITIONS,
   coachPositionLabel,
   coachPositionAllowsMultipleAgeGroups,
-  sendExecutiveNote
+  sendExecutiveNote,
+  escapeHtml
 } from "./ui-utils.js";
 import { categoryRawScore } from "./masc-data.js";
 
@@ -632,7 +633,7 @@ async function refreshNotifications() {
     notificationBadge.classList.toggle("hidden", unreadCount === 0);
   } catch (err) {
     console.error(err);
-    notificationList.innerHTML = `<p class="text-red-600 text-sm text-center py-6">โหลดการแจ้งเตือนไม่สำเร็จ: ${err.message}</p>`;
+    notificationList.innerHTML = `<p class="text-red-600 text-sm text-center py-6">โหลดการแจ้งเตือนไม่สำเร็จ: ${escapeHtml(err.message)}</p>`;
   }
 }
 
@@ -871,14 +872,14 @@ async function loadAdminMatchList() {
     .map(
       (m) => `
       <tr>
-        <td class="emphasis">${teamLogoImg(m.team)}${m.team ?? "-"}</td>
-        <td>${m.date ?? "-"}</td>
-        <td>${m.opponent ?? "-"}</td>
-        <td>${m.competitionType ?? "-"}</td>
-        <td>${m.ageGroup ?? "-"}</td>
+        <td class="emphasis">${teamLogoImg(m.team)}${escapeHtml(m.team ?? "-")}</td>
+        <td>${escapeHtml(m.date ?? "-")}</td>
+        <td>${escapeHtml(m.opponent ?? "-")}</td>
+        <td>${escapeHtml(m.competitionType ?? "-")}</td>
+        <td>${escapeHtml(m.ageGroup ?? "-")}</td>
         <td>${matchResultBadge(m.result)}</td>
         <td class="emphasis">${m.scoreUs} - ${m.scoreThem}</td>
-        <td>${m.competition ?? "-"}</td>
+        <td>${escapeHtml(m.competition ?? "-")}</td>
       </tr>`
     )
     .join("");
@@ -903,14 +904,14 @@ async function loadAdminInjuryList() {
     .map(
       (inj) => `
       <tr>
-        <td class="emphasis">${teamLogoImg(inj.team)}${inj.team ?? "-"}</td>
-        <td>${inj.date ?? "-"}</td>
-        <td>${inj.playerName ?? "-"}</td>
-        <td>${inj.ageGroup ?? "-"}</td>
-        <td>${inj.description ?? "-"}</td>
+        <td class="emphasis">${teamLogoImg(inj.team)}${escapeHtml(inj.team ?? "-")}</td>
+        <td>${escapeHtml(inj.date ?? "-")}</td>
+        <td>${escapeHtml(inj.playerName ?? "-")}</td>
+        <td>${escapeHtml(inj.ageGroup ?? "-")}</td>
+        <td>${escapeHtml(inj.description ?? "-")}</td>
         <td>${injurySeverityBadge(inj.severity)}</td>
         <td>${injuryStatusBadge(inj.status)}</td>
-        <td>${inj.expectedReturn ?? "-"}</td>
+        <td>${escapeHtml(inj.expectedReturn ?? "-")}</td>
       </tr>`
     )
     .join("");
@@ -1067,11 +1068,11 @@ async function enterMascCorrectionMode(round) {
     }
     adminMascRoundCorrectionSummary.innerHTML =
       '<p class="font-medium mb-1.5">รุ่นที่ยังประเมินไม่ครบ:</p><div class="flex flex-wrap gap-1.5">' +
-      groups.map((g) => `<span class="badge badge-warning">${teamLogoImg(g.team)}${g.team} · ${g.ageGroup}: ${g.done}/${g.total}</span>`).join("") +
+      groups.map((g) => `<span class="badge badge-warning">${teamLogoImg(g.team)}${escapeHtml(g.team)} · ${escapeHtml(g.ageGroup)}: ${g.done}/${g.total}</span>`).join("") +
       "</div>";
   } catch (err) {
     console.error(err);
-    adminMascRoundCorrectionSummary.innerHTML = `<p class="text-red-600">ตรวจสอบไม่สำเร็จ: ${err.message}</p>`;
+    adminMascRoundCorrectionSummary.innerHTML = `<p class="text-red-600">ตรวจสอบไม่สำเร็จ: ${escapeHtml(err.message)}</p>`;
   }
 }
 
@@ -1118,7 +1119,7 @@ async function loadMascRounds() {
   } catch (err) {
     console.error(err);
     adminMascRoundListBody.innerHTML =
-      `<tr><td colspan="5" class="px-4 py-6 text-center text-red-600">โหลดไม่สำเร็จ: ${err.message}</td></tr>`;
+      `<tr><td colspan="5" class="px-4 py-6 text-center text-red-600">โหลดไม่สำเร็จ: ${escapeHtml(err.message)}</td></tr>`;
   }
 }
 
@@ -1138,7 +1139,7 @@ function populateMascProgressRoundSelect(rounds) {
     return;
   }
   mascProgressRoundSelect.innerHTML = rounds
-    .map((r) => `<option value="${r.id}">${r.label} (${r.startDate} – ${r.endDate}) · ${mascRoundStatus(r).label}</option>`)
+    .map((r) => `<option value="${r.id}">${r.label} (${escapeHtml(r.startDate)} – ${escapeHtml(r.endDate)}) · ${mascRoundStatus(r).label}</option>`)
     .join("");
   // ค่าเริ่มต้น: รอบที่ "กำลังดำเนินการ" อยู่ตอนนี้ถ้ามี ไม่งั้นใช้รอบล่าสุด (rounds เรียงจากใหม่ไปเก่าอยู่แล้ว)
   const activeRound = rounds.find((r) => mascRoundStatus(r).label === "กำลังดำเนินการ");
@@ -1234,7 +1235,7 @@ async function loadMascProgressBreakdown() {
     showTeam(teamsPresent[0], mascProgressTeamTabs.children[0]);
   } catch (err) {
     console.error(err);
-    mascProgressBody.innerHTML = `<p class="text-sm text-red-600 py-4 text-center">โหลดไม่สำเร็จ: ${err.message}</p>`;
+    mascProgressBody.innerHTML = `<p class="text-sm text-red-600 py-4 text-center">โหลดไม่สำเร็จ: ${escapeHtml(err.message)}</p>`;
   }
 }
 
@@ -1248,7 +1249,7 @@ function renderMascProgressBody(teamPlayers, statusByPlayerId) {
     mascProgressBody.innerHTML = '<p class="text-sm text-slate-400 py-4 text-center">ทีมนี้ยังไม่มีนักกีฬา</p>';
     return;
   }
-  const nameChip = (p, cls) => `<span class="badge ${cls}">${p.nickname || p.fullName || "-"}</span>`;
+  const nameChip = (p, cls) => `<span class="badge ${cls}">${escapeHtml(p.nickname || p.fullName || "-")}</span>`;
   mascProgressBody.innerHTML = ageGroups
     .map((ag, i) => {
       const groupPlayers = teamPlayers
@@ -1266,7 +1267,7 @@ function renderMascProgressBody(teamPlayers, statusByPlayerId) {
       return `
         <details class="masc-progress-group"${i === 0 ? " open" : ""}>
           <summary>
-            <span>รุ่น ${ag}</span>
+            <span>รุ่น ${escapeHtml(ag)}</span>
             <span class="badge ${badgeClass}">${done.length}/${total} คน</span>
           </summary>
           <div class="masc-progress-columns">
@@ -1297,8 +1298,8 @@ function renderMascRoundList(rounds) {
       return `
         <tr>
           <td class="emphasis">${r.label ?? "-"}${r.isCorrectionRound ? ' <span class="badge badge-warning">รอบแก้ไข</span>' : ""}</td>
-          <td>${r.startDate ?? "-"}</td>
-          <td>${r.endDate ?? "-"}</td>
+          <td>${escapeHtml(r.startDate ?? "-")}</td>
+          <td>${escapeHtml(r.endDate ?? "-")}</td>
           <td><span class="badge ${status.className}">${status.label}</span></td>
           <td class="whitespace-nowrap">
             ${isEnded ? `<button type="button" class="btn btn-secondary btn-sm" data-masc-round-fix="${r.id}">สร้างรอบแก้ไข</button>` : ""}
@@ -1514,8 +1515,8 @@ async function loadPendingApprovals() {
   for (const c of pending) {
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td class="emphasis">${c.name ?? "-"}</td>
-      <td>${c.email ?? "-"}</td>
+      <td class="emphasis">${escapeHtml(c.name ?? "-")}</td>
+      <td>${escapeHtml(c.email ?? "-")}</td>
       <td>${roleLabel(c.role)}</td>
     `;
 
@@ -1631,7 +1632,7 @@ function buildCoachRow(c, sessions, attendanceRecords, players) {
   roleTd.innerHTML = roleLabel(c.role);
 
   tr.appendChild(nameTd);
-  tr.insertAdjacentHTML("beforeend", `<td>${c.email ?? "-"}</td>`);
+  tr.insertAdjacentHTML("beforeend", `<td>${escapeHtml(c.email ?? "-")}</td>`);
   tr.appendChild(roleTd);
   tr.insertAdjacentHTML(
     "beforeend",
@@ -1900,7 +1901,7 @@ function renderCoachPlanTrendChart(planTrend) {
     .map((d) => {
       const day = Number(d.date.slice(-2));
       const textColor = d.status === "none" ? "#94a3b8" : "#fff";
-      return `<div class="w-6 h-6 rounded flex items-center justify-center text-[10px] font-medium" style="background:${colors[d.status]};color:${textColor}" title="วันที่ ${d.date}: ${labels[d.status]}">${day}</div>`;
+      return `<div class="w-6 h-6 rounded flex items-center justify-center text-[10px] font-medium" style="background:${colors[d.status]};color:${textColor}" title="วันที่ ${escapeHtml(d.date)}: ${labels[d.status]}">${day}</div>`;
     })
     .join("");
   return `
@@ -1933,7 +1934,7 @@ function renderDailyConsistencyTable(dailyConsistency) {
       const rowClass = consistent ? "" : "bg-red-50";
       return `
         <tr class="${rowClass}">
-          <td>${d.date}</td>
+          <td>${escapeHtml(d.date)}</td>
           <td>${dailyConsistencyBadge(d.plan)}</td>
           <td>${dailyConsistencyBadge(d.checkin)}</td>
           <td>${dailyConsistencyBadge(d.report)}</td>
@@ -2013,8 +2014,8 @@ function renderCoachDetailContent(row) {
         "w-full text-left card card-pad py-2 px-3 hover:bg-slate-50 flex items-center justify-between gap-3 flex-wrap";
       item.innerHTML = `
         <span class="text-sm">
-          <span class="emphasis">${plan.date ?? "-"}</span>
-          <span class="text-slate-500"> — ${plan.trainingType ?? "-"} • ${(plan.ageGroups || []).join(", ") || "-"}</span>
+          <span class="emphasis">${escapeHtml(plan.date ?? "-")}</span>
+          <span class="text-slate-500"> — ${escapeHtml(plan.trainingType ?? "-")} • ${(plan.ageGroups || []).join(", ") || "-"}</span>
         </span>
         ${trainingPlanSubmissionStatus(plan)}
       `;
@@ -2049,7 +2050,7 @@ function renderCoachDetailContent(row) {
             ? '<span class="badge badge-warning">ไม่มีการซ้อม</span>'
             : "-";
       item.innerHTML = `
-        <span class="text-sm"><span class="emphasis">${report.date ?? "-"}</span></span>
+        <span class="text-sm"><span class="emphasis">${escapeHtml(report.date ?? "-")}</span></span>
         ${attendedBadge}
       `;
       item.addEventListener("click", () => renderReportDetailModal(report));
@@ -2205,7 +2206,7 @@ function renderCoachActivitySummaryTable(containerEl, rows) {
     const mainRow = document.createElement("tr");
     mainRow.className = "cursor-pointer";
     mainRow.innerHTML = `
-      <td class="emphasis"><span class="inline-block w-3 text-slate-400" data-toggle-arrow>▸</span> ${r.coachName}</td>
+      <td class="emphasis"><span class="inline-block w-3 text-slate-400" data-toggle-arrow>▸</span> ${escapeHtml(r.coachName)}</td>
       <td>${coachPositionLabel(r.coachPosition)} (${r.ageGroups.join(", ") || "-"})</td>
       <td>${checkinText}</td>
       <td>${r.reportCount > 0 ? `${r.reportCount} วัน` : "ยังไม่ได้ส่ง"}</td>
@@ -2261,7 +2262,7 @@ async function loadCoachActivitySummary(team) {
     renderCoachActivitySummaryTable(executiveCoachSummary, rows);
   } catch (err) {
     console.error(err);
-    executiveCoachSummary.innerHTML = `<p class="text-sm text-red-600">โหลดข้อมูลไม่สำเร็จ: ${err.message}</p>`;
+    executiveCoachSummary.innerHTML = `<p class="text-sm text-red-600">โหลดข้อมูลไม่สำเร็จ: ${escapeHtml(err.message)}</p>`;
   }
 }
 
@@ -2349,12 +2350,12 @@ function playerAuditRowHtml(p) {
   }
 
   const ageGroupOptions = PLAYER_AUDIT_AGE_GROUPS
-    .map((ag) => `<option value="${ag}"${p.ageGroup === ag ? " selected" : ""}>${ag}</option>`)
+    .map((ag) => `<option value="${escapeHtml(ag)}"${p.ageGroup === ag ? " selected" : ""}>${escapeHtml(ag)}</option>`)
     .join("");
   return `
     <tr data-player-id="${p.id}">
-      <td>${teamLogoImg(p.team)}${p.team ?? "-"}</td>
-      <td class="emphasis">${p.nickname ?? p.fullName ?? "-"}</td>
+      <td>${teamLogoImg(p.team)}${escapeHtml(p.team ?? "-")}</td>
+      <td class="emphasis">${escapeHtml(p.nickname ?? p.fullName ?? "-")}</td>
       <td><input type="date" class="field-input" data-audit-birthday value="${displayBirthday}" /></td>
       <td data-audit-age-display>${displayAge !== null ? `${displayAge} ปี` : "-"}</td>
       <td><select class="field-input" data-audit-age-group><option value="">-- เลือกรุ่นอายุ --</option>${ageGroupOptions}</select></td>
@@ -2600,16 +2601,16 @@ function renderProgressTable(rows) {
     const tr = document.createElement("tr");
     if (r.noTraining) {
       tr.innerHTML = `
-        <td class="emphasis">${r.coach.name ?? "-"}</td>
-        <td>${r.coach.team}</td>
+        <td class="emphasis">${escapeHtml(r.coach.name ?? "-")}</td>
+        <td>${escapeHtml(r.coach.team)}</td>
         <td>${r.totalPlayers}</td>
         <td class="text-slate-400" colspan="2">ไม่มีฝึกซ้อม</td>
         <td>-</td>
       `;
     } else {
       tr.innerHTML = `
-        <td class="emphasis">${r.coach.name ?? "-"}</td>
-        <td>${r.coach.team}</td>
+        <td class="emphasis">${escapeHtml(r.coach.name ?? "-")}</td>
+        <td>${escapeHtml(r.coach.team)}</td>
         <td>${r.totalPlayers}</td>
         <td class="text-emerald-600 font-medium">${r.evaluated}</td>
         <td class="text-red-500 font-medium">${notEvaluated}</td>
@@ -2962,15 +2963,15 @@ async function loadExecutiveNotes(team, listEl) {
               <p class="font-semibold">${typeIcon} ${n.refLabel ?? "-"}</p>
               ${unreadBadge}
             </div>
-            <p class="text-sm text-slate-600 mt-1 whitespace-pre-line">${n.message ?? "-"}</p>
-            <p class="text-xs text-slate-400 mt-2">จาก ${n.createdBy ?? "ผู้ดูแลระบบ"} • ${postedAt}</p>
+            <p class="text-sm text-slate-600 mt-1 whitespace-pre-line">${escapeHtml(n.message ?? "-")}</p>
+            <p class="text-xs text-slate-400 mt-2">จาก ${escapeHtml(n.createdBy ?? "ผู้ดูแลระบบ")} • ${postedAt}</p>
             ${readBtn}
           </div>`;
       })
       .join("");
   } catch (err) {
     console.error(err);
-    listEl.innerHTML = `<p class="text-sm text-red-600">โหลดข้อความไม่สำเร็จ: ${err.message}</p>`;
+    listEl.innerHTML = `<p class="text-sm text-red-600">โหลดข้อความไม่สำเร็จ: ${escapeHtml(err.message)}</p>`;
   }
 }
 
@@ -3191,12 +3192,12 @@ function renderPlayerList() {
   for (const p of players) {
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${p.number ?? "-"}</td>
-      <td class="emphasis">${p.nickname ?? "-"}</td>
-      <td>${p.fullName ?? "-"}</td>
-      <td>${p.birthday ?? "-"}</td>
-      <td>${p.ageGroup ?? "-"}</td>
-      <td>${p.position ?? "-"}</td>
+      <td>${escapeHtml(p.number ?? "-")}</td>
+      <td class="emphasis">${escapeHtml(p.nickname ?? "-")}</td>
+      <td>${escapeHtml(p.fullName ?? "-")}</td>
+      <td>${escapeHtml(p.birthday ?? "-")}</td>
+      <td>${escapeHtml(p.ageGroup ?? "-")}</td>
+      <td>${escapeHtml(p.position ?? "-")}</td>
     `;
     const actionTd = document.createElement("td");
     actionTd.className = "space-x-2";
@@ -3510,7 +3511,7 @@ function renderRoster(existingMap) {
     statusTd.className = "space-x-2";
     if (locked) {
       statusTd.innerHTML = existing.status
-        ? `<span class="badge badge-neutral">${existing.status}</span>`
+        ? `<span class="badge badge-neutral">${escapeHtml(existing.status)}</span>`
         : '<span class="text-slate-400">-</span>';
     } else {
       statusTd.appendChild(
@@ -4411,13 +4412,13 @@ async function renderMatchReportList() {
   for (const m of reports) {
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td class="emphasis">${m.date ?? "-"}</td>
-      <td>${m.opponent ?? "-"}</td>
-      <td>${m.competitionType ?? "-"}</td>
-      <td>${m.ageGroup ?? "-"}</td>
+      <td class="emphasis">${escapeHtml(m.date ?? "-")}</td>
+      <td>${escapeHtml(m.opponent ?? "-")}</td>
+      <td>${escapeHtml(m.competitionType ?? "-")}</td>
+      <td>${escapeHtml(m.ageGroup ?? "-")}</td>
       <td>${matchResultBadge(m.result)}</td>
       <td class="emphasis">${m.scoreUs} - ${m.scoreThem}</td>
-      <td>${m.competition ?? "-"}</td>
+      <td>${escapeHtml(m.competition ?? "-")}</td>
     `;
     const actionTd = document.createElement("td");
     actionTd.className = "space-x-2";
@@ -4655,13 +4656,13 @@ async function renderInjuryReportList() {
   for (const inj of reports) {
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td class="emphasis">${inj.date ?? "-"}</td>
-      <td>${inj.playerName ?? "-"}</td>
-      <td>${inj.ageGroup ?? "-"}</td>
-      <td>${inj.description ?? "-"}</td>
+      <td class="emphasis">${escapeHtml(inj.date ?? "-")}</td>
+      <td>${escapeHtml(inj.playerName ?? "-")}</td>
+      <td>${escapeHtml(inj.ageGroup ?? "-")}</td>
+      <td>${escapeHtml(inj.description ?? "-")}</td>
       <td>${injurySeverityBadge(inj.severity)}</td>
       <td>${injuryStatusBadge(inj.status)}</td>
-      <td>${inj.expectedReturn ?? "-"}</td>
+      <td>${escapeHtml(inj.expectedReturn ?? "-")}</td>
     `;
     const actionTd = document.createElement("td");
     actionTd.className = "space-x-2";
@@ -5162,11 +5163,11 @@ async function renderTrainingPlanList() {
       ? `<a href="${plan.fileUrl}" target="_blank" rel="noopener" class="text-blue-600 hover:underline">📎 เปิดไฟล์</a>`
       : "-";
     tr.innerHTML = `
-      <td class="emphasis">${plan.date ?? "-"}</td>
+      <td class="emphasis">${escapeHtml(plan.date ?? "-")}</td>
       <td>${(plan.ageGroups || []).join(", ") || "-"}</td>
-      <td>${plan.trainingType ?? "-"}</td>
-      <td>${plan.phase ?? "-"}</td>
-      <td>${plan.mainPart ?? "-"}</td>
+      <td>${escapeHtml(plan.trainingType ?? "-")}</td>
+      <td>${escapeHtml(plan.phase ?? "-")}</td>
+      <td>${escapeHtml(plan.mainPart ?? "-")}</td>
       <td>${(plan.physicalFocus || []).join(", ") || "-"}</td>
       <td>${trainingPlanSubmissionStatus(plan)}</td>
       <td>${fileCell}</td>
@@ -5332,8 +5333,8 @@ function renderDailyAttendancePage() {
     .map(
       (r) => `
         <tr>
-          <td class="emphasis">${r.name}</td>
-          <td>${r.status}</td>
+          <td class="emphasis">${escapeHtml(r.name)}</td>
+          <td>${escapeHtml(r.status)}</td>
           <td>${r.avgText}</td>
         </tr>`
     )
@@ -5425,7 +5426,7 @@ function renderDailyTrainingReport(snap) {
     <div class="space-y-2">
       <p><span class="text-slate-400">สถานะ:</span> ${attendedText}</p>
       <p><span class="text-slate-400">ช่วงเวลา:</span> ${formatReportPeriodForDaily(r)}</p>
-      <p><span class="text-slate-400">หมายเหตุ:</span> ${r.notes ?? "-"}</p>
+      <p><span class="text-slate-400">หมายเหตุ:</span> ${escapeHtml(r.notes ?? "-")}</p>
     </div>
   `;
 }
@@ -5445,10 +5446,10 @@ function renderDailyTrainingPlan(snap) {
   dailyTrainingPlanCard.innerHTML = `
     <div class="space-y-2">
       <p><span class="text-slate-400">รุ่นอายุ:</span> ${(p.ageGroups || []).join(", ") || "-"}</p>
-      <p><span class="text-slate-400">กรุ้ปผู้เล่น:</span> ${p.playerGroup ?? "-"}</p>
-      <p><span class="text-slate-400">ประเภทการฝึก:</span> ${p.trainingType ?? "-"}</p>
-      <p><span class="text-slate-400">Phase:</span> ${p.phase ?? "-"}</p>
-      <p><span class="text-slate-400">หัวข้อหลัก (Main part):</span> ${p.mainPart ?? "-"}</p>
+      <p><span class="text-slate-400">กรุ้ปผู้เล่น:</span> ${escapeHtml(p.playerGroup ?? "-")}</p>
+      <p><span class="text-slate-400">ประเภทการฝึก:</span> ${escapeHtml(p.trainingType ?? "-")}</p>
+      <p><span class="text-slate-400">Phase:</span> ${escapeHtml(p.phase ?? "-")}</p>
+      <p><span class="text-slate-400">หัวข้อหลัก (Main part):</span> ${escapeHtml(p.mainPart ?? "-")}</p>
       <p><span class="text-slate-400">Physical:</span> ${(p.physicalFocus || []).join(", ") || "-"}</p>
       <p><span class="text-slate-400">สถานะการส่ง:</span> ${trainingPlanSubmissionStatus(p)}</p>
     </div>
@@ -5483,12 +5484,12 @@ function renderDailyMatchReports(snap) {
     .map(
       (m) => `
       <tr>
-        <td class="emphasis">${m.opponent ?? "-"}</td>
-        <td>${m.competitionType ?? "-"}</td>
-        <td>${m.ageGroup ?? "-"}</td>
+        <td class="emphasis">${escapeHtml(m.opponent ?? "-")}</td>
+        <td>${escapeHtml(m.competitionType ?? "-")}</td>
+        <td>${escapeHtml(m.ageGroup ?? "-")}</td>
         <td>${matchResultBadge(m.result)}</td>
         <td class="emphasis">${m.scoreUs} - ${m.scoreThem}</td>
-        <td>${m.competition ?? "-"}</td>
+        <td>${escapeHtml(m.competition ?? "-")}</td>
       </tr>`
     )
     .join("");
@@ -5508,9 +5509,9 @@ function renderDailyInjuryReports(snap) {
     .map(
       (inj) => `
       <tr>
-        <td class="emphasis">${inj.playerName ?? "-"}</td>
-        <td>${inj.ageGroup ?? "-"}</td>
-        <td>${inj.description ?? "-"}</td>
+        <td class="emphasis">${escapeHtml(inj.playerName ?? "-")}</td>
+        <td>${escapeHtml(inj.ageGroup ?? "-")}</td>
+        <td>${escapeHtml(inj.description ?? "-")}</td>
         <td>${injurySeverityBadge(inj.severity)}</td>
         <td>${injuryStatusBadge(inj.status)}</td>
       </tr>`

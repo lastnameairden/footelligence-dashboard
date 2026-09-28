@@ -1,6 +1,17 @@
 import { addDoc, collection, doc, getDocs, query, serverTimestamp, setDoc, where } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 import { db } from "./firebase-init.js";
 
+// ---------- กัน XSS: escape ข้อความจากผู้ใช้ก่อนใส่ลง innerHTML ----------
+// ข้อมูลในแอปนี้ (ชื่อโค้ช ชื่อนักกีฬา คู่แข่ง หมายเหตุ ฯลฯ) มาจากผู้ใช้ที่ล็อกอินแล้วเขียนลง Firestore ได้เอง แล้วผู้ดูแล
+// ระบบ/โค้ชคนอื่นเปิดดูผ่าน template string → innerHTML ถ้าไม่ escape ผู้ใช้คนหนึ่งใส่ <img onerror=...> เป็นชื่อได้
+// แล้วสคริปต์จะรันในเบราว์เซอร์ของคนที่เปิดดู (รวมถึงแอดมินที่มีสิทธิ์เขียนทุกอย่าง) — ครอบทุกค่าที่มาจากผู้ใช้ด้วยฟังก์ชันนี้
+// ค่า null/undefined กลายเป็นสตริงว่าง (ตัวที่ต้องการ "-" ให้ใส่ ?? "-" ข้างในวงเล็บเหมือนเดิม)
+const HTML_ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+export function escapeHtml(value) {
+  if (value === null || value === undefined) return "";
+  return String(value).replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]);
+}
+
 // ---------- ข้อความจากผู้ดูแลระบบถึงทีม (แจ้งนักกีฬาที่มีพัฒนาการดี หรือแจ้งปัญหาของโค้ช) ----------
 // ใช้ร่วมกันทุกจุดที่ผู้ดูแลระบบกดส่งข้อความ (หน้าข้อมูลนักกีฬา, หน้าพัฒนาการนักกีฬา, Dashboard) เพื่อให้
 // เขียนลง Firestore ด้วยรูปแบบเดียวกันเสมอ — Firestore rules อนุญาตให้ isAdmin() สร้างเอกสารนี้เท่านั้น
@@ -63,7 +74,7 @@ export function teamIconBadge(team, { large = true, extraClass = "" } = {}) {
   const sizeClass = `icon-badge${large ? " icon-badge-lg" : ""}${extraClass ? " " + extraClass : ""}`;
   const src = TEAM_LOGOS[team];
   if (!src) return `<div class="${sizeClass}">🛡️</div>`;
-  return `<div class="${sizeClass} overflow-hidden p-0.5 bg-white"><img src="${src}" alt="${team}" class="w-full h-full object-contain rounded mix-blend-multiply" /></div>`;
+  return `<div class="${sizeClass} overflow-hidden p-0.5 bg-white"><img src="${src}" alt="${escapeHtml(team)}" class="w-full h-full object-contain rounded mix-blend-multiply" /></div>`;
 }
 
 // รูปโลโก้ทีมแบบเปล่าๆ (ไม่มีกล่องล้อม) สำหรับวางแทรกหน้าชื่อทีมในข้อความ/ตาราง — คืนสตริงว่างถ้าไม่รู้จักทีมนี้
@@ -71,7 +82,7 @@ export function teamIconBadge(team, { large = true, extraClass = "" } = {}) {
 export function teamLogoImg(team, className = "w-6 h-6 object-contain inline-block align-middle rounded mr-1.5") {
   const src = TEAM_LOGOS[team];
   if (!src) return "";
-  return `<img src="${src}" alt="${team}" class="${className} mix-blend-multiply" />`;
+  return `<img src="${src}" alt="${escapeHtml(team)}" class="${className} mix-blend-multiply" />`;
 }
 
 // การ์ดตัวเลขสรุปแบบสั้นๆ (label + value) ใช้ในหน้าสรุปภาพรวมต่างๆ
