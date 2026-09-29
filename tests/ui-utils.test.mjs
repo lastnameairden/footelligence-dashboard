@@ -23,7 +23,9 @@ import {
   thisMonthBangkok,
   bangkokHour,
   monthsAgoBangkok,
-  trainingPlanHasAttachment
+  trainingPlanHasAttachment,
+  computeDailyAvgScores,
+  buildAvgScoreSparklineSvg
 } from "../js/ui-utils.js";
 
 const ts = (date) => ({ toDate: () => date });
@@ -204,4 +206,30 @@ test("trainingPlanHasAttachment: a plan needs a new file or a kept existing file
   // ลบไฟล์เดิมแต่เลือกไฟล์ใหม่ = ส่งได้
   assert.equal(trainingPlanHasAttachment({ hasNewFile: true, existingFileUrl: "https://x/y.pdf", removeExisting: true }), true);
   assert.equal(trainingPlanHasAttachment({ hasNewFile: false, existingFileUrl: "", removeExisting: false }), false);
+});
+
+test("computeDailyAvgScores: groups by date and averages across players, dropping records with no score yet", (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: new Date("2026-03-20T12:00:00+07:00") });
+  const records = [
+    { date: "2026-03-18", scores: { physical: 4, ballSkill: 4, gameReading: 4, attitude: 4 } }, // avg 4
+    { date: "2026-03-18", scores: { physical: 2, ballSkill: 2, gameReading: 2, attitude: 2 } }, // avg 2 -> day avg (4+2)/2=3
+    { date: "2026-03-19", scores: { physical: 3, ballSkill: 3, gameReading: 3, attitude: 3 } }, // avg 3
+    { date: "2026-03-19", status: "I" }, // ไม่มีคะแนน (ลา/บาดเจ็บ) ไม่นับ
+    { date: "2025-01-01", scores: { physical: 1, ballSkill: 1, gameReading: 1, attitude: 1 } } // เกิน 30 วัน ไม่นับ
+  ];
+  const days = computeDailyAvgScores(records, 30);
+  assert.deepEqual(days.map((d) => d.date), ["2026-03-18", "2026-03-19"]);
+  assert.equal(days[0].avg, 3);
+  assert.equal(days[1].avg, 3);
+});
+
+test("computeDailyAvgScores: empty or all-unscored input gives an empty list", () => {
+  assert.deepEqual(computeDailyAvgScores([], 30), []);
+  assert.deepEqual(computeDailyAvgScores([{ date: "2026-03-18", status: "I" }], 30), []);
+});
+
+test("buildAvgScoreSparklineSvg: renders a path for 2+ points, a placeholder message otherwise", () => {
+  assert.match(buildAvgScoreSparklineSvg([{ date: "2026-03-18", avg: 3 }, { date: "2026-03-19", avg: 3.5 }]), /<svg/);
+  assert.match(buildAvgScoreSparklineSvg([{ date: "2026-03-18", avg: 3 }]), /ยังไม่มีข้อมูล/);
+  assert.match(buildAvgScoreSparklineSvg([]), /ยังไม่มีข้อมูล/);
 });

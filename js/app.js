@@ -33,7 +33,9 @@ import {
   escapeHtml,
   monthQuery,
   todayBangkok,
-  thisMonthBangkok
+  thisMonthBangkok,
+  computeDailyAvgScores,
+  buildAvgScoreSparklineSvg
 } from "./ui-utils.js";
 
 // สถานะที่นับว่า "มาซ้อม" ตาม legend ของ Logbook (A หรือค่าประเมิน 1-4)
@@ -51,6 +53,13 @@ function isInCurrentMonth(dateStr) {
 const playersGroupsEl = document.getElementById("players-groups");
 const attendanceGroupsEl = document.getElementById("attendance-groups");
 const overviewCardsEl = document.getElementById("overview-cards");
+const legacyTeamOverviewEl = document.getElementById("legacy-team-overview");
+const allTeamsOverviewEl = document.getElementById("all-teams-overview");
+const kpiCardsEl = document.getElementById("kpi-cards");
+const teamCardsGridEl = document.getElementById("team-cards-grid");
+const dashboardNotificationsListEl = document.getElementById("dashboard-notifications-list");
+const scoreTrendValueEl = document.getElementById("score-trend-value");
+const scoreTrendSparklineEl = document.getElementById("score-trend-sparkline");
 const positionToggleWrap = document.getElementById("position-toggle-wrap");
 const playerPositionToggleBtn = document.getElementById("player-position-toggle-btn");
 const gkPositionToggleBtn = document.getElementById("gk-position-toggle-btn");
@@ -65,8 +74,6 @@ const statusEl = document.getElementById("status-message");
 const loginGate = document.getElementById("login-gate");
 const loginGateMessage = document.getElementById("login-gate-message");
 const dashboardContent = document.getElementById("dashboard-content");
-const adminPickTeamPrompt = document.getElementById("admin-pick-team-prompt");
-const adminPickTeamGrid = document.getElementById("admin-pick-team-grid");
 const adminSearchBtn = document.getElementById("admin-search-btn");
 const adminSearchPanel = document.getElementById("admin-search-panel");
 const adminSearchInput = document.getElementById("admin-search-input");
@@ -431,9 +438,9 @@ function renderBarChart(containerId, entries, valueFormatter, maxValue) {
 // mode "ageGroup": ดูข้อมูลทีมใดทีมหนึ่งโดยเฉพาะ (โค้ช/ผู้บริหารทีม/ผู้ดูแลระบบที่เลือกทีมเดียว) — แบ่งกลุ่ม
 //   ตามรุ่นอายุแทน เพราะดูทีมเดียวอยู่แล้ว แบ่งตามทีมซ้ำไม่มีประโยชน์ coachLookup เป็นฟังก์ชัน (ageGroup) => coachName
 //   เพื่อให้แต่ละแถวแสดงโค้ชประจำรุ่นนั้น ๆ ถูกต้อง (แต่ละรุ่นอาจมีโค้ชคนละคน)
-function renderOverview(groups, groupStats, mode, coachLookup) {
-  const isAgeGroupMode = mode === "ageGroup";
-
+// รวมสถิติของทุกกลุ่ม (ทีม หรือ รุ่นอายุ) เป็นภาพรวมเดียว — ใช้ทั้งกล่องสถิติเดิม (renderOverview) และการ์ด KPI
+// ใหม่ของมุมมอง "ทุกทีม" (renderAllTeamsPanels) เพื่อไม่ให้ตัวเลขรวมสองจุดนี้เพี้ยนไปคนละทาง
+function sumGroupStats(groupStats) {
   const overall = { players: 0, attended: 0, missed: 0, total: 0, scoreSum: 0, scoreCount: 0 };
   for (const [, { totals, playerCount }] of groupStats) {
     overall.players += playerCount;
@@ -443,8 +450,17 @@ function renderOverview(groups, groupStats, mode, coachLookup) {
     overall.scoreSum += totals.scoreSum;
     overall.scoreCount += totals.scoreCount;
   }
-  const overallPercent = overall.total > 0 ? Math.round((overall.attended / overall.total) * 100) : 0;
-  const overallAvgScore = overall.scoreCount > 0 ? (overall.scoreSum / overall.scoreCount).toFixed(1) : "-";
+  overall.percent = overall.total > 0 ? Math.round((overall.attended / overall.total) * 100) : 0;
+  overall.avgScore = overall.scoreCount > 0 ? overall.scoreSum / overall.scoreCount : null;
+  return overall;
+}
+
+function renderOverview(groups, groupStats, mode, coachLookup) {
+  const isAgeGroupMode = mode === "ageGroup";
+
+  const overall = sumGroupStats(groupStats);
+  const overallPercent = overall.percent;
+  const overallAvgScore = overall.avgScore !== null ? overall.avgScore.toFixed(1) : "-";
 
   overviewCardsEl.innerHTML =
     statCard(isAgeGroupMode ? "จำนวนรุ่นทั้งหมด" : "จำนวนทีมทั้งหมด", groups.size) +
@@ -546,6 +562,128 @@ function renderOverview(groups, groupStats, mode, coachLookup) {
       teamSummaryTabsEl.appendChild(tabBtn);
     }
     showTeamRows(teamsPresent[0], teamSummaryTabsEl.children[0]);
+  }
+}
+
+// ---------- มุมมอง "ทุกทีม": การ์ดตัวเลขสำคัญ + การ์ดทีม + การแจ้งเตือน + แนวโน้มคะแนน ----------
+// (เลือกแนวทางนี้หลังเทียบ 2 mockup กับผู้ใช้แล้ว — ดู memory/บทสนทนาการปรับดีไซน์) แสดงเฉพาะตอนดูภาพรวมทุกทีม
+// (scopeTeam ว่าง) เท่านั้น ตอนดูทีมเดียวยังใช้กล่องสถิติ+พาย+กราฟแท่งแบบเดิมใน #legacy-team-overview
+function kpiTile({ iconName, label, value, unit, sub, danger = false }) {
+  const cardStyle = danger ? "background:#fcebea;border-color:#f1c6c2" : "";
+  return `
+    <div class="card card-pad flex flex-col gap-2.5" style="${cardStyle}">
+      <div class="icon-badge" style="background:${danger ? "#f6d8d5" : "var(--accent-tint)"};color:${danger ? "#b3281d" : "var(--accent)"}">${icon(iconName)}</div>
+      <span class="text-xs text-slate-500">${label}</span>
+      <span class="text-[1.7rem] font-bold leading-none" style="font-family:'Mitr',sans-serif;color:${danger ? "#b3281d" : "var(--text-1)"}">${value}${unit ? `<span class="text-sm font-semibold text-slate-400 ml-1">${unit}</span>` : ""}</span>
+      ${sub ? `<span class="text-xs font-semibold" style="color:${danger ? "#b3281d" : "#94a3b8"}">${sub}</span>` : ""}
+    </div>`;
+}
+
+function renderKpiCards({ overallPercent, overallAvgScore, pendingCount, severeInjuryCount }) {
+  kpiCardsEl.innerHTML =
+    kpiTile({
+      iconName: "trending-up",
+      label: "อัตราเข้าร่วมซ้อมเฉลี่ย (เดือนนี้)",
+      value: `${overallPercent}%`
+    }) +
+    kpiTile({
+      iconName: "check-circle",
+      label: "คะแนนประเมินเฉลี่ย (เดือนนี้)",
+      value: overallAvgScore,
+      unit: "/4"
+    }) +
+    kpiTile({
+      iconName: "clipboard-list",
+      label: "รออนุมัติบัญชีโค้ช",
+      value: pendingCount,
+      unit: "คน",
+      sub: pendingCount > 0 ? "รอการตรวจสอบ" : "ไม่มีรายการค้าง"
+    }) +
+    kpiTile({
+      iconName: "alert-triangle",
+      label: "บาดเจ็บระดับรุนแรงที่ยังไม่หาย",
+      value: severeInjuryCount,
+      unit: "คน",
+      danger: severeInjuryCount > 0,
+      sub: severeInjuryCount > 0 ? "ต้องติดตามอาการด่วน" : undefined
+    });
+}
+
+// การ์ดของแต่ละทีม — โลโก้จริง + จำนวนนักกีฬา + % เข้าร่วมฝึกซ้อม + คะแนนเฉลี่ย พร้อมแถบความคืบหน้าสีประจำทีม
+// (แทนที่พาย/กราฟแท่งของกล่องเดิมด้วยหน่วยที่อ่านเร็วกว่าเมื่อมีแค่ 3 ทีม — ดูรายละเอียดรายโค้ชต่อได้ที่ตารางด้านล่าง)
+function renderTeamCards(groupStats) {
+  const entries = Array.from(groupStats.entries());
+  if (entries.length === 0) {
+    teamCardsGridEl.innerHTML = '<p class="text-slate-400 text-sm">ยังไม่มีข้อมูลทีม</p>';
+    return;
+  }
+  teamCardsGridEl.innerHTML = entries
+    .map(([team, { totals, playerCount }]) => {
+      const percent = totals.total > 0 ? Math.round((totals.attended / totals.total) * 100) : 0;
+      const avgScore = totals.scoreCount > 0 ? (totals.scoreSum / totals.scoreCount).toFixed(1) : "-";
+      const color = TEAM_COLORS[team] || "#0f172a";
+      return `
+        <a href="/?team=${encodeURIComponent(team)}" class="card card-pad flex flex-col gap-3 hover:shadow-md hover:ring-2 hover:ring-slate-900 transition">
+          <div class="flex items-center gap-2.5">
+            ${teamIconBadge(team, { large: false })}
+            <span class="font-semibold text-sm flex-grow" style="font-family:'Mitr',sans-serif">${escapeHtml(team)}</span>
+            <span class="text-slate-300">${icon("chevron-right")}</span>
+          </div>
+          <div class="flex items-center justify-between text-sm">
+            <div class="flex flex-col">
+              <span class="text-[11px] text-slate-400">นักกีฬา</span>
+              <span class="font-bold" style="font-family:'Mitr',sans-serif">${playerCount} คน</span>
+            </div>
+            <div class="flex flex-col items-end">
+              <span class="text-[11px] text-slate-400">เข้าร่วมเฉลี่ย</span>
+              <span class="font-bold" style="font-family:'Mitr',sans-serif">${percent}%</span>
+            </div>
+            <div class="flex flex-col items-end">
+              <span class="text-[11px] text-slate-400">คะแนนเฉลี่ย</span>
+              <span class="font-bold" style="font-family:'Mitr',sans-serif">${avgScore}</span>
+            </div>
+          </div>
+          <div class="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+            <div class="h-full rounded-full" style="width:${percent}%;background:${color}"></div>
+          </div>
+        </a>`;
+    })
+    .join("");
+}
+
+// เรียกจาก loadDashboard เฉพาะตอนดูภาพรวมทุกทีม (ไม่ await เพราะไม่ใช่ข้อมูลหลักของหน้า — ถ้าพังไม่ควรบล็อกส่วนอื่น
+// เหมือน loadTrainingPlanSummary/loadMatchAndInjuryReports ด้านล่าง) ใช้ attendanceRecordsAllTime ที่โหลดมาแล้ว
+// (ไม่กรองเดือนปัจจุบัน) มาคำนวณแนวโน้ม 30 วันแทนการ query ซ้ำ ส่วนการแจ้งเตือนใช้ชุดเดียวกับกระดิ่งบนหัว
+// (refreshNotifications เก็บผลไว้ที่ currentNotifications) จึงไม่ต้อง query ซ้ำอีกรอบ
+async function renderAllTeamsPanels(groupStats, attendanceRecordsAllTime) {
+  const overall = sumGroupStats(groupStats);
+  renderTeamCards(groupStats);
+
+  const dailyAvgScores = computeDailyAvgScores(attendanceRecordsAllTime, 30);
+  scoreTrendSparklineEl.innerHTML = buildAvgScoreSparklineSvg(dailyAvgScores);
+  scoreTrendValueEl.textContent = dailyAvgScores.length > 0 ? dailyAvgScores[dailyAvgScores.length - 1].avg.toFixed(1) : "-";
+
+  try {
+    await refreshNotifications();
+    const pendingCount = currentNotifications.find((n) => n.key === "pending_accounts")?.count ?? 0;
+    const severeInjuryCount = currentNotifications.find((n) => n.key === "severe_injuries")?.count ?? 0;
+    renderKpiCards({
+      overallPercent: overall.percent,
+      overallAvgScore: overall.avgScore !== null ? overall.avgScore.toFixed(1) : "-",
+      pendingCount,
+      severeInjuryCount
+    });
+  } catch (err) {
+    console.error(err);
+    dashboardNotificationsListEl.innerHTML = `<p class="text-red-600 text-sm text-center py-6">โหลดการแจ้งเตือนไม่สำเร็จ: ${escapeHtml(err.message)}</p>`;
+    // โหลดแจ้งเตือนไม่สำเร็จ — ยังแสดงการ์ด KPI 2 ใบแรกได้ตามปกติ (ไม่ต้องพึ่งการแจ้งเตือน) ส่วนอีก 2 ใบที่ต้องใช้
+    // ตัวเลขจากการแจ้งเตือนแสดงเป็น "-" แทนเลข 0 ที่อาจทำให้เข้าใจผิดว่าตรวจสอบแล้วไม่มีจริง
+    renderKpiCards({
+      overallPercent: overall.percent,
+      overallAvgScore: overall.avgScore !== null ? overall.avgScore.toFixed(1) : "-",
+      pendingCount: "-",
+      severeInjuryCount: "-"
+    });
   }
 }
 
@@ -1199,6 +1337,11 @@ async function loadDashboard(scopeTeam) {
     const playerGroups = groupByTeam(players);
     const teamStats = computeTeamStats(playerGroups, attendanceRecords);
 
+    // มุมมอง "ทุกทีม" ใช้การ์ด KPI/การ์ดทีมแบบใหม่ (#all-teams-overview) ส่วนดูทีมเดียวยังใช้กล่องสถิติ+พาย+
+    // กราฟแท่งแบบเดิม (#legacy-team-overview) — สลับให้ตรงกับ branch ด้านล่างเสมอ
+    allTeamsOverviewEl.classList.toggle("hidden", !!scopeTeam);
+    legacyTeamOverviewEl.classList.toggle("hidden", !scopeTeam);
+
     if (scopeTeam) {
       // ดูข้อมูลทีมเดียวอยู่แล้ว (โค้ช/ผู้บริหารทีม/ผู้ดูแลระบบที่เลือกทีมเดียว) — ภาพรวมด้านบนแบ่งตาม
       // รุ่นอายุแทนทีม เพื่อให้เห็นข้อมูลที่ใช้ได้จริงมากกว่าการแยกตามทีมซึ่งมีทีมเดียวอยู่แล้ว พร้อมปุ่มสลับดู
@@ -1212,6 +1355,9 @@ async function loadDashboard(scopeTeam) {
       scopedOverviewData = null;
       const coachOverviewRows = buildCoachOverviewRows(coaches, playerGroups, attendanceRecords);
       renderOverview(playerGroups, teamStats, "team", coachOverviewRows);
+      // ไม่ await: เป็นข้อมูลเสริม (การ์ดทีม/แจ้งเตือน/แนวโน้ม) ไม่ใช่ข้อมูลหลักของหน้า พังแล้วไม่ควรบล็อกส่วนอื่น
+      // (เหมือน loadTrainingPlanSummary/loadMatchAndInjuryReports ด้านล่าง)
+      renderAllTeamsPanels(teamStats, attendanceRecordsAllTime);
     }
     renderPlayersGroups(playerGroups);
     renderAttendanceGroups(playerGroups, attendanceRecords);
@@ -1238,39 +1384,7 @@ async function loadDashboard(scopeTeam) {
   }
 }
 
-// ---------- ผู้ดูแลระบบ: การ์ดเลือกทีม (สไตล์เดียวกับแผงควบคุมผู้ดูแลระบบในหน้าเช็คชื่อ) ----------
-function linkCard(iconHtml, title, description, href) {
-  const a = document.createElement("a");
-  a.href = href;
-  a.className = "text-left card card-pad hover:shadow-md hover:ring-2 hover:ring-slate-900 transition block";
-  a.innerHTML = `
-    ${iconHtml}
-    <div class="text-lg font-semibold mb-1">${title}</div>
-    <p class="text-sm text-slate-500">${description}</p>
-  `;
-  return a;
-}
-
-function emojiBadge(emoji) {
-  return `<div class="icon-badge icon-badge-lg mb-3">${emoji}</div>`;
-}
-
-// การ์ดของแต่ละทีมใช้โลโก้จริงแทนอิโมจิ 🛡️ (teamIconBadge จะ fallback เป็น 🛡️ เองถ้าไม่รู้จักชื่อทีมนี้)
-function teamPickCard(title, description, teamParam) {
-  return linkCard(teamIconBadge(teamParam, { extraClass: "mb-3" }), title, description, `/?team=${encodeURIComponent(teamParam)}`);
-}
-
-function renderAdminPickTeamGrid() {
-  adminPickTeamGrid.innerHTML = "";
-  adminPickTeamGrid.appendChild(
-    linkCard(emojiBadge("📊"), "ทุกทีม (ภาพรวม)", "ดูสรุปข้อมูลรวมทุกทีมในหน้าเดียว", `/?team=${encodeURIComponent("__ALL__")}`)
-  );
-  for (const team of TEAMS) {
-    adminPickTeamGrid.appendChild(teamPickCard(team, "ดูข้อมูล Dashboard เฉพาะทีมนี้", team));
-  }
-}
-
-// ---------- ผู้ดูแลระบบ: ค้นหาชื่อโค้ช/นักกีฬาแบบพิมพ์แล้วเห็นผลทันที (จากหน้าเลือกทีม) ----------
+// ---------- ผู้ดูแลระบบ: ค้นหาชื่อโค้ช/นักกีฬาแบบพิมพ์แล้วเห็นผลทันที (จากหน้าภาพรวมทุกทีม) ----------
 // โหลด coaches/players ทั้งหมดครั้งเดียวตอนพิมพ์ครั้งแรก (cache ไว้ใน memory) แทนการ query ทุกครั้งที่พิมพ์
 // เพราะ Firestore rules ให้ isAdmin() อ่านได้ไม่จำกัดอยู่แล้ว และจำนวนเอกสารทั้งระบบไม่มากพอจะโหลดทั้งก้อนได้สบาย
 let adminSearchCoaches = null;
@@ -1392,29 +1506,28 @@ navDrawerOverlay.addEventListener("click", closeDrawer);
 // ---------- การแจ้งเตือน (เฉพาะผู้ดูแลระบบ — โค้ช/ผู้บริหารทีมมีปุ่มกระดิ่งแต่ยังไม่เปิดใช้งาน) ----------
 let currentNotifications = [];
 
+// วาดผลลงทั้งกระดิ่งบนหัว (notificationList) และการ์ดแจ้งเตือนในภาพรวมทุกทีม (dashboardNotificationsListEl) เสมอ
+// จากข้อมูลชุดเดียวกัน — วาดลง element ที่สองแบบไม่มีอันตรายแม้กำลังถูกซ่อนอยู่ (ดูทีมเดียว/ยังไม่โหลด Dashboard)
 async function refreshNotifications() {
   if (currentViewerRole !== "admin") return;
   notificationList.innerHTML = '<p class="text-slate-400 text-sm text-center py-6">กำลังโหลด...</p>';
   try {
     currentNotifications = await loadAdminNotifications();
     renderAdminNotifications(notificationList, currentNotifications);
+    renderAdminNotifications(dashboardNotificationsListEl, currentNotifications);
     const unreadCount = currentNotifications.filter((n) => !n.read).length;
     notificationBadge.classList.toggle("hidden", unreadCount === 0);
   } catch (err) {
     console.error(err);
-    notificationList.innerHTML = `<p class="text-red-600 text-sm text-center py-6">โหลดการแจ้งเตือนไม่สำเร็จ: ${escapeHtml(err.message)}</p>`;
+    const message = `<p class="text-red-600 text-sm text-center py-6">โหลดการแจ้งเตือนไม่สำเร็จ: ${escapeHtml(err.message)}</p>`;
+    notificationList.innerHTML = message;
+    dashboardNotificationsListEl.innerHTML = message;
   }
 }
 
-notificationBellBtn.addEventListener("click", () => {
-  const opening = notificationPanel.classList.contains("hidden");
-  notificationPanel.classList.toggle("hidden", !opening);
-  if (opening) refreshNotifications();
-});
-notificationRefreshBtn.addEventListener("click", refreshNotifications);
-// คลิกปุ่ม "✓" ในรายการเพื่อทำเครื่องหมายว่าอ่านแล้วทีละรายการ (event delegation เพราะรายการถูกสร้างใหม่
-// ทุกครั้งที่โหลดข้อมูล) กันไม่ให้คลิกไปโดนลิงก์ที่ห่ออยู่ด้วย (preventDefault + stopPropagation)
-notificationList.addEventListener("click", async (e) => {
+// คลิกปุ่ม "ทำเครื่องหมายว่าอ่านแล้ว" ไม่ว่าจะคลิกจากกระดิ่งบนหัวหรือการ์ดแจ้งเตือนในภาพรวมทุกทีม (ทั้งสองจุดใช้
+// currentNotifications ชุดเดียวกัน จึง index ตรงกัน) — ใช้ฟังก์ชันเดียวกันกันตรรกะเพี้ยนไปคนละทางถ้าแก้แยกกัน
+async function handleMarkReadClick(e) {
   const btn = e.target.closest("[data-mark-read-index]");
   if (!btn) return;
   e.preventDefault();
@@ -1428,7 +1541,18 @@ notificationList.addEventListener("click", async (e) => {
     console.error(err);
     alert("ทำเครื่องหมายว่าอ่านแล้วไม่สำเร็จ: " + err.message);
   }
+}
+
+notificationBellBtn.addEventListener("click", () => {
+  const opening = notificationPanel.classList.contains("hidden");
+  notificationPanel.classList.toggle("hidden", !opening);
+  if (opening) refreshNotifications();
 });
+notificationRefreshBtn.addEventListener("click", refreshNotifications);
+// คลิกปุ่ม "✓" ในรายการเพื่อทำเครื่องหมายว่าอ่านแล้วทีละรายการ (event delegation เพราะรายการถูกสร้างใหม่
+// ทุกครั้งที่โหลดข้อมูล) กันไม่ให้คลิกไปโดนลิงก์ที่ห่ออยู่ด้วย (preventDefault + stopPropagation)
+notificationList.addEventListener("click", handleMarkReadClick);
+dashboardNotificationsListEl.addEventListener("click", handleMarkReadClick);
 document.addEventListener("click", (e) => {
   if (notificationPanel.classList.contains("hidden")) return;
   if (notificationPanel.contains(e.target) || notificationBellBtn.contains(e.target)) return;
@@ -1500,7 +1624,6 @@ onAuthStateChanged(auth, async (user) => {
   adminSearchBtn.classList.add("hidden");
   adminSearchPanel.classList.add("hidden");
   if (!isCoachSession) {
-    adminPickTeamPrompt.classList.add("hidden");
     dashboardBackLink.classList.add("hidden");
     closeDrawer();
     showLoginGate("ต้องเข้าสู่ระบบด้วยบัญชีโค้ชหรือผู้ดูแลระบบก่อน จึงจะดูข้อมูล Dashboard ได้");
@@ -1512,7 +1635,6 @@ onAuthStateChanged(auth, async (user) => {
     const data = coachDoc.exists() ? coachDoc.data() : null;
 
     if (!data || data.status !== "approved") {
-      adminPickTeamPrompt.classList.add("hidden");
       dashboardBackLink.classList.add("hidden");
       showLoginGate("บัญชีนี้ยังไม่ได้รับการอนุมัติจากผู้ดูแลระบบ กรุณารอหรือติดต่อผู้ดูแลระบบ");
       return;
@@ -1546,29 +1668,20 @@ onAuthStateChanged(auth, async (user) => {
     // กลับมาหน้านี้ทันที) จึงซ่อนไว้เฉพาะผู้ดูแลระบบ ให้ใช้เมนู ☰ แทน — โค้ช/ผู้บริหารทีมยังใช้ได้ตามปกติ
     headerAttendanceLink.classList.toggle("hidden", isAdmin);
     if (isAdmin) {
-      // ต้องมาจากลิงก์ "ดู Dashboard ทีมนี้" ในหน้าเช็คชื่อ (มี ?team= แนบมา) เท่านั้น ถึงจะเห็นข้อมูล
-      // ถ้าเข้าหน้านี้ตรงๆ โดยไม่มีพารามิเตอร์ จะแสดงข้อความให้กลับไปเลือกทีมที่หน้าเช็คชื่อแทน
+      // หน้าแรกสุดของผู้ดูแลระบบ (ไม่มี ?team= แนบมาเลย หรือแนบมาเป็น __ALL__) คือภาพรวมทุกทีมตรงๆ ทันที ไม่ต้อง
+      // เลือกทีมก่อน — อยากดูแยกทีมไหนค่อยกดที่การ์ดทีมนั้นในภาพรวม (ลิงก์ไป ?team=ชื่อทีม) ปุ่ม "← กลับภาพรวม
+      // ทุกทีม" จึงโชว์เฉพาะตอนดูทีมใดทีมหนึ่งอยู่เท่านั้น เพราะหน้าภาพรวมทุกทีมไม่มีหน้าก่อนหน้าให้ย้อนกลับแล้ว
       const teamFromUrl = new URLSearchParams(window.location.search).get("team");
-      if (teamFromUrl === "__ALL__") {
-        adminPickTeamPrompt.classList.add("hidden");
-        dashboardContent.classList.remove("hidden");
-        dashboardBackLink.classList.remove("hidden");
-        loadDashboard(null);
-      } else if (teamFromUrl && TEAMS.includes(teamFromUrl)) {
-        adminPickTeamPrompt.classList.add("hidden");
+      if (teamFromUrl && TEAMS.includes(teamFromUrl)) {
         dashboardContent.classList.remove("hidden");
         dashboardBackLink.classList.remove("hidden");
         loadDashboard(teamFromUrl);
       } else {
-        // อยู่ที่หน้าเลือกทีมเอง (หน้าแรกของผู้ดูแลระบบ) ไม่มีหน้าก่อนหน้าให้ย้อนกลับแล้ว จึงไม่ต้องมีปุ่มนี้
-        dashboardContent.classList.add("hidden");
+        dashboardContent.classList.remove("hidden");
         dashboardBackLink.classList.add("hidden");
-        renderAdminPickTeamGrid();
-        adminPickTeamPrompt.classList.remove("hidden");
-        setStatus("");
+        loadDashboard(null);
       }
     } else {
-      adminPickTeamPrompt.classList.add("hidden");
       dashboardBackLink.classList.add("hidden");
       dashboardContent.classList.remove("hidden");
       loadDashboard(data.team);

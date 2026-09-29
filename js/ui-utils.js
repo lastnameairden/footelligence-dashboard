@@ -241,6 +241,50 @@ export function buildScoreTrendChartSvg(records) {
   `;
 }
 
+// รวมการเช็คชื่อ+ให้คะแนน (attendance) เป็น "คะแนนเฉลี่ยต่อวัน" หนึ่งจุดต่อวัน (ต่างจาก buildScoreTrendChartSvg
+// ด้านบนที่เป็นหนึ่งจุดต่อการประเมินหนึ่งครั้งของนักกีฬาคนเดียว) — ใช้กับภาพรวมทั้งหมดของ Dashboard ที่ต้องดู
+// แนวโน้มรวมทุกทีม/ทุกนักกีฬาในวันเดียวกัน ไม่ใช่ของนักกีฬาคนเดียว
+export function computeDailyAvgScores(records, days = 30) {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  const byDate = new Map();
+  for (const r of records) {
+    if (!r.date || r.date < cutoffStr) continue;
+    const avg = computeAvgScore(r.scores);
+    if (avg === null) continue;
+    if (!byDate.has(r.date)) byDate.set(r.date, { sum: 0, count: 0 });
+    const bucket = byDate.get(r.date);
+    bucket.sum += avg;
+    bucket.count += 1;
+  }
+  return Array.from(byDate.entries())
+    .map(([date, { sum, count }]) => ({ date, avg: sum / count }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+// เส้นแนวโน้มขนาดเล็ก (sparkline) สำหรับการ์ดสรุป — ไม่มีแกน/ตัวเลขกำกับ (มีตัวเลขสรุปแยกอยู่นอกการ์ดแล้ว)
+// สีเส้นรับจาก currentColor ของ element ที่ห่อ (ใส่ class/style กำหนดสีจากภายนอกได้ เหมือน icon())
+export function buildAvgScoreSparklineSvg(points, { width = 360, height = 78 } = {}) {
+  if (points.length < 2) {
+    return '<p class="text-xs text-slate-400 text-center py-4">ยังไม่มีข้อมูลเพียงพอสำหรับแสดงแนวโน้ม</p>';
+  }
+  const maxScore = 4;
+  const coords = points.map((p, i) => ({
+    x: (i / (points.length - 1)) * width,
+    y: height - (Math.max(0, Math.min(p.avg, maxScore)) / maxScore) * height
+  }));
+  const line = coords.map((c, i) => `${i === 0 ? "M" : "L"}${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(" ");
+  const area = `${line} L${width},${height} L0,${height} Z`;
+  return `
+    <svg viewBox="0 0 ${width} ${height}" width="100%" height="${height}" preserveAspectRatio="none" style="color:inherit">
+      <path d="${area}" fill="currentColor" opacity="0.12" />
+      <path d="${line}" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+      <title>${escapeHtml(points[0].date)} – ${escapeHtml(points[points.length - 1].date)}</title>
+    </svg>
+  `;
+}
+
 // กราฟใยแมงมุม (radar chart) แบบ SVG แสดงคะแนนเฉลี่ยทั้ง 4 ด้านเทียบกันในรูปเดียว ให้เห็นจุดแข็ง/จุดที่ต้อง
 // พัฒนาของนักกีฬาได้เร็วกว่าดูเป็นแท่งเรียงกัน — size ปรับได้ (สมุดพกสำหรับพิมพ์ใช้ขนาดเล็กกว่าค่าเริ่มต้นเพื่อ
 // ประหยัดพื้นที่หน้ากระดาษ A4)
@@ -553,6 +597,7 @@ export async function loadAdminNotifications() {
       key: "pending_accounts",
       icon: icon("star"),
       level: "urgent",
+      count: pendingNames.length,
       title: `คำขอลงทะเบียนรออนุมัติ ${pendingNames.length} รายการ`,
       detail: pendingNames.slice(0, 5).join(", ") + (pendingNames.length > 5 ? " และอื่นๆ" : ""),
       link: "attendance.html#admin=approvals"
@@ -571,6 +616,7 @@ export async function loadAdminNotifications() {
       key: "severe_injuries",
       icon: icon("heart-pulse"),
       level: "urgent",
+      count: severeInjuries.length,
       title: `นักกีฬาบาดเจ็บระดับรุนแรงที่ยังไม่หาย ${severeInjuries.length} คน`,
       detail: severeInjuries.map((inj) => `${inj.playerName ?? "-"} (${inj.team ?? "-"})`).join(", "),
       link: "attendance.html#admin=injuries"
@@ -582,6 +628,7 @@ export async function loadAdminNotifications() {
       key: "other_injuries",
       icon: icon("heart-pulse"),
       level: "info",
+      count: otherActiveCount,
       title: `นักกีฬาบาดเจ็บที่ยังไม่หาย ${otherActiveCount} คน`,
       detail: "ระดับปานกลาง/กำลังพักฟื้น — ไม่เร่งด่วนเท่าระดับรุนแรง",
       link: "attendance.html#admin=injuries"
@@ -599,6 +646,7 @@ export async function loadAdminNotifications() {
         key: "missing_plans_today",
         icon: icon("clock"),
         level: "action",
+        count: missingTeams.length,
         title: `ทีมที่ยังไม่ส่งแผนการฝึกซ้อมวันนี้ ${missingTeams.length} ทีม`,
         detail: `เลยเวลา ${TRAINING_PLAN_DEADLINE_HOUR}:00 น. แล้ว — ${missingTeams.join(", ")}`,
         // ?team=__ALL__ เพื่อให้ผู้ดูแลระบบเห็นข้อมูลทันที (ไม่งั้น Dashboard จะโชว์หน้าเลือกทีมแทน) และ
@@ -626,6 +674,7 @@ export async function loadAdminNotifications() {
       key: "late_coaches_month",
       icon: icon("trending-down"),
       level: "action",
+      count: lateCoaches.length,
       title: `โค้ชที่ส่งแผนการฝึกซ้อมสายเกินเกณฑ์เดือนนี้ ${lateCoaches.length} คน`,
       detail: lateCoaches.map((g) => `${g.coachName} (สาย ${g.late}/${g.total} ครั้ง)`).join(", "),
       link: "index.html?team=__ALL__#training-plan-summary-section"
@@ -655,6 +704,7 @@ export async function loadAdminNotifications() {
       key: "incomplete_evaluations_today",
       icon: icon("clipboard-list"),
       level: "info",
+      count: incompleteTeams.length,
       title: `การประเมินนักกีฬาวันนี้ยังไม่ครบ ${incompleteTeams.length} ทีม`,
       detail: incompleteTeams.map((t) => `${t.team} (${t.evaluated}/${t.total} คน)`).join(", "),
       link: `attendance.html#admin=progress&team=${encodeURIComponent(incompleteTeams[0].team)}`
