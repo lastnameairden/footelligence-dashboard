@@ -1595,16 +1595,22 @@ function renderDrawerItems() {
     navDrawerItems.appendChild(drawerSectionLabel("ผู้ดูแลระบบ"));
     navDrawerItems.appendChild(drawerItem(icon("users"), "รายชื่อโค้ชในระบบ", "./attendance.html#admin=coaches"));
     navDrawerItems.appendChild(drawerItem(icon("search"), "ตรวจสอบข้อมูลนักกีฬาที่ผิดปกติ", "./attendance.html#admin=player-audit"));
-    navDrawerItems.appendChild(drawerItem(icon("trending-up"), "ความคืบหน้าการประเมินรายวัน", "./attendance.html#admin=progress"));
-    navDrawerItems.appendChild(drawerItem(icon("file-text"), "คำขอลงทะเบียนที่รอการอนุมัติ", "./attendance.html#admin=approvals"));
+    navDrawerItems.appendChild(drawerItem(icon("trending-up"), "ความคืบหน้าเช็คชื่อรายวัน", "./attendance.html#admin=progress"));
+    navDrawerItems.appendChild(drawerItem(icon("file-text"), "คำขอลงทะเบียนรออนุมัติ", "./attendance.html#admin=approvals"));
     navDrawerItems.appendChild(drawerItem(icon("football"), "รายงานผลการแข่งขันทั้งหมด", "./attendance.html#admin=matches"));
     navDrawerItems.appendChild(drawerItem(icon("heart-pulse"), "รายงานอาการบาดเจ็บทั้งหมด", "./attendance.html#admin=injuries"));
-    navDrawerItems.appendChild(drawerItem(icon("printer"), "พิมพ์สรุป Dashboard", "./attendance.html#admin=print"));
+    navDrawerItems.appendChild(drawerItem(icon("printer"), "พิมพ์สรุปผลงานโค้ช", "./attendance.html#admin=print"));
     navDrawerItems.appendChild(drawerItem(icon("book"), "สมุดพกนักกีฬา", "./attendance.html#admin=report-card"));
     navDrawerItems.appendChild(drawerItem(icon("dna"), "กำหนดรอบการประเมิน MASC", "./attendance.html#admin=masc-rounds"));
     navDrawerItems.appendChild(drawerItem(icon("trending-up"), "พัฒนาการนักกีฬา", "./development.html"));
-    navDrawerItems.appendChild(drawerDivider());
-    navDrawerItems.appendChild(drawerItem(icon("refresh"), "เลือกทีมอื่น (Dashboard)", "/"));
+    // "กลับภาพรวมทุกทีม" มีประโยชน์เฉพาะตอนกำลังดูทีมใดทีมหนึ่งอยู่ (มี ?team= เจาะจงทีมจริงในนี้) — ถ้าอยู่ที่
+    // ภาพรวมทุกทีมอยู่แล้ว (หน้าแรกสุด ไม่มี ?team= หรือมีแต่ไม่ตรงชื่อทีมไหนเลย) กดแล้วจะแค่โหลดหน้าเดิมซ้ำ
+    // ไม่มีประโยชน์ จึงไม่ต้องมีปุ่มนี้ให้เห็นเลย (เหมือน dashboardBackLink ในหน้าที่ซ่อนกรณีเดียวกัน)
+    const teamFromUrl = new URLSearchParams(window.location.search).get("team");
+    if (teamFromUrl && TEAMS.includes(teamFromUrl)) {
+      navDrawerItems.appendChild(drawerDivider());
+      navDrawerItems.appendChild(drawerItem(icon("refresh"), "กลับภาพรวมทุกทีม", "/"));
+    }
   } else if (currentViewerRole === "coach") {
     navDrawerItems.appendChild(drawerSectionLabel("เมนู"));
     navDrawerItems.appendChild(drawerItem(icon("calendar"), "กลับหน้า Daily", "./attendance.html"));

@@ -773,17 +773,17 @@ function renderDrawerItems() {
       navDrawerItems.appendChild(drawerSectionLabel("ผู้ดูแลระบบ"));
       navDrawerItems.appendChild(drawerItem(icon("users"), "รายชื่อโค้ชในระบบ", openAdminCoachesSection));
       navDrawerItems.appendChild(drawerItem(icon("search"), "ตรวจสอบข้อมูลนักกีฬาที่ผิดปกติ", openAdminPlayerAuditSection));
-      navDrawerItems.appendChild(drawerItem(icon("trending-up"), "ความคืบหน้าการประเมินรายวัน", openAdminProgressSection));
-      navDrawerItems.appendChild(drawerItem(icon("file-text"), "คำขอลงทะเบียนที่รอการอนุมัติ", openAdminApprovalsSection));
+      navDrawerItems.appendChild(drawerItem(icon("trending-up"), "ความคืบหน้าเช็คชื่อรายวัน", openAdminProgressSection));
+      navDrawerItems.appendChild(drawerItem(icon("file-text"), "คำขอลงทะเบียนรออนุมัติ", openAdminApprovalsSection));
       navDrawerItems.appendChild(drawerItem(icon("football"), "รายงานผลการแข่งขันทั้งหมด", openAdminMatchesSection));
       navDrawerItems.appendChild(drawerItem(icon("heart-pulse"), "รายงานอาการบาดเจ็บทั้งหมด", openAdminInjuriesSection));
-      navDrawerItems.appendChild(drawerItem(icon("bar-chart"), "ดู Dashboard ทีม", openAdminDashboardSection));
-      navDrawerItems.appendChild(drawerItem(icon("printer"), "พิมพ์สรุป Dashboard", openAdminPrintSection));
+      navDrawerItems.appendChild(drawerItem(icon("bar-chart"), "เลือกทีมเพื่อดู Dashboard", openAdminDashboardSection));
+      navDrawerItems.appendChild(drawerItem(icon("printer"), "พิมพ์สรุปผลงานโค้ช", openAdminPrintSection));
       navDrawerItems.appendChild(drawerItem(icon("book"), "สมุดพกนักกีฬา", openAdminReportCardSection));
       navDrawerItems.appendChild(drawerItem(icon("dna"), "กำหนดรอบการประเมิน MASC", openAdminMascRoundsSection));
       navDrawerItems.appendChild(drawerItem(icon("trending-up"), "พัฒนาการนักกีฬา", () => (window.location.href = "./development.html")));
       navDrawerItems.appendChild(drawerDivider());
-      navDrawerItems.appendChild(drawerItem(icon("home"), "หน้า Dashboard หลัก", goToDashboard));
+      navDrawerItems.appendChild(drawerItem(icon("home"), "ภาพรวมทุกทีม (Dashboard)", goToDashboard));
     }
     return;
   }
