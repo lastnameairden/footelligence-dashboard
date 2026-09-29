@@ -44,6 +44,7 @@ import {
   loadAdminNotifications,
   renderAdminNotifications,
   markNotificationRead,
+  markAllNotificationsRead,
   getCoachPlayerIds,
   ageGroupSortKey,
   ageGroupNumber,
@@ -240,6 +241,7 @@ const notificationBadge = document.getElementById("notification-badge");
 const notificationPanel = document.getElementById("notification-panel");
 const notificationList = document.getElementById("notification-list");
 const notificationRefreshBtn = document.getElementById("notification-refresh-btn");
+const notificationMarkAllReadBtn = document.getElementById("notification-mark-all-read-btn");
 const navDrawerOverlay = document.getElementById("nav-drawer-overlay");
 const navDrawer = document.getElementById("nav-drawer");
 const navDrawerCloseBtn = document.getElementById("nav-drawer-close-btn");
@@ -656,6 +658,22 @@ notificationBellBtn.addEventListener("click", () => {
   if (opening) refreshNotifications();
 });
 notificationRefreshBtn.addEventListener("click", refreshNotifications);
+
+// "อ่านทั้งหมด" — ปิดปุ่มระหว่างเขียน กันกดซ้ำระหว่างที่ยังเขียน Firestore ไม่เสร็จ
+notificationMarkAllReadBtn.addEventListener("click", async () => {
+  if (currentNotifications.every((n) => n.read)) return;
+  notificationMarkAllReadBtn.disabled = true;
+  try {
+    await markAllNotificationsRead(currentNotifications);
+    await refreshNotifications();
+  } catch (err) {
+    console.error(err);
+    alert("ทำเครื่องหมายว่าอ่านทั้งหมดไม่สำเร็จ: " + err.message);
+  } finally {
+    notificationMarkAllReadBtn.disabled = false;
+  }
+});
+
 // คลิกปุ่ม "✓" ในรายการเพื่อทำเครื่องหมายว่าอ่านแล้วทีละรายการ (event delegation เพราะรายการถูกสร้างใหม่
 // ทุกครั้งที่โหลดข้อมูล) กันไม่ให้คลิกไปโดนลิงก์ที่ห่ออยู่ด้วย (preventDefault + stopPropagation)
 notificationList.addEventListener("click", async (e) => {

@@ -23,6 +23,12 @@ export function monthsAgoBangkok(n, now = new Date()) {
   const [y, m] = thisMonthBangkok(now).split("-").map(Number);
   return new Date(Date.UTC(y, m - 1 - n, 1)).toISOString().slice(0, 7);
 }
+// วันที่ "YYYY-MM-DD" ย้อนหลัง n วันจากวันนี้ (ตามเวลาไทย) — ใช้ทำ query ช่วงวันที่ย้อนหลังแบบไม่อิงเดือนปฏิทิน
+// (ต่างจาก monthsAgoBangkok/monthDateRange ซึ่งตัดตามวันที่ 1 ของเดือน ทำให้ช่วง "ย้อนหลัง N วัน" ที่ตกคาบเกี่ยว
+// รอยต่อเดือนได้ช่วงสั้นกว่าที่ตั้งใจ)
+export function daysAgoBangkok(n, now = new Date()) {
+  return new Date(now.getTime() + BANGKOK_UTC_OFFSET_MS - n * 86400000).toISOString().slice(0, 10);
+}
 
 // ---------- query ของทีมหนึ่งในช่วงวันที่ที่ต้องการ (แทนการดึงทั้ง collection มากรองฝั่ง client) ----------
 // attendance/sessions/รายงาน/แผนการฝึก โตขึ้นทุกวัน — เดิมหลายหน้าดึงของทั้งทีม "ทุกเดือนตั้งแต่เริ่มใช้" มาก่อนค่อยกรอง
@@ -569,21 +575,64 @@ export function applyDataLabels(tbody) {
 // ครบแล้ว ฯลฯ ก็หายไปจากรายการเอง) — "อ่านแล้ว" ถูกบันทึกแยกต่างหากใน adminNotificationReads/{key} เทียบกับ
 // เนื้อหาปัจจุบันของหมวดนั้น (ดู markNotificationRead) ถ้าเนื้อหาเปลี่ยน (เช่น มีรายการใหม่เพิ่มเข้ามา) จะกลับมา
 // เป็น "ยังไม่อ่าน" ให้เองอัตโนมัติ ไม่ต้องกลัวพลาดเรื่องใหม่เพราะไปกดอ่านของเก่าทิ้งไว้ก่อนหน้า
+// นับจำนวนวันที่แต่ละทีม "มีซ้อมจริงแต่ยังไม่ส่งแผนการฝึกซ้อม" — แยกเป็นฟังก์ชันล้วน (ไม่พึ่ง Firestore/เวลาจริง)
+// จาก loadAdminNotifications ด้านล่าง เพื่อเทสต์ตรงๆ ได้ sessions/plans เป็น array เอกสารดิบจาก Firestore
+// (ยังไม่กรองอะไร อาจมีมากกว่าช่วง windowStart-todayStr ก็ได้ ฟังก์ชันนี้กรองเองอีกชั้น) ของวันนี้เองยังไม่นับว่า
+// ขาดจนกว่า currentHour จะถึง deadlineHour (เผื่อโค้ชยังไม่ถึงเวลาส่งของวันนี้)
+export function computeMissingPlanDaysByTeam(sessions, plans, { windowStart, todayStr, deadlineHour, currentHour }) {
+  const trainingDaysByTeam = new Map(); // team -> Set(date) เฉพาะวันที่มีซ้อมจริงในช่วงที่สนใจ
+  for (const s of sessions) {
+    if (s.noTraining || !s.team || !s.date || s.date < windowStart || s.date > todayStr) continue;
+    if (!trainingDaysByTeam.has(s.team)) trainingDaysByTeam.set(s.team, new Set());
+    trainingDaysByTeam.get(s.team).add(s.date);
+  }
+  const plannedDatesByTeam = new Map(); // team -> Set(date) ที่ส่งแผนไว้แล้ว
+  for (const p of plans) {
+    if (!p.team || !p.date) continue;
+    if (!plannedDatesByTeam.has(p.team)) plannedDatesByTeam.set(p.team, new Set());
+    plannedDatesByTeam.get(p.team).add(p.date);
+  }
+  const missing = new Map();
+  for (const [team, dates] of trainingDaysByTeam) {
+    for (const d of dates) {
+      if (d === todayStr && currentHour < deadlineHour) continue;
+      if (!(plannedDatesByTeam.get(team) || new Set()).has(d)) {
+        missing.set(team, (missing.get(team) || 0) + 1);
+      }
+    }
+  }
+  return missing;
+}
+
 // ครอบคลุม 6 เรื่องที่ผู้ดูแลระบบต้องรู้ (เรียงความสำคัญ): บัญชีรออนุมัติ, อาการบาดเจ็บที่ยังไม่หาย (แยกรุนแรง),
-// แผนการฝึกซ้อมวันนี้ที่ยังไม่ส่งหลังเลยเวลา, โค้ชที่ส่งแผนสายเกินเกณฑ์เดือนนี้, การประเมินนักกีฬาวันนี้ที่ยังไม่ครบ
+// แผนการฝึกซ้อมที่ยังไม่ส่งย้อนหลัง 14 วัน, โค้ชที่ส่งแผนสายเกินเกณฑ์เดือนนี้, การประเมินนักกีฬาที่ยังไม่ครบย้อนหลัง 14 วัน
+//
+// ทำไมย้อนหลัง 14 วัน (ไม่ใช่แค่ "วันนี้"): ระบบนี้ไม่มีการเก็บ "ประวัติ" การแจ้งเตือนไว้เลย — คำนวณสดจากสถานะ
+// ปัจจุบันทุกครั้งที่เปิดกระดิ่ง ถ้าเช็คแค่วันนี้ ผู้ดูแลระบบที่ไม่ได้เข้ามาดูทุกวันจะพลาดเรื่องที่ค้างของวันก่อนๆ ไปเงียบๆ
+// (พอวันเปลี่ยน "วันนี้" ของเมื่อวานก็หายไปจากเงื่อนไขทันที) จึงมองย้อนหลัง 14 วันแทน โดยยังนับเฉพาะวันที่ "มีการ
+// ฝึกซ้อมจริง" (มี sessions และไม่ได้ติ๊ก "วันนี้ไม่มีฝึกซ้อม") ไม่ใช่ทุกวันตามปฏิทิน กันเสียงรบกวนจากวันหยุดที่ไม่มี
+// ซ้อมอยู่แล้วซึ่งไม่ควรนับว่า "ขาดส่งแผน/ประเมิน"
 export async function loadAdminNotifications() {
   const todayStr = todayBangkok();
   const thisMonth = todayStr.slice(0, 7);
-  const teams = Object.keys(TEAM_LOGOS);
+  const windowStart = daysAgoBangkok(13); // รวมวันนี้ = ย้อนหลัง 14 วัน
   const notifications = [];
 
   const [coachSnap, injurySnap, planSnap, sessionSnap] = await Promise.all([
     getDocs(collection(db, "coaches")),
     getDocs(collection(db, "injuryReports")),
-    // แผนที่ใช้ตรวจมีแค่ของวันนี้และเดือนนี้ (ส่งสาย/ยังไม่ส่ง) จึงไม่ต้องดึงทุกเดือน — injuryReports ยังดึงทั้งหมดเพราะ
-    // ต้องดูอาการที่ "ยังไม่หาย" ซึ่งอาจเกิดตั้งแต่เดือนก่อนๆ
-    getDocs(monthQuery("trainingPlans", null, thisMonth)),
-    getDocs(query(collection(db, "sessions"), where("date", "==", todayStr)))
+    // แผนที่ใช้ตรวจ ต้องครอบทั้งช่วง 14 วันย้อนหลัง (ข้อ 3) และทั้งเดือนปฏิทินนี้ (ข้อ 4) พร้อมกัน — สองช่วงนี้ไม่ทับกัน
+    // สนิทเสมอ (เช่น วันที่ 3 ของเดือน ย้อนหลัง 14 วันจะเลยไปเดือนก่อน) จึง query ตั้งแต่จุดที่เก่ากว่าของสองจุดนี้
+    // แล้วให้แต่ละข้อกรองช่วงของตัวเองจาก plans อีกที เป็น query ช่วงวันที่ล้วนๆ (ไม่ผูก team) จึงไม่ต้องมี
+    // composite index เพิ่ม — injuryReports ยังดึงทั้งหมดเพราะต้องดูอาการที่ "ยังไม่หาย" ซึ่งอาจเกิดขึ้นนานแล้วก็ได้
+    getDocs(
+      query(
+        collection(db, "trainingPlans"),
+        where("date", ">=", windowStart < `${thisMonth}-01` ? windowStart : `${thisMonth}-01`),
+        where("date", "<=", todayStr)
+      )
+    ),
+    getDocs(query(collection(db, "sessions"), where("date", ">=", windowStart), where("date", "<=", todayStr)))
   ]);
 
   // 1) บัญชีรออนุมัติ
@@ -635,25 +684,29 @@ export async function loadAdminNotifications() {
     });
   }
 
-  // 3) แผนการฝึกซ้อมวันนี้ที่ยังไม่ส่ง (เตือนเฉพาะหลังเลยเวลาเส้นตายของวันนั้นแล้ว)
+  // 3) แผนการฝึกซ้อมที่ยังไม่ส่ง ย้อนหลัง 14 วัน — นับเฉพาะวันที่ทีมนั้นมีวันซ้อมจริง (มี sessions และไม่ได้ติ๊ก
+  // "วันนี้ไม่มีฝึกซ้อม") ไม่ใช่ทุกวันตามปฏิทิน ของวันนี้เองยังไม่นับว่าขาดจนกว่าจะเลยเวลาเส้นตาย
   const plans = [];
   planSnap.forEach((d) => plans.push(d.data()));
-  if (bangkokHour() >= TRAINING_PLAN_DEADLINE_HOUR) {
-    const teamsWithPlanToday = new Set(plans.filter((p) => p.date === todayStr).map((p) => p.team));
-    const missingTeams = teams.filter((t) => !teamsWithPlanToday.has(t));
-    if (missingTeams.length > 0) {
-      notifications.push({
-        key: "missing_plans_today",
-        icon: icon("clock"),
-        level: "action",
-        count: missingTeams.length,
-        title: `ทีมที่ยังไม่ส่งแผนการฝึกซ้อมวันนี้ ${missingTeams.length} ทีม`,
-        detail: `เลยเวลา ${TRAINING_PLAN_DEADLINE_HOUR}:00 น. แล้ว — ${missingTeams.join(", ")}`,
-        // ?team=__ALL__ เพื่อให้ผู้ดูแลระบบเห็นข้อมูลทันที (ไม่งั้น Dashboard จะโชว์หน้าเลือกทีมแทน) และ
-        // #training-plan-summary-section ให้เลื่อนไปที่ตารางสรุปแผนการฝึกซ้อมโดยตรง
-        link: "index.html?team=__ALL__#training-plan-summary-section"
-      });
-    }
+  const sessionsInWindow = sessionSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const missingPlanDaysByTeam = computeMissingPlanDaysByTeam(sessionsInWindow, plans, {
+    windowStart,
+    todayStr,
+    deadlineHour: TRAINING_PLAN_DEADLINE_HOUR,
+    currentHour: bangkokHour()
+  });
+  if (missingPlanDaysByTeam.size > 0) {
+    notifications.push({
+      key: "missing_plans_recent",
+      icon: icon("clock"),
+      level: "action",
+      count: missingPlanDaysByTeam.size,
+      title: `ทีมที่มีวันขาดส่งแผนการฝึกซ้อมใน 14 วันที่ผ่านมา ${missingPlanDaysByTeam.size} ทีม`,
+      detail: Array.from(missingPlanDaysByTeam.entries()).map(([t, count]) => `${t} (ขาด ${count} วัน)`).join(", "),
+      // ?team=__ALL__ เพื่อให้ผู้ดูแลระบบเห็นข้อมูลทันที (ไม่งั้น Dashboard จะโชว์หน้าเลือกทีมแทน) และ
+      // #training-plan-summary-section ให้เลื่อนไปที่ตารางสรุปแผนการฝึกซ้อมโดยตรง
+      link: "index.html?team=__ALL__#training-plan-summary-section"
+    });
   }
 
   // 4) โค้ชที่ส่งแผนการฝึกซ้อมสายเกินเกณฑ์ในเดือนนี้ (ใช้เกณฑ์เดียวกับหน้าสรุปแผนการฝึกซ้อมใน Dashboard)
@@ -681,33 +734,43 @@ export async function loadAdminNotifications() {
     });
   }
 
-  // 5) การประเมินนักกีฬาวันนี้ที่ยังไม่ครบ (ตรวจเฉพาะทีมที่มีการฝึกซ้อมวันนี้แล้วเท่านั้น)
-  const incompleteTeams = [];
-  for (const sessionDoc of sessionSnap.docs) {
-    const session = sessionDoc.data();
-    if (session.noTraining) continue;
-    const [playersSnap, attendanceSnap] = await Promise.all([
-      getDocs(query(collection(db, "players"), where("team", "==", session.team))),
-      getDocs(query(collection(db, "attendance"), where("sessionId", "==", sessionDoc.id)))
-    ]);
-    const totalPlayers = playersSnap.size;
-    if (totalPlayers === 0) continue;
-    const evaluatedCount = attendanceSnap.docs.map((d) => d.data()).filter((a) => isPlayerFullyEvaluated(a)).length;
-    if (evaluatedCount < totalPlayers) {
-      incompleteTeams.push({ team: session.team, evaluated: evaluatedCount, total: totalPlayers });
-    }
+  // 5) การประเมินนักกีฬาที่ยังไม่ครบ ย้อนหลัง 14 วัน (ตรวจเฉพาะวันที่มีการฝึกซ้อมจริงของแต่ละทีม — ใช้ sessions
+  // ชุดเดียวกับข้อ 3 ด้านบน) — ดึงจำนวนนักกีฬาต่อทีมครั้งเดียวต่อทีม (ไม่ใช่ต่อวันซ้อม) แล้วเช็ค attendance ของ
+  // แต่ละวันซ้อมแบบขนาน (Promise.all) กันคำขอ Firestore บวมเกินจำเป็นเมื่อย้อนหลังหลายวัน
+  const realSessions = sessionsInWindow.filter((s) => !s.noTraining && s.team && s.date && s.date >= windowStart);
+  const teamsWithSessions = Array.from(new Set(realSessions.map((s) => s.team)));
+  const playerCountByTeam = new Map();
+  await Promise.all(
+    teamsWithSessions.map(async (team) => {
+      const snap = await getDocs(query(collection(db, "players"), where("team", "==", team)));
+      playerCountByTeam.set(team, snap.size);
+    })
+  );
+  const incompleteTeamPerSession = await Promise.all(
+    realSessions.map(async (session) => {
+      const totalPlayers = playerCountByTeam.get(session.team) || 0;
+      if (totalPlayers === 0) return null;
+      const attendanceSnap = await getDocs(query(collection(db, "attendance"), where("sessionId", "==", session.id)));
+      const evaluatedCount = attendanceSnap.docs.map((d) => d.data()).filter((a) => isPlayerFullyEvaluated(a)).length;
+      return evaluatedCount < totalPlayers ? session.team : null;
+    })
+  );
+  const incompleteDaysByTeam = new Map(); // team -> จำนวนวันที่ประเมินไม่ครบ
+  for (const team of incompleteTeamPerSession) {
+    if (!team) continue;
+    incompleteDaysByTeam.set(team, (incompleteDaysByTeam.get(team) || 0) + 1);
   }
-  if (incompleteTeams.length > 0) {
+  if (incompleteDaysByTeam.size > 0) {
     // แนบชื่อทีมแรกที่ยังไม่ครบไปกับลิงก์ ให้หน้าความคืบหน้าเปิดทีมนั้นให้ทันที (ไม่ต้องไล่หาเอง) — ถ้ามีหลาย
     // ทีมค้างอยู่ ทีมอื่นๆ ยังเลือกดูต่อได้จากปุ่มเลือกทีมในหน้านั้นตามปกติ
     notifications.push({
-      key: "incomplete_evaluations_today",
+      key: "incomplete_evaluations_recent",
       icon: icon("clipboard-list"),
       level: "info",
-      count: incompleteTeams.length,
-      title: `การประเมินนักกีฬาวันนี้ยังไม่ครบ ${incompleteTeams.length} ทีม`,
-      detail: incompleteTeams.map((t) => `${t.team} (${t.evaluated}/${t.total} คน)`).join(", "),
-      link: `attendance.html#admin=progress&team=${encodeURIComponent(incompleteTeams[0].team)}`
+      count: incompleteDaysByTeam.size,
+      title: `ทีมที่มีวันประเมินนักกีฬาไม่ครบใน 14 วันที่ผ่านมา ${incompleteDaysByTeam.size} ทีม`,
+      detail: Array.from(incompleteDaysByTeam.entries()).map(([t, count]) => `${t} (${count} วัน)`).join(", "),
+      link: `attendance.html#admin=progress&team=${encodeURIComponent(incompleteDaysByTeam.keys().next().value)}`
     });
   }
 
@@ -733,6 +796,13 @@ export async function loadAdminNotifications() {
 // เป็น "ยังไม่อ่าน" เองอัตโนมัติ) ผู้ดูแลระบบทุกคนเห็นสถานะอ่านร่วมกัน ไม่แยกเป็นรายบุคคล
 export async function markNotificationRead(key, contentHash) {
   await setDoc(doc(db, "adminNotificationReads", key), { contentHash, readAt: serverTimestamp() });
+}
+
+// ทำเครื่องหมายว่าอ่านแล้วทีละหมวดพร้อมกันทั้งหมด (ปุ่ม "ทำเครื่องหมายว่าอ่านทั้งหมด") — เขียนแยกเอกสารต่อหมวด
+// เหมือน markNotificationRead ปกติทุกประการ แค่ยิงพร้อมกันทีเดียวแทนการกดทีละรายการ ข้ามรายการที่อ่านแล้วอยู่ก่อน
+// (n.read) เพื่อไม่ต้องเขียนทับด้วยค่าเดิมโดยไม่จำเป็น
+export async function markAllNotificationsRead(notifications) {
+  await Promise.all(notifications.filter((n) => !n.read).map((n) => markNotificationRead(n.key, n.detail)));
 }
 
 const NOTIFICATION_LEVEL_CLASS = {

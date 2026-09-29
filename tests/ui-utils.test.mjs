@@ -23,9 +23,11 @@ import {
   thisMonthBangkok,
   bangkokHour,
   monthsAgoBangkok,
+  daysAgoBangkok,
   trainingPlanHasAttachment,
   computeDailyAvgScores,
-  buildAvgScoreSparklineSvg
+  buildAvgScoreSparklineSvg,
+  computeMissingPlanDaysByTeam
 } from "../js/ui-utils.js";
 
 const ts = (date) => ({ toDate: () => date });
@@ -232,4 +234,54 @@ test("buildAvgScoreSparklineSvg: renders a path for 2+ points, a placeholder mes
   assert.match(buildAvgScoreSparklineSvg([{ date: "2026-03-18", avg: 3 }, { date: "2026-03-19", avg: 3.5 }]), /<svg/);
   assert.match(buildAvgScoreSparklineSvg([{ date: "2026-03-18", avg: 3 }]), /ยังไม่มีข้อมูล/);
   assert.match(buildAvgScoreSparklineSvg([]), /ยังไม่มีข้อมูล/);
+});
+
+test("daysAgoBangkok: steps back whole days in Thai time, across month/year boundaries", () => {
+  assert.equal(daysAgoBangkok(0, new Date("2026-03-15T10:00:00+07:00")), "2026-03-15");
+  assert.equal(daysAgoBangkok(13, new Date("2026-03-15T10:00:00+07:00")), "2026-03-02");
+  assert.equal(daysAgoBangkok(14, new Date("2026-03-01T10:00:00+07:00")), "2026-02-15");
+  assert.equal(daysAgoBangkok(1, new Date("2026-01-01T10:00:00+07:00")), "2025-12-31");
+  // ช่วงตี 0-7 เวลาไทยเป็นวันใหม่แล้วแม้เวลา UTC ยังเป็นวันเดิม (ดู todayBangkok)
+  assert.equal(daysAgoBangkok(0, new Date("2026-03-10T17:00:00Z")), "2026-03-11");
+});
+
+// ตัวเลือก "ขยายช่วงตรวจจับ" ของการแจ้งเตือนผู้ดูแลระบบ — เช็คแผนการฝึกซ้อมที่ยังไม่ส่งย้อนหลัง 14 วัน แทนแค่วันนี้
+const WINDOW = { windowStart: "2026-03-01", todayStr: "2026-03-14", deadlineHour: 14, currentHour: 15 };
+
+test("computeMissingPlanDaysByTeam: only counts days with a real session and no matching plan", () => {
+  const sessions = [
+    { team: "A", date: "2026-03-10" }, // ซ้อมจริง ไม่มีแผน -> ขาด
+    { team: "A", date: "2026-03-11" }, // ซ้อมจริง มีแผนแล้ว -> ไม่ขาด
+    { team: "A", date: "2026-03-12", noTraining: true }, // ติ๊กไม่มีซ้อม -> ไม่นับ ไม่ว่าจะมีแผนหรือไม่
+    { team: "B", date: "2026-03-10" } // ทีม B ซ้อมจริง ไม่มีแผน -> ขาด
+  ];
+  const plans = [{ team: "A", date: "2026-03-11" }];
+  const missing = computeMissingPlanDaysByTeam(sessions, plans, WINDOW);
+  assert.equal(missing.get("A"), 1);
+  assert.equal(missing.get("B"), 1);
+});
+
+test("computeMissingPlanDaysByTeam: today doesn't count as missing until the deadline hour passes", () => {
+  const sessions = [{ team: "A", date: "2026-03-14" }]; // = todayStr
+  const beforeDeadline = computeMissingPlanDaysByTeam(sessions, [], { ...WINDOW, currentHour: 10 });
+  assert.equal(beforeDeadline.has("A"), false);
+  const afterDeadline = computeMissingPlanDaysByTeam(sessions, [], { ...WINDOW, currentHour: 15 });
+  assert.equal(afterDeadline.get("A"), 1);
+});
+
+test("computeMissingPlanDaysByTeam: ignores sessions/plans outside the window and duplicate session docs", () => {
+  const sessions = [
+    { team: "A", date: "2026-02-15" }, // ก่อน windowStart -> ไม่นับ
+    { team: "A", date: "2026-03-10" },
+    { team: "A", date: "2026-03-10" } // เอกสาร session ซ้ำวันเดียวกัน -> ยังนับเป็น 1 วัน ไม่ใช่ 2
+  ];
+  const missing = computeMissingPlanDaysByTeam(sessions, [], WINDOW);
+  assert.equal(missing.get("A"), 1);
+});
+
+test("computeMissingPlanDaysByTeam: no sessions or all planned gives an empty map", () => {
+  assert.equal(computeMissingPlanDaysByTeam([], [], WINDOW).size, 0);
+  const sessions = [{ team: "A", date: "2026-03-10" }];
+  const plans = [{ team: "A", date: "2026-03-10" }];
+  assert.equal(computeMissingPlanDaysByTeam(sessions, plans, WINDOW).size, 0);
 });
