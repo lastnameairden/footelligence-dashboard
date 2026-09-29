@@ -1,30 +1,70 @@
-@import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap');
+
+/* ---------- โทนสี/ฟอนต์ของระบบ ("Clarity" — สว่าง เป็นทางการ อ่านง่าย) ----------
+   เลือกจากการเทียบ 2 ทิศทางกับผู้ใช้ (mockup) แล้วเลือกทิศทางนี้เพราะอ่านชัดเจนที่สุด — สว่าง สีเน้นเขียวมรกต
+   หัวข้อใช้ Mitr (โค้งมน เป็นทางการ) เนื้อหา/ตัวเลขใช้ IBM Plex Sans Thai (คมชัด อ่านง่ายแม้ตัวเล็ก)
+   ทุกสีอ้างอิงจากตัวแปรกลางด้านล่างนี้ — เปลี่ยนโทนทั้งระบบได้จากจุดเดียว ไม่ต้องไล่แก้ทีละ selector */
+:root {
+  --bg: #F5F6F3;
+  --surface: #FFFFFF;
+  --surface-2: #EEF0EC;
+  --border: #E1E4DE;
+  --text-1: #1C2321;
+  --text-2: #5B655F;
+  --text-3: #8B948D;
+  --accent: #0E6B52;
+  --accent-hover: #0A4E3C;
+  --accent-ink: #FFFFFF;
+  --accent-tint: rgba(14, 107, 82, 0.1);
+  --danger: #B3281D;
+  --danger-hover: #942018;
+  --danger-bg: #FCEBEA;
+  --danger-border: #F1C6C2;
+  --warning: #95530A;
+  --warning-bg: #FCF1DE;
+  --warning-border: #EFD49C;
+  --success: #1E7A46;
+  --success-bg: #E8F5EC;
+  --success-border: #BFE3CB;
+  --info: #1F5C8F;
+  --info-bg: #EAF2FA;
+  --card-shadow: 0 1px 2px rgba(28, 35, 33, 0.03), 0 8px 20px rgba(28, 35, 33, 0.03);
+}
 
 body {
-  font-family: 'Prompt', 'Segoe UI', sans-serif;
+  margin: 0;
+  font-family: 'IBM Plex Sans Thai', 'Segoe UI', sans-serif;
 }
+
+/* body/header ในทุกหน้าใส่ Tailwind utility (bg-slate-50, text-slate-900, text-white) ตรงๆ ไว้ใน <body>/<header>
+   ที่ HTML — แทนที่จะไปแก้ไฟล์ .html ทั้ง 7 ไฟล์ ใช้ตัวเลือกรวม class คู่ (specificity สูงกว่า class เดี่ยวของ
+   Tailwind เสมอไม่ว่า tailwind.css จะถูกโหลดทีหลังแค่ไหน) ทับสีเดิมจากจุดนี้ที่เดียวแทน */
+body.bg-slate-50 { background: var(--bg); }
+body.text-slate-900 { color: var(--text-1); }
+.app-header.text-white { color: var(--text-1); }
 
 /* ---------- Layout primitives ---------- */
 .card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 0.9rem;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 1px rgba(15, 23, 42, 0.03);
+  box-shadow: var(--card-shadow);
 }
 .card-pad { padding: 1.5rem; }
-.card-warning { background: #fffbeb; border-color: #fde68a; }
-.card-success { background: #ecfdf5; border-color: #a7f3d0; }
+.card-warning { background: var(--warning-bg); border-color: var(--warning-border); }
+.card-success { background: var(--success-bg); border-color: var(--success-border); }
 
 .section-title {
+  font-family: 'Mitr', sans-serif;
   font-size: 1.05rem;
   font-weight: 600;
-  color: #0f172a;
-  letter-spacing: -0.01em;
+  color: var(--text-1);
+  letter-spacing: 0;
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
-.section-sub { font-size: 0.8125rem; color: #64748b; margin-top: 0.125rem; }
+.section-sub { font-size: 0.8125rem; color: var(--text-2); margin-top: 0.125rem; }
 
 .icon-badge {
   display: inline-flex;
@@ -34,7 +74,7 @@ body {
   height: 2rem;
   border-radius: 0.6rem;
   font-size: 1.05rem;
-  background: #f1f5f9;
+  background: var(--surface-2);
   flex-shrink: 0;
 }
 .icon-badge-lg {
@@ -50,32 +90,32 @@ body {
   gap: 0.85rem;
   margin-bottom: 0.5rem;
 }
-.page-heading h2 { font-size: 1.35rem; font-weight: 700; color: #0f172a; letter-spacing: -0.01em; }
-.page-heading p { font-size: 0.8125rem; color: #64748b; margin-top: 0.1rem; }
+.page-heading h2 { font-family: 'Mitr', sans-serif; font-size: 1.35rem; font-weight: 600; color: var(--text-1); letter-spacing: 0; }
+.page-heading p { font-size: 0.8125rem; color: var(--text-2); margin-top: 0.1rem; }
 
 /* ---------- Tables ---------- */
 .table-wrap { overflow-x: auto; }
 table.pro-table { width: 100%; font-size: 0.875rem; text-align: left; border-collapse: collapse; }
 table.pro-table thead th {
-  background: #f8fafc;
-  color: #64748b;
+  background: var(--surface-2);
+  color: var(--text-2);
   text-transform: uppercase;
   font-size: 0.6875rem;
   letter-spacing: 0.04em;
   font-weight: 600;
   padding: 0.75rem 1rem;
   white-space: nowrap;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border);
 }
 table.pro-table tbody td {
   padding: 0.65rem 1rem;
-  border-bottom: 1px solid #f1f5f9;
-  color: #334155;
+  border-bottom: 1px solid var(--surface-2);
+  color: var(--text-2);
   vertical-align: middle;
 }
 table.pro-table tbody tr:last-child td { border-bottom: none; }
-table.pro-table tbody tr:hover { background: #f8fafc; }
-table.pro-table td.emphasis { font-weight: 600; color: #0f172a; }
+table.pro-table tbody tr:hover { background: var(--surface-2); }
+table.pro-table td.emphasis { font-weight: 600; color: var(--text-1); }
 
 /* ตารางเช็คชื่อการฝึกซ้อม: คอลัมน์เยอะกว่าตารางอื่นในระบบ (ผู้เล่น + สถานะ + คะแนน 4 ด้าน + เฉลี่ย) จึงมักต้อง
    เลื่อนแนวนอนบนจอ PC/แท็บเล็ต — ปักหมุดคอลัมน์ "ผู้เล่น" ไว้ซ้ายเสมอกันหลุดว่ากำลังให้คะแนนใคร และย่อปุ่ม
@@ -87,10 +127,10 @@ table.pro-table td.emphasis { font-weight: 600; color: #0f172a; }
     position: sticky;
     left: 0;
     z-index: 1;
-    background: #fff;
+    background: var(--surface);
   }
-  #roster-wrap table.pro-table thead th:first-child { background: #f8fafc; }
-  #roster-wrap table.pro-table tbody tr:hover td:first-child { background: #f8fafc; }
+  #roster-wrap table.pro-table thead th:first-child { background: var(--surface-2); }
+  #roster-wrap table.pro-table tbody tr:hover td:first-child { background: var(--surface-2); }
 
   #roster-wrap .segmented-btn { min-width: 1.7rem; height: 1.7rem; padding: 0 0.3rem; font-size: 0.75rem; }
 }
@@ -112,28 +152,28 @@ table.pro-table td.emphasis { font-weight: 600; color: #0f172a; }
 }
 .btn-block { width: 100%; }
 .btn-sm { padding: 0.35rem 0.75rem; font-size: 0.75rem; border-radius: 0.45rem; }
-.btn-primary { background: #0f172a; color: #fff; }
-.btn-primary:hover { background: #1e293b; }
-.btn-secondary { background: #fff; color: #334155; border-color: #e2e8f0; }
-.btn-secondary:hover { background: #f8fafc; }
-.btn-success { background: #059669; color: #fff; }
-.btn-success:hover { background: #047857; }
-.btn-danger-soft { background: #fef2f2; color: #b91c1c; }
-.btn-danger-soft:hover { background: #fee2e2; }
-.btn-warning-soft { background: #fffbeb; color: #92400e; border-color: #fde68a; }
-.btn-warning-soft:hover { background: #fef3c7; }
-.btn-ghost { background: transparent; color: #64748b; padding-left: 0.25rem; padding-right: 0.25rem; }
-.btn-ghost:hover { color: #0f172a; }
-.btn-ghost-danger { background: transparent; color: #dc2626; padding-left: 0.25rem; padding-right: 0.25rem; }
-.btn-ghost-danger:hover { color: #991b1b; }
+.btn-primary { background: var(--accent); color: var(--accent-ink); }
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-secondary { background: var(--surface); color: var(--text-2); border-color: var(--border); }
+.btn-secondary:hover { background: var(--surface-2); }
+.btn-success { background: var(--success); color: #fff; }
+.btn-success:hover { background: #165c34; }
+.btn-danger-soft { background: var(--danger-bg); color: var(--danger); }
+.btn-danger-soft:hover { background: #F9DCDA; }
+.btn-warning-soft { background: var(--warning-bg); color: var(--warning); border-color: var(--warning-border); }
+.btn-warning-soft:hover { background: #FAE7C4; }
+.btn-ghost { background: transparent; color: var(--text-2); padding-left: 0.25rem; padding-right: 0.25rem; }
+.btn-ghost:hover { color: var(--text-1); }
+.btn-ghost-danger { background: transparent; color: var(--danger); padding-left: 0.25rem; padding-right: 0.25rem; }
+.btn-ghost-danger:hover { color: var(--danger-hover); }
 
 /* ---------- Segmented control (สถานะ/คะแนน แบบกดเลือกค่าเดียว) ---------- */
 .segmented {
   display: inline-flex;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border);
   border-radius: 0.5rem;
   overflow: hidden;
-  background: #fff;
+  background: var(--surface);
   vertical-align: middle;
 }
 .segmented-btn {
@@ -145,21 +185,21 @@ table.pro-table td.emphasis { font-weight: 600; color: #0f172a; }
   justify-content: center;
   font-size: 0.8125rem;
   font-weight: 600;
-  color: #475569;
+  color: var(--text-2);
   background: transparent;
   border: none;
-  border-right: 1px solid #e2e8f0;
+  border-right: 1px solid var(--border);
   transition: background-color 0.15s ease, color 0.15s ease;
   cursor: pointer;
 }
 .segmented-btn:last-child { border-right: none; }
-.segmented-btn:hover { background: #f1f5f9; }
-.segmented-btn.active { background: #0f172a; color: #fff; }
-.segmented-btn.active:hover { background: #0f172a; }
+.segmented-btn:hover { background: var(--surface-2); }
+.segmented-btn.active { background: var(--accent); color: var(--accent-ink); }
+.segmented-btn.active:hover { background: var(--accent); }
 .segmented-readonly {
   font-size: 0.8125rem;
   font-weight: 600;
-  color: #475569;
+  color: var(--text-2);
 }
 
 /* ---------- Chip toggle (เลือกได้หลายค่าพร้อมกัน แบบตัวเลือกจำนวนมากที่ต้องขึ้นบรรทัดใหม่ได้) ---------- */
@@ -167,17 +207,17 @@ table.pro-table td.emphasis { font-weight: 600; color: #0f172a; }
 .chip-toggle {
   padding: 0.4rem 0.85rem;
   border-radius: 999px;
-  border: 1px solid #e2e8f0;
-  background: #fff;
+  border: 1px solid var(--border);
+  background: var(--surface);
   font-size: 0.8125rem;
   font-weight: 500;
-  color: #475569;
+  color: var(--text-2);
   cursor: pointer;
   transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
-.chip-toggle:hover { background: #f1f5f9; }
-.chip-toggle.active { background: #0f172a; border-color: #0f172a; color: #fff; }
-.chip-toggle.active:hover { background: #0f172a; }
+.chip-toggle:hover { background: var(--surface-2); }
+.chip-toggle.active { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.chip-toggle.active:hover { background: var(--accent); }
 
 /* ---------- Badges ---------- */
 .badge {
@@ -191,18 +231,18 @@ table.pro-table td.emphasis { font-weight: 600; color: #0f172a; }
   border-radius: 9999px;
   white-space: nowrap;
 }
-.badge-success { background: #d1fae5; color: #065f46; }
-.badge-warning { background: #fef3c7; color: #92400e; }
-.badge-info { background: #e0e7ff; color: #3730a3; }
-.badge-neutral { background: #f1f5f9; color: #475569; }
-.badge-danger { background: #fee2e2; color: #b91c1c; }
+.badge-success { background: var(--success-bg); color: var(--success); }
+.badge-warning { background: var(--warning-bg); color: var(--warning); }
+.badge-info { background: var(--info-bg); color: var(--info); }
+.badge-neutral { background: var(--surface-2); color: var(--text-2); }
+.badge-danger { background: var(--danger-bg); color: var(--danger); }
 
 /* ---------- ความคืบหน้าการประเมิน MASC รายรุ่น (การ์ดเปิด/ปิดได้ ทีละรุ่นอายุ) ---------- */
 .masc-progress-group {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 0.9rem;
   overflow: hidden;
-  background: #fff;
+  background: var(--surface);
 }
 .masc-progress-group + .masc-progress-group { margin-top: 0.6rem; }
 .masc-progress-group summary {
@@ -214,20 +254,20 @@ table.pro-table td.emphasis { font-weight: 600; color: #0f172a; }
   gap: 0.75rem;
   padding: 0.85rem 1.1rem;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--text-1);
 }
 .masc-progress-group summary::-webkit-details-marker { display: none; }
 .masc-progress-group summary::after {
   content: "▾";
-  color: #94a3b8;
+  color: var(--text-3);
   font-size: 0.75rem;
   transition: transform 0.15s;
 }
 .masc-progress-group[open] summary::after { transform: rotate(180deg); }
-.masc-progress-group summary:hover { background: #f8fafc; }
+.masc-progress-group summary:hover { background: var(--surface-2); }
 .masc-progress-columns {
   padding: 0 1.1rem 1.1rem;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid var(--surface-2);
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.5rem 1.25rem;
@@ -235,31 +275,31 @@ table.pro-table td.emphasis { font-weight: 600; color: #0f172a; }
 .masc-progress-col-title {
   font-size: 0.75rem;
   font-weight: 700;
-  color: #64748b;
+  color: var(--text-2);
   margin: 0.85rem 0 0.5rem;
 }
 .masc-progress-names { display: flex; flex-wrap: wrap; gap: 0.4rem; }
-.masc-progress-empty { font-size: 0.8125rem; color: #94a3b8; }
+.masc-progress-empty { font-size: 0.8125rem; color: var(--text-3); }
 @media (max-width: 640px) {
   .masc-progress-columns { grid-template-columns: 1fr; }
 }
 
 /* ---------- Inputs ---------- */
-.field-label { display: block; font-size: 0.8125rem; font-weight: 500; color: #475569; margin-bottom: 0.35rem; }
+.field-label { display: block; font-size: 0.8125rem; font-weight: 500; color: var(--text-2); margin-bottom: 0.35rem; }
 .field-input {
   width: 100%;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border);
   border-radius: 0.55rem;
   padding: 0.55rem 0.75rem;
   font-size: 0.875rem;
-  color: #0f172a;
-  background: #fff;
+  color: var(--text-1);
+  background: var(--surface);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .field-input:focus {
   outline: none;
-  border-color: #0f172a;
-  box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.08);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-tint);
 }
 
 /* ---------- Tabs ---------- */
@@ -268,33 +308,35 @@ table.pro-table td.emphasis { font-weight: 600; color: #0f172a; }
   font-size: 0.875rem;
   font-weight: 600;
   border-bottom: 2px solid transparent;
-  color: #94a3b8;
+  color: var(--text-3);
 }
-.tab-btn:hover { color: #475569; }
-.tab-btn-active { color: #0f172a; border-bottom-color: #0f172a; }
+.tab-btn:hover { color: var(--text-2); }
+.tab-btn-active { color: var(--text-1); border-bottom-color: var(--accent); }
 
 /* ---------- App shell ---------- */
 .app-header {
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
 }
+.app-header h1 { font-family: 'Mitr', sans-serif; font-weight: 600; letter-spacing: 0; }
 .stat-card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 0.9rem;
   padding: 1.25rem 1.4rem;
 }
-.stat-label { font-size: 0.8125rem; color: #64748b; }
-.stat-value { font-size: 1.7rem; font-weight: 700; color: #0f172a; margin-top: 0.25rem; letter-spacing: -0.02em; }
+.stat-label { font-size: 0.8125rem; color: var(--text-2); }
+.stat-value { font-family: 'Mitr', sans-serif; font-size: 1.7rem; font-weight: 600; color: var(--text-1); margin-top: 0.25rem; letter-spacing: 0; }
 
 .app-footer {
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--border);
   padding: 1.5rem 0;
   text-align: center;
   font-size: 0.75rem;
-  color: #94a3b8;
+  color: var(--text-3);
 }
 
-/* ---------- ปุ่มไอคอนบน header เข้ม (☰ เปิดเมนู, 🔔 แจ้งเตือน) ---------- */
+/* ---------- ปุ่มไอคอนบน header (☰ เปิดเมนู, 🔔 แจ้งเตือน, 🔍 ค้นหา) ---------- */
 .btn-icon {
   display: inline-flex;
   align-items: center;
@@ -303,14 +345,14 @@ table.pro-table td.emphasis { font-weight: 600; color: #0f172a; }
   height: 2.25rem;
   border-radius: 0.55rem;
   background: transparent;
-  color: #e2e8f0;
+  color: var(--text-2);
   font-size: 1.15rem;
   border: none;
   cursor: pointer;
   transition: background-color 0.15s ease;
   flex-shrink: 0;
 }
-.btn-icon:hover { background: rgba(255, 255, 255, 0.1); }
+.btn-icon:hover { background: var(--surface-2); }
 .hamburger-lines {
   display: inline-flex;
   flex-direction: column;
@@ -325,6 +367,9 @@ table.pro-table td.emphasis { font-weight: 600; color: #0f172a; }
   background: currentColor;
   border-radius: 1px;
 }
+/* จุดแดงแจ้งเตือนบนปุ่มกระดิ่ง — ขอบสีตรงกับพื้นหลัง header (var(--surface)) เพื่อให้ดูเหมือน "เจาะ" ออกมาจากปุ่ม
+   ไม่ใช่แปะทับ (ใช้ #notification-badge ID เลือกเพื่อให้แน่ใจว่าชนะ border-slate-900 ของ Tailwind เดิมในทุกกรณี) */
+#notification-badge { border-color: var(--surface); }
 
 /* ---------- เมนูนำทางแบบเลื่อนออกจากด้านซ้าย (nav drawer) ---------- */
 #nav-drawer {
@@ -343,14 +388,14 @@ table.pro-table td.emphasis { font-weight: 600; color: #0f172a; }
   padding: 0.7rem 1.1rem;
   font-size: 0.875rem;
   font-weight: 500;
-  color: #334155;
+  color: var(--text-2);
   background: transparent;
   border: none;
   cursor: pointer;
   transition: background-color 0.15s ease;
 }
-.drawer-item:hover { background: #f1f5f9; }
-.drawer-item.active { background: #eef2ff; color: #3730a3; font-weight: 600; }
+.drawer-item:hover { background: var(--surface-2); }
+.drawer-item.active { background: var(--accent-tint); color: var(--accent); font-weight: 600; }
 .drawer-item .drawer-item-icon { font-size: 1.05rem; width: 1.5rem; text-align: center; flex-shrink: 0; }
 .drawer-section-label {
   padding: 0.85rem 1.1rem 0.35rem;
@@ -358,9 +403,9 @@ table.pro-table td.emphasis { font-weight: 600; color: #0f172a; }
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #94a3b8;
+  color: var(--text-3);
 }
-.drawer-divider { height: 1px; background: #f1f5f9; margin: 0.4rem 0; }
+.drawer-divider { height: 1px; background: var(--surface-2); margin: 0.4rem 0; }
 
 /* ==========================================================================
    โหมดมือถือ (iOS / Android) — คงหน้าตาแบบ PC ไว้เหมือนเดิม ปรับเฉพาะจอแคบ
@@ -408,7 +453,7 @@ table.pro-table td.emphasis { font-weight: 600; color: #0f172a; }
     width: 100%;
   }
   table.pro-table tbody tr {
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--border);
     border-radius: 0.75rem;
     margin: 0.65rem;
     overflow: hidden;
@@ -420,7 +465,7 @@ table.pro-table td.emphasis { font-weight: 600; color: #0f172a; }
     justify-content: space-between;
     gap: 1rem;
     padding: 0.6rem 0.9rem;
-    border-bottom: 1px solid #f1f5f9;
+    border-bottom: 1px solid var(--surface-2);
     text-align: right;
   }
   table.pro-table tr td:last-child { border-bottom: none; }
@@ -430,7 +475,7 @@ table.pro-table td.emphasis { font-weight: 600; color: #0f172a; }
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.03em;
-    color: #94a3b8;
+    color: var(--text-3);
     text-align: left;
     flex-shrink: 0;
   }
