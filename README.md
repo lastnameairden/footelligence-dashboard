@@ -19,6 +19,7 @@
 | `print.html` + `js/print.js` | สรุปผลงานโค้ชสำหรับพิมพ์ A4 |
 | `player.html` + `js/player.js`, `development.html` + `js/development.js` | ข้อมูลและพัฒนาการนักกีฬา |
 | `js/ui-utils.js` | ฟังก์ชันร่วม: `escapeHtml`, `safeHttpUrl`, query รายเดือน, กฎ "ส่งสาย", โควตารายเดือน, กราฟ SVG |
+| `js/icons.js` | ชุดไอคอนเส้น (inline SVG) แทนอิโมจิ — `icon("ชื่อ")` คืน SVG ขนาด `1em` สี `currentColor` (ปรับตามฟอนต์/สีของ element ที่ห่อเอง) |
 | `js/firebase-config.js`, `js/firebase-init.js` | ตั้งค่า Firebase (config ฝั่งเว็บเป็นข้อมูลสาธารณะโดยธรรมชาติ ความปลอดภัยอยู่ที่ rules) |
 | `firestore.rules`, `storage.rules`, `firestore.indexes.json` | Security rules และ index — deploy ด้วย Firebase CLI |
 | `vercel.json` | Security headers รวม CSP |
@@ -106,6 +107,7 @@ node --import ./tests/setup.mjs --test "tests/*.test.mjs"
 | `tests/ui-utils.test.mjs` | `escapeHtml`/`safeHttpUrl`, query รายเดือนต้องมี `team ==`, กฎ "ส่งสาย", ความเป็นเจ้าของนักกีฬา, ลำดับรุ่นอายุ, อายุ |
 | `tests/attendance-save.test.mjs` | บันทึกเช็คชื่อ/คะแนนแบบอัปเดตหน้าจอทันที: แตะเร็วๆ ไม่ทับกัน, คิวเขียนเรียงลำดับต่อนักกีฬา, นับรายการรอส่ง, ล้มเหลวแล้วไม่ค้างคิว |
 | `tests/screen-route.test.mjs` | รูปแบบ URL hash ที่จำหน้าจอปัจจุบัน (รีเฟรชแล้วกลับหน้าเดิม): สร้าง/อ่านกลับครบทุกฟิลด์ ตัดค่าที่ไม่ถูกต้องทิ้ง |
+| `tests/icons.test.mjs` | `icon("ชื่อ")` คืน SVG จริง, fallback เมื่อชื่อไม่มีจริง, ทุกจุดที่เรียก `icon("...")` ทั่ว `js/*.js` สะกดชื่อถูกต้อง (กันไอคอนเงียบๆ กลายเป็นสามเหลี่ยมเตือน) |
 | `tests/masc-data.test.mjs` | สูตรคะแนน MASC / เกรด / ข้อมูลเกณฑ์ครบทุกตำแหน่ง×ช่วงวัย×หมวด |
 | `tests/site-integrity.test.mjs` | ทุกหน้าลิงก์ Tailwind ที่ build แล้ว, ไม่มี inline handler (CSP), class ที่ใช้มี CSS ครบ (ลืม build), CSP ไม่หละหลวม, rules ไม่เปิดกว้าง, ไฟล์ index ถูกต้อง |
 

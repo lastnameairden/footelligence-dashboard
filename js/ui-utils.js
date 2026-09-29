@@ -1,5 +1,6 @@
 import { addDoc, collection, doc, getDocs, query, serverTimestamp, setDoc, where } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 import { db } from "./firebase-init.js";
+import { icon } from "./icons.js";
 
 // ---------- วันที่/เวลาตามเขตเวลาไทย (Asia/Bangkok, UTC+7 ไม่มี DST) ----------
 // เดิมหลายหน้าหา "วันนี้" ด้วย new Date().toISOString().slice(0, 10) ซึ่งเป็นวันที่ตาม UTC — ช่วง 00:00–07:00 น. เวลาไทย
@@ -128,7 +129,7 @@ export const TEAM_COLORS = {
 export function teamIconBadge(team, { large = true, extraClass = "" } = {}) {
   const sizeClass = `icon-badge${large ? " icon-badge-lg" : ""}${extraClass ? " " + extraClass : ""}`;
   const src = TEAM_LOGOS[team];
-  if (!src) return `<div class="${sizeClass}">🛡️</div>`;
+  if (!src) return `<div class="${sizeClass}">${icon("shield")}</div>`;
   return `<div class="${sizeClass} overflow-hidden p-0.5 bg-white"><img src="${src}" alt="${escapeHtml(team)}" class="w-full h-full object-contain rounded mix-blend-multiply" /></div>`;
 }
 
@@ -550,7 +551,7 @@ export async function loadAdminNotifications() {
   if (pendingNames.length > 0) {
     notifications.push({
       key: "pending_accounts",
-      icon: "🆕",
+      icon: icon("star"),
       level: "urgent",
       title: `คำขอลงทะเบียนรออนุมัติ ${pendingNames.length} รายการ`,
       detail: pendingNames.slice(0, 5).join(", ") + (pendingNames.length > 5 ? " และอื่นๆ" : ""),
@@ -568,7 +569,7 @@ export async function loadAdminNotifications() {
   if (severeInjuries.length > 0) {
     notifications.push({
       key: "severe_injuries",
-      icon: "🚑",
+      icon: icon("heart-pulse"),
       level: "urgent",
       title: `นักกีฬาบาดเจ็บระดับรุนแรงที่ยังไม่หาย ${severeInjuries.length} คน`,
       detail: severeInjuries.map((inj) => `${inj.playerName ?? "-"} (${inj.team ?? "-"})`).join(", "),
@@ -579,7 +580,7 @@ export async function loadAdminNotifications() {
   if (otherActiveCount > 0) {
     notifications.push({
       key: "other_injuries",
-      icon: "🩹",
+      icon: icon("heart-pulse"),
       level: "info",
       title: `นักกีฬาบาดเจ็บที่ยังไม่หาย ${otherActiveCount} คน`,
       detail: "ระดับปานกลาง/กำลังพักฟื้น — ไม่เร่งด่วนเท่าระดับรุนแรง",
@@ -596,7 +597,7 @@ export async function loadAdminNotifications() {
     if (missingTeams.length > 0) {
       notifications.push({
         key: "missing_plans_today",
-        icon: "⏰",
+        icon: icon("clock"),
         level: "action",
         title: `ทีมที่ยังไม่ส่งแผนการฝึกซ้อมวันนี้ ${missingTeams.length} ทีม`,
         detail: `เลยเวลา ${TRAINING_PLAN_DEADLINE_HOUR}:00 น. แล้ว — ${missingTeams.join(", ")}`,
@@ -623,7 +624,7 @@ export async function loadAdminNotifications() {
   if (lateCoaches.length > 0) {
     notifications.push({
       key: "late_coaches_month",
-      icon: "📉",
+      icon: icon("trending-down"),
       level: "action",
       title: `โค้ชที่ส่งแผนการฝึกซ้อมสายเกินเกณฑ์เดือนนี้ ${lateCoaches.length} คน`,
       detail: lateCoaches.map((g) => `${g.coachName} (สาย ${g.late}/${g.total} ครั้ง)`).join(", "),
@@ -652,7 +653,7 @@ export async function loadAdminNotifications() {
     // ทีมค้างอยู่ ทีมอื่นๆ ยังเลือกดูต่อได้จากปุ่มเลือกทีมในหน้านั้นตามปกติ
     notifications.push({
       key: "incomplete_evaluations_today",
-      icon: "📋",
+      icon: icon("clipboard-list"),
       level: "info",
       title: `การประเมินนักกีฬาวันนี้ยังไม่ครบ ${incompleteTeams.length} ทีม`,
       detail: incompleteTeams.map((t) => `${t.team} (${t.evaluated}/${t.total} คน)`).join(", "),
@@ -706,7 +707,7 @@ export function renderAdminNotifications(listEl, notifications) {
       const unreadClass = n.read ? "" : "bg-blue-50/60";
       const markReadBtn = n.read
         ? ""
-        : `<button type="button" class="btn-icon flex-shrink-0" data-mark-read-index="${i}" title="ทำเครื่องหมายว่าอ่านแล้ว" aria-label="ทำเครื่องหมายว่าอ่านแล้ว">✓</button>`;
+        : `<button type="button" class="btn-icon flex-shrink-0" data-mark-read-index="${i}" title="ทำเครื่องหมายว่าอ่านแล้ว" aria-label="ทำเครื่องหมายว่าอ่านแล้ว">${icon("check")}</button>`;
       return `
     <div class="flex items-start gap-1 rounded-lg hover:bg-slate-50 ${NOTIFICATION_LEVEL_CLASS[n.level] || ""} ${unreadClass}">
       <a href="${n.link}" class="flex-1 min-w-0 p-3">

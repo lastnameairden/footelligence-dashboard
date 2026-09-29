@@ -64,6 +64,7 @@ import {
 import { isEvaluationComplete } from "./masc-data.js";
 import { applyAttendanceChange, firestoreFieldsForChange, createSaveQueue, rosterLockState } from "./attendance-save.js";
 import { buildRouteHash, parseRouteHash, isValidRouteDate } from "./screen-route.js";
+import { icon } from "./icons.js";
 
 const STATUS_OPTIONS = ["A", "I", "R", "P"];
 const SCORE_OPTIONS = [1, 2, 3, 4];
@@ -596,7 +597,7 @@ async function checkTodayReminders() {
     }
     if (reminders.length === 0) return;
 
-    dailyReminderBanner.innerHTML = '<p class="text-sm font-semibold text-amber-800 mb-1">🔔 สิ่งที่ยังไม่ได้ทำวันนี้</p>';
+    dailyReminderBanner.innerHTML = `<p class="text-sm font-semibold text-amber-800 mb-1">${icon("bell")} สิ่งที่ยังไม่ได้ทำวันนี้</p>`;
     for (const r of reminders) {
       const row = document.createElement("div");
       row.className = "flex items-center justify-between gap-3";
@@ -678,11 +679,11 @@ document.addEventListener("click", (e) => {
   notificationPanel.classList.add("hidden");
 });
 
-function drawerItem(icon, label, onClick) {
+function drawerItem(iconHtml, label, onClick) {
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = "drawer-item";
-  btn.innerHTML = `<span class="drawer-item-icon">${icon}</span><span>${label}</span>`;
+  btn.innerHTML = `<span class="drawer-item-icon">${iconHtml}</span><span>${label}</span>`;
   btn.addEventListener("click", () => {
     closeDrawer();
     onClick();
@@ -743,20 +744,20 @@ function renderDrawerItems() {
       // สวมบทบาทเป็นผู้บริหารทีม (ดูอย่างเดียว) — เมนูเหมือนที่ผู้บริหารทีมจริงเห็นทุกประการ (มีแค่ทาง
       // ไป Dashboard) บวกทางกลับแผงควบคุมผู้ดูแลระบบเพิ่มมาให้ (ผู้บริหารทีมจริงไม่มีปุ่มนี้)
       navDrawerItems.appendChild(drawerSectionLabel(`ผู้บริหารทีม: ${teamLogoImg(myTeam)}${myTeam}`));
-      navDrawerItems.appendChild(drawerItem("📊", "Dashboard", goToDashboard));
+      navDrawerItems.appendChild(drawerItem(icon("bar-chart"), "Dashboard", goToDashboard));
       navDrawerItems.appendChild(drawerDivider());
-      navDrawerItems.appendChild(drawerItem("🛡️", "กลับแผงควบคุมผู้ดูแลระบบ", exitTeamManagementToAdminPanel));
+      navDrawerItems.appendChild(drawerItem(icon("shield"), "กลับแผงควบคุมผู้ดูแลระบบ", exitTeamManagementToAdminPanel));
     } else if (myTeam) {
       navDrawerItems.appendChild(drawerSectionLabel(`จัดการทีม: ${teamLogoImg(myTeam)}${myTeam}`));
-      navDrawerItems.appendChild(drawerItem("📅", "Daily", showDaily));
-      navDrawerItems.appendChild(drawerItem("👤", "เพิ่ม/แก้ไขนักกีฬา", openAddPlayerSection));
-      navDrawerItems.appendChild(drawerItem("✅", "เช็คชื่อ + ให้คะแนน", openCheckinSection));
-      navDrawerItems.appendChild(drawerItem("📝", "รายงานการฝึกซ้อม", openReportSection));
-      navDrawerItems.appendChild(drawerItem("⚽", "รายงานผลการแข่งขัน", openMatchReportSection));
-      navDrawerItems.appendChild(drawerItem("🩹", "รายงานอาการบาดเจ็บ", openInjuryReportSection));
-      navDrawerItems.appendChild(drawerItem("📋", "แผนการฝึกซ้อมรายวัน", openTrainingPlanSection));
+      navDrawerItems.appendChild(drawerItem(icon("calendar"), "Daily", showDaily));
+      navDrawerItems.appendChild(drawerItem(icon("user"), "เพิ่ม/แก้ไขนักกีฬา", openAddPlayerSection));
+      navDrawerItems.appendChild(drawerItem(icon("check-circle"), "เช็คชื่อ + ให้คะแนน", openCheckinSection));
+      navDrawerItems.appendChild(drawerItem(icon("file-text"), "รายงานการฝึกซ้อม", openReportSection));
+      navDrawerItems.appendChild(drawerItem(icon("football"), "รายงานผลการแข่งขัน", openMatchReportSection));
+      navDrawerItems.appendChild(drawerItem(icon("heart-pulse"), "รายงานอาการบาดเจ็บ", openInjuryReportSection));
+      navDrawerItems.appendChild(drawerItem(icon("clipboard-list"), "แผนการฝึกซ้อมรายวัน", openTrainingPlanSection));
       navDrawerItems.appendChild(
-        drawerItem("🧬", "การประเมิน MASC", () => {
+        drawerItem(icon("dna"), "การประเมิน MASC", () => {
           // แนบ ageGroups/coachPosition ไปด้วยถ้ากำลังสวมบทบาทเป็นโค้ชคนใดคนหนึ่งอยู่ (myAgeGroups มีค่า) เพื่อให้
           // masc.html กรองรายชื่อนักกีฬาให้ตรงกับที่โค้ชคนนั้นเห็นจริง เหมือนกับทุกเมนูอื่นในโหมดนี้ — ถ้าเป็นการ
           // จัดการทีมแบบกว้าง (ไม่เจาะจงโค้ช) myAgeGroups จะว่างอยู่แล้ว จึงไม่แนบพารามิเตอร์เพิ่ม เห็นทุกรุ่นเหมือนเดิม
@@ -767,44 +768,44 @@ function renderDrawerItems() {
         })
       );
       navDrawerItems.appendChild(drawerDivider());
-      navDrawerItems.appendChild(drawerItem("🛡️", "กลับแผงควบคุมผู้ดูแลระบบ", exitTeamManagementToAdminPanel));
+      navDrawerItems.appendChild(drawerItem(icon("shield"), "กลับแผงควบคุมผู้ดูแลระบบ", exitTeamManagementToAdminPanel));
     } else {
       navDrawerItems.appendChild(drawerSectionLabel("ผู้ดูแลระบบ"));
-      navDrawerItems.appendChild(drawerItem("👥", "รายชื่อโค้ชในระบบ", openAdminCoachesSection));
-      navDrawerItems.appendChild(drawerItem("🧐", "ตรวจสอบข้อมูลนักกีฬาที่ผิดปกติ", openAdminPlayerAuditSection));
-      navDrawerItems.appendChild(drawerItem("📈", "ความคืบหน้าการประเมินรายวัน", openAdminProgressSection));
-      navDrawerItems.appendChild(drawerItem("📝", "คำขอลงทะเบียนที่รอการอนุมัติ", openAdminApprovalsSection));
-      navDrawerItems.appendChild(drawerItem("⚽", "รายงานผลการแข่งขันทั้งหมด", openAdminMatchesSection));
-      navDrawerItems.appendChild(drawerItem("🩹", "รายงานอาการบาดเจ็บทั้งหมด", openAdminInjuriesSection));
-      navDrawerItems.appendChild(drawerItem("📊", "ดู Dashboard ทีม", openAdminDashboardSection));
-      navDrawerItems.appendChild(drawerItem("🖨️", "พิมพ์สรุป Dashboard", openAdminPrintSection));
-      navDrawerItems.appendChild(drawerItem("📔", "สมุดพกนักกีฬา", openAdminReportCardSection));
-      navDrawerItems.appendChild(drawerItem("🧬", "กำหนดรอบการประเมิน MASC", openAdminMascRoundsSection));
-      navDrawerItems.appendChild(drawerItem("📈", "พัฒนาการนักกีฬา", () => (window.location.href = "./development.html")));
+      navDrawerItems.appendChild(drawerItem(icon("users"), "รายชื่อโค้ชในระบบ", openAdminCoachesSection));
+      navDrawerItems.appendChild(drawerItem(icon("search"), "ตรวจสอบข้อมูลนักกีฬาที่ผิดปกติ", openAdminPlayerAuditSection));
+      navDrawerItems.appendChild(drawerItem(icon("trending-up"), "ความคืบหน้าการประเมินรายวัน", openAdminProgressSection));
+      navDrawerItems.appendChild(drawerItem(icon("file-text"), "คำขอลงทะเบียนที่รอการอนุมัติ", openAdminApprovalsSection));
+      navDrawerItems.appendChild(drawerItem(icon("football"), "รายงานผลการแข่งขันทั้งหมด", openAdminMatchesSection));
+      navDrawerItems.appendChild(drawerItem(icon("heart-pulse"), "รายงานอาการบาดเจ็บทั้งหมด", openAdminInjuriesSection));
+      navDrawerItems.appendChild(drawerItem(icon("bar-chart"), "ดู Dashboard ทีม", openAdminDashboardSection));
+      navDrawerItems.appendChild(drawerItem(icon("printer"), "พิมพ์สรุป Dashboard", openAdminPrintSection));
+      navDrawerItems.appendChild(drawerItem(icon("book"), "สมุดพกนักกีฬา", openAdminReportCardSection));
+      navDrawerItems.appendChild(drawerItem(icon("dna"), "กำหนดรอบการประเมิน MASC", openAdminMascRoundsSection));
+      navDrawerItems.appendChild(drawerItem(icon("trending-up"), "พัฒนาการนักกีฬา", () => (window.location.href = "./development.html")));
       navDrawerItems.appendChild(drawerDivider());
-      navDrawerItems.appendChild(drawerItem("🏠", "หน้า Dashboard หลัก", goToDashboard));
+      navDrawerItems.appendChild(drawerItem(icon("home"), "หน้า Dashboard หลัก", goToDashboard));
     }
     return;
   }
 
   if (myTeam) {
     navDrawerItems.appendChild(drawerSectionLabel(`ทีม: ${teamLogoImg(myTeam)}${myTeam}`));
-    navDrawerItems.appendChild(drawerItem("📅", "Daily", showDaily));
-    navDrawerItems.appendChild(drawerItem("👤", "เพิ่ม/แก้ไขนักกีฬา", openAddPlayerSection));
-    navDrawerItems.appendChild(drawerItem("✅", "เช็คชื่อ + ให้คะแนน", openCheckinSection));
-    navDrawerItems.appendChild(drawerItem("📝", "รายงานการฝึกซ้อม", openReportSection));
-    navDrawerItems.appendChild(drawerItem("⚽", "รายงานผลการแข่งขัน", openMatchReportSection));
-    navDrawerItems.appendChild(drawerItem("🩹", "รายงานอาการบาดเจ็บ", openInjuryReportSection));
-    navDrawerItems.appendChild(drawerItem("📋", "แผนการฝึกซ้อมรายวัน", openTrainingPlanSection));
-    navDrawerItems.appendChild(drawerItem("🧬", "การประเมิน MASC", () => (window.location.href = "./masc.html")));
+    navDrawerItems.appendChild(drawerItem(icon("calendar"), "Daily", showDaily));
+    navDrawerItems.appendChild(drawerItem(icon("user"), "เพิ่ม/แก้ไขนักกีฬา", openAddPlayerSection));
+    navDrawerItems.appendChild(drawerItem(icon("check-circle"), "เช็คชื่อ + ให้คะแนน", openCheckinSection));
+    navDrawerItems.appendChild(drawerItem(icon("file-text"), "รายงานการฝึกซ้อม", openReportSection));
+    navDrawerItems.appendChild(drawerItem(icon("football"), "รายงานผลการแข่งขัน", openMatchReportSection));
+    navDrawerItems.appendChild(drawerItem(icon("heart-pulse"), "รายงานอาการบาดเจ็บ", openInjuryReportSection));
+    navDrawerItems.appendChild(drawerItem(icon("clipboard-list"), "แผนการฝึกซ้อมรายวัน", openTrainingPlanSection));
+    navDrawerItems.appendChild(drawerItem(icon("dna"), "การประเมิน MASC", () => (window.location.href = "./masc.html")));
     navDrawerItems.appendChild(drawerDivider());
-    navDrawerItems.appendChild(drawerItem("📊", "Dashboard", goToDashboard));
+    navDrawerItems.appendChild(drawerItem(icon("bar-chart"), "Dashboard", goToDashboard));
     return;
   }
 
   // ผู้บริหารทีม (ดูข้อมูลอย่างเดียว ไม่มีเครื่องมือจัดการทีม) หรือกรณีอื่นที่ยังไม่ทราบทีม
   navDrawerItems.appendChild(drawerSectionLabel("เมนู"));
-  navDrawerItems.appendChild(drawerItem("📊", "Dashboard", goToDashboard));
+  navDrawerItems.appendChild(drawerItem(icon("bar-chart"), "Dashboard", goToDashboard));
 }
 
 function populateTeamSelect(selectEl, placeholder) {
@@ -1279,11 +1280,11 @@ function renderMascProgressBody(teamPlayers, statusByPlayerId) {
           </summary>
           <div class="masc-progress-columns">
             <div>
-              <p class="masc-progress-col-title">✅ ประเมินครบแล้ว (${done.length})</p>
+              <p class="masc-progress-col-title">${icon("check-circle")} ประเมินครบแล้ว (${done.length})</p>
               <div class="masc-progress-names">${doneChips}</div>
             </div>
             <div>
-              <p class="masc-progress-col-title">⏳ ยังไม่ประเมิน / ยังไม่ครบ (${partial.length + notStarted.length})</p>
+              <p class="masc-progress-col-title">${icon("clock")} ยังไม่ประเมิน / ยังไม่ครบ (${partial.length + notStarted.length})</p>
               <div class="masc-progress-names">${pendingChips}</div>
             </div>
           </div>
@@ -1923,9 +1924,9 @@ function renderCoachPlanTrendChart(planTrend) {
 }
 
 function dailyConsistencyBadge(status) {
-  if (status === "onTime") return '<span class="badge badge-success">✅ ตรงเวลา</span>';
-  if (status === "late") return '<span class="badge badge-warning">⚠️ สาย</span>';
-  return '<span class="badge badge-danger">❌ ไม่ได้ส่ง</span>';
+  if (status === "onTime") return `<span class="badge badge-success">${icon("check-circle")} ตรงเวลา</span>`;
+  if (status === "late") return `<span class="badge badge-warning">${icon("alert-triangle")} สาย</span>`;
+  return `<span class="badge badge-danger">${icon("x-circle")} ไม่ได้ส่ง</span>`;
 }
 
 // ตารางตรวจความสอดคล้องรายวัน: แผนฝึกซ้อม/เช็คชื่อ+ให้คะแนน/รายงานการฝึกซ้อม ของโค้ชคนเดียวกันควรทำครบทั้ง 3
@@ -1964,7 +1965,7 @@ function renderDailyConsistencyTable(dailyConsistency) {
         <tbody>${rows}</tbody>
       </table>
     </div>
-    <p class="text-xs text-slate-400 mt-1">🔴 แถวสีแดง = วันที่ทำ 3 อย่างไม่สอดคล้องกัน (ทำบางอย่างแต่ขาดอย่างอื่น หรือส่งสายไม่พร้อมกัน)</p>
+    <p class="text-xs text-slate-400 mt-1"><span class="inline-block w-2.5 h-2.5 rounded-sm align-middle" style="background:#ef4444"></span> แถวสีแดง = วันที่ทำ 3 อย่างไม่สอดคล้องกัน (ทำบางอย่างแต่ขาดอย่างอื่น หรือส่งสายไม่พร้อมกัน)</p>
   `;
 }
 
@@ -2960,7 +2961,7 @@ async function loadExecutiveNotes(team, listEl) {
 
     listEl.innerHTML = notes
       .map((n) => {
-        const typeIcon = n.type === "player" ? "⭐" : n.type === "coach" ? "⚠️" : "📌";
+        const typeIcon = n.type === "player" ? icon("star") : n.type === "coach" ? icon("alert-triangle") : icon("pin");
         const postedAt =
           n.createdAt && typeof n.createdAt.toDate === "function"
             ? n.createdAt.toDate().toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" })
@@ -2968,7 +2969,7 @@ async function loadExecutiveNotes(team, listEl) {
         const unreadBadge = n.read ? "" : '<span class="badge badge-info">ใหม่</span>';
         const readBtn = n.read
           ? ""
-          : `<button type="button" class="btn btn-ghost btn-sm mt-2" data-mark-read-id="${n.id}">✓ ทำเครื่องหมายว่าอ่านแล้ว</button>`;
+          : `<button type="button" class="btn btn-ghost btn-sm mt-2" data-mark-read-id="${n.id}">${icon("check")} ทำเครื่องหมายว่าอ่านแล้ว</button>`;
         return `
           <div class="card card-pad${n.read ? "" : " border-2 border-blue-200"}">
             <div class="flex items-center justify-between gap-2 flex-wrap">
@@ -5225,7 +5226,7 @@ function renderTrainingPlanFileStatusText() {
     return;
   }
   if (trainingPlanExistingFileUrl && !trainingPlanRemoveExistingFile) {
-    trainingPlanFileStatus.innerHTML = `📎 ไฟล์ที่แนบไว้: <a href="${trainingPlanExistingFileUrl}" target="_blank" rel="noopener" class="text-blue-600 hover:underline">${trainingPlanExistingFileName ?? "เปิดไฟล์"}</a> `;
+    trainingPlanFileStatus.innerHTML = `${icon("paperclip")} ไฟล์ที่แนบไว้: <a href="${trainingPlanExistingFileUrl}" target="_blank" rel="noopener" class="text-blue-600 hover:underline">${trainingPlanExistingFileName ?? "เปิดไฟล์"}</a> `;
     const removeBtn = document.createElement("button");
     removeBtn.type = "button";
     removeBtn.className = "btn btn-ghost-danger btn-sm";
@@ -5340,8 +5341,8 @@ async function deleteTrainingPlan(plan) {
 function trainingPlanSubmissionStatus(plan) {
   if (!plan.updatedAt || !plan.date) return "-";
   return isTrainingPlanLate(plan)
-    ? '<span class="badge badge-warning">⏱ เลท</span>'
-    : '<span class="badge badge-success">✅ ตรงเวลา</span>';
+    ? '<span class="badge badge-warning">${icon("clock")} เลท</span>'
+    : `<span class="badge badge-success">${icon("check-circle")} ตรงเวลา</span>`;
 }
 
 // นับจำนวนครั้งที่ส่งสายในเดือนปัจจุบัน (ตามวันที่ในแผน ไม่ใช่วันที่ส่งจริง) ใช้เตือนโค้ชเมื่อเกินเกณฑ์
@@ -5380,7 +5381,7 @@ async function renderTrainingPlanList() {
   for (const plan of plans) {
     const tr = document.createElement("tr");
     const fileCell = plan.fileUrl
-      ? `<a href="${plan.fileUrl}" target="_blank" rel="noopener" class="text-blue-600 hover:underline">📎 เปิดไฟล์</a>`
+      ? `<a href="${plan.fileUrl}" target="_blank" rel="noopener" class="text-blue-600 hover:underline">${icon("paperclip")} เปิดไฟล์</a>`
       : "-";
     tr.innerHTML = `
       <td class="emphasis">${escapeHtml(plan.date ?? "-")}</td>

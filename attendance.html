@@ -22,13 +22,13 @@
       </div>
       <div class="relative">
         <button id="notification-bell-btn" class="hidden btn-icon" aria-label="การแจ้งเตือน" title="การแจ้งเตือน">
-          🔔
+          <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
           <span id="notification-badge" class="hidden absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-red-500 border-2 border-slate-900"></span>
         </button>
         <div id="notification-panel" class="hidden absolute right-0 mt-2 w-80 max-w-[90vw] bg-white rounded-xl shadow-2xl border border-slate-100 z-50 max-h-[70vh] overflow-y-auto text-slate-900">
           <div class="p-3 border-b border-slate-100 flex items-center justify-between">
             <h3 class="font-semibold text-sm">การแจ้งเตือน</h3>
-            <button id="notification-refresh-btn" type="button" class="btn-icon" aria-label="รีเฟรช" title="รีเฟรช">🔄</button>
+            <button id="notification-refresh-btn" type="button" class="btn-icon" aria-label="รีเฟรช" title="รีเฟรช"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 4v6h-6"/></svg></button>
           </div>
           <div id="notification-list" class="p-2">
             <p class="text-slate-400 text-sm text-center py-6">กำลังโหลด...</p>
@@ -46,7 +46,7 @@
         <img src="./assets/logo.png" alt="Footelligence" class="w-8 h-8 object-contain" />
         <span class="font-bold text-slate-900">FOOTELLIGENCE DATA</span>
       </div>
-      <button id="nav-drawer-close-btn" class="btn-icon" aria-label="ปิดเมนู">✕</button>
+      <button id="nav-drawer-close-btn" class="btn-icon" aria-label="ปิดเมนู"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </div>
     <div class="px-4 py-3 border-b border-slate-100 bg-slate-50">
       <p id="nav-drawer-name" class="text-sm font-semibold text-slate-900 truncate"></p>
@@ -190,7 +190,7 @@
     <!-- ข้อความสำหรับผู้บริหารทีม: ให้ดูข้อมูลที่หน้า Dashboard เท่านั้น -->
     <section id="executive-section" class="hidden space-y-6">
       <div class="page-heading">
-        <div class="icon-badge icon-badge-lg">📊</div>
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M4 20V10M10 20V4M16 20v-7M4 20h16"/></svg></div>
         <div>
           <h2>สรุปภาพรวมทีมประจำเดือนนี้</h2>
           <p id="executive-status" class="text-sm text-slate-500">กำลังโหลดข้อมูล...</p>
@@ -200,20 +200,20 @@
       <div id="executive-stat-cards" class="grid grid-cols-2 sm:grid-cols-4 gap-4"></div>
 
       <div id="executive-late-warning" class="hidden card card-pad border-2 border-red-200 bg-red-50">
-        <p class="font-semibold text-red-700">⚠️ เดือนนี้มีโค้ชที่ส่งแผนการฝึกซ้อมสายเกินเกณฑ์ <span id="executive-late-count">0</span> คน</p>
+        <p class="font-semibold text-red-700"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4"/><path d="M12 17h.01"/></svg> เดือนนี้มีโค้ชที่ส่งแผนการฝึกซ้อมสายเกินเกณฑ์ <span id="executive-late-count">0</span> คน</p>
         <p id="executive-late-detail" class="text-sm text-red-600 mt-1"></p>
       </div>
 
       <!-- สรุปการทำงานของโค้ชแต่ละคนในทีมประจำเดือนนี้ (เช็คชื่อ/รายงานการฝึกซ้อม/แผนการฝึกซ้อม) แยกรายคน
       ต่างจากสถิติรวมทั้งทีมด้านบน — ให้ผู้บริหารทีมเห็นได้เองว่าใครทำงานสม่ำเสมอ/ใครยังไม่ได้ส่งอะไรบ้าง -->
       <div>
-        <h2 class="section-title mb-3"><span class="icon-badge">🧑‍🏫</span> สรุปการทำงานของโค้ชแต่ละคนประจำเดือนนี้</h2>
+        <h2 class="section-title mb-3"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><circle cx="17.5" cy="9" r="2.6"/><path d="M15.5 14.3c2.8.4 4.5 2.3 4.5 5.7"/></svg></span> สรุปการทำงานของโค้ชแต่ละคนประจำเดือนนี้</h2>
         <div id="executive-coach-summary"><p class="text-sm text-slate-400">กำลังโหลด...</p></div>
       </div>
 
       <!-- ข้อความที่ผู้ดูแลระบบส่งถึงทีมนี้โดยตรง (เช่น แจ้งนักกีฬาที่มีพัฒนาการดี หรือแจ้งปัญหาของโค้ช) -->
       <div id="executive-notes-section">
-        <h2 class="section-title mb-3"><span class="icon-badge">📬</span> ข้อความจากผู้ดูแลระบบ</h2>
+        <h2 class="section-title mb-3"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg></span> ข้อความจากผู้ดูแลระบบ</h2>
         <div id="executive-notes-list" class="space-y-3">
           <p class="text-sm text-slate-400">กำลังโหลด...</p>
         </div>
@@ -231,7 +231,7 @@
     <div id="coach-bar" class="hidden card card-pad">
       <div class="flex items-start justify-between flex-wrap gap-4">
         <div class="flex items-center gap-4">
-          <div class="icon-badge icon-badge-lg">👤</div>
+          <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c0-4.1 3.4-7 7.5-7s7.5 2.9 7.5 7"/></svg></div>
           <div>
             <div class="flex items-center gap-2 flex-wrap">
               <span id="coach-name" class="text-lg font-semibold text-slate-900"></span>
@@ -263,7 +263,7 @@
     <section id="admin-coaches-section" class="hidden space-y-6">
       <button data-admin-back class="btn btn-ghost px-0">← กลับหน้า Dashboard</button>
       <div class="page-heading">
-        <div class="icon-badge icon-badge-lg">👥</div>
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><circle cx="17.5" cy="9" r="2.6"/><path d="M15.5 14.3c2.8.4 4.5 2.3 4.5 5.7"/></svg></div>
         <div>
           <h2>รายชื่อโค้ชในระบบ</h2>
           <p>ดูโค้ชทั้งหมด สถานะ % ส่งข้อมูลตรงเวลา และแก้ไขข้อมูลบัญชีได้</p>
@@ -281,7 +281,7 @@
     <section id="admin-player-audit-section" class="hidden space-y-6">
       <button data-admin-back class="btn btn-ghost px-0">← กลับหน้า Dashboard</button>
       <div class="page-heading">
-        <div class="icon-badge icon-badge-lg">🧐</div>
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></div>
         <div>
           <h2>ตรวจสอบข้อมูลนักกีฬาที่ผิดปกติ</h2>
           <p id="player-audit-status">กำลังโหลด...</p>
@@ -312,7 +312,7 @@
       <div class="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col">
         <div class="flex items-center justify-between p-6 pb-4 border-b border-slate-100 flex-shrink-0">
           <h3 class="text-lg font-semibold">แก้ไขบัญชีผู้ใช้</h3>
-          <button id="edit-coach-close-btn" class="btn-icon" aria-label="ปิด">✕</button>
+          <button id="edit-coach-close-btn" class="btn-icon" aria-label="ปิด"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M6 6l12 12M18 6 6 18"/></svg></button>
         </div>
         <div class="p-6 overflow-y-auto flex-1 space-y-3">
           <div>
@@ -398,7 +398,7 @@
           </div>
           <div class="pt-3 border-t border-slate-100">
             <button id="edit-coach-reset-password-btn" type="button" class="btn btn-secondary btn-block">
-              ✉️ ส่งอีเมลรีเซ็ตรหัสผ่านให้บัญชีนี้
+              <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg> ส่งอีเมลรีเซ็ตรหัสผ่านให้บัญชีนี้
             </button>
             <p class="text-xs text-slate-400 mt-1">
               ใช้เมื่อโค้ชลืมรหัสผ่าน — ระบบจะส่งลิงก์ตั้งรหัสผ่านใหม่ไปที่อีเมลของบัญชีนี้โดยตรง ปลอดภัยกว่าการตั้งรหัสผ่านให้เอง
@@ -406,7 +406,7 @@
           </div>
           <div class="pt-3 border-t border-slate-100">
             <button id="edit-coach-delete-btn" type="button" class="btn btn-danger-soft btn-block">
-              🗑️ ลบบัญชีนี้ออกจากระบบ
+              <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg> ลบบัญชีนี้ออกจากระบบ
             </button>
             <p class="text-xs text-slate-400 mt-1">
               ลบข้อมูลบัญชีนี้ออกจากระบบถาวร (ไม่สามารถย้อนกลับได้) — ใช้เมื่อโค้ช/ผู้บริหารทีมคนนี้ไม่ได้ทำงานร่วมกับอคาเดมีแล้ว
@@ -431,7 +431,7 @@
       <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
         <div class="flex items-center justify-between p-6 pb-4 border-b border-slate-100 flex-shrink-0">
           <h3 id="coach-plan-detail-title" class="text-lg font-semibold">รายละเอียดแผนการฝึกซ้อม</h3>
-          <button id="coach-plan-detail-close-btn" class="btn-icon" aria-label="ปิด">✕</button>
+          <button id="coach-plan-detail-close-btn" class="btn-icon" aria-label="ปิด"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M6 6l12 12M18 6 6 18"/></svg></button>
         </div>
         <div id="coach-plan-detail-body" class="p-6 overflow-y-auto flex-1 space-y-2 text-sm"></div>
       </div>
@@ -442,7 +442,7 @@
       <button data-admin-back class="btn btn-ghost px-0">← กลับหน้า Dashboard</button>
       <div class="flex items-center justify-between mb-3 flex-wrap gap-3">
         <div class="page-heading mb-0">
-          <div class="icon-badge icon-badge-lg">📊</div>
+          <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M4 20V10M10 20V4M16 20v-7M4 20h16"/></svg></div>
           <div>
             <h2>ความคืบหน้าการประเมินรายวัน</h2>
             <p>ตรวจสอบว่าแต่ละทีมประเมินนักกีฬาครบแล้วหรือยัง</p>
@@ -484,7 +484,7 @@
     <section id="admin-approvals-section" class="hidden space-y-6">
       <button data-admin-back class="btn btn-ghost px-0">← กลับหน้า Dashboard</button>
       <div class="page-heading">
-        <div class="icon-badge icon-badge-lg">📝</div>
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M7 3h7l4 4v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M14 3v4h4"/><path d="M8.5 12.5h7M8.5 16h7"/></svg></div>
         <div>
           <h2>คำขอลงทะเบียนที่รอการอนุมัติ</h2>
           <p>อนุมัติหรือปฏิเสธผู้ลงทะเบียนใหม่ พร้อมกำหนดทีม</p>
@@ -512,7 +512,7 @@
     <section id="admin-matches-section" class="hidden space-y-6">
       <button data-admin-back class="btn btn-ghost px-0">← กลับหน้า Dashboard</button>
       <div class="page-heading">
-        <div class="icon-badge icon-badge-lg">⚽</div>
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><circle cx="12" cy="12" r="9"/><path d="m12 7 3 2.2-1.1 3.6h-3.8L9 9.2 12 7Z"/><path d="M12 3v4M4.5 9l3.3 1M5 16.3l3-2.2M19.5 9l-3.3 1M19 16.3l-3-2.2M9.2 20l1.5-3.2M14.8 20l-1.5-3.2"/></svg></div>
         <div>
           <h2>รายงานผลการแข่งขันทั้งหมด</h2>
           <p>ดูผลการแข่งขันของทุกทีมในที่เดียว</p>
@@ -543,7 +543,7 @@
     <section id="admin-injuries-section" class="hidden space-y-6">
       <button data-admin-back class="btn btn-ghost px-0">← กลับหน้า Dashboard</button>
       <div class="page-heading">
-        <div class="icon-badge icon-badge-lg">🩹</div>
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M20 8.5c0 4-4 6.5-8 9.5-4-3-8-5.5-8-9.5A4.5 4.5 0 0 1 8.5 4c1.4 0 2.7.7 3.5 1.8C12.8 4.7 14.1 4 15.5 4A4.5 4.5 0 0 1 20 8.5Z"/><path d="M4.5 10H8l1.5-3L12 12l1.5-4 1 2h4.5"/></svg></div>
         <div>
           <h2>รายงานอาการบาดเจ็บทั้งหมด</h2>
           <p>ดูอาการบาดเจ็บของนักกีฬาทุกทีมในที่เดียว</p>
@@ -574,7 +574,7 @@
     <section id="admin-manage-team-section" class="hidden space-y-6">
       <button data-admin-back class="btn btn-ghost px-0">← กลับหน้า Dashboard</button>
       <div class="page-heading">
-        <div class="icon-badge icon-badge-lg">🗂️</div>
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M3 6a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6Z"/></svg></div>
         <div>
           <h2>จัดการข้อมูลทีม</h2>
           <p>เลือกทีมที่ต้องการจัดการ แล้วเลือกว่าจะเข้าดูในโหมดโค้ชหรือโหมดผู้บริหารทีม</p>
@@ -586,7 +586,7 @@
           <select id="admin-team-select" class="field-input w-full"></select>
         </div>
         <button id="admin-select-team-btn" class="btn btn-primary btn-block">จัดการข้อมูลทีมนี้ (โหมดโค้ช) →</button>
-        <button id="admin-select-team-executive-btn" class="btn btn-secondary btn-block">👔 ดูในโหมดผู้บริหารทีม →</button>
+        <button id="admin-select-team-executive-btn" class="btn btn-secondary btn-block"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><rect x="3" y="7" width="18" height="12" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg> ดูในโหมดผู้บริหารทีม →</button>
       </div>
     </section>
 
@@ -594,7 +594,7 @@
     <section id="admin-dashboard-section" class="hidden space-y-6">
       <button data-admin-back class="btn btn-ghost px-0">← กลับหน้า Dashboard</button>
       <div class="page-heading">
-        <div class="icon-badge icon-badge-lg">📈</div>
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="m3 17 6-6 4 4 8-9"/><path d="M15 6h6v6"/></svg></div>
         <div>
           <h2>ดู Dashboard ทีม</h2>
           <p>เลือกทีมที่ต้องการดูภาพรวมข้อมูลนักกีฬาและผลการประเมิน หรือเลือก "ทุกทีม" เพื่อดูภาพรวมทั้งหมด</p>
@@ -613,7 +613,7 @@
     <section id="admin-print-section" class="hidden space-y-6">
       <button data-admin-back class="btn btn-ghost px-0">← กลับหน้า Dashboard</button>
       <div class="page-heading">
-        <div class="icon-badge icon-badge-lg">🖨️</div>
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><rect x="6" y="9" width="12" height="7" rx="1"/><path d="M6 9V4h12v5"/><path d="M8 16v4h8v-4"/></svg></div>
         <div>
           <h2>พิมพ์สรุป Dashboard</h2>
           <p>เลือกทีมและรุ่นอายุที่ต้องการ แล้วสร้างสรุปสำหรับพิมพ์หรือบันทึกเป็น PDF</p>
@@ -656,7 +656,7 @@
     <section id="admin-report-card-section" class="hidden space-y-6">
       <button data-admin-back class="btn btn-ghost px-0">← กลับหน้า Dashboard</button>
       <div class="page-heading">
-        <div class="icon-badge icon-badge-lg">📔</div>
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M6 4h11a2 2 0 0 1 2 2v13a1 1 0 0 1-1 1H8a2 2 0 0 1-2-2V4Z"/><path d="M6 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2"/><path d="M9 8h6"/></svg></div>
         <div>
           <h2>สมุดพกนักกีฬา</h2>
           <p>เลือกทีม รุ่นอายุ และช่วงเวลา แล้วสร้างสมุดพกสำหรับพิมพ์ส่งผู้ปกครองทั้งชุด</p>
@@ -705,7 +705,7 @@
     <section id="admin-masc-rounds-section" class="hidden space-y-6">
       <button data-admin-back class="btn btn-ghost px-0">← กลับหน้า Dashboard</button>
       <div class="page-heading">
-        <div class="icon-badge icon-badge-lg">🧬</div>
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M7 3c0 4 10 4 10 8s-10 4-10 8"/><path d="M17 3c0 4-10 4-10 8s10 4 10 8"/><path d="M8 7h8M8 12h8M8 17h8"/></svg></div>
         <div>
           <h2>กำหนดรอบการประเมิน MASC</h2>
           <p>ตั้งช่วงวันที่ให้โค้ชดำเนินการประเมิน MASC — เริ่มรอบแล้วระบบจะแจ้งเตือนไปยังทุกทีมโดยอัตโนมัติ</p>
@@ -715,7 +715,7 @@
         <!-- โหมด "สร้างรอบแก้ไข" — ล็อกช่วงที่ไว้กับรอบเดิมที่เลือกจากตารางประวัติด้านล่าง พร้อมสรุปว่ารุ่นไหนของทีม
              ไหนยังประเมินไม่ครบ ให้ผู้ดูแลระบบตัดสินใจก่อนกำหนดวันที่ใหม่ (ซ่อนไว้ปกติ แสดงเมื่อกด "สร้างรอบแก้ไข") -->
         <div id="admin-masc-round-correction-note" class="hidden card card-warning card-pad text-sm space-y-2">
-          <p class="font-semibold text-amber-800">🔁 กำลังสร้างรอบแก้ไขสำหรับ <span id="admin-masc-round-correction-label"></span></p>
+          <p class="font-semibold text-amber-800"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 4v6h-6"/></svg> กำลังสร้างรอบแก้ไขสำหรับ <span id="admin-masc-round-correction-label"></span></p>
           <div id="admin-masc-round-correction-summary" class="text-xs text-amber-800"></div>
           <button type="button" id="admin-masc-round-correction-cancel" class="btn btn-ghost btn-sm px-0">ยกเลิก กลับไปสร้างรอบใหม่ตามปกติ</button>
         </div>
@@ -743,7 +743,7 @@
         <p id="admin-masc-round-status" class="text-sm text-red-600 w-full"></p>
       </div>
       <div>
-        <h2 class="section-title mb-3"><span class="icon-badge">📋</span> ประวัติรอบการประเมิน</h2>
+        <h2 class="section-title mb-3"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/><path d="M9 11h6M9 15h6M9 19h3"/></svg></span> ประวัติรอบการประเมิน</h2>
         <div class="card table-wrap">
           <table class="pro-table">
             <thead>
@@ -764,7 +764,7 @@
 
       <!-- ความคืบหน้าการประเมินแยกทีม/รุ่น — ดูได้ทีละทีม แต่ละรุ่นคลิกเปิด/ปิดดูรายชื่อได้ -->
       <div>
-        <h2 class="section-title mb-3"><span class="icon-badge">✅</span> ความคืบหน้าการประเมินรายทีม</h2>
+        <h2 class="section-title mb-3"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.3 2.3L16 10"/></svg></span> ความคืบหน้าการประเมินรายทีม</h2>
         <div class="card card-pad space-y-3">
           <div class="max-w-sm">
             <label class="field-label">ดูความคืบหน้าของรอบ</label>
@@ -784,7 +784,7 @@
     <section id="add-player-section" class="hidden space-y-6">
       <button data-back class="btn btn-ghost px-0">← กลับหน้า Daily</button>
       <div class="card card-pad">
-        <h2 class="section-title mb-4"><span class="icon-badge">➕</span> เพิ่มข้อมูลนักกีฬา</h2>
+        <h2 class="section-title mb-4"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M18 8v4M16 10h4"/></svg></span> เพิ่มข้อมูลนักกีฬา</h2>
         <form id="add-player-form" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label class="field-label">เบอร์/ลำดับ</label>
@@ -867,7 +867,7 @@
       </div>
 
       <div>
-        <h2 class="section-title mb-3"><span class="icon-badge">👤</span> รายชื่อนักกีฬาในทีม</h2>
+        <h2 class="section-title mb-3"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c0-4.1 3.4-7 7.5-7s7.5 2.9 7.5 7"/></svg></span> รายชื่อนักกีฬาในทีม</h2>
         <div class="card table-wrap">
           <table class="pro-table">
             <thead>
@@ -894,7 +894,7 @@
       <button data-back class="btn btn-ghost px-0">← กลับหน้า Daily</button>
 
       <div class="page-heading">
-        <div class="icon-badge icon-badge-lg">✅</div>
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.3 2.3L16 10"/></svg></div>
         <div>
           <h2>เช็คชื่อการฝึกซ้อม</h2>
           <p>เลือกวันที่ฝึกซ้อม แล้วบันทึกสถานะและให้คะแนนผู้เล่นแต่ละคน</p>
@@ -907,24 +907,24 @@
           <input id="session-date" type="date" class="field-input" />
         </div>
         <button id="load-session-btn" class="btn btn-primary">โหลด / สร้างวันซ้อมนี้</button>
-        <button id="view-session-btn" class="btn btn-secondary">🔍 เรียกดู (ไม่สร้างวันซ้อมใหม่)</button>
+        <button id="view-session-btn" class="btn btn-secondary"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg> เรียกดู (ไม่สร้างวันซ้อมใหม่)</button>
         <button id="mark-no-training-btn" class="btn btn-warning-soft">วันนี้ไม่มีฝึกซ้อม</button>
         <p id="attendance-status" class="text-sm text-slate-500 w-full">เลือกวันที่แล้วกดปุ่ม เพื่อเริ่มเช็คชื่อ</p>
       </div>
 
       <!-- แสดงเมื่อวันที่เลือกถูกทำเครื่องหมายว่าไม่มีฝึกซ้อม -->
       <div id="no-training-banner" class="hidden card card-warning card-pad flex items-center justify-between">
-        <p class="text-sm text-amber-800">📌 วันนี้ถูกบันทึกว่า <strong>ไม่มีฝึกซ้อม</strong></p>
+        <p class="text-sm text-amber-800"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M12 21s7-6.5 7-11.5A7 7 0 0 0 5 9.5C5 14.5 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.3"/></svg> วันนี้ถูกบันทึกว่า <strong>ไม่มีฝึกซ้อม</strong></p>
         <button id="undo-no-training-btn" class="btn btn-ghost px-0">ยกเลิก (มีฝึกซ้อมจริง)</button>
       </div>
 
       <!-- แสดงเมื่อประเมินนักกีฬาครบทุกคนแล้วในวันฝึกซ้อมนั้น (ยังแก้ไขได้จนสิ้นวัน แล้วระบบจะล็อกเอง) -->
       <div id="roster-complete-banner" class="hidden card card-success card-pad">
-        <p class="text-sm text-emerald-800">✅ ประเมินนักกีฬาครบทุกคนแล้ว — ยังแก้ไขได้จนสิ้นวันนี้ (เวลาไทย) หลังจากนั้นระบบจะล็อกเป็นดูอย่างเดียวให้เอง</p>
+        <p class="text-sm text-emerald-800"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.3 2.3L16 10"/></svg> ประเมินนักกีฬาครบทุกคนแล้ว — ยังแก้ไขได้จนสิ้นวันนี้ (เวลาไทย) หลังจากนั้นระบบจะล็อกเป็นดูอย่างเดียวให้เอง</p>
       </div>
       <!-- แสดงเมื่อประเมินครบทุกคนและพ้นวันฝึกซ้อมนั้นแล้ว (โค้ชแก้ไขต่อไม่ได้ ดูได้อย่างเดียว) -->
       <div id="roster-locked-banner" class="hidden card card-success card-pad flex items-center justify-between">
-        <p class="text-sm text-emerald-800">🔒 ประเมินนักกีฬาครบทุกคนและพ้นวันฝึกซ้อมแล้ว — ข้อมูลถูกล็อกเพื่อความถูกต้อง ดูได้อย่างเดียว (ติดต่อผู้ดูแลระบบหากต้องการแก้ไข)</p>
+        <p class="text-sm text-emerald-800"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg> ประเมินนักกีฬาครบทุกคนและพ้นวันฝึกซ้อมแล้ว — ข้อมูลถูกล็อกเพื่อความถูกต้อง ดูได้อย่างเดียว (ติดต่อผู้ดูแลระบบหากต้องการแก้ไข)</p>
       </div>
 
       <p class="text-xs text-slate-400 -mb-2">เกณฑ์การให้คะแนนแต่ละด้าน: 1=แย่ 2=ปานกลาง 3=ดี 4=ยอดเยี่ยม</p>
@@ -953,7 +953,7 @@
       <button data-back class="btn btn-ghost px-0">← กลับหน้า Daily</button>
 
       <div class="page-heading">
-        <div class="icon-badge icon-badge-lg">📝</div>
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M7 3h7l4 4v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M14 3v4h4"/><path d="M8.5 12.5h7M8.5 16h7"/></svg></div>
         <div>
           <h2>รายงานการฝึกซ้อม</h2>
           <p>ระบุรายชื่อนักกีฬาที่ไม่ได้เข้าซ้อมในวันนี้</p>
@@ -975,7 +975,7 @@
         <p id="report-summary-text" class="text-sm text-emerald-700 font-medium"></p>
         <div id="report-summary-details" class="text-sm text-slate-600 space-y-1"></div>
         <div id="report-summary-photos" class="flex flex-wrap gap-2"></div>
-        <button type="button" id="report-edit-btn" class="btn btn-secondary btn-sm">✏️ แก้ไขรายงาน</button>
+        <button type="button" id="report-edit-btn" class="btn btn-secondary btn-sm"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M4 20h4L18 10l-4-4L4 16v4Z"/><path d="m14.5 5.5 4 4"/></svg> แก้ไขรายงาน</button>
       </div>
 
       <form id="report-form" class="card card-pad space-y-6 hidden">
@@ -1014,7 +1014,7 @@
       <button data-back class="btn btn-ghost px-0">← กลับหน้า Daily</button>
 
       <div class="page-heading">
-        <div class="icon-badge icon-badge-lg">🏆</div>
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M8 4h8v4a4 4 0 0 1-8 0V4Z"/><path d="M8 5H5a1 1 0 0 0-1 1c0 2 1.5 3.5 3.5 3.8"/><path d="M16 5h3a1 1 0 0 1 1 1c0 2-1.5 3.5-3.5 3.8"/><path d="M12 12v3"/><path d="M8 20h8"/><path d="M9 17h6l1 3H8l1-3Z"/></svg></div>
         <div>
           <h2>รายงานผลการแข่งขัน</h2>
           <p>บันทึกผลการแข่งขัน คู่แข่ง และรายการแข่งขันของทีม</p>
@@ -1104,7 +1104,7 @@
       </div>
 
       <div>
-        <h2 class="section-title mb-3"><span class="icon-badge">📋</span> ประวัติผลการแข่งขัน</h2>
+        <h2 class="section-title mb-3"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/><path d="M9 11h6M9 15h6M9 19h3"/></svg></span> ประวัติผลการแข่งขัน</h2>
         <div class="card table-wrap">
           <table class="pro-table">
             <thead>
@@ -1132,7 +1132,7 @@
       <button data-back class="btn btn-ghost px-0">← กลับหน้า Daily</button>
 
       <div class="page-heading">
-        <div class="icon-badge icon-badge-lg">🩹</div>
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M20 8.5c0 4-4 6.5-8 9.5-4-3-8-5.5-8-9.5A4.5 4.5 0 0 1 8.5 4c1.4 0 2.7.7 3.5 1.8C12.8 4.7 14.1 4 15.5 4A4.5 4.5 0 0 1 20 8.5Z"/><path d="M4.5 10H8l1.5-3L12 12l1.5-4 1 2h4.5"/></svg></div>
         <div>
           <h2>รายงานอาการบาดเจ็บ</h2>
           <p>บันทึกอาการบาดเจ็บของนักกีฬา ความรุนแรง และสถานะการพักฟื้น</p>
@@ -1209,7 +1209,7 @@
       </div>
 
       <div>
-        <h2 class="section-title mb-3"><span class="icon-badge">📋</span> รายชื่อนักกีฬาที่บาดเจ็บ</h2>
+        <h2 class="section-title mb-3"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/><path d="M9 11h6M9 15h6M9 19h3"/></svg></span> รายชื่อนักกีฬาที่บาดเจ็บ</h2>
         <div class="card table-wrap">
           <table class="pro-table">
             <thead>
@@ -1237,7 +1237,7 @@
       <button data-back class="btn btn-ghost px-0">← กลับหน้า Daily</button>
 
       <div class="page-heading">
-        <div class="icon-badge icon-badge-lg">📋</div>
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/><path d="M9 11h6M9 15h6M9 19h3"/></svg></div>
         <div>
           <h2>แผนการฝึกซ้อมรายวัน</h2>
           <p>ส่งแผนการฝึกซ้อมของวันนั้นๆ พร้อมหัวข้อหลัก จุดเน้นด้านฟิสิคอล และไฟล์แผน (รูป/PDF) ที่ต้องแนบทุกครั้ง (ต้องส่งภายใน 14:00 น. ของวันนั้น)</p>
@@ -1246,7 +1246,7 @@
 
       <!-- แจ้งเตือนเมื่อส่งสายเกินเกณฑ์ในเดือนนี้ -->
       <div id="training-plan-late-warning" class="hidden card card-pad border-2 border-red-200 bg-red-50">
-        <p class="font-semibold text-red-700">⚠️ เดือนนี้ส่งแผนการฝึกซ้อมสายแล้ว <span id="training-plan-late-count">0</span> ครั้ง</p>
+        <p class="font-semibold text-red-700"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4"/><path d="M12 17h.01"/></svg> เดือนนี้ส่งแผนการฝึกซ้อมสายแล้ว <span id="training-plan-late-count">0</span> ครั้ง</p>
         <p class="text-sm text-red-600 mt-1">กรุณาส่งแผนการฝึกซ้อมภายในเวลา 14:00 น. ของวันนั้นๆ เพื่อให้เป็นไปตามมาตรฐานของทีม หากยังส่งสายต่อเนื่องอาจต้องมีการพูดคุยกับผู้ดูแลระบบ</p>
       </div>
 
@@ -1312,7 +1312,7 @@
       </div>
 
       <div>
-        <h2 class="section-title mb-3"><span class="icon-badge">📋</span> ประวัติแผนการฝึกซ้อม</h2>
+        <h2 class="section-title mb-3"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/><path d="M9 11h6M9 15h6M9 19h3"/></svg></span> ประวัติแผนการฝึกซ้อม</h2>
         <div class="card table-wrap">
           <table class="pro-table">
             <thead>
@@ -1339,7 +1339,7 @@
     <!-- หน้าจอสรุปประจำวัน (Daily) -->
     <section id="daily-section" class="hidden space-y-6">
       <div class="page-heading">
-        <div class="icon-badge icon-badge-lg">📅</div>
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></div>
         <div>
           <h2>สรุปประจำวัน</h2>
           <p>ดูข้อมูลทั้งหมดที่กรอกไว้ในวันที่เลือก ครบในหน้าเดียว</p>
@@ -1364,14 +1364,14 @@
       <!-- ข้อความที่ผู้ดูแลระบบส่งถึงทีมนี้โดยตรง (เดิมมีให้แค่บัญชีผู้บริหารทีมเห็น — เพิ่มให้โค้ชจริงเห็นด้วย
       เพราะเป็นผู้รับผิดชอบตัวจริงที่ควรรู้เรื่องนี้) -->
       <div id="daily-executive-notes-section">
-        <h2 class="section-title mb-3"><span class="icon-badge">📬</span> ข้อความจากผู้ดูแลระบบ</h2>
+        <h2 class="section-title mb-3"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg></span> ข้อความจากผู้ดูแลระบบ</h2>
         <div id="daily-executive-notes-list" class="space-y-3">
           <p class="text-sm text-slate-400">กำลังโหลด...</p>
         </div>
       </div>
 
       <div>
-        <h2 class="section-title mb-3"><span class="icon-badge">✅</span> เช็คชื่อการฝึกซ้อม</h2>
+        <h2 class="section-title mb-3"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.3 2.3L16 10"/></svg></span> เช็คชื่อการฝึกซ้อม</h2>
         <div class="card table-wrap">
           <table class="pro-table">
             <thead>
@@ -1390,17 +1390,17 @@
       </div>
 
       <div>
-        <h2 class="section-title mb-3"><span class="icon-badge">📝</span> รายงานการฝึกซ้อม</h2>
+        <h2 class="section-title mb-3"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M7 3h7l4 4v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M14 3v4h4"/><path d="M8.5 12.5h7M8.5 16h7"/></svg></span> รายงานการฝึกซ้อม</h2>
         <div id="daily-training-report-card" class="card card-pad text-sm text-slate-400">เลือกวันที่แล้วกด "โหลดข้อมูล"</div>
       </div>
 
       <div>
-        <h2 class="section-title mb-3"><span class="icon-badge">📋</span> แผนการฝึกซ้อมรายวัน</h2>
+        <h2 class="section-title mb-3"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/><path d="M9 11h6M9 15h6M9 19h3"/></svg></span> แผนการฝึกซ้อมรายวัน</h2>
         <div id="daily-training-plan-card" class="card card-pad text-sm text-slate-400">เลือกวันที่แล้วกด "โหลดข้อมูล"</div>
       </div>
 
       <div>
-        <h2 class="section-title mb-3"><span class="icon-badge">🏆</span> รายงานผลการแข่งขัน</h2>
+        <h2 class="section-title mb-3"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M8 4h8v4a4 4 0 0 1-8 0V4Z"/><path d="M8 5H5a1 1 0 0 0-1 1c0 2 1.5 3.5 3.5 3.8"/><path d="M16 5h3a1 1 0 0 1 1 1c0 2-1.5 3.5-3.5 3.8"/><path d="M12 12v3"/><path d="M8 20h8"/><path d="M9 17h6l1 3H8l1-3Z"/></svg></span> รายงานผลการแข่งขัน</h2>
         <div class="card table-wrap">
           <table class="pro-table">
             <thead>
@@ -1421,7 +1421,7 @@
       </div>
 
       <div>
-        <h2 class="section-title mb-3"><span class="icon-badge">🩹</span> รายงานอาการบาดเจ็บ</h2>
+        <h2 class="section-title mb-3"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M20 8.5c0 4-4 6.5-8 9.5-4-3-8-5.5-8-9.5A4.5 4.5 0 0 1 8.5 4c1.4 0 2.7.7 3.5 1.8C12.8 4.7 14.1 4 15.5 4A4.5 4.5 0 0 1 20 8.5Z"/><path d="M4.5 10H8l1.5-3L12 12l1.5-4 1 2h4.5"/></svg></span> รายงานอาการบาดเจ็บ</h2>
         <div class="card table-wrap">
           <table class="pro-table">
             <thead>

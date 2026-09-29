@@ -14,6 +14,7 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.0/f
 import { db, auth } from "./firebase-init.js";
 import { AGES, POS, SECT, SB, CRITERIA, SCORE_VALUES, categoryRawScore, isEvaluationComplete, scoreToGrade } from "./masc-data.js";
 import { getCoachPlayerIds, escapeHtml, todayBangkok } from "./ui-utils.js";
+import { icon } from "./icons.js";
 
 const statusEl = document.getElementById("status-message");
 const accessGate = document.getElementById("access-gate");
@@ -146,7 +147,7 @@ async function loadMascRoundBanner() {
       const daysLeft = daysBetween(active.endDate, todayStr);
       mascRoundBanner.className = "card card-pad no-print bg-emerald-50 border-emerald-200";
       mascRoundBanner.innerHTML = `
-        <p class="font-semibold text-emerald-800">🔔 รอบประเมิน MASC ปัจจุบัน: ${active.label} (${escapeHtml(active.startDate)} – ${escapeHtml(active.endDate)})</p>
+        <p class="font-semibold text-emerald-800">${icon("bell")} รอบประเมิน MASC ปัจจุบัน: ${active.label} (${escapeHtml(active.startDate)} – ${escapeHtml(active.endDate)})</p>
         <p class="text-sm text-emerald-700 mt-1">${daysLeft > 0 ? `เหลือเวลาอีก ${daysLeft} วัน` : "หมดเขตวันนี้"}</p>
       `;
       mascRoundBanner.classList.remove("hidden");
@@ -154,7 +155,7 @@ async function loadMascRoundBanner() {
     }
     mascRoundBanner.className = "card card-pad no-print bg-slate-100 border-slate-200";
     mascRoundBanner.innerHTML = `
-      <p class="font-semibold text-slate-700">🔒 ยังไม่มีรอบการประเมิน MASC ที่กำลังดำเนินการอยู่ในขณะนี้</p>
+      <p class="font-semibold text-slate-700">${icon("lock")} ยังไม่มีรอบการประเมิน MASC ที่กำลังดำเนินการอยู่ในขณะนี้</p>
       <p class="text-sm text-slate-500 mt-1">ต้องรอผู้ดูแลระบบกำหนดรอบก่อน จึงจะเริ่ม/บันทึกการประเมินได้</p>
     `;
     mascRoundBanner.classList.remove("hidden");

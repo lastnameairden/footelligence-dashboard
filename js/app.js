@@ -8,6 +8,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import { db, auth } from "./firebase-init.js";
+import { icon } from "./icons.js";
 import {
   applyDataLabels,
   computeAvgScore,
@@ -1438,11 +1439,11 @@ drawerLogoutBtn.addEventListener("click", () => {
   signOut(auth);
 });
 
-function drawerItem(icon, label, href) {
+function drawerItem(iconHtml, label, href) {
   const a = document.createElement("a");
   a.href = href;
   a.className = "drawer-item";
-  a.innerHTML = `<span class="drawer-item-icon">${icon}</span><span>${label}</span>`;
+  a.innerHTML = `<span class="drawer-item-icon">${iconHtml}</span><span>${label}</span>`;
   return a;
 }
 
@@ -1468,24 +1469,24 @@ function renderDrawerItems() {
     // ใช้ URL hash (#admin=...) แทน query string เพราะเซิร์ฟเวอร์ทดสอบในเครื่อง (serve, clean-url) จะ
     // redirect "attendance.html" ไปเป็น "attendance" และตัด query string ทิ้งระหว่างทาง แต่ไม่ตัด hash
     navDrawerItems.appendChild(drawerSectionLabel("ผู้ดูแลระบบ"));
-    navDrawerItems.appendChild(drawerItem("👥", "รายชื่อโค้ชในระบบ", "./attendance.html#admin=coaches"));
-    navDrawerItems.appendChild(drawerItem("🧐", "ตรวจสอบข้อมูลนักกีฬาที่ผิดปกติ", "./attendance.html#admin=player-audit"));
-    navDrawerItems.appendChild(drawerItem("📈", "ความคืบหน้าการประเมินรายวัน", "./attendance.html#admin=progress"));
-    navDrawerItems.appendChild(drawerItem("📝", "คำขอลงทะเบียนที่รอการอนุมัติ", "./attendance.html#admin=approvals"));
-    navDrawerItems.appendChild(drawerItem("⚽", "รายงานผลการแข่งขันทั้งหมด", "./attendance.html#admin=matches"));
-    navDrawerItems.appendChild(drawerItem("🩹", "รายงานอาการบาดเจ็บทั้งหมด", "./attendance.html#admin=injuries"));
-    navDrawerItems.appendChild(drawerItem("🖨️", "พิมพ์สรุป Dashboard", "./attendance.html#admin=print"));
-    navDrawerItems.appendChild(drawerItem("📔", "สมุดพกนักกีฬา", "./attendance.html#admin=report-card"));
-    navDrawerItems.appendChild(drawerItem("🧬", "กำหนดรอบการประเมิน MASC", "./attendance.html#admin=masc-rounds"));
-    navDrawerItems.appendChild(drawerItem("📈", "พัฒนาการนักกีฬา", "./development.html"));
+    navDrawerItems.appendChild(drawerItem(icon("users"), "รายชื่อโค้ชในระบบ", "./attendance.html#admin=coaches"));
+    navDrawerItems.appendChild(drawerItem(icon("search"), "ตรวจสอบข้อมูลนักกีฬาที่ผิดปกติ", "./attendance.html#admin=player-audit"));
+    navDrawerItems.appendChild(drawerItem(icon("trending-up"), "ความคืบหน้าการประเมินรายวัน", "./attendance.html#admin=progress"));
+    navDrawerItems.appendChild(drawerItem(icon("file-text"), "คำขอลงทะเบียนที่รอการอนุมัติ", "./attendance.html#admin=approvals"));
+    navDrawerItems.appendChild(drawerItem(icon("football"), "รายงานผลการแข่งขันทั้งหมด", "./attendance.html#admin=matches"));
+    navDrawerItems.appendChild(drawerItem(icon("heart-pulse"), "รายงานอาการบาดเจ็บทั้งหมด", "./attendance.html#admin=injuries"));
+    navDrawerItems.appendChild(drawerItem(icon("printer"), "พิมพ์สรุป Dashboard", "./attendance.html#admin=print"));
+    navDrawerItems.appendChild(drawerItem(icon("book"), "สมุดพกนักกีฬา", "./attendance.html#admin=report-card"));
+    navDrawerItems.appendChild(drawerItem(icon("dna"), "กำหนดรอบการประเมิน MASC", "./attendance.html#admin=masc-rounds"));
+    navDrawerItems.appendChild(drawerItem(icon("trending-up"), "พัฒนาการนักกีฬา", "./development.html"));
     navDrawerItems.appendChild(drawerDivider());
-    navDrawerItems.appendChild(drawerItem("🔄", "เลือกทีมอื่น (Dashboard)", "/"));
+    navDrawerItems.appendChild(drawerItem(icon("refresh"), "เลือกทีมอื่น (Dashboard)", "/"));
   } else if (currentViewerRole === "coach") {
     navDrawerItems.appendChild(drawerSectionLabel("เมนู"));
-    navDrawerItems.appendChild(drawerItem("📅", "กลับหน้า Daily", "./attendance.html"));
+    navDrawerItems.appendChild(drawerItem(icon("calendar"), "กลับหน้า Daily", "./attendance.html"));
   } else {
     navDrawerItems.appendChild(drawerSectionLabel("เมนู"));
-    navDrawerItems.appendChild(drawerItem("📋", "กลับหน้าหลัก", "./attendance.html"));
+    navDrawerItems.appendChild(drawerItem(icon("clipboard-list"), "กลับหน้าหลัก", "./attendance.html"));
   }
 }
 

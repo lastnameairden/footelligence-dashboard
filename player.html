@@ -24,7 +24,7 @@
 
     <!-- แสดงเมื่อยังไม่ได้ล็อกอิน / บัญชียังไม่อนุมัติ / ไม่มีสิทธิ์ดูนักกีฬาคนนี้ / ไม่พบรหัสนักกีฬา -->
     <section id="access-gate" class="hidden card card-pad max-w-md mx-auto text-center">
-      <div class="icon-badge icon-badge-lg mx-auto mb-3">🔒</div>
+      <div class="icon-badge icon-badge-lg mx-auto mb-3"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
       <h2 class="text-lg font-semibold mb-2">ไม่สามารถแสดงข้อมูลนี้ได้</h2>
       <p class="text-sm text-slate-500 mb-4" id="access-gate-message">
         ต้องเข้าสู่ระบบก่อน จึงจะดูข้อมูลนักกีฬาได้
@@ -36,25 +36,25 @@
       <!-- ข้อมูลนักกีฬา -->
       <div class="card card-pad">
         <div class="page-heading mb-0 flex-wrap">
-          <div id="player-photo-badge" class="icon-badge icon-badge-lg overflow-hidden">👤</div>
+          <div id="player-photo-badge" class="icon-badge icon-badge-lg overflow-hidden"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c0-4.1 3.4-7 7.5-7s7.5 2.9 7.5 7"/></svg></div>
           <div class="flex-1">
             <h2 id="player-name-heading">-</h2>
             <p id="player-subheading">-</p>
           </div>
           <!-- แสดงเฉพาะผู้ดูแลระบบ ใช้ส่งข้อมูลนักกีฬาคนนี้ (เช่น พัฒนาการที่ดี) ไปแจ้งผู้บริหารทีมโดยตรง -->
-          <button id="send-to-executive-btn" class="hidden btn btn-secondary btn-sm">📤 ส่งไปยังผู้บริหารทีม</button>
+          <button id="send-to-executive-btn" class="hidden btn btn-secondary btn-sm"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M4 11 20 4l-6 16-3-7-7-2Z"/></svg> ส่งไปยังผู้บริหารทีม</button>
         </div>
       </div>
 
       <!-- ภาพรวมสถิติ -->
       <section>
-        <h2 class="section-title mb-4"><span class="icon-badge">📊</span> ภาพรวมสถิติ</h2>
+        <h2 class="section-title mb-4"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M4 20V10M10 20V4M16 20v-7M4 20h16"/></svg></span> ภาพรวมสถิติ</h2>
         <div id="player-stat-cards" class="grid grid-cols-2 sm:grid-cols-4 gap-4"></div>
       </section>
 
       <!-- กราฟพัฒนาการคะแนนเฉลี่ยตามช่วงเวลา -->
       <section>
-        <h2 class="section-title mb-4"><span class="icon-badge">📈</span> พัฒนาการคะแนนเฉลี่ยตามช่วงเวลา</h2>
+        <h2 class="section-title mb-4"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="m3 17 6-6 4 4 8-9"/><path d="M15 6h6v6"/></svg></span> พัฒนาการคะแนนเฉลี่ยตามช่วงเวลา</h2>
         <div class="card card-pad">
           <div id="score-trend-chart-wrap" class="overflow-x-auto"></div>
         </div>
@@ -62,7 +62,7 @@
 
       <!-- คะแนนเฉลี่ยแต่ละด้าน -->
       <section>
-        <h2 class="section-title mb-4"><span class="icon-badge">🎯</span> คะแนนเฉลี่ยแต่ละด้าน (เต็ม 4)</h2>
+        <h2 class="section-title mb-4"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="0.8" fill="currentColor" stroke="none"/></svg></span> คะแนนเฉลี่ยแต่ละด้าน (เต็ม 4)</h2>
         <div class="card card-pad">
           <div id="category-bars"></div>
         </div>
@@ -70,7 +70,7 @@
 
       <!-- ประวัติการเข้าร่วมฝึกซ้อม -->
       <section>
-        <h2 class="section-title mb-4"><span class="icon-badge">📝</span> ประวัติการเข้าร่วมฝึกซ้อม</h2>
+        <h2 class="section-title mb-4"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M7 3h7l4 4v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M14 3v4h4"/><path d="M8.5 12.5h7M8.5 16h7"/></svg></span> ประวัติการเข้าร่วมฝึกซ้อม</h2>
         <div class="card table-wrap">
           <table class="pro-table">
             <thead>
@@ -93,7 +93,7 @@
 
       <!-- การแข่งขันที่ลงเล่นตัวจริง -->
       <section>
-        <h2 class="section-title mb-4"><span class="icon-badge">⚽</span> การแข่งขันที่ลงเล่น (ตัวจริง)</h2>
+        <h2 class="section-title mb-4"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><circle cx="12" cy="12" r="9"/><path d="m12 7 3 2.2-1.1 3.6h-3.8L9 9.2 12 7Z"/><path d="M12 3v4M4.5 9l3.3 1M5 16.3l3-2.2M19.5 9l-3.3 1M19 16.3l-3-2.2M9.2 20l1.5-3.2M14.8 20l-1.5-3.2"/></svg></span> การแข่งขันที่ลงเล่น (ตัวจริง)</h2>
         <div class="card table-wrap">
           <table class="pro-table">
             <thead>
@@ -114,7 +114,7 @@
 
       <!-- ประวัติการบาดเจ็บ -->
       <section>
-        <h2 class="section-title mb-4"><span class="icon-badge">🩹</span> ประวัติการบาดเจ็บ</h2>
+        <h2 class="section-title mb-4"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M20 8.5c0 4-4 6.5-8 9.5-4-3-8-5.5-8-9.5A4.5 4.5 0 0 1 8.5 4c1.4 0 2.7.7 3.5 1.8C12.8 4.7 14.1 4 15.5 4A4.5 4.5 0 0 1 20 8.5Z"/><path d="M4.5 10H8l1.5-3L12 12l1.5-4 1 2h4.5"/></svg></span> ประวัติการบาดเจ็บ</h2>
         <div class="card table-wrap">
           <table class="pro-table">
             <thead>

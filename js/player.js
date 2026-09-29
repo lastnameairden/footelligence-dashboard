@@ -8,6 +8,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import { db, auth } from "./firebase-init.js";
+import { icon } from "./icons.js";
 import {
   applyDataLabels,
   SCORE_CATEGORIES,
@@ -61,7 +62,7 @@ function renderPlayerInfo(player) {
   // มีรูปจริงก็แสดงแทนไอคอน 👤 เริ่มต้น (เพิ่มรูปได้จากขั้นตอนแก้ไขข้อมูลนักกีฬาในหน้าเช็คชื่อ)
   playerPhotoBadge.innerHTML = player.photoUrl
     ? `<img src="${safeHttpUrl(player.photoUrl)}" alt="รูปนักกีฬา" class="w-full h-full object-cover" />`
-    : "👤";
+    : icon("user");
   playerNameHeading.textContent = player.nickname || player.fullName || "-";
   const parts = [
     player.fullName ?? "-",

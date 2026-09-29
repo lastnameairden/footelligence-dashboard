@@ -1,6 +1,7 @@
 import { collection, getDocs, getDoc, doc } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import { db, auth } from "./firebase-init.js";
+import { icon } from "./icons.js";
 import { SCORE_CATEGORIES, computeAvgScore, applyDataLabels, teamLogoImg, sendExecutiveNote, escapeHtml } from "./ui-utils.js";
 
 const TEAMS = ["KHAMPHEE FOOTBALL", "THAWEE SC", "THAMMASATHIT"];
@@ -153,7 +154,7 @@ function renderTable(rows) {
           <td>${r.count}</td>
           <td>${renderSparkline(r.trend)}</td>
           <td>
-            <button type="button" class="btn btn-secondary btn-sm" data-send-player-id="${r.player.id}">📤</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-send-player-id="${r.player.id}">${icon("send")}</button>
           </td>
         </tr>`;
     })

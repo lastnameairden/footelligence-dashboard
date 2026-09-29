@@ -25,11 +25,11 @@
         ไล่เลือกทีม → รายชื่อโค้ช/ผู้เล่นทีละขั้น อยู่ข้างปุ่มกระดิ่งเพื่อเข้าถึงได้จากทุกหน้าของ Dashboard -->
         <div class="relative">
           <button id="admin-search-btn" class="hidden btn-icon" aria-label="ค้นหาโค้ช/นักกีฬา" title="ค้นหาโค้ช/นักกีฬา">
-            🔍
+            <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
           </button>
           <div id="admin-search-panel" class="hidden absolute right-0 mt-2 w-80 max-w-[90vw] bg-white rounded-xl shadow-2xl border border-slate-100 z-50 text-slate-900 p-3">
             <div class="relative">
-              <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-sm">🔍</span>
+              <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-sm"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></span>
               <input
                 id="admin-search-input"
                 type="text"
@@ -43,13 +43,13 @@
         </div>
         <div class="relative">
           <button id="notification-bell-btn" class="hidden btn-icon" aria-label="การแจ้งเตือน" title="การแจ้งเตือน">
-            🔔
+            <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
             <span id="notification-badge" class="hidden absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-red-500 border-2 border-slate-900"></span>
           </button>
           <div id="notification-panel" class="hidden absolute right-0 mt-2 w-80 max-w-[90vw] bg-white rounded-xl shadow-2xl border border-slate-100 z-50 max-h-[70vh] overflow-y-auto text-slate-900">
             <div class="p-3 border-b border-slate-100 flex items-center justify-between">
               <h3 class="font-semibold text-sm">การแจ้งเตือน</h3>
-              <button id="notification-refresh-btn" type="button" class="btn-icon" aria-label="รีเฟรช" title="รีเฟรช">🔄</button>
+              <button id="notification-refresh-btn" type="button" class="btn-icon" aria-label="รีเฟรช" title="รีเฟรช"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 4v6h-6"/></svg></button>
             </div>
             <div id="notification-list" class="p-2">
               <p class="text-slate-400 text-sm text-center py-6">กำลังโหลด...</p>
@@ -70,7 +70,7 @@
         <img src="./assets/logo.png" alt="Footelligence" class="w-8 h-8 object-contain" />
         <span class="font-bold text-slate-900">FOOTELLIGENCE DATA</span>
       </div>
-      <button id="nav-drawer-close-btn" class="btn-icon" aria-label="ปิดเมนู">✕</button>
+      <button id="nav-drawer-close-btn" class="btn-icon" aria-label="ปิดเมนู"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </div>
     <div class="px-4 py-3 border-b border-slate-100 bg-slate-50">
       <p id="nav-drawer-name" class="text-sm font-semibold text-slate-900 truncate"></p>
@@ -107,7 +107,7 @@
     <!-- ใช้รูปแบบการ์ดแบบเดียวกับหน้าแผงควบคุมผู้ดูแลระบบใน attendance.html ให้เลือกทีมได้ในหน้าเดียวเลย -->
     <section id="admin-pick-team-prompt" class="hidden">
       <div class="page-heading">
-        <div class="icon-badge icon-badge-lg">🛡️</div>
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M12 2 4 5v6c0 5 3.4 8.7 8 10 4.6-1.3 8-5 8-10V5l-8-3Z"/></svg></div>
         <div>
           <h2>เลือกทีมที่ต้องการดูข้อมูล</h2>
           <p>เลือกทีมใดทีมหนึ่ง หรือ "ทุกทีม" เพื่อดูภาพรวมทั้งหมด</p>
@@ -121,7 +121,7 @@
 
     <!-- ภาพรวมทั้งหมด -->
     <section>
-      <h2 class="section-title mb-4"><span class="icon-badge">📈</span> ภาพรวมทั้งหมด</h2>
+      <h2 class="section-title mb-4"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="m3 17 6-6 4 4 8-9"/><path d="M15 6h6v6"/></svg></span> ภาพรวมทั้งหมด</h2>
       <!-- ข้อมูลทั้งหน้านี้จำกัดไว้แค่เดือนปัจจุบันเสมอ (ดู isInCurrentMonth ใน app.js) — ไม่แสดงข้อความแจ้งเตือน
       เรื่องนี้ในหน้าเว็บแล้วตามคำขอ -->
       <!-- แสดงเฉพาะตอนดูทีมเดียว (ไม่ใช่ "ทุกทีม") ให้เลือกดูสถิติของผู้เล่นตำแหน่งอื่นหรือ GK แยกกัน เพราะมี
@@ -176,7 +176,7 @@
     <!-- ความคืบหน้าการประเมินรายวัน แยกตามรุ่นอายุ (แสดงเฉพาะตอนดูข้อมูลทีมใดทีมหนึ่ง) -->
     <section id="age-group-progress-section" class="hidden">
       <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
-        <h2 class="section-title"><span class="icon-badge">📊</span> ความคืบหน้าการประเมินรายวัน</h2>
+        <h2 class="section-title"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M4 20V10M10 20V4M16 20v-7M4 20h16"/></svg></span> ความคืบหน้าการประเมินรายวัน</h2>
         <div class="flex items-center gap-2">
           <input id="age-progress-date-input" type="date" class="field-input w-auto" />
           <button id="age-progress-refresh-btn" class="btn btn-primary">โหลด</button>
@@ -209,7 +209,7 @@
 
     <!-- รายงานสถานะการฝึกซ้อมประจำวัน ส่งโดยโค้ช (แสดงเฉพาะตอนดูข้อมูลทีมใดทีมหนึ่ง) -->
     <section id="training-reports-section" class="hidden">
-      <h2 class="section-title mb-4"><span class="icon-badge">📝</span> รายงานสถานะการฝึกซ้อม</h2>
+      <h2 class="section-title mb-4"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M7 3h7l4 4v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M14 3v4h4"/><path d="M8.5 12.5h7M8.5 16h7"/></svg></span> รายงานสถานะการฝึกซ้อม</h2>
       <div class="card table-wrap">
         <table class="pro-table">
           <thead>
@@ -234,7 +234,7 @@
          และทีมใดทีมหนึ่ง เพราะเป็นตัวเลขที่ต้องเห็นภาพรวมได้เสมอ ไม่ได้ผูกกับ scopeTeam เหมือน section อื่น)
          มี id ไว้ให้ลิงก์จากการแจ้งเตือนเลื่อนมาที่ส่วนนี้ได้ทันที (ดู scrollToHashTarget ใน app.js) -->
     <section id="training-plan-summary-section">
-      <h2 class="section-title mb-4"><span class="icon-badge">📋</span> สรุปการส่งแผนการฝึกซ้อมรายวัน (เดือนนี้)</h2>
+      <h2 class="section-title mb-4"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/><path d="M9 11h6M9 15h6M9 19h3"/></svg></span> สรุปการส่งแผนการฝึกซ้อมรายวัน (เดือนนี้)</h2>
       <!-- แสดงเฉพาะตอนดูภาพรวม "ทุกทีม" (scopeTeam ว่าง) ให้เลือกดูทีละทีมผ่านแท็บแบบเดียวกับ "ภาพรวมทุกทีม"
       ด้านบน — ตอนดูทีมเดียวอยู่แล้ว (มี scopeTeam) ไม่ต้องมีแท็บซ้ำ -->
       <div id="training-plan-summary-tabs" class="hidden flex flex-wrap gap-2 mb-3"></div>
@@ -260,7 +260,7 @@
 
     <!-- รายงานผลการแข่งขัน -->
     <section>
-      <h2 class="section-title mb-4"><span class="icon-badge">🏆</span> รายงานผลการแข่งขัน</h2>
+      <h2 class="section-title mb-4"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M8 4h8v4a4 4 0 0 1-8 0V4Z"/><path d="M8 5H5a1 1 0 0 0-1 1c0 2 1.5 3.5 3.5 3.8"/><path d="M16 5h3a1 1 0 0 1 1 1c0 2-1.5 3.5-3.5 3.8"/><path d="M12 12v3"/><path d="M8 20h8"/><path d="M9 17h6l1 3H8l1-3Z"/></svg></span> รายงานผลการแข่งขัน</h2>
       <div id="match-reports-stat-cards" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4"></div>
       <div class="card table-wrap">
         <table class="pro-table">
@@ -286,7 +286,7 @@
 
     <!-- รายงานอาการบาดเจ็บ -->
     <section>
-      <h2 class="section-title mb-4"><span class="icon-badge">🩹</span> รายงานอาการบาดเจ็บ</h2>
+      <h2 class="section-title mb-4"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M20 8.5c0 4-4 6.5-8 9.5-4-3-8-5.5-8-9.5A4.5 4.5 0 0 1 8.5 4c1.4 0 2.7.7 3.5 1.8C12.8 4.7 14.1 4 15.5 4A4.5 4.5 0 0 1 20 8.5Z"/><path d="M4.5 10H8l1.5-3L12 12l1.5-4 1 2h4.5"/></svg></span> รายงานอาการบาดเจ็บ</h2>
       <div id="injury-reports-stat-cards" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4"></div>
       <div class="card table-wrap">
         <table class="pro-table">
@@ -312,7 +312,7 @@
 
     <!-- รายชื่อผู้เล่น แยกตามทีม/โค้ชผู้รับผิดชอบ -->
     <section>
-      <h2 class="section-title mb-4"><span class="icon-badge">👤</span> รายชื่อผู้เล่น</h2>
+      <h2 class="section-title mb-4"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c0-4.1 3.4-7 7.5-7s7.5 2.9 7.5 7"/></svg></span> รายชื่อผู้เล่น</h2>
       <div id="players-groups" class="space-y-6">
         <p class="text-slate-400 text-sm">กำลังโหลด...</p>
       </div>
@@ -320,7 +320,7 @@
 
     <!-- สถิติการฝึกซ้อม แยกตามทีม/โค้ชผู้รับผิดชอบ -->
     <section>
-      <h2 class="section-title mb-4"><span class="icon-badge">📊</span> สถิติการฝึกซ้อม</h2>
+      <h2 class="section-title mb-4"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M4 20V10M10 20V4M16 20v-7M4 20h16"/></svg></span> สถิติการฝึกซ้อม</h2>
       <div id="attendance-groups" class="space-y-6">
         <p class="text-slate-400 text-sm">กำลังโหลด...</p>
       </div>

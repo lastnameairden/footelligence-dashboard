@@ -28,6 +28,7 @@ import {
   safeHttpUrl
 } from "./ui-utils.js";
 import { CRITERIA, SECT, categoryRawScore, isEvaluationComplete, scoreToGrade } from "./masc-data.js";
+import { icon } from "./icons.js";
 
 const UNASSIGNED_AGE_GROUP = "ไม่ระบุรุ่นอายุ";
 const DEFAULT_ACCENT = "#0f172a";
@@ -827,7 +828,7 @@ async function loadReportCards(team, ageGroup, start, end) {
     excludedPlayers.sort((a, b) => (a.nickname || a.fullName || "").localeCompare(b.nickname || b.fullName || ""));
     const names = excludedPlayers.map((p) => `<span class="badge badge-neutral">${escapeHtml(p.nickname || p.fullName || "-")}</span>`).join("");
     reportCardExcludedWrap.innerHTML = `
-      <p class="font-semibold text-amber-800">⚠️ ยังไม่มีสมุดพกให้ ${excludedPlayers.length} คน — เพราะยังไม่ผ่านการประเมิน MASC ครบทุกหมวด</p>
+      <p class="font-semibold text-amber-800">${icon("alert-triangle")} ยังไม่มีสมุดพกให้ ${excludedPlayers.length} คน — เพราะยังไม่ผ่านการประเมิน MASC ครบทุกหมวด</p>
       <div class="flex flex-wrap gap-1.5 mt-2">${names}</div>
       <p class="text-xs text-amber-700 mt-2">ให้โค้ชของนักกีฬากลุ่มนี้เข้าไปประเมิน MASC ให้ครบก่อน แล้วกลับมาสร้างสมุดพกอีกครั้ง</p>
     `;
