@@ -131,7 +131,7 @@ async function saveComment(player, team, start, end, commentText, indicatorEl) {
       updatedAt: serverTimestamp(),
       updatedBy: currentAdminName
     });
-    indicatorEl.textContent = "บันทึกแล้ว ✓";
+    indicatorEl.innerHTML = `บันทึกแล้ว ${icon("check")}`;
     indicatorEl.className = "text-xs text-emerald-600 no-print";
   } catch (err) {
     console.error(err);

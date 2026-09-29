@@ -1564,7 +1564,7 @@ async function approveCoach(coachId, team) {
   }
   try {
     await updateDoc(doc(db, "coaches", coachId), { status: "approved", team });
-    adminStatus.textContent = "อนุมัติเรียบร้อย ✓";
+    adminStatus.innerHTML = `อนุมัติเรียบร้อย ${icon("check")}`;
     adminStatus.className = "text-sm text-emerald-600 w-full";
     await loadPendingApprovals();
     await loadCoachDirectory();
@@ -1753,7 +1753,7 @@ async function loadCoachDirectory() {
 
     const sendSummaryBtn = document.createElement("button");
     sendSummaryBtn.type = "button";
-    sendSummaryBtn.textContent = "📤 ส่งสรุปการทำงานโค้ชให้ผู้บริหารทีม";
+    sendSummaryBtn.innerHTML = `${icon("send")} ส่งสรุปการทำงานโค้ชให้ผู้บริหารทีม`;
     sendSummaryBtn.className = "btn btn-secondary btn-sm mb-3";
     sendSummaryBtn.addEventListener("click", () => sendCoachActivitySummaryToExecutive(team, sendSummaryBtn));
 
@@ -1775,7 +1775,7 @@ async function loadCoachDirectory() {
     unassignedGroup.sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
     const heading = document.createElement("h3");
     heading.className = "section-title text-sm mb-2";
-    heading.textContent = `🛡️ ยังไม่มีทีม (ผู้ดูแลระบบ/รอกำหนดทีม) (${unassignedGroup.length} คน)`;
+    heading.innerHTML = `${icon("shield")} ยังไม่มีทีม (ผู้ดูแลระบบ/รอกำหนดทีม) (${unassignedGroup.length} คน)`;
     coachDirectoryGroups.appendChild(heading);
     coachDirectoryGroups.appendChild(buildCoachGroupTable(unassignedGroup, sessions, attendanceRecords, players));
   }
@@ -2119,7 +2119,7 @@ function renderPlanDetailModal(plan) {
     fileLink.target = "_blank";
     fileLink.rel = "noopener";
     fileLink.className = "btn btn-secondary btn-sm inline-block mt-2";
-    fileLink.textContent = plan.fileName ? `📎 เปิดไฟล์แนบ: ${plan.fileName}` : "📎 เปิดไฟล์แนบ";
+    fileLink.innerHTML = plan.fileName ? `${icon("paperclip")} เปิดไฟล์แนบ: ${escapeHtml(plan.fileName)}` : `${icon("paperclip")} เปิดไฟล์แนบ`;
     coachPlanDetailBody.appendChild(fileLink);
   }
 
@@ -2388,7 +2388,7 @@ async function loadPlayerAudit() {
     );
 
     if (flagged.length === 0) {
-      playerAuditStatus.textContent = `ตรวจสอบนักกีฬาทั้งหมด ${players.length} คนแล้ว ไม่พบข้อมูลที่ผิดปกติ ✓`;
+      playerAuditStatus.innerHTML = `ตรวจสอบนักกีฬาทั้งหมด ${players.length} คนแล้ว ไม่พบข้อมูลที่ผิดปกติ ${icon("check")}`;
       playerAuditBody.innerHTML =
         '<tr><td colspan="7" class="px-4 py-6 text-center text-slate-400">ไม่พบนักกีฬาที่ข้อมูลผิดปกติ</td></tr>';
       return;
@@ -2433,7 +2433,7 @@ playerAuditBody.addEventListener("click", async (e) => {
     await updateDoc(doc(db, "players", playerId), { birthday, ageGroup });
     tr.remove();
     if (playerAuditBody.children.length === 0) {
-      playerAuditStatus.textContent = "แก้ไขครบทุกรายการแล้ว ✓";
+      playerAuditStatus.innerHTML = `แก้ไขครบทุกรายการแล้ว ${icon("check")}`;
       playerAuditBody.innerHTML =
         '<tr><td colspan="7" class="px-4 py-6 text-center text-slate-400">ไม่พบนักกีฬาที่ข้อมูลผิดปกติ</td></tr>';
     }
@@ -2522,7 +2522,7 @@ editCoachSaveBtn.addEventListener("click", async () => {
     editCoachModalStatus.textContent = "กำลังบันทึก...";
     editCoachModalStatus.className = "text-sm text-slate-500";
     await updateDoc(doc(db, "coaches", editingCoachAccountId), payload);
-    editCoachModalStatus.textContent = "บันทึกสำเร็จ ✓";
+    editCoachModalStatus.innerHTML = `บันทึกสำเร็จ ${icon("check")}`;
     editCoachModalStatus.className = "text-sm text-emerald-600";
     await loadCoachDirectory();
     setTimeout(closeEditCoachModal, 500);
@@ -2544,7 +2544,7 @@ editCoachResetPasswordBtn.addEventListener("click", async () => {
     editCoachModalStatus.textContent = "กำลังส่งอีเมล...";
     editCoachModalStatus.className = "text-sm text-slate-500";
     await sendPasswordResetEmail(auth, email);
-    editCoachModalStatus.textContent = `ส่งลิงก์ตั้งรหัสผ่านใหม่ไปที่ ${email} แล้ว ✓`;
+    editCoachModalStatus.innerHTML = `ส่งลิงก์ตั้งรหัสผ่านใหม่ไปที่ ${escapeHtml(email)} แล้ว ${icon("check")}`;
     editCoachModalStatus.className = "text-sm text-emerald-600";
   } catch (err) {
     console.error(err);
@@ -2569,7 +2569,7 @@ editCoachDeleteBtn.addEventListener("click", async () => {
     editCoachModalStatus.textContent = "กำลังลบ...";
     editCoachModalStatus.className = "text-sm text-slate-500";
     await deleteDoc(doc(db, "coaches", editingCoachAccountId));
-    editCoachModalStatus.textContent = "ลบบัญชีสำเร็จ ✓";
+    editCoachModalStatus.innerHTML = `ลบบัญชีสำเร็จ ${icon("check")}`;
     editCoachModalStatus.className = "text-sm text-emerald-600";
     await loadCoachDirectory();
     setTimeout(closeEditCoachModal, 500);
@@ -3536,7 +3536,7 @@ addPlayerForm.addEventListener("submit", async (e) => {
 
     if (editingPlayerId) {
       await updateDoc(doc(db, "players", editingPlayerId), payload);
-      addPlayerStatus.textContent = `บันทึกการแก้ไข "${nickname}" สำเร็จ ✓${birthdayCorrectedNote}`;
+      addPlayerStatus.innerHTML = `บันทึกการแก้ไข "${escapeHtml(nickname)}" สำเร็จ ${icon("check")}${escapeHtml(birthdayCorrectedNote)}`;
       addPlayerStatus.className = "text-sm text-emerald-600";
       stopEditPlayer();
     } else {
@@ -3547,7 +3547,7 @@ addPlayerForm.addEventListener("submit", async (e) => {
       playerExistingPhotoPath = null;
       playerRemoveExistingPhoto = false;
       renderPlayerPhotoStatus();
-      addPlayerStatus.textContent = `เพิ่ม "${nickname}" สำเร็จ ✓${birthdayCorrectedNote}`;
+      addPlayerStatus.innerHTML = `เพิ่ม "${escapeHtml(nickname)}" สำเร็จ ${icon("check")}${escapeHtml(birthdayCorrectedNote)}`;
       addPlayerStatus.className = "text-sm text-emerald-600";
     }
 
@@ -4153,7 +4153,7 @@ function renderReportPhotoPreview() {
     removeBtn.type = "button";
     removeBtn.className =
       "absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 text-xs leading-none flex items-center justify-center";
-    removeBtn.textContent = "✕";
+    removeBtn.innerHTML = icon("close");
     removeBtn.title = "ลบรูปนี้";
     removeBtn.addEventListener("click", () => {
       reportExistingPhotos = reportExistingPhotos.filter((p) => p !== photo);
@@ -4446,7 +4446,7 @@ reportForm.addEventListener("submit", async (e) => {
     reportForm.classList.add("hidden");
     renderReportSummary(dateStr, payload, `ส่งรายงานสำหรับวันที่ ${dateStr} เรียบร้อย ✓ — ดูอย่างเดียว กดแก้ไขรายงานหากต้องการเปลี่ยนข้อมูล`);
     reportSummary.classList.remove("hidden");
-    reportLoadStatus.textContent = `ส่งรายงานสำหรับวันที่ ${dateStr} เรียบร้อย ✓ (ซิงก์กับหน้าเช็คชื่อรายวันอัตโนมัติ)`;
+    reportLoadStatus.innerHTML = `ส่งรายงานสำหรับวันที่ ${escapeHtml(dateStr)} เรียบร้อย ${icon("check")} (ซิงก์กับหน้าเช็คชื่อรายวันอัตโนมัติ)`;
     reportLoadStatus.className = "text-sm text-emerald-600 w-full";
   } catch (err) {
     console.error(err);
@@ -4509,7 +4509,7 @@ function renderMatchLineupChips() {
     chip.textContent = playerLabel(p);
     const removeBtn = document.createElement("button");
     removeBtn.type = "button";
-    removeBtn.textContent = "✕";
+    removeBtn.innerHTML = icon("close");
     removeBtn.className = "text-slate-400 hover:text-red-600 leading-none";
     removeBtn.addEventListener("click", () => {
       matchLineupSelectedIds.delete(p.id);
@@ -4745,7 +4745,7 @@ matchReportForm.addEventListener("submit", async (e) => {
 
     if (editingMatchId) {
       await updateDoc(doc(db, "matchReports", editingMatchId), payload);
-      matchReportStatus.textContent = "บันทึกการแก้ไขสำเร็จ ✓";
+      matchReportStatus.innerHTML = `บันทึกการแก้ไขสำเร็จ ${icon("check")}`;
       matchReportStatus.className = "text-sm text-emerald-600";
       stopEditMatch();
     } else {
@@ -4755,7 +4755,7 @@ matchReportForm.addEventListener("submit", async (e) => {
       renderMatchResultSegmented();
       matchLineupSelectedIds = new Set();
       renderMatchLineupChips();
-      matchReportStatus.textContent = "บันทึกผลการแข่งขันสำเร็จ ✓";
+      matchReportStatus.innerHTML = `บันทึกผลการแข่งขันสำเร็จ ${icon("check")}`;
       matchReportStatus.className = "text-sm text-emerald-600";
     }
     await renderMatchReportList();
@@ -4974,7 +4974,7 @@ injuryReportForm.addEventListener("submit", async (e) => {
 
     if (editingInjuryId) {
       await updateDoc(doc(db, "injuryReports", editingInjuryId), payload);
-      injuryReportStatus.textContent = "บันทึกการแก้ไขสำเร็จ ✓";
+      injuryReportStatus.innerHTML = `บันทึกการแก้ไขสำเร็จ ${icon("check")}`;
       injuryReportStatus.className = "text-sm text-emerald-600";
       stopEditInjury();
     } else {
@@ -4982,7 +4982,7 @@ injuryReportForm.addEventListener("submit", async (e) => {
       injuryReportForm.reset();
       injurySelectedPlayerId = null;
       injuryPlayerDropdown.classList.add("hidden");
-      injuryReportStatus.textContent = "บันทึกอาการบาดเจ็บสำเร็จ ✓";
+      injuryReportStatus.innerHTML = `บันทึกอาการบาดเจ็บสำเร็จ ${icon("check")}`;
       injuryReportStatus.className = "text-sm text-emerald-600";
     }
     await renderInjuryReportList();
@@ -5509,14 +5509,14 @@ trainingPlanForm.addEventListener("submit", async (e) => {
 
     if (editingTrainingPlanId) {
       await updateDoc(doc(db, "trainingPlans", editingTrainingPlanId), payload);
-      trainingPlanStatus.textContent = "บันทึกการแก้ไขสำเร็จ ✓";
+      trainingPlanStatus.innerHTML = `บันทึกการแก้ไขสำเร็จ ${icon("check")}`;
       trainingPlanStatus.className = "text-sm text-emerald-600";
       stopEditTrainingPlan();
     } else {
       await addDoc(collection(db, "trainingPlans"), { ...payload, createdAt: serverTimestamp() });
       stopEditTrainingPlan();
       trainingPlanDateInput.value = dateStr;
-      trainingPlanStatus.textContent = "ส่งแผนการฝึกซ้อมสำเร็จ ✓";
+      trainingPlanStatus.innerHTML = `ส่งแผนการฝึกซ้อมสำเร็จ ${icon("check")}`;
       trainingPlanStatus.className = "text-sm text-emerald-600";
     }
     // ลบไฟล์เก่าทิ้งแบบ best-effort หลังบันทึกสำเร็จแล้วเท่านั้น (เฉพาะตอนถูกแทนที่ด้วยไฟล์ใหม่ หรือถูกลบทิ้ง)
@@ -5757,7 +5757,7 @@ async function loadDailyData(dateStr) {
   }
   dailyStatus.textContent = "กำลังโหลดข้อมูล...";
   dailyStatus.className = "text-sm text-slate-500 w-full";
-  dailyDateHeading.textContent = `📅 ${formatThaiDate(dateStr)}`;
+  dailyDateHeading.innerHTML = `${icon("calendar")} ${escapeHtml(formatThaiDate(dateStr))}`;
   dailyDateHeading.classList.remove("hidden");
 
   try {
@@ -5775,7 +5775,7 @@ async function loadDailyData(dateStr) {
     renderDailyMatchReports(matchSnap);
     renderDailyInjuryReports(injurySnap);
 
-    dailyStatus.textContent = "โหลดข้อมูลสำเร็จ ✓";
+    dailyStatus.innerHTML = `โหลดข้อมูลสำเร็จ ${icon("check")}`;
     dailyStatus.className = "text-sm text-emerald-600 w-full";
   } catch (err) {
     console.error(err);

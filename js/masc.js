@@ -601,7 +601,7 @@ saveBtn.addEventListener("click", async () => {
       currentEvaluationId = newDoc.id;
       deleteBtn.classList.remove("hidden");
     }
-    saveStatus.textContent = "บันทึกสำเร็จ ✓";
+    saveStatus.innerHTML = `บันทึกสำเร็จ ${icon("check")}`;
     saveStatus.className = "text-sm text-emerald-600";
     // อัปเดตลิสต์ "ประเมินครบสมบูรณ์แล้ว" ทันทีในหน้าเดียวกัน ไม่ต้องรอโหลดหน้าใหม่ — เช็คเทียบกับรอบที่กำลัง
     // ดำเนินการอยู่ตอนนี้เท่านั้น เผื่อโค้ชแก้ assessmentPeriod เป็นรอบอื่นเอง (ไม่ควรไปกระทบสถานะของรอบปัจจุบัน)
