@@ -180,6 +180,9 @@ const coachPlanDetailTitleEl = document.getElementById("coach-plan-detail-title"
 const coachPlanDetailBody = document.getElementById("coach-plan-detail-body");
 const coachPlanDetailCloseBtn = document.getElementById("coach-plan-detail-close-btn");
 const executiveNotesList = document.getElementById("executive-notes-list");
+const executivePlayersSection = document.getElementById("executive-players-section");
+const executivePlayersBackBtn = document.getElementById("executive-players-back-btn");
+const executivePlayersGroupsEl = document.getElementById("executive-players-groups");
 const coachNameEl = document.getElementById("coach-name");
 const coachEmailEl = document.getElementById("coach-email");
 const coachTeamEl = document.getElementById("coach-team");
@@ -296,6 +299,10 @@ let currentSessionId = null;
 let currentSessionData = null;
 let currentAttendanceMap = new Map();
 let myTeam = null;
+// ทีมของบัญชีผู้บริหารทีมจริง (ไม่ใช่การสวมบทบาทของผู้ดูแลระบบ) — เก็บแยกจาก myTeam เพราะ myTeam ต้องเป็น
+// null สำหรับผู้บริหารทีมจริงเสมอ (renderDrawerItems ใช้ myTeam ที่มีค่าเป็นสัญญาณว่า "มีเครื่องมือจัดการทีมเต็มรูปแบบ"
+// ถ้าตั้ง myTeam ให้ผู้บริหารทีมจริงจะได้เมนูของโค้ชผิดๆ ไปด้วย) ใช้เฉพาะเปิดหน้ารายชื่อนักกีฬาแบบดูอย่างเดียว
+let myExecutiveTeam = null;
 // ชื่อ/อีเมลของบัญชีผู้ดูแลระบบเอง เก็บไว้ตอนล็อกอิน เพื่อใช้คืนค่ากลับตอนออกจากโหมดสวมบทบาท (โค้ช/ผู้บริหารทีม)
 // เพราะระหว่างสวมบทบาทจะเขียนทับ coachNameEl/coachEmailEl ด้วยข้อมูลของโค้ช/ผู้บริหารทีมที่สวมบทบาทอยู่
 let adminOwnName = null;
@@ -544,6 +551,7 @@ registerForm.addEventListener("submit", async (e) => {
 function hideAllScreens() {
   pendingSection.classList.add("hidden");
   executiveSection.classList.add("hidden");
+  executivePlayersSection.classList.add("hidden");
   adminCoachesSection.classList.add("hidden");
   adminProgressSection.classList.add("hidden");
   adminApprovalsSection.classList.add("hidden");
@@ -762,6 +770,7 @@ function renderDrawerItems() {
       // สวมบทบาทเป็นผู้บริหารทีม (ดูอย่างเดียว) — เมนูเหมือนที่ผู้บริหารทีมจริงเห็นทุกประการ (มีแค่ทาง
       // ไป Dashboard) บวกทางกลับแผงควบคุมผู้ดูแลระบบเพิ่มมาให้ (ผู้บริหารทีมจริงไม่มีปุ่มนี้)
       navDrawerItems.appendChild(drawerSectionLabel(`ผู้บริหารทีม: ${teamLogoImg(myTeam)}${myTeam}`));
+      navDrawerItems.appendChild(drawerItem(icon("users"), "รายชื่อนักกีฬาในทีม", () => openExecutivePlayersSection(myTeam)));
       navDrawerItems.appendChild(drawerItem(icon("bar-chart"), "Dashboard", goToDashboard));
       navDrawerItems.appendChild(drawerDivider());
       navDrawerItems.appendChild(drawerItem(icon("shield"), "กลับแผงควบคุมผู้ดูแลระบบ", exitTeamManagementToAdminPanel));
@@ -823,6 +832,11 @@ function renderDrawerItems() {
 
   // ผู้บริหารทีม (ดูข้อมูลอย่างเดียว ไม่มีเครื่องมือจัดการทีม) หรือกรณีอื่นที่ยังไม่ทราบทีม
   navDrawerItems.appendChild(drawerSectionLabel("เมนู"));
+  if (myExecutiveTeam) {
+    navDrawerItems.appendChild(
+      drawerItem(icon("users"), "รายชื่อนักกีฬาในทีม", () => openExecutivePlayersSection(myExecutiveTeam))
+    );
+  }
   navDrawerItems.appendChild(drawerItem(icon("bar-chart"), "Dashboard", goToDashboard));
 }
 
@@ -2880,13 +2894,99 @@ async function enterExecutiveViewMode(team, returnSection, execRecordOverride) {
   // สวมบทบาทไม่มีทีมผูกกับบัญชีจริง จึงต้องแนบทีมที่เลือกไว้ไปกับลิงก์ด้วย ไม่งั้น Dashboard จะไม่รู้ว่าจะโชว์ทีมไหน
   executiveDashboardLink.href = `/?team=${encodeURIComponent(team)}`;
   adminReturnSection = returnSection || adminManageTeamSection;
+  renderDrawerItems();
+  showExecutiveHome(team);
+}
+
+// หน้าแรกของโหมดผู้บริหารทีม (สรุปภาพรวม) — ใช้ร่วมกันทั้งบัญชีผู้บริหารทีมจริง, ผู้ดูแลระบบที่สวมบทบาท
+// ผ่าน enterExecutiveViewMode และปุ่ม "กลับ" ของหน้ารายชื่อนักกีฬา (openExecutivePlayersSection) ด้านล่าง
+function showExecutiveHome(team) {
   hideAllScreens();
   executiveSection.classList.remove("hidden");
-  renderDrawerItems();
   loadExecutiveSummary(team);
   loadCoachActivitySummary(team);
   loadExecutiveNotes(team, executiveNotesList);
 }
+
+// รายชื่อนักกีฬาในทีม สำหรับโหมดผู้บริหารทีม (ดูอย่างเดียว ไม่มีปุ่มแก้ไข/ลบเหมือนหน้าของโค้ช) — เขียน
+// query แยกจาก loadPlayers()/players ทั่วไป เพราะ loadPlayers() อิงตัวแปร myTeam ซึ่งบัญชีผู้บริหารทีมจริง
+// ตั้งใจปล่อยเป็น null ไว้เสมอ (ดูหมายเหตุที่ myExecutiveTeam) จึงรับทีมที่จะดูเป็นพารามิเตอร์ตรงๆ แทน
+const EXECUTIVE_UNASSIGNED_AGE_GROUP = "ไม่ระบุรุ่นอายุ";
+
+async function openExecutivePlayersSection(team) {
+  executivePlayersReturnTeam = team;
+  hideAllScreens();
+  executivePlayersSection.classList.remove("hidden");
+  executivePlayersGroupsEl.innerHTML = '<p class="text-slate-400 text-sm">กำลังโหลด...</p>';
+  try {
+    const snapshot = await getDocs(query(collection(db, "players"), where("team", "==", team)));
+    const teamPlayers = [];
+    snapshot.forEach((docSnap) => teamPlayers.push({ id: docSnap.id, ...docSnap.data() }));
+    renderExecutivePlayerList(teamPlayers);
+  } catch (err) {
+    console.error(err);
+    executivePlayersGroupsEl.innerHTML = `<p class="text-red-600 text-sm">โหลดรายชื่อนักกีฬาไม่สำเร็จ: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+// แบ่งรายชื่อเป็นการ์ดแยกตามรุ่นอายุ (ทีมหนึ่งมักมีหลายรุ่นอายุคละกัน) เรียงรุ่นน้อยไปมากด้วย ageGroupNumber
+// เหมือนหน้า Dashboard ของผู้ดูแลระบบ (renderPlayersGroups ใน app.js) เพื่อให้ดูง่ายกว่าตารางเดียวรวมทุกรุ่น
+function renderExecutivePlayerList(teamPlayers) {
+  executivePlayersGroupsEl.innerHTML = "";
+  if (teamPlayers.length === 0) {
+    executivePlayersGroupsEl.innerHTML = '<p class="text-slate-400 text-sm">ยังไม่มีนักกีฬาในทีมนี้</p>';
+    return;
+  }
+  const ageGroupMap = new Map();
+  for (const p of teamPlayers) {
+    const ageGroup = p.ageGroup || EXECUTIVE_UNASSIGNED_AGE_GROUP;
+    if (!ageGroupMap.has(ageGroup)) ageGroupMap.set(ageGroup, []);
+    ageGroupMap.get(ageGroup).push(p);
+  }
+  const sortedAgeGroups = [...ageGroupMap.keys()].sort((a, b) => ageGroupNumber(a) - ageGroupNumber(b));
+
+  for (const ageGroup of sortedAgeGroups) {
+    const groupPlayers = ageGroupMap.get(ageGroup).slice().sort((a, b) => (a.number ?? 0) - (b.number ?? 0));
+    const wrapper = document.createElement("div");
+    wrapper.innerHTML = `
+      <h3 class="section-title text-sm mb-2">${escapeHtml(ageGroup)} <span class="text-slate-400 font-normal">(${groupPlayers.length} คน)</span></h3>
+      <div class="card table-wrap">
+        <table class="pro-table">
+          <thead>
+            <tr>
+              <th>เบอร์</th>
+              <th>ชื่อเล่น</th>
+              <th>ชื่อ-นามสกุล</th>
+              <th>วันเกิด</th>
+              <th>ตำแหน่ง</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${groupPlayers
+              .map(
+                (p) => `
+              <tr>
+                <td>${escapeHtml(p.number ?? "-")}</td>
+                <td class="emphasis"><a href="./player.html#id=${p.id}" class="text-blue-600 hover:underline">${escapeHtml(p.nickname ?? "-")}</a></td>
+                <td>${escapeHtml(p.fullName ?? "-")}</td>
+                <td>${escapeHtml(p.birthday ?? "-")}</td>
+                <td>${escapeHtml(p.position ?? "-")}</td>
+              </tr>`
+              )
+              .join("")}
+          </tbody>
+        </table>
+      </div>
+    `;
+    applyDataLabels(wrapper.querySelector("tbody"));
+    executivePlayersGroupsEl.appendChild(wrapper);
+  }
+}
+
+// จำทีมที่กำลังดูอยู่ไว้ ให้ปุ่ม "กลับ" ของหน้ารายชื่อนักกีฬาย้อนกลับไปหน้าสรุปภาพรวมของทีมเดิมได้ถูกต้อง
+// (ต่างจากปุ่ม [data-back] ทั่วไปที่ผูกกับ showDaily() ซึ่งใช้ไม่ได้กับโหมดผู้บริหารทีมที่ไม่มีหน้า Daily)
+let executivePlayersReturnTeam = null;
+executivePlayersBackBtn.addEventListener("click", () => showExecutiveHome(executivePlayersReturnTeam));
 
 // สรุปภาพรวมทีมสั้นๆ ที่ผู้บริหารทีมควรเห็นทันทีที่เข้าระบบ (ไม่ต้องคลิกไปหน้า Dashboard ก่อนถึงจะเห็นอะไร)
 // ใช้ร่วมกันทั้งบัญชีผู้บริหารทีมจริง และผู้ดูแลระบบที่สวมบทบาทผ่าน enterExecutiveViewMode
@@ -3087,6 +3187,7 @@ const ROUTE_SCREENS = [
   { el: trainingPlanSection, key: "plan", kind: "coach" },
   { el: addPlayerSection, key: "players", kind: "coach" },
   { el: executiveSection, key: "executive", kind: "executive" },
+  { el: executivePlayersSection, key: "executive-players", kind: "executive" },
   { el: adminCoachesSection, key: "coaches", kind: "admin" },
   { el: adminPlayerAuditSection, key: "player-audit", kind: "admin" },
   { el: adminProgressSection, key: "progress", kind: "admin" },
@@ -3304,16 +3405,13 @@ onAuthStateChanged(auth, async (user) => {
       renderCoachProfile(user, data, data.team);
       coachAgeGroupsWrap.classList.add("hidden");
       myTeam = null;
+      myExecutiveTeam = data.team;
       adminViewingAs = null;
       // บัญชีผู้บริหารทีมจริงไม่ต้องแนบ ?team= เพราะ Dashboard รู้ทีมจากบัญชีอยู่แล้ว (ต่างจากตอนผู้ดูแล
       // ระบบสวมบทบาทที่ enterExecutiveViewMode ซึ่งต้องแนบทีมไปกับลิงก์ด้วย)
       executiveDashboardLink.href = "./index.html";
       renderDrawerItems();
-      hideAllScreens();
-      executiveSection.classList.remove("hidden");
-      loadExecutiveSummary(data.team);
-      loadCoachActivitySummary(data.team);
-      loadExecutiveNotes(data.team, executiveNotesList);
+      showExecutiveHome(data.team);
       return;
     }
 

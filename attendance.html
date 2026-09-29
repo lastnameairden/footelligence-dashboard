@@ -230,6 +230,17 @@
       </div>
     </section>
 
+    <!-- รายชื่อนักกีฬาในทีม สำหรับผู้บริหารทีม (ดูอย่างเดียว ไม่มีปุ่มแก้ไข/ลบ) — เข้าถึงได้จากเมนูลิ้นชัก
+    ทั้งบัญชีผู้บริหารทีมจริงและผู้ดูแลระบบที่สวมบทบาทเป็นผู้บริหารทีม -->
+    <section id="executive-players-section" class="hidden space-y-6">
+      <button id="executive-players-back-btn" type="button" class="btn btn-ghost px-0">← กลับหน้าสรุปภาพรวม</button>
+      <div>
+        <h2 class="section-title mb-3"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c0-4.1 3.4-7 7.5-7s7.5 2.9 7.5 7"/></svg></span> รายชื่อนักกีฬาในทีม</h2>
+        <!-- แบ่งเป็นการ์ดแยกตามรุ่นอายุ (สร้างด้วย JS ต่อรุ่น เพราะจำนวนรุ่นอายุของแต่ละทีมไม่เท่ากัน) -->
+        <div id="executive-players-groups" class="space-y-6"></div>
+      </div>
+    </section>
+
     <!-- แถบโปรไฟล์ผู้ใช้งาน (แสดงหลังล็อกอินสำเร็จ ทุกหน้าจอย่อย) -->
     <div id="coach-bar" class="hidden card card-pad">
       <div class="flex items-start justify-between flex-wrap gap-4">
