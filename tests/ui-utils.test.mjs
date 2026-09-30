@@ -27,7 +27,8 @@ import {
   trainingPlanHasAttachment,
   computeDailyAvgScores,
   buildAvgScoreSparklineSvg,
-  computeMissingPlanDaysByTeam
+  computeMissingPlanDaysByTeam,
+  trainingDaysQuotaForTeamMonth
 } from "../js/ui-utils.js";
 
 const ts = (date) => ({ toDate: () => date });
@@ -284,4 +285,25 @@ test("computeMissingPlanDaysByTeam: no sessions or all planned gives an empty ma
   const sessions = [{ team: "A", date: "2026-03-10" }];
   const plans = [{ team: "A", date: "2026-03-10" }];
   assert.equal(computeMissingPlanDaysByTeam(sessions, plans, WINDOW).size, 0);
+});
+
+// เกณฑ์ที่ต้องส่งของแต่ละทีมต่อเดือน ต้องตรงกับจำนวนวันตามวันฝึกซ้อมปกติของทีมนั้นจริงๆ ในปฏิทินเดือนนั้น
+// (ตรวจไขว้กับค่าที่คำนวณมือ/สคริปต์แยกไว้ล่วงหน้า ไม่ใช่ใช้ตรรกะเดียวกับ implementation)
+test("trainingDaysQuotaForTeamMonth: THAWEE SC (จ-ศ) counts weekdays only", () => {
+  assert.equal(trainingDaysQuotaForTeamMonth("THAWEE SC", "2025-06"), 21);
+  assert.equal(trainingDaysQuotaForTeamMonth("THAWEE SC", "2026-02"), 20);
+  assert.equal(trainingDaysQuotaForTeamMonth("THAWEE SC", "2026-09"), 22);
+});
+test("trainingDaysQuotaForTeamMonth: THAMMASATHIT (จ-ส) counts one more day per week than จ-ศ", () => {
+  assert.equal(trainingDaysQuotaForTeamMonth("THAMMASATHIT", "2025-06"), 25);
+  assert.equal(trainingDaysQuotaForTeamMonth("THAMMASATHIT", "2026-02"), 24);
+  assert.equal(trainingDaysQuotaForTeamMonth("THAMMASATHIT", "2026-09"), 26);
+});
+test("trainingDaysQuotaForTeamMonth: KHAMPHEE FOOTBALL (อา-พฤ) also 5 days/week but different days than THAWEE SC", () => {
+  assert.equal(trainingDaysQuotaForTeamMonth("KHAMPHEE FOOTBALL", "2025-06"), 22);
+  assert.equal(trainingDaysQuotaForTeamMonth("KHAMPHEE FOOTBALL", "2026-02"), 20);
+  assert.equal(trainingDaysQuotaForTeamMonth("KHAMPHEE FOOTBALL", "2026-09"), 22);
+});
+test("trainingDaysQuotaForTeamMonth: unknown team falls back to the old fixed 20", () => {
+  assert.equal(trainingDaysQuotaForTeamMonth("ไม่มีทีมนี้", "2025-06"), 20);
 });

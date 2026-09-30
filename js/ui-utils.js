@@ -482,12 +482,30 @@ export function calcAge(birthday, now = new Date()) {
 export const TRAINING_PLAN_DEADLINE_HOUR = 14;
 // สายเกินกี่ครั้งต่อเดือนถึงต้องแจ้งเตือนให้โค้ชปรับปรุงมาตรฐานการส่งแผน
 export const TRAINING_PLAN_LATE_WARNING_THRESHOLD = 3;
-// เกณฑ์จำนวนแผนที่โค้ชแต่ละคนต้องส่งต่อเดือน (ทุกคนเท่ากันไม่ว่าจะดูแลกี่รุ่นอายุ) ใช้แสดงเป็น "จำนวนทั้งหมดที่
-// ต้องส่ง" ในสรุปการทำงานของโค้ช (print.js) — เป็นตัวเลขคงที่ ไม่ได้อิงจำนวนวันฝึกซ้อมจริงจาก sessions
-export const TRAINING_PLAN_MONTHLY_QUOTA = 20;
-// เกณฑ์จำนวนวันที่โค้ชแต่ละคนต้องเช็คชื่อ+ให้คะแนนนักกีฬาต่อเดือน — แยกจาก TRAINING_PLAN_MONTHLY_QUOTA เพราะเป็น
-// คนละกิจกรรมกัน แม้ปัจจุบันจะตั้งไว้เท่ากันก็ตาม (เผื่ออนาคตค่าอาจต่างกัน)
-export const CHECKIN_MONTHLY_QUOTA = 20;
+// วันฝึกซ้อมปกติของแต่ละทีมต่อสัปดาห์ (0=อาทิตย์ ... 6=เสาร์ ตาม Date.getUTCDay()) — ใช้คำนวณ "จำนวนทั้งหมดที่
+// ต้องส่ง" ต่อเดือนในสรุปการทำงานของโค้ช (print.js) ให้ตรงกับจำนวนวันฝึกซ้อมจริงของ "ปฏิทิน" เดือนนั้นๆ ของแต่ละทีม
+// แทนตัวเลขคงที่แบบเดิม — ใช้แสดงเกณฑ์เฉยๆ ไม่ได้ใช้ล็อกว่าห้ามส่ง/ต้องส่งเฉพาะวันเหล่านี้ (โค้ชยังส่งวันอื่นได้ตามปกติ
+// ถ้ามีการฝึกซ้อมจริงนอกตารางปกติ) แก้ตรงนี้ที่เดียวถ้าตารางฝึกซ้อมของทีมใดเปลี่ยน
+export const TEAM_TRAINING_WEEKDAYS = {
+  "THAWEE SC": [1, 2, 3, 4, 5], // จันทร์-ศุกร์ (5 วัน/สัปดาห์)
+  THAMMASATHIT: [1, 2, 3, 4, 5, 6], // จันทร์-เสาร์ (6 วัน/สัปดาห์)
+  "KHAMPHEE FOOTBALL": [0, 1, 2, 3, 4] // อาทิตย์-พฤหัสบดี (5 วัน/สัปดาห์)
+};
+// เกณฑ์จำนวนแผนที่ต้องส่ง/จำนวนวันที่ต้องเช็คชื่อ+ให้คะแนนนักกีฬาต่อเดือน ของทีมนั้นในเดือนนั้น (นับจากปฏิทินตาม
+// TEAM_TRAINING_WEEKDAYS ไม่ใช่จำนวน sessions ที่มีคนสร้างจริง เพราะถ้าโค้ชไม่เช็คชื่อเลยจะไม่มี session ให้นับ
+// เกณฑ์จะเหลือ 0 กลายเป็น "ทำครบ 100%" ผิดๆ) ใช้ร่วมกันทั้งสรุปแผนการฝึกซ้อมและสรุปการเช็คชื่อ (คนละกิจกรรมกัน
+// แต่ทั้งคู่ควรเกิดขึ้นทุกวันฝึกซ้อมจริงเท่ากัน จึงใช้เกณฑ์เดียวกัน) ทีมที่ไม่มีในตาราง fallback เป็น 20 (ค่าคงที่เดิม)
+export function trainingDaysQuotaForTeamMonth(team, monthStr) {
+  const weekdays = TEAM_TRAINING_WEEKDAYS[team];
+  if (!weekdays || !monthStr) return 20;
+  const [y, m] = monthStr.split("-").map(Number);
+  const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  let count = 0;
+  for (let d = 1; d <= daysInMonth; d++) {
+    if (weekdays.includes(new Date(Date.UTC(y, m - 1, d)).getUTCDay())) count++;
+  }
+  return count;
+}
 
 // แผนการฝึกซ้อมต้องมีไฟล์แนบ (รูป/PDF) ทุกครั้งที่ส่ง/บันทึกแก้ไข — นับว่ามีไฟล์เมื่อเลือกไฟล์ใหม่แล้ว หรือมีไฟล์เดิมที่ยังไม่ถูกสั่งลบ
 export function trainingPlanHasAttachment({ hasNewFile, existingFileUrl, removeExisting }) {

@@ -13,8 +13,7 @@ import {
   statCard,
   applyDataLabels,
   isTrainingPlanLate,
-  TRAINING_PLAN_MONTHLY_QUOTA,
-  CHECKIN_MONTHLY_QUOTA,
+  trainingDaysQuotaForTeamMonth,
   matchResultBadge,
   injurySeverityBadge,
   injuryStatusBadge,
@@ -234,7 +233,7 @@ function buildTopicBarChartSvg(topics, color) {
 
 // กราฟแท่งแนวนอนแบบซ้อน (stacked) 1 แท่งต่อ 1 โค้ช แสดงสัดส่วนตรงเวลา/สาย/ไม่ส่ง เทียบกับเกณฑ์ที่ต้องส่ง — เลือก
 // แนวนอนเพราะจำนวนโค้ชอาจมีหลายคน แนวตั้งจะแคบเกินไปจนป้ายชื่อโค้ชทับกัน
-function buildCoachQuotaBarChartSvg(coachRows) {
+function buildCoachQuotaBarChartSvg(coachRows, quota) {
   if (coachRows.length === 0) {
     return '<p class="text-xs text-slate-400 text-center py-4">ไม่มีข้อมูล</p>';
   }
@@ -246,7 +245,7 @@ function buildCoachQuotaBarChartSvg(coachRows) {
   const numbersW = 66;
   const width = labelW + barAreaW + numbersW + 8;
   const height = padTop + padBottom + coachRows.length * rowH;
-  const maxTotal = Math.max(...coachRows.map((r) => r.onTime + r.late + r.missing), TRAINING_PLAN_MONTHLY_QUOTA);
+  const maxTotal = Math.max(...coachRows.map((r) => r.onTime + r.late + r.missing), quota);
 
   const rows = coachRows
     .map((r, i) => {
@@ -624,8 +623,10 @@ async function loadPrintExtras(team, ageGroup, month) {
   // ---------- สรุปการส่งแผนการฝึกซ้อมรายวัน แยกรายโค้ช (ตรงเวลา/สาย/เกณฑ์ที่ต้องส่ง/% ตรงเวลา) ----------
   // จับคู่แผนกับโค้ชด้วยชื่อ (coachName) ไม่ใช่ coachId เพราะถ้าผู้ดูแลระบบสวมบทบาทส่งแทนโค้ช coachId จะกลายเป็น
   // uid ของผู้ดูแลระบบเอง (หลักการเดียวกับ computeCoachMonthlySummaryRows ในหน้า attendance.html) — คอลัมน์
-  // "จำนวนทั้งหมดที่ต้องส่ง" แสดงเกณฑ์คงที่ TRAINING_PLAN_MONTHLY_QUOTA (ทุกคนเท่ากัน) ไม่ใช่จำนวนวันฝึกซ้อมจริง
-  // ส่วน % ตรงเวลา เทียบกับจำนวนที่ส่งจริง (onTime/(onTime+late)) วัดคุณภาพความตรงเวลาของสิ่งที่ส่งมาแล้ว
+  // "จำนวนทั้งหมดที่ต้องส่ง" แสดงจำนวนวันฝึกซ้อมจริงของทีมนี้ในเดือนนี้ (ตามตารางฝึกซ้อมปกติของทีม ดู
+  // TEAM_TRAINING_WEEKDAYS) ไม่ใช่เกณฑ์คงที่ทุกทีมเท่ากันแบบเดิม — ส่วน % ตรงเวลา เทียบกับจำนวนที่ส่งจริง
+  // (onTime/(onTime+late)) วัดคุณภาพความตรงเวลาของสิ่งที่ส่งมาแล้ว
+  const monthlyQuota = trainingDaysQuotaForTeamMonth(team, month);
   let plans = [];
   trainingPlanSnap.forEach((d) => plans.push(d.data()));
   plans = plans.filter((p) => (p.date || "").startsWith(month));
@@ -647,12 +648,12 @@ async function loadPrintExtras(team, ageGroup, month) {
     const total = myPlans.length;
     const onTime = total - late;
     // ถ้าส่งเกินเกณฑ์ (total > quota) ถือว่าไม่มีจำนวนที่ "ไม่ส่ง" เหลือ ไม่ใช่ค่าติดลบ
-    const missing = Math.max(TRAINING_PLAN_MONTHLY_QUOTA - total, 0);
+    const missing = Math.max(monthlyQuota - total, 0);
     const onTimePercent = total > 0 ? Math.round((onTime / total) * 100) : null;
     return { coach: c, onTime, late, missing, onTimePercent };
   });
 
-  printTrainingPlanCoachChart.innerHTML = buildCoachQuotaBarChartSvg(coachRows);
+  printTrainingPlanCoachChart.innerHTML = buildCoachQuotaBarChartSvg(coachRows, monthlyQuota);
   printTrainingPlanPie.innerHTML = buildQuotaPieChartSvg(
     coachRows.reduce((sum, r) => sum + r.onTime, 0),
     coachRows.reduce((sum, r) => sum + r.late, 0),
@@ -671,7 +672,7 @@ async function loadPrintExtras(team, ageGroup, month) {
           <tr>
             <td class="emphasis">${escapeHtml(coach.name ?? "-")}</td>
             <td>${(coach.ageGroups || []).join(", ") || "-"}</td>
-            <td>${TRAINING_PLAN_MONTHLY_QUOTA}</td>
+            <td>${monthlyQuota}</td>
             <td class="text-emerald-600 font-medium">${onTime}</td>
             <td class="text-red-500 font-medium">${late}</td>
             <td class="text-slate-500 font-medium">${missing}</td>
@@ -726,17 +727,18 @@ async function loadPrintExtras(team, ageGroup, month) {
       if (isCoachSubmissionOnTime(s, myAttendanceForSession)) onTime += 1;
     }
     const late = checkinDays - onTime;
-    // เกณฑ์ "ต้องเช็คชื่อ" เป็นตัวเลขคงที่ CHECKIN_MONTHLY_QUOTA เหมือนแผนการฝึกซ้อม ไม่ใช่จำนวนวันฝึกซ้อมจริง —
-    // checkinDays ยังนับจากวันฝึกซ้อมจริง (monthSessions) เหมือนเดิม เพราะเช็คชื่อได้เฉพาะวันที่มี session จริง
-    // เท่านั้น แต่ % เทียบกับเกณฑ์คงที่นี้แทน
-    const matchPercent = Math.round((checkinDays / CHECKIN_MONTHLY_QUOTA) * 100);
+    // เกณฑ์ "ต้องเช็คชื่อ" ใช้จำนวนวันฝึกซ้อมจริงของทีมนี้ในเดือนนี้ (monthlyQuota เดียวกับแผนการฝึกซ้อมด้านบน
+    // เพราะทั้งสองกิจกรรมควรเกิดขึ้นทุกวันฝึกซ้อมจริงเท่ากัน) ไม่ใช่ตัวเลขคงที่แบบเดิม — checkinDays ยังนับจาก
+    // วันฝึกซ้อมจริง (monthSessions) เหมือนเดิม เพราะเช็คชื่อได้เฉพาะวันที่มี session จริงเท่านั้น แต่ % เทียบกับ
+    // เกณฑ์นี้แทน
+    const matchPercent = Math.round((checkinDays / monthlyQuota) * 100);
     return { coach: c, checkinDays, onTime, late, matchPercent };
   });
 
   const totalCheckinDays = checkinRows.reduce((sum, r) => sum + r.checkinDays, 0);
   const totalOnTime = checkinRows.reduce((sum, r) => sum + r.onTime, 0);
   printCheckinCards.innerHTML =
-    statCard("จำนวนที่ต้องเช็คชื่อ", CHECKIN_MONTHLY_QUOTA) +
+    statCard("จำนวนที่ต้องเช็คชื่อ", monthlyQuota) +
     statCard("เช็คชื่อตรงวันฝึกซ้อม (รวม)", totalCheckinDays) +
     statCard("ตรงเวลา (รวม)", totalOnTime) +
     statCard("สาย (รวม)", totalCheckinDays - totalOnTime);
@@ -753,7 +755,7 @@ async function loadPrintExtras(team, ageGroup, month) {
           <tr>
             <td class="emphasis">${escapeHtml(coach.name ?? "-")}</td>
             <td>${(coach.ageGroups || []).join(", ") || "-"}</td>
-            <td>${CHECKIN_MONTHLY_QUOTA}</td>
+            <td>${monthlyQuota}</td>
             <td>${checkinDays}</td>
             <td class="text-emerald-600 font-medium">${onTime}</td>
             <td class="text-red-500 font-medium">${late}</td>
