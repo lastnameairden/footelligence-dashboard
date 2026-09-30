@@ -787,7 +787,10 @@ async function loadPrintExtras(team, ageGroup, month) {
   // ---------- สรุปการส่งรายงานการฝึกซ้อม แยกรายโค้ช ----------
   // คนละอย่างกับ "แผนการฝึกซ้อม" (ส่งก่อนซ้อม) — รายงานนี้ส่งหลังซ้อมจบ และไม่มีฟิลด์ ageGroups ในตัวเอง (1
   // รายงานต่อโค้ชต่อวัน ไม่แยกตามรุ่นอายุ) จึงกรองตามรายชื่อโค้ชในขอบเขต (coaches) แทนการกรองตัวรายงานเอง — เกณฑ์
-  // "ต้องส่ง" เป็นวันฝึกซ้อมจริงเหมือนการเช็คชื่อ ไม่ใช่ตัวเลขคงที่ (ไม่มีการระบุเกณฑ์คงที่สำหรับรายงานนี้)
+  // "ต้องส่ง" ใช้ monthlyQuota เดียวกับแผนการฝึกซ้อม/เช็คชื่อด้านบน (จำนวนวันฝึกซ้อมจริงของทีมตามปฏิทิน) ไม่ใช่
+  // จำนวน session ที่มีคนสร้างจริงอีกต่อไป (เดิมใช้ monthSessions.length เป็นเกณฑ์ ทำให้ถ้าทีมไม่ได้สร้าง session
+  // ครบทุกวันฝึกซ้อมจริง เกณฑ์จะลดตามไปด้วยเหมือนกับปัญหาที่แก้ในส่วนแผนการฝึกซ้อม/เช็คชื่อ) — ส่วนตัวเศษ
+  // (matchDays/onTime) ยังนับจาก monthSessions เหมือนเดิม เพราะส่งรายงานได้เฉพาะวันที่มี session จริงเท่านั้น
   let reports = [];
   trainingReportSnap.forEach((d) => reports.push(d.data()));
   reports = reports.filter((r) => (r.date || "").startsWith(month));
@@ -803,12 +806,12 @@ async function loadPrintExtras(team, ageGroup, month) {
       if (dayReports.some((r) => !isReportLate(r))) onTime += 1;
     }
     const late = matchDays - onTime;
-    const matchPercent = monthSessions.length > 0 ? Math.round((matchDays / monthSessions.length) * 100) : null;
+    const matchPercent = Math.round((matchDays / monthlyQuota) * 100);
     return { coach: c, matchDays, onTime, late, matchPercent };
   });
 
   printReportCards.innerHTML =
-    statCard("วันฝึกซ้อมทั้งหมด", monthSessions.length) +
+    statCard("วันฝึกซ้อมทั้งหมด", monthlyQuota) +
     statCard("ส่งตรงวันฝึกซ้อม (รวม)", reportRows.reduce((sum, r) => sum + r.matchDays, 0)) +
     statCard("ตรงเวลา (รวม)", reportRows.reduce((sum, r) => sum + r.onTime, 0)) +
     statCard("สาย (รวม)", reportRows.reduce((sum, r) => sum + r.late, 0));
@@ -819,13 +822,13 @@ async function loadPrintExtras(team, ageGroup, month) {
   } else {
     printReportBody.innerHTML = reportRows
       .map(({ coach, matchDays, onTime, late, matchPercent }) => {
-        const percentText = matchPercent === null ? "-" : `${matchPercent}%`;
-        const percentBadgeClass = matchPercent === null ? "badge-neutral" : matchPercent >= 80 ? "badge-success" : matchPercent >= 50 ? "badge-warning" : "badge-danger";
+        const percentText = `${matchPercent}%`;
+        const percentBadgeClass = matchPercent >= 80 ? "badge-success" : matchPercent >= 50 ? "badge-warning" : "badge-danger";
         return `
           <tr>
             <td class="emphasis">${escapeHtml(coach.name ?? "-")}</td>
             <td>${(coach.ageGroups || []).join(", ") || "-"}</td>
-            <td>${monthSessions.length}</td>
+            <td>${monthlyQuota}</td>
             <td>${matchDays}</td>
             <td class="text-emerald-600 font-medium">${onTime}</td>
             <td class="text-red-500 font-medium">${late}</td>
@@ -855,7 +858,8 @@ async function loadPrintExtras(team, ageGroup, month) {
 
   // ---------- ความสอดคล้องของการทำงานประจำวัน (แผน + เช็คชื่อ + รายงาน) แยกรายโค้ช ----------
   // นับเฉพาะวันฝึกซ้อมจริง (monthSessions) ที่โค้ชคนนั้นส่งครบทั้ง 3 อย่าง (ไม่สนว่าตรงเวลาหรือสาย เพราะความ
-  // ตรงเวลาแยกดูได้แล้วในแต่ละส่วนด้านบน — ส่วนนี้วัดแค่ "ทำครบหรือไม่" ในวันเดียวกัน)
+  // ตรงเวลาแยกดูได้แล้วในแต่ละส่วนด้านบน — ส่วนนี้วัดแค่ "ทำครบหรือไม่" ในวันเดียวกัน) — เกณฑ์ "วันฝึกซ้อมทั้งหมด"
+  // ใช้ monthlyQuota เหมือน 3 ส่วนด้านบน (ดูเหตุผลที่คอมเมนต์ของสรุปการส่งรายงานการฝึกซ้อม) ไม่ใช่ monthSessions.length
   const consistencyRows = coaches.map((c) => {
     const myPlayerIds = getCoachPlayerIds(c, scopedPlayers);
     const myPlans = plans.filter((p) => p.coachName === c.name);
@@ -867,8 +871,9 @@ async function loadPrintExtras(team, ageGroup, month) {
       const hasReport = myReports.some((r) => r.date === s.date);
       if (hasPlan && hasCheckin && hasReport) complete += 1;
     }
-    const incomplete = monthSessions.length - complete;
-    const completePercent = monthSessions.length > 0 ? Math.round((complete / monthSessions.length) * 100) : null;
+    // ถ้าทำครบเกินเกณฑ์ (เช่น team มี session จริงมากกว่า monthlyQuota) ถือว่าไม่มีจำนวนที่ "ขาด" เหลือ ไม่ใช่ค่าติดลบ
+    const incomplete = Math.max(monthlyQuota - complete, 0);
+    const completePercent = Math.round((complete / monthlyQuota) * 100);
     return { coach: c, complete, incomplete, completePercent };
   });
 
@@ -878,14 +883,13 @@ async function loadPrintExtras(team, ageGroup, month) {
   } else {
     printConsistencyBody.innerHTML = consistencyRows
       .map(({ coach, complete, incomplete, completePercent }) => {
-        const percentText = completePercent === null ? "-" : `${completePercent}%`;
-        const percentBadgeClass =
-          completePercent === null ? "badge-neutral" : completePercent >= 80 ? "badge-success" : completePercent >= 50 ? "badge-warning" : "badge-danger";
+        const percentText = `${completePercent}%`;
+        const percentBadgeClass = completePercent >= 80 ? "badge-success" : completePercent >= 50 ? "badge-warning" : "badge-danger";
         return `
           <tr>
             <td class="emphasis">${escapeHtml(coach.name ?? "-")}</td>
             <td>${(coach.ageGroups || []).join(", ") || "-"}</td>
-            <td>${monthSessions.length}</td>
+            <td>${monthlyQuota}</td>
             <td class="text-emerald-600 font-medium">${complete}</td>
             <td class="text-red-500 font-medium">${incomplete}</td>
             <td><span class="badge ${percentBadgeClass}">${percentText}</span></td>
