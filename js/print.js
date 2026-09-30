@@ -737,8 +737,12 @@ async function loadPrintExtras(team, ageGroup, month) {
 
   const totalCheckinDays = checkinRows.reduce((sum, r) => sum + r.checkinDays, 0);
   const totalOnTime = checkinRows.reduce((sum, r) => sum + r.onTime, 0);
+  // การ์ดนี้อยู่คู่กับสถิติแบบ "รวม" ของทุกโค้ช (totalCheckinDays ฯลฯ) จึงต้องคูณ coaches.length ด้วย ไม่งั้น
+  // จะเทียบกันไม่ตรง (เช่น 22 vs รวมจริง 118 ของ 7 คน — ดูเหมือนทำเกินเกณฑ์ผิดๆ ทั้งที่คูณแล้วยังไม่ถึงเกณฑ์)
+  // เกณฑ์ต่อโค้ช 1 คนยังเป็น monthlyQuota เท่าเดิม (ดูคอลัมน์ "จำนวนที่ต้องเช็คชื่อ" ในตารางรายโค้ชด้านล่าง)
+  const totalQuota = monthlyQuota * coaches.length;
   printCheckinCards.innerHTML =
-    statCard("จำนวนที่ต้องเช็คชื่อ", monthlyQuota) +
+    statCard("จำนวนที่ต้องเช็คชื่อ (รวม)", totalQuota) +
     statCard("เช็คชื่อตรงวันฝึกซ้อม (รวม)", totalCheckinDays) +
     statCard("ตรงเวลา (รวม)", totalOnTime) +
     statCard("สาย (รวม)", totalCheckinDays - totalOnTime);
@@ -810,8 +814,11 @@ async function loadPrintExtras(team, ageGroup, month) {
     return { coach: c, matchDays, onTime, late, matchPercent };
   });
 
+  // การ์ดนี้อยู่คู่กับสถิติแบบ "รวม" ของทุกโค้ช (matchDays ฯลฯ รวมทุกคน) จึงต้องคูณ coaches.length ด้วยเหมือนกับ
+  // การ์ดสรุปการเช็คชื่อด้านบน ไม่งั้นจะเทียบกันไม่ตรง — เกณฑ์ต่อโค้ช 1 คนยังเป็น monthlyQuota เท่าเดิม (ดูคอลัมน์
+  // "วันฝึกซ้อมทั้งหมด" ในตารางรายโค้ชด้านล่าง)
   printReportCards.innerHTML =
-    statCard("วันฝึกซ้อมทั้งหมด", monthlyQuota) +
+    statCard("วันฝึกซ้อมทั้งหมด (รวม)", monthlyQuota * coaches.length) +
     statCard("ส่งตรงวันฝึกซ้อม (รวม)", reportRows.reduce((sum, r) => sum + r.matchDays, 0)) +
     statCard("ตรงเวลา (รวม)", reportRows.reduce((sum, r) => sum + r.onTime, 0)) +
     statCard("สาย (รวม)", reportRows.reduce((sum, r) => sum + r.late, 0));
