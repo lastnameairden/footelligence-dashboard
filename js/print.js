@@ -39,8 +39,7 @@ const printMonthSelect = document.getElementById("print-month-select");
 const printMonthLoadBtn = document.getElementById("print-month-load-btn");
 const printTrainingPlanCards = document.getElementById("print-training-plan-cards");
 const printTrainingPlanBody = document.getElementById("print-training-plan-body");
-const printTrainingPlanCoachChart = document.getElementById("print-training-plan-coach-chart");
-const printTrainingPlanPie = document.getElementById("print-training-plan-pie");
+const printTrainingPlanQuotaBar = document.getElementById("print-training-plan-quota-bar");
 const printTrainingPlanTrend = document.getElementById("print-training-plan-trend");
 const printTrainingPlanTopicsPlayer = document.getElementById("print-training-plan-topics-player");
 const printTrainingPlanTopicsGk = document.getElementById("print-training-plan-topics-gk");
@@ -230,127 +229,93 @@ function buildTopicBarChartSvg(topics, color) {
   return `<svg viewBox="0 0 ${width} ${height}" width="100%" style="max-width:${width}px; display:block;">${rows}</svg>`;
 }
 
-// กราฟแท่งแนวนอนแบบซ้อน (stacked) 1 แท่งต่อ 1 โค้ช แสดงสัดส่วนตรงเวลา/สาย/ไม่ส่ง เทียบกับเกณฑ์ที่ต้องส่ง — เลือก
-// แนวนอนเพราะจำนวนโค้ชอาจมีหลายคน แนวตั้งจะแคบเกินไปจนป้ายชื่อโค้ชทับกัน
-function buildCoachQuotaBarChartSvg(coachRows, quota) {
-  if (coachRows.length === 0) {
-    return '<p class="text-xs text-slate-400 text-center py-4">ไม่มีข้อมูล</p>';
-  }
-  const rowH = 23;
-  const padTop = 6;
-  const padBottom = 6;
-  const labelW = 100;
-  const barAreaW = 268;
-  const numbersW = 66;
-  const width = labelW + barAreaW + numbersW + 8;
-  const height = padTop + padBottom + coachRows.length * rowH;
-  const maxTotal = Math.max(...coachRows.map((r) => r.onTime + r.late + r.missing), quota);
-
-  const rows = coachRows
-    .map((r, i) => {
-      const y = padTop + i * rowH;
-      const midY = (y + rowH / 2 + 3.5).toFixed(1);
-      const name = r.coach.name ?? "-";
-      const label = name.length > 13 ? `${name.slice(0, 12)}…` : name;
-      const segs = [
-        { count: r.onTime, color: "#10b981", segLabel: "ตรงเวลา" },
-        { count: r.late, color: "#f59e0b", segLabel: "สาย" },
-        { count: r.missing, color: "#cbd5e1", segLabel: "ไม่ส่ง" }
-      ];
-      let x = labelW;
-      let rects = "";
-      for (const seg of segs) {
-        if (seg.count <= 0) continue;
-        const w = (seg.count / maxTotal) * barAreaW;
-        rects += `<rect x="${x.toFixed(1)}" y="${(y + 3).toFixed(1)}" width="${w.toFixed(1)}" height="${rowH - 6}" rx="1.5" fill="${seg.color}"><title>${escapeHtml(name)} ${seg.segLabel}: ${seg.count}</title></rect>`;
-        x += w;
-      }
-      // ตัวเลขจำนวนครั้งแยกสีตามหมวด วางไว้ตำแหน่งคงที่ท้ายแท่งเสมอ (ไม่ใช่ต่อท้ายความยาวแท่งจริงที่ไม่เท่ากัน
-      // แต่ละแถว) เพื่อให้อ่านเป็นคอลัมน์ตรงกันทุกแถวเหมือนตาราง แทนที่จะต้อง hover ดู tooltip ซึ่งพิมพ์ออกมาไม่ได้
-      const numbersX = labelW + barAreaW + 6;
-      const numbers = `<text x="${numbersX}" y="${midY}" font-size="9.5" font-weight="600"><tspan fill="#059669">${r.onTime}</tspan><tspan fill="#94a3b8" font-weight="400"> / </tspan><tspan fill="#d97706">${r.late}</tspan><tspan fill="#94a3b8" font-weight="400"> / </tspan><tspan fill="#64748b">${r.missing}</tspan></text>`;
-      return `<text x="${labelW - 8}" y="${midY}" font-size="10" fill="#334155" text-anchor="end">${escapeHtml(label)}<title>${escapeHtml(name)}</title></text>${rects}${numbers}`;
-    })
-    .join("");
-
-  return `
-    <svg viewBox="0 0 ${width} ${height}" width="100%" style="max-width:${width}px; display:block; margin:0 auto;">${rows}</svg>
-    <div class="text-xs text-slate-500 flex flex-wrap justify-center gap-x-4 gap-y-1 mt-2">
-      <span class="inline-flex items-center gap-1"><span class="inline-block w-2.5 h-2.5 rounded-full" style="background:#10b981"></span>ตรงเวลา</span>
-      <span class="inline-flex items-center gap-1"><span class="inline-block w-2.5 h-2.5 rounded-full" style="background:#f59e0b"></span>สาย</span>
-      <span class="inline-flex items-center gap-1"><span class="inline-block w-2.5 h-2.5 rounded-full" style="background:#cbd5e1"></span>ไม่ส่ง</span>
-    </div>
-  `;
-}
-
-// แผนภูมิวงกลมสัดส่วนตรงเวลา/สาย/ไม่ส่ง รวมทุกโค้ชในขอบเขต — วาดเป็นวงกลมเต็มดวงตรงๆ (ไม่ผ่าน arc path) ถ้ามีแค่
-// สถานะเดียวที่ไม่เป็นศูนย์ เพราะสูตร arc มาตรฐานคำนวณวงกลมเต็ม 360 องศาไม่ได้ (จุดเริ่ม/จบซ้อนกันพอดี)
-function buildQuotaPieChartSvg(totalOnTime, totalLate, totalMissing) {
+// แถบสัดส่วนรวมทีมเดียวแบบ 100%-stacked แนวนอน แทนกราฟวงกลมเดิม — วงกลมกะสัดส่วนด้วยตาเปล่ายากเมื่อสัดส่วนเบ้มาก
+// (เช่น 90% เป็นสถานะเดียว) แถบเทียบความยาวตรงๆ แม่นยำกว่า และย่อพื้นที่หน้าพิมพ์ลงได้มากกว่าวงกลม
+function buildQuotaProportionBarHtml(totalOnTime, totalLate, totalMissing) {
   const total = totalOnTime + totalLate + totalMissing;
   if (total === 0) {
     return '<p class="text-xs text-slate-400 text-center py-4">ไม่มีข้อมูล</p>';
   }
-  const slices = [
+  const width = 600;
+  const height = 26;
+  const segs = [
     { value: totalOnTime, color: "#10b981", label: "ตรงเวลา" },
     { value: totalLate, color: "#f59e0b", label: "สาย" },
     { value: totalMissing, color: "#cbd5e1", label: "ไม่ส่ง" }
   ];
-  const cx = 100;
-  const cy = 100;
-  const r = 90;
-  const nonZero = slices.filter((s) => s.value > 0);
-
-  let svgBody;
-  if (nonZero.length === 1) {
-    svgBody = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${nonZero[0].color}"><title>${nonZero[0].label}: ${nonZero[0].value} (100%)</title></circle>`;
-  } else {
-    let angle = -Math.PI / 2;
-    svgBody = slices
-      .map((s) => {
-        if (s.value <= 0) return "";
-        const sweep = (s.value / total) * 2 * Math.PI;
-        const angleEnd = angle + sweep;
-        const x1 = (cx + r * Math.cos(angle)).toFixed(1);
-        const y1 = (cy + r * Math.sin(angle)).toFixed(1);
-        const x2 = (cx + r * Math.cos(angleEnd)).toFixed(1);
-        const y2 = (cy + r * Math.sin(angleEnd)).toFixed(1);
-        const largeArc = sweep > Math.PI ? 1 : 0;
-        const pct = Math.round((s.value / total) * 100);
-        angle = angleEnd;
-        return `<path d="M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z" fill="${s.color}"><title>${s.label}: ${s.value} (${pct}%)</title></path>`;
-      })
-      .join("");
-  }
-
-  const legend = slices
+  let x = 0;
+  const rects = segs
+    .map((s) => {
+      if (s.value <= 0) return "";
+      const w = (s.value / total) * width;
+      const rect = `<rect x="${x.toFixed(1)}" y="0" width="${w.toFixed(1)}" height="${height}" fill="${s.color}"><title>${s.label}: ${s.value} (${Math.round((s.value / total) * 100)}%)</title></rect>`;
+      x += w;
+      return rect;
+    })
+    .join("");
+  const legend = segs
     .map((s) => {
       const pct = Math.round((s.value / total) * 100);
       return `<span class="inline-flex items-center gap-1.5"><span class="inline-block w-2.5 h-2.5 rounded-full" style="background:${s.color}"></span>${s.label} ${pct}% (${s.value})</span>`;
     })
     .join("");
 
+  // สำคัญ: ห้ามใส่ height="${height}" เป็น attribute ตายตัวคู่กับ width="100%" — สัดส่วนกล่อง SVG ที่ได้ (เต็ม
+  // ความกว้าง container x สูงคงที่) จะไม่ตรงกับสัดส่วนของ viewBox แล้ว browser จะ letterbox (ย่อเนื้อหาให้พอดี
+  // แล้ววางกึ่งกลาง) เหลือพื้นที่ว่าง 2 ข้างเป็นสีพื้นหลังของ div ครอบ ดูเหมือนแท่งสีเทาโผล่มาก่อน/หลังแท่งจริง
+  // ทั้งที่โค้ดคำนวณตำแหน่งถูกต้อง (เจอบั๊กนี้จริงตอนทดสอบ) ใช้ style="max-width" แทนเพื่อให้สัดส่วนคงที่เสมอ
   return `
-    <svg viewBox="0 0 200 200" width="100%" style="max-width:220px; display:block; margin:0 auto;">${svgBody}</svg>
+    <div style="border-radius:6px; overflow:hidden; background:#e2e8f0;">
+      <svg viewBox="0 0 ${width} ${height}" width="100%" style="max-width:${width}px; display:block;">${rects}</svg>
+    </div>
     <div class="text-xs text-slate-500 flex flex-wrap justify-center gap-x-4 gap-y-1.5 mt-3">${legend}</div>
   `;
+}
+
+// แถบสัดส่วนขนาดเล็กในแต่ละแถวของตาราง (ตรงเวลา/สาย/ไม่ส่ง เทียบกับเกณฑ์ที่ต้องส่งของโค้ชคนนั้น) แทนกราฟแท่งแยก
+// รายโค้ชแบบเดิมที่เคยอยู่คนละที่กับตาราง — เห็นสัดส่วนพร้อมตัวเลขในแถวเดียวกันเลย ไม่ต้องสลับดูกราฟแยก
+function buildInlineQuotaBarSvg(onTime, late, missing, quota) {
+  const width = 120;
+  const height = 10;
+  const denom = Math.max(quota, onTime + late + missing, 1);
+  const segs = [
+    { value: onTime, color: "#10b981" },
+    { value: late, color: "#f59e0b" },
+    { value: missing, color: "#94a3b8" }
+  ];
+  let x = 0;
+  const rects = segs
+    .map((s) => {
+      if (s.value <= 0) return "";
+      const w = (s.value / denom) * width;
+      const rect = `<rect x="${x.toFixed(1)}" y="0" width="${w.toFixed(1)}" height="${height}" fill="${s.color}"/>`;
+      x += w;
+      return rect;
+    })
+    .join("");
+  return `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}"><rect x="0" y="0" width="${width}" height="${height}" rx="2" fill="#eef0ec"/>${rects}</svg>`;
 }
 
 // แถบผลต่างประตูวิ่งจากกึ่งกลาง (diverging bar) — เขียวไปทางขวาเมื่อได้มากกว่าเสีย แดงไปทางซ้ายเมื่อเสียมากกว่าได้
 // เห็นทิศทาง "รุกดี/รับดี" ได้ทันทีโดยไม่ต้องคำนวณลบเลขเอง ความยาวแท่งเทียบกับ maxAbsDiff (ผลต่างที่มากที่สุด
 // ในบรรดารุ่นอายุที่แสดง) เพื่อให้เทียบขนาดข้ามการ์ดกันได้
 function buildGoalDiffBarSvg(diff, maxAbsDiff) {
-  const halfW = 100;
-  const rawLen = maxAbsDiff > 0 ? (Math.abs(diff) / maxAbsDiff) * halfW : 0;
+  const cx = 120;
+  const trackHalf = 90;
+  const rawLen = maxAbsDiff > 0 ? (Math.abs(diff) / maxAbsDiff) * trackHalf : 0;
   const barLen = diff === 0 ? 0 : Math.max(rawLen, 2);
   const color = diff > 0 ? "#059669" : diff < 0 ? "#dc2626" : "#94a3b8";
-  const x = diff < 0 ? 110 - barLen : 110;
   const diffText = diff > 0 ? `+${diff}` : `${diff}`;
+  // ป้ายตัวเลขวางต่อท้ายปลายแท่งจริงเสมอ (ไม่ใช่ตำแหน่งคงที่ริมกรอบ) กันตัวเลขไปทับแท่งตอนแท่งยาวใกล้สุดทาง
+  // (เคยเกิดจริง — ค่าผลต่างมากๆ ทำให้แท่งยาวจนป้ายเลข (สีเดียวกับแท่ง) ซ้อนทับแท่งจนตัวเลขบางส่วนมองไม่เห็น)
   const onRight = diff >= 0;
+  const textX = onRight ? cx + barLen + 6 : cx - barLen - 6;
+  const barX = onRight ? cx : cx - barLen;
   return `
-    <svg viewBox="0 0 220 28" width="100%" style="max-width:220px; display:block;" height="28">
-      <line x1="110" y1="2" x2="110" y2="24" stroke="#e2e8f0"/>
-      ${barLen > 0 ? `<rect x="${x.toFixed(1)}" y="9" width="${barLen.toFixed(1)}" height="10" rx="2" fill="${color}"><title>ผลต่างประตู: ${diffText}</title></rect>` : ""}
-      <text x="${onRight ? 216 : 4}" y="18.5" font-size="11" font-weight="700" fill="${color}" text-anchor="${onRight ? "end" : "start"}">${diffText}</text>
+    <svg viewBox="0 0 240 28" width="100%" style="max-width:240px; display:block;">
+      <line x1="${cx}" y1="2" x2="${cx}" y2="24" stroke="#e2e8f0"/>
+      ${barLen > 0 ? `<rect x="${barX.toFixed(1)}" y="9" width="${barLen.toFixed(1)}" height="10" rx="2" fill="${color}"><title>ผลต่างประตู: ${diffText}</title></rect>` : ""}
+      <text x="${textX.toFixed(1)}" y="18.5" font-size="11" font-weight="700" fill="${color}" text-anchor="${onRight ? "start" : "end"}">${diffText}</text>
     </svg>`;
 }
 
@@ -571,8 +536,7 @@ async function loadPrintExtras(team, ageGroup, month) {
     return { coach: c, onTime, late, missing, onTimePercent };
   });
 
-  printTrainingPlanCoachChart.innerHTML = buildCoachQuotaBarChartSvg(coachRows, monthlyQuota);
-  printTrainingPlanPie.innerHTML = buildQuotaPieChartSvg(
+  printTrainingPlanQuotaBar.innerHTML = buildQuotaProportionBarHtml(
     coachRows.reduce((sum, r) => sum + r.onTime, 0),
     coachRows.reduce((sum, r) => sum + r.late, 0),
     coachRows.reduce((sum, r) => sum + r.missing, 0)
@@ -580,7 +544,7 @@ async function loadPrintExtras(team, ageGroup, month) {
 
   if (coachRows.length === 0) {
     printTrainingPlanBody.innerHTML =
-      '<tr><td colspan="7" class="px-4 py-6 text-center text-slate-400">ไม่มีโค้ชในขอบเขตที่เลือก</td></tr>';
+      '<tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">ไม่มีโค้ชในขอบเขตที่เลือก</td></tr>';
   } else {
     printTrainingPlanBody.innerHTML = coachRows
       .map(({ coach, onTime, late, missing, onTimePercent }) => {
@@ -591,6 +555,7 @@ async function loadPrintExtras(team, ageGroup, month) {
             <td class="emphasis">${escapeHtml(coach.name ?? "-")}</td>
             <td>${(coach.ageGroups || []).join(", ") || "-"}</td>
             <td>${monthlyQuota}</td>
+            <td>${buildInlineQuotaBarSvg(onTime, late, missing, monthlyQuota)}</td>
             <td class="text-emerald-600 font-medium">${onTime}</td>
             <td class="text-red-500 font-medium">${late}</td>
             <td class="text-slate-500 font-medium">${missing}</td>
