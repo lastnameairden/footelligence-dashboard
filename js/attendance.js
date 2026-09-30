@@ -2913,12 +2913,23 @@ function showExecutiveHome(team) {
 // ตั้งใจปล่อยเป็น null ไว้เสมอ (ดูหมายเหตุที่ myExecutiveTeam) จึงรับทีมที่จะดูเป็นพารามิเตอร์ตรงๆ แทน
 const EXECUTIVE_UNASSIGNED_AGE_GROUP = "ไม่ระบุรุ่นอายุ";
 
+// จัดกลุ่มตำแหน่งเล่น (รหัสละเอียดตามที่กรอกตอนเพิ่มนักกีฬา) เป็น 4 หมวดกว้างๆ แบบที่คุ้นตาในวงการฟุตบอล
+// (GK/กองหลัง/กองกลาง/กองหน้า) ใช้กำหนดสี badge ให้แยกแยะตำแหน่งได้ไวขึ้นด้วยสายตา ไม่ต้องอ่านตัวย่อทีละคน
+const POSITION_GROUPS = {
+  GK: "gk",
+  CB: "df", RB: "df", LB: "df", RWB: "df", LWB: "df", SW: "df",
+  CDM: "mf", CM: "mf", CAM: "mf", RM: "mf", LM: "mf",
+  RW: "fw", LW: "fw", SS: "fw", CF: "fw", ST: "fw"
+};
+const POSITION_GROUP_BADGE = { gk: "badge-warning", df: "badge-info", mf: "badge-success", fw: "badge-danger" };
+
 async function openExecutivePlayersSection(team) {
   executivePlayersReturnTeam = team;
   hideAllScreens();
   executivePlayersSection.classList.remove("hidden");
   executivePlayersGroupsEl.innerHTML = '<p class="text-slate-400 text-sm">กำลังโหลด...</p>';
   try {
+    // ไม่มี limit/pagination ใดๆ ในนี้ — ดึงนักกีฬาทุกคนของทีมนี้มาแสดงทั้งหมดในครั้งเดียวเสมอ
     const snapshot = await getDocs(query(collection(db, "players"), where("team", "==", team)));
     const teamPlayers = [];
     snapshot.forEach((docSnap) => teamPlayers.push({ id: docSnap.id, ...docSnap.data() }));
@@ -2929,8 +2940,43 @@ async function openExecutivePlayersSection(team) {
   }
 }
 
+// การ์ดวงกลมรูปนักกีฬา (รูปจริงถ้ามี ไม่มีก็ไอคอนคนแทน) ให้หน้าตาเป็นทาวเนอร์รายชื่อแบบมืออาชีพ ไม่ใช่ตารางตัวหนังสือล้วน
+function executiveAvatarHtml(p) {
+  const photo = p.photoUrl
+    ? `<img src="${safeHttpUrl(p.photoUrl)}" alt="" class="w-full h-full object-cover" />`
+    : icon("user");
+  return `<div class="w-9 h-9 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center overflow-hidden flex-shrink-0">${photo}</div>`;
+}
+
+// สรุปจำนวนรวม + แยกตามหมวดตำแหน่งไว้บนสุด ให้เห็นตัวเลขยืนยันว่าครบทุกคนในทีมได้ทันทีโดยไม่ต้องนับเอง
+function executiveRosterSummaryHtml(teamPlayers) {
+  const counts = { gk: 0, df: 0, mf: 0, fw: 0, other: 0 };
+  for (const p of teamPlayers) {
+    const group = POSITION_GROUPS[p.position] || "other";
+    counts[group] += 1;
+  }
+  const chip = (label, value, badgeClass) =>
+    `<span class="badge ${badgeClass}">${label} ${value}</span>`;
+  return `
+    <div class="card card-pad flex flex-wrap items-center gap-x-6 gap-y-3 mb-4">
+      <div>
+        <p class="text-xs text-slate-400 uppercase tracking-wide">นักกีฬาทั้งหมดในทีม</p>
+        <p class="text-2xl font-semibold text-slate-900" style="font-family:'Mitr',sans-serif;">${teamPlayers.length} คน</p>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        ${chip("GK", counts.gk, POSITION_GROUP_BADGE.gk)}
+        ${chip("กองหลัง", counts.df, POSITION_GROUP_BADGE.df)}
+        ${chip("กองกลาง", counts.mf, POSITION_GROUP_BADGE.mf)}
+        ${chip("กองหน้า", counts.fw, POSITION_GROUP_BADGE.fw)}
+        ${counts.other > 0 ? chip("ไม่ระบุตำแหน่ง", counts.other, "badge-neutral") : ""}
+      </div>
+    </div>
+  `;
+}
+
 // แบ่งรายชื่อเป็นการ์ดแยกตามรุ่นอายุ (ทีมหนึ่งมักมีหลายรุ่นอายุคละกัน) เรียงรุ่นน้อยไปมากด้วย ageGroupNumber
-// เหมือนหน้า Dashboard ของผู้ดูแลระบบ (renderPlayersGroups ใน app.js) เพื่อให้ดูง่ายกว่าตารางเดียวรวมทุกรุ่น
+// เหมือนหน้า Dashboard ของผู้ดูแลระบบ (renderPlayersGroups ใน app.js) เพื่อให้ดูง่ายกว่าตารางเดียวรวมทุกรุ่น —
+// ไม่มี limit/pagination ที่ไหนเลยในฟังก์ชันนี้ ทุกคนที่ query กลับมาจะถูกแสดงครบ ไม่มีการตัดรายการทิ้ง
 function renderExecutivePlayerList(teamPlayers) {
   executivePlayersGroupsEl.innerHTML = "";
   if (teamPlayers.length === 0) {
@@ -2945,8 +2991,14 @@ function renderExecutivePlayerList(teamPlayers) {
   }
   const sortedAgeGroups = [...ageGroupMap.keys()].sort((a, b) => ageGroupNumber(a) - ageGroupNumber(b));
 
+  executivePlayersGroupsEl.insertAdjacentHTML("beforeend", executiveRosterSummaryHtml(teamPlayers));
+
   for (const ageGroup of sortedAgeGroups) {
-    const groupPlayers = ageGroupMap.get(ageGroup).slice().sort((a, b) => (a.number ?? 0) - (b.number ?? 0));
+    // เบอร์เสื้อที่ไม่ได้กรอกไว้ (undefined/null) ให้ไปอยู่ท้ายกลุ่มเสมอ ไม่ใช่ดันขึ้นบนสุดเหมือนเบอร์ 0
+    const groupPlayers = ageGroupMap
+      .get(ageGroup)
+      .slice()
+      .sort((a, b) => (a.number ?? Infinity) - (b.number ?? Infinity));
     const wrapper = document.createElement("div");
     wrapper.innerHTML = `
       <h3 class="section-title text-sm mb-2">${escapeHtml(ageGroup)} <span class="text-slate-400 font-normal">(${groupPlayers.length} คน)</span></h3>
@@ -2955,24 +3007,34 @@ function renderExecutivePlayerList(teamPlayers) {
           <thead>
             <tr>
               <th>เบอร์</th>
-              <th>ชื่อเล่น</th>
+              <th>นักกีฬา</th>
               <th>ชื่อ-นามสกุล</th>
+              <th>อายุ</th>
               <th>วันเกิด</th>
               <th>ตำแหน่ง</th>
             </tr>
           </thead>
           <tbody>
             ${groupPlayers
-              .map(
-                (p) => `
+              .map((p) => {
+                const age = calcAge(p.birthday);
+                const posGroup = POSITION_GROUPS[p.position];
+                const posBadgeClass = posGroup ? POSITION_GROUP_BADGE[posGroup] : "badge-neutral";
+                return `
               <tr>
-                <td>${escapeHtml(p.number ?? "-")}</td>
-                <td class="emphasis"><a href="./player.html#id=${p.id}" class="text-blue-600 hover:underline">${escapeHtml(p.nickname ?? "-")}</a></td>
+                <td class="text-slate-400 font-medium">${p.number != null ? escapeHtml(p.number) : "-"}</td>
+                <td class="emphasis">
+                  <a href="./player.html#id=${p.id}" class="flex items-center gap-3 text-blue-600 hover:underline">
+                    ${executiveAvatarHtml(p)}
+                    <span>${escapeHtml(p.nickname ?? "-")}</span>
+                  </a>
+                </td>
                 <td>${escapeHtml(p.fullName ?? "-")}</td>
+                <td>${age != null ? `${age} ปี` : "-"}</td>
                 <td>${escapeHtml(p.birthday ?? "-")}</td>
-                <td>${escapeHtml(p.position ?? "-")}</td>
-              </tr>`
-              )
+                <td>${p.position ? `<span class="badge ${posBadgeClass}">${escapeHtml(p.position)}</span>` : `<span class="text-slate-300">-</span>`}</td>
+              </tr>`;
+              })
               .join("")}
           </tbody>
         </table>
