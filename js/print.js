@@ -54,7 +54,7 @@ const printMatchCards = document.getElementById("print-match-cards");
 const printMatchSummaryCards = document.getElementById("print-match-summary-cards");
 const printMatchBody = document.getElementById("print-match-body");
 const printInjuryCards = document.getElementById("print-injury-cards");
-const printInjuryChart = document.getElementById("print-injury-chart");
+const printInjurySummaryCards = document.getElementById("print-injury-summary-cards");
 const printInjuryBody = document.getElementById("print-injury-body");
 
 let currentPrintTeam = null;
@@ -369,10 +369,10 @@ function buildMatchSummaryCardsHtml(matches) {
   return `<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">${cards}</div>`;
 }
 
-// กราฟแท่งกลุ่มความรุนแรงของอาการบาดเจ็บ (เล็กน้อย/ปานกลาง/รุนแรง) แยกตามรุ่นอายุ — กลุ่มแท่งต่อรุ่นอายุแบบ
-// เดียวกับที่รายงานผลการแข่งขันด้านบนเคยใช้ (ก่อนเปลี่ยนเป็นการ์ด+แถบผลต่างประตู) เปลี่ยนแค่หมวดหมู่และสี
-// ให้เห็นว่ารุ่นไหนมีนักกีฬาบาดเจ็บรุนแรงสะสมมากกว่ากัน
-function buildInjurySeverityChartSvg(injuries) {
+// การ์ดสรุปอาการบาดเจ็บแยกรายรุ่นอายุ (จำนวนรวม/สัดส่วนความรุนแรง รวมไว้ในการ์ดเดียวต่อรุ่น) แทนกราฟแท่งกลุ่ม
+// แบบเดิม — ใช้หลักการเดียวกับการ์ดผลการแข่งขันด้านบน (สีของแต่ละระดับความรุนแรงยังใช้สีเดิมของกราฟเก่าเพื่อความ
+// ต่อเนื่อง) การ์ดที่มีเคส "รุนแรง" อย่างน้อย 1 รายจะมีขอบสีแดงเน้นให้สังเกตง่ายกว่าตัวเลขเฉยๆ
+function buildInjurySummaryCardsHtml(injuries) {
   if (injuries.length === 0) {
     return '<p class="text-xs text-slate-400 text-center py-6">ไม่มีข้อมูลอาการบาดเจ็บ</p>';
   }
@@ -387,64 +387,42 @@ function buildInjurySeverityChartSvg(injuries) {
   }
   const ageGroups = Array.from(groups.keys()).sort((a, b) => ageGroupNumber(a) - ageGroupNumber(b));
 
-  const width = 700;
-  const height = 190;
-  const padTop = 10;
-  const padBottom = 24;
-  const padLeft = 24;
-  const padRight = 8;
-  const chartW = width - padLeft - padRight;
-  const chartH = height - padTop - padBottom;
-  const n = ageGroups.length;
-  const groupW = chartW / n;
-  const groupGap = groupW * 0.18;
-  const series = ["mild", "moderate", "severe"];
-  const barW = (groupW - groupGap) / series.length;
-  const seriesColor = { mild: "#94a3b8", moderate: "#f59e0b", severe: "#ef4444" };
-  const maxY = Math.max(...ageGroups.map((ag) => Math.max(groups.get(ag).mild, groups.get(ag).moderate, groups.get(ag).severe)), 1);
-  const baselineY = padTop + chartH;
-
-  const gridLines = [0.5, 1]
-    .map((frac) => {
-      const y = padTop + chartH - frac * chartH;
-      return `<line x1="${padLeft}" y1="${y.toFixed(1)}" x2="${width - padRight}" y2="${y.toFixed(1)}" stroke="#e2e8f0" stroke-width="1"/>
-              <text x="${padLeft - 4}" y="${(y + 2.5).toFixed(1)}" font-size="7" fill="#94a3b8" text-anchor="end">${Math.round(frac * maxY)}</text>`;
-    })
-    .join("");
-
-  const bars = ageGroups
-    .map((ag, gi) => {
+  const cards = ageGroups
+    .map((ag) => {
       const g = groups.get(ag);
-      const groupX = padLeft + gi * groupW + groupGap / 2;
-      return series
-        .map((key, si) => {
-          const val = g[key];
-          if (val === 0) return "";
-          const barH = (val / maxY) * chartH;
-          const x = groupX + si * barW;
-          const y = baselineY - barH;
-          const label = key === "mild" ? "เล็กน้อย" : key === "moderate" ? "ปานกลาง" : "รุนแรง";
-          return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${Math.max(barW - 1, 1).toFixed(1)}" height="${barH.toFixed(1)}" rx="1" fill="${seriesColor[key]}"><title>${escapeHtml(ag)} ${label}: ${val} ราย</title></rect>`;
+      const total = g.mild + g.moderate + g.severe;
+      const cardBorder = g.severe > 0 ? "border: 1.5px solid #fecaca;" : "";
+      const segs = [
+        { value: g.mild, color: "#94a3b8" },
+        { value: g.moderate, color: "#f59e0b" },
+        { value: g.severe, color: "#ef4444" }
+      ];
+      let x = 0;
+      const barWidth = 200;
+      const rects = segs
+        .map((s) => {
+          if (s.value <= 0) return "";
+          const w = (s.value / total) * barWidth;
+          const rect = `<rect x="${x.toFixed(1)}" y="0" width="${w.toFixed(1)}" height="10" fill="${s.color}"/>`;
+          x += w;
+          return rect;
         })
         .join("");
-    })
-    .join("");
-
-  const groupLabels = ageGroups
-    .map((ag, gi) => {
-      const x = padLeft + gi * groupW + groupW / 2;
-      return `<text x="${x.toFixed(1)}" y="${height - 6}" font-size="8" fill="#64748b" text-anchor="middle">${escapeHtml(ag)}</text>`;
+      return `
+        <div class="card card-pad flex flex-col gap-2" style="${cardBorder}">
+          <div class="flex items-baseline justify-between">
+            <h4 class="font-semibold text-slate-800">${escapeHtml(ag)}</h4>
+            <span class="text-xs text-slate-400">${total} ราย</span>
+          </div>
+          <p class="text-xs text-slate-500">${g.mild} เล็กน้อย · ${g.moderate} ปานกลาง · ${g.severe} รุนแรง</p>
+          <svg viewBox="0 0 ${barWidth} 10" width="100%" style="max-width:${barWidth}px; display:block;"><rect width="${barWidth}" height="10" rx="2" fill="#eef0ec"/>${rects}</svg>
+        </div>`;
     })
     .join("");
 
   return `
-    <svg viewBox="0 0 ${width} ${height}" width="100%" style="max-width:${width}px; display:block; margin:0 auto;">
-      ${gridLines}
-      <line x1="${padLeft}" y1="${baselineY.toFixed(1)}" x2="${width - padRight}" y2="${baselineY.toFixed(1)}" stroke="#cbd5e1" stroke-width="1"/>
-      ${bars}
-      ${groupLabels}
-    </svg>
-    <div class="text-[10px] text-slate-500 flex flex-wrap justify-center gap-x-3 gap-y-1 mt-1">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">${cards}</div>
+    <div class="text-xs text-slate-500 flex flex-wrap justify-center gap-x-4 gap-y-1 mt-3">
       <span class="inline-flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-full" style="background:#94a3b8"></span>เล็กน้อย</span>
       <span class="inline-flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-full" style="background:#f59e0b"></span>ปานกลาง</span>
       <span class="inline-flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-full" style="background:#ef4444"></span>รุนแรง</span>
@@ -613,9 +591,10 @@ async function loadPrintExtras(team, ageGroup, month) {
     // เกณฑ์ "ต้องเช็คชื่อ" ใช้จำนวนวันฝึกซ้อมจริงของทีมนี้ในเดือนนี้ (monthlyQuota เดียวกับแผนการฝึกซ้อมด้านบน
     // เพราะทั้งสองกิจกรรมควรเกิดขึ้นทุกวันฝึกซ้อมจริงเท่ากัน) ไม่ใช่ตัวเลขคงที่แบบเดิม — checkinDays ยังนับจาก
     // วันฝึกซ้อมจริง (monthSessions) เหมือนเดิม เพราะเช็คชื่อได้เฉพาะวันที่มี session จริงเท่านั้น แต่ % เทียบกับ
-    // เกณฑ์นี้แทน
+    // เกณฑ์นี้แทน — missing ใช้แสดงในแถบสัดส่วนของตาราง (ไม่มีคอลัมน์ตัวเลขแยกเหมือนตารางแผนการฝึกซ้อม)
     const matchPercent = Math.round((checkinDays / monthlyQuota) * 100);
-    return { coach: c, checkinDays, onTime, late, matchPercent };
+    const missing = Math.max(monthlyQuota - checkinDays, 0);
+    return { coach: c, checkinDays, onTime, late, missing, matchPercent };
   });
 
   const totalCheckinDays = checkinRows.reduce((sum, r) => sum + r.checkinDays, 0);
@@ -632,10 +611,10 @@ async function loadPrintExtras(team, ageGroup, month) {
 
   if (checkinRows.length === 0) {
     printCheckinBody.innerHTML =
-      '<tr><td colspan="7" class="px-4 py-6 text-center text-slate-400">ไม่มีโค้ชในขอบเขตที่เลือก</td></tr>';
+      '<tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">ไม่มีโค้ชในขอบเขตที่เลือก</td></tr>';
   } else {
     printCheckinBody.innerHTML = checkinRows
-      .map(({ coach, checkinDays, onTime, late, matchPercent }) => {
+      .map(({ coach, checkinDays, onTime, late, missing, matchPercent }) => {
         const percentText = `${matchPercent}%`;
         const percentBadgeClass = matchPercent >= 80 ? "badge-success" : matchPercent >= 50 ? "badge-warning" : "badge-danger";
         return `
@@ -643,6 +622,7 @@ async function loadPrintExtras(team, ageGroup, month) {
             <td class="emphasis">${escapeHtml(coach.name ?? "-")}</td>
             <td>${(coach.ageGroups || []).join(", ") || "-"}</td>
             <td>${monthlyQuota}</td>
+            <td>${buildInlineQuotaBarSvg(onTime, late, missing, monthlyQuota)}</td>
             <td>${checkinDays}</td>
             <td class="text-emerald-600 font-medium">${onTime}</td>
             <td class="text-red-500 font-medium">${late}</td>
@@ -694,7 +674,8 @@ async function loadPrintExtras(team, ageGroup, month) {
     }
     const late = matchDays - onTime;
     const matchPercent = Math.round((matchDays / monthlyQuota) * 100);
-    return { coach: c, matchDays, onTime, late, matchPercent };
+    const missing = Math.max(monthlyQuota - matchDays, 0);
+    return { coach: c, matchDays, onTime, late, missing, matchPercent };
   });
 
   // การ์ดนี้อยู่คู่กับสถิติแบบ "รวม" ของทุกโค้ช (matchDays ฯลฯ รวมทุกคน) จึงต้องคูณ coaches.length ด้วยเหมือนกับ
@@ -708,10 +689,10 @@ async function loadPrintExtras(team, ageGroup, month) {
 
   if (reportRows.length === 0) {
     printReportBody.innerHTML =
-      '<tr><td colspan="7" class="px-4 py-6 text-center text-slate-400">ไม่มีโค้ชในขอบเขตที่เลือก</td></tr>';
+      '<tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">ไม่มีโค้ชในขอบเขตที่เลือก</td></tr>';
   } else {
     printReportBody.innerHTML = reportRows
-      .map(({ coach, matchDays, onTime, late, matchPercent }) => {
+      .map(({ coach, matchDays, onTime, late, missing, matchPercent }) => {
         const percentText = `${matchPercent}%`;
         const percentBadgeClass = matchPercent >= 80 ? "badge-success" : matchPercent >= 50 ? "badge-warning" : "badge-danger";
         return `
@@ -719,6 +700,7 @@ async function loadPrintExtras(team, ageGroup, month) {
             <td class="emphasis">${escapeHtml(coach.name ?? "-")}</td>
             <td>${(coach.ageGroups || []).join(", ") || "-"}</td>
             <td>${monthlyQuota}</td>
+            <td>${buildInlineQuotaBarSvg(onTime, late, missing, monthlyQuota)}</td>
             <td>${matchDays}</td>
             <td class="text-emerald-600 font-medium">${onTime}</td>
             <td class="text-red-500 font-medium">${late}</td>
@@ -747,32 +729,39 @@ async function loadPrintExtras(team, ageGroup, month) {
   printReportTrend.innerHTML = buildCoachDailyTrendSvg(reportDailyCounts, coaches.length, { noneLabel: "ยังไม่ส่งรายงาน" });
 
   // ---------- ความสอดคล้องของการทำงานประจำวัน (แผน + เช็คชื่อ + รายงาน) แยกรายโค้ช ----------
-  // นับเฉพาะวันฝึกซ้อมจริง (monthSessions) ที่โค้ชคนนั้นส่งครบทั้ง 3 อย่าง (ไม่สนว่าตรงเวลาหรือสาย เพราะความ
-  // ตรงเวลาแยกดูได้แล้วในแต่ละส่วนด้านบน — ส่วนนี้วัดแค่ "ทำครบหรือไม่" ในวันเดียวกัน) — เกณฑ์ "วันฝึกซ้อมทั้งหมด"
+  // นับเฉพาะวันฝึกซ้อมจริง (monthSessions) — planCount/checkinCount/reportCount นับแยกแต่ละอย่างว่าทำกี่วัน (ไม่
+  // สนว่าตรงเวลาหรือสาย เพราะความตรงเวลาแยกดูได้แล้วในแต่ละส่วนด้านบน) ส่วน complete นับเฉพาะวันที่ทำครบทั้ง 3
+  // อย่างพร้อมกันเท่านั้น (คนละความหมายกับ planCount ฯลฯ ซึ่งอาจทำแยกกันคนละวันก็ได้) — เกณฑ์ "วันฝึกซ้อมทั้งหมด"
   // ใช้ monthlyQuota เหมือน 3 ส่วนด้านบน (ดูเหตุผลที่คอมเมนต์ของสรุปการส่งรายงานการฝึกซ้อม) ไม่ใช่ monthSessions.length
   const consistencyRows = coaches.map((c) => {
     const myPlayerIds = getCoachPlayerIds(c, scopedPlayers);
     const myPlans = plans.filter((p) => p.coachName === c.name);
     const myReports = reports.filter((r) => r.coachName === c.name);
+    let planCount = 0;
+    let checkinCount = 0;
+    let reportCount = 0;
     let complete = 0;
     for (const s of monthSessions) {
       const hasPlan = myPlans.some((p) => p.date === s.date);
       const hasCheckin = attendanceRecords.some((a) => s.ids.includes(a.sessionId) && myPlayerIds.has(a.playerId));
       const hasReport = myReports.some((r) => r.date === s.date);
+      if (hasPlan) planCount += 1;
+      if (hasCheckin) checkinCount += 1;
+      if (hasReport) reportCount += 1;
       if (hasPlan && hasCheckin && hasReport) complete += 1;
     }
     // ถ้าทำครบเกินเกณฑ์ (เช่น team มี session จริงมากกว่า monthlyQuota) ถือว่าไม่มีจำนวนที่ "ขาด" เหลือ ไม่ใช่ค่าติดลบ
     const incomplete = Math.max(monthlyQuota - complete, 0);
     const completePercent = Math.round((complete / monthlyQuota) * 100);
-    return { coach: c, complete, incomplete, completePercent };
+    return { coach: c, planCount, checkinCount, reportCount, complete, incomplete, completePercent };
   });
 
   if (consistencyRows.length === 0) {
     printConsistencyBody.innerHTML =
-      '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">ไม่มีโค้ชในขอบเขตที่เลือก</td></tr>';
+      '<tr><td colspan="7" class="px-4 py-6 text-center text-slate-400">ไม่มีโค้ชในขอบเขตที่เลือก</td></tr>';
   } else {
     printConsistencyBody.innerHTML = consistencyRows
-      .map(({ coach, complete, incomplete, completePercent }) => {
+      .map(({ coach, planCount, checkinCount, reportCount, completePercent }) => {
         const percentText = `${completePercent}%`;
         const percentBadgeClass = completePercent >= 80 ? "badge-success" : completePercent >= 50 ? "badge-warning" : "badge-danger";
         return `
@@ -780,8 +769,9 @@ async function loadPrintExtras(team, ageGroup, month) {
             <td class="emphasis">${escapeHtml(coach.name ?? "-")}</td>
             <td>${(coach.ageGroups || []).join(", ") || "-"}</td>
             <td>${monthlyQuota}</td>
-            <td class="text-emerald-600 font-medium">${complete}</td>
-            <td class="text-red-500 font-medium">${incomplete}</td>
+            <td>${planCount}</td>
+            <td>${checkinCount}</td>
+            <td>${reportCount}</td>
             <td><span class="badge ${percentBadgeClass}">${percentText}</span></td>
           </tr>`;
       })
@@ -842,7 +832,7 @@ async function loadPrintExtras(team, ageGroup, month) {
     statCard("หายแล้ว", injuries.filter((i) => i.status === "หายแล้ว").length) +
     statCard("รุนแรง", injuries.filter((i) => i.severity === "รุนแรง").length);
 
-  printInjuryChart.innerHTML = buildInjurySeverityChartSvg(injuries);
+  printInjurySummaryCards.innerHTML = buildInjurySummaryCardsHtml(injuries);
 
   if (injuries.length === 0) {
     printInjuryBody.innerHTML =
