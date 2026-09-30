@@ -519,9 +519,17 @@ async function loadPrintExtras(team, ageGroup, month) {
   // วันที่ส่งแผนการฝึกซ้อม (ไม่ใช่เกณฑ์คงที่ต่อเดือนแบบเดิมอีกต่อไป)
   let sessions = [];
   sessionSnap.forEach((d) => sessions.push({ id: d.id, ...d.data() }));
-  const monthSessions = sessions
-    .filter((s) => (s.date || "").startsWith(month) && !s.noTraining)
-    .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  // รวม session doc ที่มีวันที่ซ้ำกันให้เหลือ 1 รายการต่อวัน (บางครั้งมี session doc ซ้ำวันเดียวกันมากกว่า 1 ใบ
+  // เช่น สร้างผิดพลาด/สร้างซ้ำ — เจอจริงจนต้อง dedupe ไว้แล้วใน computeMissingPlanDaysByTeam ของ ui-utils.js)
+  // ไม่งั้นกราฟแนวโน้มด้านล่างจะมีแท่ง/ป้ายวันที่ซ้ำกัน และตัวเศษของ "เช็คชื่อตรงวันฝึกซ้อม" จะถูกนับซ้ำสองเท่า
+  // ในวันนั้น — เก็บ ids ของทุก session doc ในวันนั้นไว้ (แทน id เดี่ยว) เพื่อให้ยังจับคู่ attendance ที่อาจผูกกับ
+  // doc ใดก็ได้ในวันนั้นได้ครบ
+  const monthSessionsByDate = new Map();
+  for (const s of sessions.filter((s) => (s.date || "").startsWith(month) && !s.noTraining)) {
+    if (!monthSessionsByDate.has(s.date)) monthSessionsByDate.set(s.date, { date: s.date, ids: [] });
+    monthSessionsByDate.get(s.date).ids.push(s.id);
+  }
+  const monthSessions = Array.from(monthSessionsByDate.values()).sort((a, b) => a.date.localeCompare(b.date));
 
   let attendanceRecords = [];
   attendanceSnap.forEach((d) => attendanceRecords.push(d.data()));
@@ -631,7 +639,7 @@ async function loadPrintExtras(team, ageGroup, month) {
     let checkinDays = 0;
     let onTime = 0;
     for (const s of monthSessions) {
-      const myAttendanceForSession = attendanceRecords.filter((a) => a.sessionId === s.id && myPlayerIds.has(a.playerId));
+      const myAttendanceForSession = attendanceRecords.filter((a) => s.ids.includes(a.sessionId) && myPlayerIds.has(a.playerId));
       if (myAttendanceForSession.length === 0) continue;
       checkinDays += 1;
       if (isCoachSubmissionOnTime(s, myAttendanceForSession)) onTime += 1;
@@ -686,7 +694,7 @@ async function loadPrintExtras(team, ageGroup, month) {
     let dNone = 0;
     for (const c of coaches) {
       const myPlayerIds = getCoachPlayerIds(c, scopedPlayers);
-      const myAttendanceForSession = attendanceRecords.filter((a) => a.sessionId === s.id && myPlayerIds.has(a.playerId));
+      const myAttendanceForSession = attendanceRecords.filter((a) => s.ids.includes(a.sessionId) && myPlayerIds.has(a.playerId));
       if (myAttendanceForSession.length === 0) {
         dNone += 1;
         continue;
@@ -784,7 +792,7 @@ async function loadPrintExtras(team, ageGroup, month) {
     let complete = 0;
     for (const s of monthSessions) {
       const hasPlan = myPlans.some((p) => p.date === s.date);
-      const hasCheckin = attendanceRecords.some((a) => a.sessionId === s.id && myPlayerIds.has(a.playerId));
+      const hasCheckin = attendanceRecords.some((a) => s.ids.includes(a.sessionId) && myPlayerIds.has(a.playerId));
       const hasReport = myReports.some((r) => r.date === s.date);
       if (hasPlan && hasCheckin && hasReport) complete += 1;
     }
