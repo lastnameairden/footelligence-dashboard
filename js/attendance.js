@@ -60,7 +60,8 @@ import {
   todayBangkok,
   thisMonthBangkok,
   monthsAgoBangkok,
-  trainingPlanHasAttachment
+  trainingPlanHasAttachment,
+  TEAM_TRAINING_WEEKDAYS
 } from "./ui-utils.js";
 import { isEvaluationComplete } from "./masc-data.js";
 import { applyAttendanceChange, firestoreFieldsForChange, createSaveQueue, rosterLockState } from "./attendance-save.js";
@@ -175,6 +176,10 @@ const executiveLateWarning = document.getElementById("executive-late-warning");
 const executiveLateCountEl = document.getElementById("executive-late-count");
 const executiveLateDetailEl = document.getElementById("executive-late-detail");
 const executiveCoachSummary = document.getElementById("executive-coach-summary");
+const executiveAttendanceAgeGroupSelect = document.getElementById("executive-attendance-age-group-select");
+const executiveAttendanceStatusEl = document.getElementById("executive-attendance-status");
+const executiveAttendanceGridWrap = document.getElementById("executive-attendance-grid-wrap");
+const executiveAttendanceCoachLabel = document.getElementById("executive-attendance-coach-label");
 const coachPlanDetailOverlay = document.getElementById("coach-plan-detail-overlay");
 const coachPlanDetailTitleEl = document.getElementById("coach-plan-detail-title");
 const coachPlanDetailBody = document.getElementById("coach-plan-detail-body");
@@ -2906,6 +2911,7 @@ function showExecutiveHome(team) {
   loadExecutiveSummary(team);
   loadCoachActivitySummary(team);
   loadExecutiveNotes(team, executiveNotesList);
+  loadExecutiveDailyAttendance(team);
 }
 
 // รายชื่อนักกีฬาในทีม สำหรับโหมดผู้บริหารทีม (ดูอย่างเดียว ไม่มีปุ่มแก้ไข/ลบเหมือนหน้าของโค้ช) — เขียน
@@ -3112,6 +3118,231 @@ async function loadExecutiveSummary(team) {
     executiveStatusEl.textContent = "โหลดข้อมูลไม่สำเร็จ: " + err.message;
   }
 }
+
+// ---------- การเช็คชื่อ+ให้คะแนนรายวัน แยกตามรุ่นอายุ (โหมดผู้บริหารทีม) ----------
+// ตารางแบบ "นักกีฬา × ทุกวันในเดือน" (คนละอย่างกับสรุปแบบรายวันเดิมที่เคยทำ) อิงฟอร์ม ATTENDANCE REGISTER ของ
+// FA Thailand ที่ผู้ใช้ส่งมา — คอลัมน์สรุป A/Missed/AV/% อยู่หน้าตาราง ตามด้วยช่องของแต่ละวันในเดือน ทีมหนึ่งมีหลาย
+// รุ่นอายุคละกัน ดูพร้อมกันหมดจะแน่นเกินไป จึงให้เลือกดูได้ทีละรุ่นอายุผ่าน dropdown — ดึงข้อมูลเดือนนี้มาครั้งเดียว
+// เก็บไว้ในตัวแปรปิดสโคป แล้วกรองใหม่ตามรุ่นอายุที่เลือกตอนสลับ dropdown โดยไม่ query ซ้ำ
+const EXECUTIVE_STATUS_META = { I: "บาดเจ็บ", P: "ลา", R: "พักฟื้น" };
+let executiveAttendancePlayersByAgeGroup = new Map(); // ageGroup -> [{id, number, nickname}] เรียงเบอร์แล้ว
+let executiveAttendanceRecordByPlayerDate = new Map(); // "playerId|date" -> attendance record ล่าสุด (เผื่อมีบันทึกซ้ำ)
+let executiveAttendanceTrainingDates = []; // วันที่ (YYYY-MM-DD) ที่มีวันฝึกซ้อมจริงในเดือนนี้ เรียงจากน้อยไปมาก
+let executiveAttendanceMonth = ""; // "YYYY-MM" ของรอบข้อมูลที่โหลดไว้ล่าสุด
+let executiveAttendanceCoachesByAgeGroup = new Map(); // ageGroup -> [{name, coachPosition}] โค้ชที่รับผิดชอบรุ่นนั้น
+
+async function loadExecutiveDailyAttendance(team) {
+  executiveAttendanceStatusEl.textContent = "กำลังโหลด...";
+  executiveAttendanceGridWrap.innerHTML = '<p class="px-4 py-6 text-center text-slate-400 text-sm">กำลังโหลด...</p>';
+  try {
+    const thisMonth = thisMonthBangkok();
+    executiveAttendanceMonth = thisMonth;
+    const { start: monthStart, end: monthEnd } = monthDateRange(thisMonth);
+    const [playersSnap, sessionSnap, attendanceSnap, coachSnap] = await Promise.all([
+      getDocs(query(collection(db, "players"), where("team", "==", team))),
+      getDocs(teamDateRangeQuery("sessions", team, monthStart, monthEnd)),
+      getDocs(teamDateRangeQuery("attendance", team, monthStart, monthEnd)),
+      getDocs(query(collection(db, "coaches"), where("team", "==", team), where("role", "==", "coach")))
+    ]);
+
+    // โค้ชแต่ละคนรับผิดชอบได้หลายรุ่นอายุพร้อมกัน (ageGroups เป็น array) จึงอาจมีโค้ชมากกว่า 1 คนต่อ 1 รุ่น
+    // (เช่น Head Coach + GK Coach ดูแลรุ่นเดียวกัน) เก็บไว้ทุกคนที่ตรงรุ่นนั้น ไม่ใช่แค่คนแรกที่เจอ
+    executiveAttendanceCoachesByAgeGroup = new Map();
+    coachSnap.forEach((d) => {
+      const data = d.data();
+      for (const ag of data.ageGroups || []) {
+        if (!executiveAttendanceCoachesByAgeGroup.has(ag)) executiveAttendanceCoachesByAgeGroup.set(ag, []);
+        executiveAttendanceCoachesByAgeGroup.get(ag).push({ name: data.name || "-", coachPosition: data.coachPosition });
+      }
+    });
+
+    executiveAttendancePlayersByAgeGroup = new Map();
+    for (const d of playersSnap.docs) {
+      const data = d.data();
+      const ageGroup = data.ageGroup || "ไม่ระบุรุ่นอายุ";
+      if (!executiveAttendancePlayersByAgeGroup.has(ageGroup)) executiveAttendancePlayersByAgeGroup.set(ageGroup, []);
+      executiveAttendancePlayersByAgeGroup.get(ageGroup).push({ id: d.id, number: data.number ?? null, nickname: data.nickname ?? "-" });
+    }
+    for (const list of executiveAttendancePlayersByAgeGroup.values()) {
+      list.sort((a, b) => (a.number ?? Infinity) - (b.number ?? Infinity));
+    }
+
+    // วันฝึกซ้อม "ควรจะมี" อิงตารางฝึกซ้อมปกติประจำสัปดาห์ของแต่ละทีม (TEAM_TRAINING_WEEKDAYS เดียวกับที่ใช้คำนวณ
+    // เกณฑ์ในหน้าพิมพ์สรุปผลงานโค้ช) ไม่ใช่แค่ดูว่ามี session doc จริงหรือเปล่า — เพราะถ้าโค้ชลืมสร้าง session เลย
+    // (ไม่เช็คชื่ออะไรทั้งนั้น) วันนั้นจะไม่มี session ให้เจอ ถ้าอิง session อย่างเดียวจะกลายเป็น "ไม่มีซ้อม" (เทา)
+    // ทั้งที่จริงควรเป็น "มีซ้อมแต่ไม่เช็คชื่อ" (ส้ม) ซึ่งเป็นปัญหาที่ต้องติดตาม — ส่วน session doc ที่มีจริงยังใช้
+    // ช่วยปรับสองกรณี: 1) noTraining=true วันนั้นทำเครื่องหมายว่าไม่ซ้อมจริง (เช่น วันหยุดพิเศษ) ให้ตัดออกแม้จะตรง
+    // ตารางปกติ 2) มี session จริงในวันที่ไม่ตรงตารางปกติ (เช่น ซ้อมพิเศษวันเสาร์ของทีมที่ปกติซ้อมจันทร์-ศุกร์)
+    // ให้นับเพิ่มเข้าไปด้วย
+    const noTrainingDates = new Set();
+    const extraSessionDates = new Set();
+    sessionSnap.forEach((d) => {
+      const data = d.data();
+      if (!data.date) return;
+      if (data.noTraining) noTrainingDates.add(data.date);
+      else extraSessionDates.add(data.date);
+    });
+
+    const weekdays = TEAM_TRAINING_WEEKDAYS[team] || [1, 2, 3, 4, 5];
+    const [schedYear, schedMonth] = thisMonth.split("-").map(Number);
+    const daysInSchedMonth = new Date(Date.UTC(schedYear, schedMonth, 0)).getUTCDate();
+    const trainingDateSet = new Set();
+    for (let day = 1; day <= daysInSchedMonth; day++) {
+      const dateStr = `${thisMonth}-${String(day).padStart(2, "0")}`;
+      const dow = new Date(Date.UTC(schedYear, schedMonth - 1, day)).getUTCDay();
+      if (weekdays.includes(dow)) trainingDateSet.add(dateStr);
+    }
+    for (const date of extraSessionDates) trainingDateSet.add(date);
+    for (const date of noTrainingDates) trainingDateSet.delete(date);
+    executiveAttendanceTrainingDates = [...trainingDateSet].sort();
+
+    // เก็บ "บันทึกล่าสุด" ต่อคนต่อวัน (ถ้ามีมากกว่า 1 ใบในวันเดียวกันจริงๆ ใช้ใบที่ updatedAt ล่าสุด) กัน
+    // ข้อมูลเพี้ยนถ้าเกิดกรณีบันทึกซ้ำ
+    executiveAttendanceRecordByPlayerDate = new Map();
+    attendanceSnap.forEach((d) => {
+      const data = d.data();
+      if (!data.playerId || !data.date) return;
+      const key = `${data.playerId}|${data.date}`;
+      const existing = executiveAttendanceRecordByPlayerDate.get(key);
+      const existingTime = existing?.updatedAt && typeof existing.updatedAt.toDate === "function" ? existing.updatedAt.toDate().getTime() : 0;
+      const newTime = data.updatedAt && typeof data.updatedAt.toDate === "function" ? data.updatedAt.toDate().getTime() : 0;
+      if (!existing || newTime >= existingTime) executiveAttendanceRecordByPlayerDate.set(key, data);
+    });
+
+    const ageGroups = [...executiveAttendancePlayersByAgeGroup.keys()].sort((a, b) => ageGroupNumber(a) - ageGroupNumber(b));
+    if (ageGroups.length === 0) {
+      executiveAttendanceStatusEl.textContent = "ยังไม่มีนักกีฬาในทีมนี้";
+      executiveAttendanceGridWrap.innerHTML = '<p class="px-4 py-6 text-center text-slate-400 text-sm">ยังไม่มีนักกีฬาในทีมนี้</p>';
+      executiveAttendanceAgeGroupSelect.innerHTML = "";
+      return;
+    }
+    const keepSelected = ageGroups.includes(executiveAttendanceAgeGroupSelect.value) ? executiveAttendanceAgeGroupSelect.value : ageGroups[0];
+    executiveAttendanceAgeGroupSelect.innerHTML = ageGroups.map((ag) => `<option value="${escapeHtml(ag)}">${escapeHtml(ag)}</option>`).join("");
+    executiveAttendanceAgeGroupSelect.value = keepSelected;
+    executiveAttendanceStatusEl.textContent = `อัปเดตข้อมูลล่าสุด • เดือนนี้`;
+    renderExecutiveDailyAttendanceForAgeGroup(executiveAttendanceAgeGroupSelect.value);
+  } catch (err) {
+    console.error(err);
+    executiveAttendanceStatusEl.textContent = "โหลดข้อมูลไม่สำเร็จ: " + err.message;
+    executiveAttendanceGridWrap.innerHTML = `<p class="px-4 py-6 text-center text-red-600 text-sm">โหลดข้อมูลไม่สำเร็จ: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+const EXEC_WEEKDAY_TH = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
+
+// ตารางเมทริกซ์นักกีฬา × ทุกวันของเดือนนี้ (ไม่ใช่แค่วันที่มีข้อมูล) — แต่ละช่องบอกทั้งสถานะเช็คชื่อและคะแนนพร้อมกัน:
+// เขียว+ตัวเลข = มาซ้อม+ให้คะแนน (ตัวเลขคือคะแนนเฉลี่ยจริงของวันนั้น), ส้ม = มีวันฝึกซ้อมจริงแต่ไม่มีการเช็คชื่อเลย,
+// แดง+I/P/R = บาดเจ็บ/ลา/พักฟื้นตามสถานะจริงในระบบ, ช่องเทาว่าง = วันที่ไม่มีการฝึกซ้อม, ช่องขาวล้วน = ยังไม่มีบันทึก
+// แต่ยังไม่ถือเป็นปัญหา (วันนี้ที่ยังไม่จบ หรืออนาคต) — ขึ้นเป็นส้ม (ปัญหาจริง) ก็ต่อเมื่อ "พ้นวันนั้นไปแล้ว" เท่านั้น
+// (วันนี้เองแม้ยังไม่เช็คชื่อก็ยังเป็นขาวไว้ก่อน เผื่อยังไม่ถึงเวลาซ้อม/โค้ชยังไม่ได้กรอก) — คอลัมน์สรุป A/Missed/AV/%
+// นับเฉพาะวันฝึกซ้อมจริงที่มีบันทึกแล้ว (ไม่รวมช่องส้ม/ขาว) ตามฟอร์ม ATTENDANCE REGISTER ต้นแบบ
+function renderExecutiveDailyAttendanceForAgeGroup(ageGroup) {
+  const coaches = executiveAttendanceCoachesByAgeGroup.get(ageGroup) || [];
+  executiveAttendanceCoachLabel.textContent =
+    coaches.length > 0
+      ? `โค้ชผู้รับผิดชอบ: ${coaches.map((c) => `${c.name} (${coachPositionLabel(c.coachPosition)})`).join(", ")}`
+      : "ยังไม่มีโค้ชที่รับผิดชอบรุ่นนี้";
+
+  const players = executiveAttendancePlayersByAgeGroup.get(ageGroup) || [];
+  if (players.length === 0) {
+    executiveAttendanceGridWrap.innerHTML = '<p class="px-4 py-6 text-center text-slate-400 text-sm">ยังไม่มีนักกีฬาในรุ่นนี้</p>';
+    return;
+  }
+
+  const today = todayBangkok();
+  const [year, month] = executiveAttendanceMonth.split("-").map(Number);
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const trainingDateSet = new Set(executiveAttendanceTrainingDates);
+  const allDates = Array.from({ length: daysInMonth }, (_, i) => `${executiveAttendanceMonth}-${String(i + 1).padStart(2, "0")}`);
+
+  const headerCells = allDates
+    .map((date, i) => {
+      const day = i + 1;
+      const dow = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+      const isTraining = trainingDateSet.has(date);
+      const isToday = date === today;
+      const bg = isTraining ? "" : "background:#F8FAFC;";
+      const ring = isToday ? "box-shadow:inset 0 0 0 2px #10b981;" : "";
+      return `<th style="padding:0.5rem 0.3rem;text-align:center;font-size:0.65rem;white-space:nowrap;${bg}${ring}">${day}<br><span class="text-slate-400 font-normal">${EXEC_WEEKDAY_TH[dow]}</span></th>`;
+    })
+    .join("");
+
+  const bodyRows = players
+    .map((p) => {
+      let attendedCount = 0;
+      let missedCount = 0;
+      let scoreSum = 0;
+      let scoreCount = 0;
+
+      const dayCells = allDates
+        .map((date) => {
+          const isTraining = trainingDateSet.has(date);
+          if (!isTraining) return '<td style="padding:0.3rem;text-align:center;background:#F8FAFC;"></td>';
+
+          const record = executiveAttendanceRecordByPlayerDate.get(`${p.id}|${date}`);
+          if (!record) {
+            // ยังไม่ขึ้นเป็น "ไม่มีการเช็คชื่อ" (ส้ม) จนกว่าจะพ้นวันนั้นไปแล้วจริงๆ — วันนี้เองแม้ยังไม่เช็คชื่อก็ถือว่า
+            // ยังไม่ถึงกำหนด (ขาว) เผื่อโค้ชยังไม่ได้ซ้อม/ยังไม่มีเวลากรอก ไม่ใช่ปัญหาจนกว่าจะข้ามวันไปแล้ว
+            if (date >= today) return '<td style="padding:0.3rem;text-align:center;background:#fff;"></td>';
+            return `<td style="padding:0.3rem;text-align:center;"><span class="inline-flex items-center justify-center w-7 h-7 rounded-full text-white text-[10px] font-bold" style="background:#C2680C;" title="มีวันฝึกซ้อมจริงแต่ไม่มีการเช็คชื่อ">–</span></td>`;
+          }
+          if (record.status === "A") {
+            attendedCount += 1;
+            const avg = computeAvgScore(record.scores);
+            if (avg !== null) {
+              scoreSum += avg;
+              scoreCount += 1;
+            }
+            const label = avg !== null ? avg.toFixed(1) : "-";
+            return `<td style="padding:0.3rem;text-align:center;"><span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-emerald-700 text-white text-[10px] font-bold" title="มาซ้อม คะแนนเฉลี่ย ${avg !== null ? avg.toFixed(2) : "ยังไม่ให้คะแนน"}">${label}</span></td>`;
+          }
+          if (EXECUTIVE_STATUS_META[record.status]) {
+            missedCount += 1;
+            return `<td style="padding:0.3rem;text-align:center;"><span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-red-700 text-white text-[10px] font-bold" title="${EXECUTIVE_STATUS_META[record.status]}">${escapeHtml(record.status)}</span></td>`;
+          }
+          // สถานะอื่นที่ไม่รู้จัก (กันโค้ดพังถ้าข้อมูลเพี้ยน) — แสดงตัวย่อสถานะดิบๆ ไว้เทาๆ ไม่นับเข้าสรุปฝั่งไหน
+          return `<td style="padding:0.3rem;text-align:center;"><span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-300 text-slate-600 text-[10px] font-bold">${escapeHtml(record.status ?? "?")}</span></td>`;
+        })
+        .join("");
+
+      const totalReported = attendedCount + missedCount;
+      const percent = totalReported > 0 ? Math.round((attendedCount / totalReported) * 100) : null;
+      const avgScore = scoreCount > 0 ? (scoreSum / scoreCount).toFixed(1) : "-";
+      const percentText = percent === null ? "-" : `${percent}%`;
+      const percentColor = percent === null ? "text-slate-400" : percent >= 80 ? "text-emerald-700" : percent >= 50 ? "text-amber-700" : "text-red-700";
+
+      return `
+        <tr>
+          <td class="emphasis" style="position:sticky;left:0;background:#fff;white-space:nowrap;padding:0.5rem 0.75rem;">${p.number != null ? escapeHtml(p.number) + " · " : ""}${escapeHtml(p.nickname)}</td>
+          <td style="text-align:center;background:#F8FAFC;font-weight:600;">${attendedCount}</td>
+          <td style="text-align:center;background:#F8FAFC;">${missedCount}</td>
+          <td style="text-align:center;background:#F8FAFC;">${avgScore}</td>
+          <td style="text-align:center;background:#F8FAFC;border-right:2px solid #E1E4DE;font-weight:600;" class="${percentColor}">${percentText}</td>
+          ${dayCells}
+        </tr>`;
+    })
+    .join("");
+
+  executiveAttendanceGridWrap.innerHTML = `
+    <table class="pro-table grid-table" style="font-size:0.75rem;">
+      <thead>
+        <tr>
+          <th style="position:sticky;left:0;background:#EEF0EC;text-align:left;min-width:9rem;">นักกีฬา</th>
+          <th style="text-align:center;" title="Attendance — จำนวนครั้งที่มาซ้อม">A</th>
+          <th style="text-align:center;" title="Missed — รวมบาดเจ็บ/ลา/พักฟื้น">Missed</th>
+          <th style="text-align:center;" title="Average — คะแนนเฉลี่ยรวม">AV</th>
+          <th style="text-align:center;border-right:2px solid #E1E4DE;" title="% เข้าร่วม">%</th>
+          ${headerCells}
+        </tr>
+      </thead>
+      <tbody>${bodyRows}</tbody>
+    </table>
+  `;
+}
+
+executiveAttendanceAgeGroupSelect.addEventListener("change", () => {
+  renderExecutiveDailyAttendanceForAgeGroup(executiveAttendanceAgeGroupSelect.value);
+});
 
 // ข้อความที่ผู้ดูแลระบบส่งถึงทีมนี้โดยตรง (เช่น แจ้งนักกีฬาที่มีพัฒนาการดี หรือแจ้งปัญหาของโค้ช) — ใช้ร่วมกันทั้ง
 // บัญชีผู้บริหารทีมจริง (executiveNotesList ในหน้าสรุปภาพรวม), โค้ชจริง (dailyExecutiveNotesList ในหน้า Daily

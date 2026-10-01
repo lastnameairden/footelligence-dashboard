@@ -214,6 +214,35 @@
         <div id="executive-coach-summary"><p class="text-sm text-slate-400">กำลังโหลด...</p></div>
       </div>
 
+      <!-- การเช็คชื่อ+ให้คะแนนนักกีฬารายวัน แยกตามรุ่นอายุ — ต่อจากสรุปการทำงานของโค้ชด้านบน (ซึ่งนับแค่ "ส่งหรือยัง")
+      ส่วนนี้ให้ผู้บริหารทีมดูข้อมูลจริงรายวันของนักกีฬาได้ ดูได้ทีละรุ่นอายุ (รุ่นอายุเยอะเกินกว่าจะแสดงพร้อมกันหมด) -->
+      <div>
+        <h2 class="section-title mb-3"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.3 2.3L16 10"/></svg></span> การเช็คชื่อ + ให้คะแนนรายวัน (แยกตามรุ่นอายุ)</h2>
+        <div class="card card-pad flex items-end gap-3 flex-wrap mb-3">
+          <div>
+            <label class="field-label">รุ่นอายุ</label>
+            <select id="executive-attendance-age-group-select" class="field-input w-40"></select>
+            <p id="executive-attendance-coach-label" class="text-xs text-slate-500 mt-1"></p>
+          </div>
+          <p id="executive-attendance-status" class="text-sm text-slate-500">กำลังโหลด...</p>
+        </div>
+        <!-- คำอธิบายสัญลักษณ์ในตารางด้านล่าง — สีเขียว/ส้ม/แดง/ขาว ความหมายตามที่ตกลงกันไว้ ดูรายละเอียดใน
+        renderExecutiveAttendanceLegend ของ attendance.js (เขียนไว้เป็น HTML คงที่ตรงนี้เพราะไม่ได้เปลี่ยนตามข้อมูล) -->
+        <div class="card card-pad mb-3 flex flex-wrap gap-4 text-xs text-slate-600 items-center">
+          <span class="font-semibold text-slate-500">สัญลักษณ์:</span>
+          <span class="flex items-center gap-1.5"><span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-700 text-white text-[10px] font-bold">3.5</span> ซ้อม + ให้คะแนน</span>
+          <span class="flex items-center gap-1.5"><span class="inline-flex items-center justify-center w-5 h-5 rounded-full text-white text-[10px] font-bold" style="background:#C2680C;">–</span> มีซ้อม ไม่มีการเช็คชื่อ</span>
+          <span class="flex items-center gap-1.5"><span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-700 text-white text-[10px] font-bold">I</span> บาดเจ็บ</span>
+          <span class="flex items-center gap-1.5"><span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-700 text-white text-[10px] font-bold">P</span> ลา</span>
+          <span class="flex items-center gap-1.5"><span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-700 text-white text-[10px] font-bold">R</span> พักฟื้น</span>
+          <span class="flex items-center gap-1.5"><span class="inline-block w-5 h-5 rounded bg-slate-100"></span> ไม่มีซ้อม</span>
+          <span class="flex items-center gap-1.5"><span class="inline-block w-5 h-5 rounded bg-white border border-slate-200"></span> ยังไม่จบวัน/ยังไม่ถึงวัน (ยังไม่นับเป็นปัญหา)</span>
+        </div>
+        <div id="executive-attendance-grid-wrap" class="card table-wrap">
+          <p class="px-4 py-6 text-center text-slate-400 text-sm">กำลังโหลด...</p>
+        </div>
+      </div>
+
       <!-- ข้อความที่ผู้ดูแลระบบส่งถึงทีมนี้โดยตรง (เช่น แจ้งนักกีฬาที่มีพัฒนาการดี หรือแจ้งปัญหาของโค้ช) -->
       <div id="executive-notes-section">
         <h2 class="section-title mb-3"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg></span> ข้อความจากผู้ดูแลระบบ</h2>

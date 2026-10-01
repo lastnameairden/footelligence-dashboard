@@ -484,4 +484,20 @@ table.pro-table td.emphasis { font-weight: 600; color: var(--text-1); }
     flex-wrap: wrap;
     justify-content: flex-start;
   }
+
+  /* ตารางเมทริกซ์ (เช่น นักกีฬา × ทุกวันในเดือน ของโหมดผู้บริหารทีม) มีคอลัมน์เยอะเกิน 20-30 คอลัมน์ พับเป็นการ์ด
+     แบบตารางทั่วไปด้านบนจะยาวเกินอ่านไหว ให้คงเป็นตารางเลื่อนแนวนอนเหมือนจอใหญ่ไว้แทน (ใส่คลาส grid-table) */
+  table.pro-table.grid-table { display: table; width: max-content; }
+  table.pro-table.grid-table thead { display: table-header-group; }
+  table.pro-table.grid-table tbody { display: table-row-group; }
+  table.pro-table.grid-table tr { display: table-row; border: none; margin: 0; border-radius: 0; }
+  table.pro-table.grid-table th,
+  table.pro-table.grid-table td {
+    display: table-cell;
+    width: auto;
+    text-align: center;
+    padding: 0.4rem 0.3rem;
+    border-bottom: 1px solid var(--surface-2);
+  }
+  table.pro-table.grid-table td[data-label]::before { content: none; }
 }
