@@ -29,7 +29,8 @@ import {
   buildAvgScoreSparklineSvg,
   computeMissingPlanDaysByTeam,
   trainingDaysQuotaForTeamMonth,
-  isSameCoachName
+  isSameCoachName,
+  isRecordOfCoach
 } from "../js/ui-utils.js";
 
 const ts = (date) => ({ toDate: () => date });
@@ -316,4 +317,10 @@ test("isSameCoachName: tolerates spacing, case and the โค้ช prefix but n
   assert.equal(isSameCoachName("โค้ชบอม", "โค้ชบิว"), false);
   assert.equal(isSameCoachName("", ""), false);
   assert.equal(isSameCoachName(null, "บอม"), false);
+});
+test("isRecordOfCoach: matches by coachId even when the name was changed, else falls back to name", () => {
+  const coach = { id: "u1", name: "โค้ชบอม" };
+  assert.equal(isRecordOfCoach({ coachId: "u1", coachName: "COACH BOM" }, coach), true);
+  assert.equal(isRecordOfCoach({ coachId: "admin", coachName: "โค้ชบอม" }, coach), true);
+  assert.equal(isRecordOfCoach({ coachId: "u2", coachName: "COACH BOM" }, coach), false);
 });

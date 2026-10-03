@@ -61,7 +61,8 @@ import {
   thisMonthBangkok,
   monthsAgoBangkok,
   trainingPlanHasAttachment,
-  TEAM_TRAINING_WEEKDAYS
+  TEAM_TRAINING_WEEKDAYS,
+  isRecordOfCoach
 } from "./ui-utils.js";
 import { isEvaluationComplete } from "./masc-data.js";
 import { applyAttendanceChange, firestoreFieldsForChange, createSaveQueue, rosterLockState } from "./attendance-save.js";
@@ -1874,7 +1875,7 @@ async function computeCoachMonthlySummaryRows(team) {
       if (s.date) checkinStatusByDate.set(s.date, onTime ? "onTime" : "late");
     }
     const myReports = monthReports
-      .filter((r) => r.coachName === c.name)
+      .filter((r) => isRecordOfCoach(r, c))
       .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
     const reportCount = myReports.length;
     // สถานะการส่งรายงานรายวัน ใช้เกณฑ์ "สาย" เดียวกับเช็คชื่อ (23:59 น. ดู isReportLate)
@@ -1884,7 +1885,7 @@ async function computeCoachMonthlySummaryRows(team) {
       reportStatusByDate.set(r.date, isReportLate(r) ? "late" : "onTime");
     }
     const myPlans = monthPlans
-      .filter((p) => p.coachName === c.name)
+      .filter((p) => isRecordOfCoach(p, c))
       .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
     const planLateCount = myPlans.filter((p) => isTrainingPlanLate(p)).length;
 

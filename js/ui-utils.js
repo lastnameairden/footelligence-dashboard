@@ -510,6 +510,13 @@ export function isSameCoachName(a, b) {
   return ka !== "" && ka === coachNameKey(b);
 }
 
+// แผน/รายงานเป็นของโค้ชคนนี้ไหม — ดูจาก coachId (uid ผู้ส่ง = id เอกสารโค้ช ทนต่อการเปลี่ยนชื่อโค้ชภายหลัง) หรือชื่อตรงกัน
+// (กรณีผู้ดูแลระบบสวมบทบาทส่งแทน coachId จะเป็น uid ของผู้ดูแลระบบ จึงต้องพึ่งชื่อ)
+export function isRecordOfCoach(record, coach) {
+  if (record?.coachId && coach?.id && record.coachId === coach.id) return true;
+  return isSameCoachName(record?.coachName, coach?.name);
+}
+
 export function trainingDaysQuotaForTeamMonth(team, monthStr) {
   const weekdays = TEAM_TRAINING_WEEKDAYS[team];
   if (!weekdays || !monthStr) return 20;
