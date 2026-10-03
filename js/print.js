@@ -14,6 +14,7 @@ import {
   applyDataLabels,
   isTrainingPlanLate,
   trainingDaysQuotaForTeamMonth,
+  isSameCoachName,
   matchResultBadge,
   injurySeverityBadge,
   injuryStatusBadge,
@@ -504,7 +505,7 @@ async function loadPrintExtras(team, ageGroup, month) {
     statCard("จำนวนโค้ชทั้งหมด", coaches.length);
 
   const coachRows = coaches.map((c) => {
-    const myPlans = plans.filter((p) => p.coachName === c.name);
+    const myPlans = plans.filter((p) => isSameCoachName(p.coachName, c.name));
     const late = myPlans.filter((p) => isTrainingPlanLate(p)).length;
     const total = myPlans.length;
     const onTime = total - late;
@@ -544,13 +545,33 @@ async function loadPrintExtras(team, ageGroup, month) {
     applyDataLabels(printTrainingPlanBody);
   }
 
+  // แผนที่ชื่อโค้ชไม่ตรงกับโค้ชคนใดในทีมเลย (เช่น โค้ชถูกเปลี่ยนชื่อ/ส่งด้วยอีเมล) จะไม่ถูกนับในแถวโค้ชด้านบน —
+  // แจ้งให้เห็นชัดใต้ตาราง แทนที่จะหายเงียบจนดูเหมือนโค้ชไม่ได้ส่ง
+  const teamCoachNames = [];
+  coachSnap.forEach((d) => teamCoachNames.push(d.data().name));
+  const unmatchedPlans = plans.filter((p) => !teamCoachNames.some((n) => isSameCoachName(p.coachName, n)));
+  const unmatchedNoteId = "print-training-plan-unmatched";
+  document.getElementById(unmatchedNoteId)?.remove();
+  if (unmatchedPlans.length > 0) {
+    const byName = new Map();
+    for (const p of unmatchedPlans) byName.set(p.coachName ?? "-", (byName.get(p.coachName ?? "-") || 0) + 1);
+    const note = document.createElement("p");
+    note.id = unmatchedNoteId;
+    note.className = "text-sm text-amber-700 mt-2";
+    note.textContent = `หมายเหตุ: มี ${unmatchedPlans.length} แผนที่ชื่อผู้ส่งไม่ตรงกับรายชื่อโค้ชในทีม (ไม่นับในตารางด้านบน): ${Array.from(
+      byName,
+      ([n, k]) => `${n} (${k})`
+    ).join(", ")}`;
+    printTrainingPlanBody.closest("table").insertAdjacentElement("afterend", note);
+  }
+
   // กราฟแนวโน้มยังอิงวันฝึกซ้อมจริง (monthSessions) เพื่อให้แกน X ตรงกับกราฟเช็คชื่อด้านล่าง ไม่ใช่ทุกวันปฏิทิน
   const planDailyCounts = monthSessions.map((s) => {
     let dOnTime = 0;
     let dLate = 0;
     let dNone = 0;
     for (const c of coaches) {
-      const dayPlans = plans.filter((p) => p.date === s.date && p.coachName === c.name);
+      const dayPlans = plans.filter((p) => p.date === s.date && isSameCoachName(p.coachName, c.name));
       if (dayPlans.length === 0) {
         dNone += 1;
         continue;
@@ -663,7 +684,7 @@ async function loadPrintExtras(team, ageGroup, month) {
   reports = reports.filter((r) => (r.date || "").startsWith(month));
 
   const reportRows = coaches.map((c) => {
-    const myReports = reports.filter((r) => r.coachName === c.name);
+    const myReports = reports.filter((r) => isSameCoachName(r.coachName, c.name));
     let matchDays = 0;
     let onTime = 0;
     for (const s of monthSessions) {
@@ -716,7 +737,7 @@ async function loadPrintExtras(team, ageGroup, month) {
     let dLate = 0;
     let dNone = 0;
     for (const c of coaches) {
-      const dayReports = reports.filter((r) => r.date === s.date && r.coachName === c.name);
+      const dayReports = reports.filter((r) => r.date === s.date && isSameCoachName(r.coachName, c.name));
       if (dayReports.length === 0) {
         dNone += 1;
         continue;
@@ -735,8 +756,8 @@ async function loadPrintExtras(team, ageGroup, month) {
   // ใช้ monthlyQuota เหมือน 3 ส่วนด้านบน (ดูเหตุผลที่คอมเมนต์ของสรุปการส่งรายงานการฝึกซ้อม) ไม่ใช่ monthSessions.length
   const consistencyRows = coaches.map((c) => {
     const myPlayerIds = getCoachPlayerIds(c, scopedPlayers);
-    const myPlans = plans.filter((p) => p.coachName === c.name);
-    const myReports = reports.filter((r) => r.coachName === c.name);
+    const myPlans = plans.filter((p) => isSameCoachName(p.coachName, c.name));
+    const myReports = reports.filter((r) => isSameCoachName(r.coachName, c.name));
     let planCount = 0;
     let checkinCount = 0;
     let reportCount = 0;

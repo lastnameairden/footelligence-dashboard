@@ -28,7 +28,8 @@ import {
   computeDailyAvgScores,
   buildAvgScoreSparklineSvg,
   computeMissingPlanDaysByTeam,
-  trainingDaysQuotaForTeamMonth
+  trainingDaysQuotaForTeamMonth,
+  isSameCoachName
 } from "../js/ui-utils.js";
 
 const ts = (date) => ({ toDate: () => date });
@@ -306,4 +307,13 @@ test("trainingDaysQuotaForTeamMonth: KHAMPHEE FOOTBALL (อา-พฤ) also 5 da
 });
 test("trainingDaysQuotaForTeamMonth: unknown team falls back to the old fixed 20", () => {
   assert.equal(trainingDaysQuotaForTeamMonth("ไม่มีทีมนี้", "2025-06"), 20);
+});
+
+test("isSameCoachName: tolerates spacing, case and the โค้ช prefix but not different names", () => {
+  assert.equal(isSameCoachName("โค้ชบอม", "บอม"), true);
+  assert.equal(isSameCoachName("  โค้ช  บอม ", "โค้ชบอม"), true);
+  assert.equal(isSameCoachName("Tong", "tong"), true);
+  assert.equal(isSameCoachName("โค้ชบอม", "โค้ชบิว"), false);
+  assert.equal(isSameCoachName("", ""), false);
+  assert.equal(isSameCoachName(null, "บอม"), false);
 });

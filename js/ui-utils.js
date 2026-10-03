@@ -495,6 +495,21 @@ export const TEAM_TRAINING_WEEKDAYS = {
 // TEAM_TRAINING_WEEKDAYS ไม่ใช่จำนวน sessions ที่มีคนสร้างจริง เพราะถ้าโค้ชไม่เช็คชื่อเลยจะไม่มี session ให้นับ
 // เกณฑ์จะเหลือ 0 กลายเป็น "ทำครบ 100%" ผิดๆ) ใช้ร่วมกันทั้งสรุปแผนการฝึกซ้อมและสรุปการเช็คชื่อ (คนละกิจกรรมกัน
 // แต่ทั้งคู่ควรเกิดขึ้นทุกวันฝึกซ้อมจริงเท่ากัน จึงใช้เกณฑ์เดียวกัน) ทีมที่ไม่มีในตาราง fallback เป็น 20 (ค่าคงที่เดิม)
+// เทียบชื่อโค้ชแบบทนต่อความต่างเล็กน้อย (ช่องว่างหัว/ท้าย/ซ้ำ, ตัวพิมพ์เล็กใหญ่, คำนำหน้า "โค้ช") — แผน/รายงานเก็บชื่อโค้ช
+// ณ ตอนที่ส่ง ส่วนรายชื่อโค้ชแก้ไขได้ทีหลัง จึงเทียบแบบเท่ากันเป๊ะแล้วแผนที่ส่งแล้วหลุดไม่ถูกนับให้โค้ชได้
+export function coachNameKey(name) {
+  return String(name ?? "")
+    .normalize("NFC")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^โค้ช\s*/, "")
+    .toLowerCase();
+}
+export function isSameCoachName(a, b) {
+  const ka = coachNameKey(a);
+  return ka !== "" && ka === coachNameKey(b);
+}
+
 export function trainingDaysQuotaForTeamMonth(team, monthStr) {
   const weekdays = TEAM_TRAINING_WEEKDAYS[team];
   if (!weekdays || !monthStr) return 20;
