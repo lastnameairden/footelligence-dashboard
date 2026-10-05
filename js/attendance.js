@@ -67,6 +67,14 @@ import {
 import { openAdminMeetings, renderCoachMeetingCard, loadCoachMeetingNotifications } from "./coach-meetings-ui.js";
 import { isEvaluationComplete } from "./masc-data.js";
 import { applyAttendanceChange, firestoreFieldsForChange, createSaveQueue, rosterLockState } from "./attendance-save.js";
+import {
+  INJURY_SEVERITIES,
+  INJURY_STATUS_HEALED,
+  activeInjuryByPlayer,
+  buildQuickInjuryReport,
+  describeInjury,
+  planInjuryAutoFill
+} from "./injury-attendance.js";
 import { buildRouteHash, parseRouteHash, isValidRouteDate } from "./screen-route.js";
 import { icon } from "./icons.js";
 
@@ -307,6 +315,11 @@ const progressTeamTabs = document.getElementById("progress-team-tabs");
 let currentSessionId = null;
 let currentSessionData = null;
 let currentAttendanceMap = new Map();
+// รายงานบาดเจ็บที่ยังไม่หาย ณ วันที่เช็คชื่อ (playerId -> รายงาน) ใช้เติม I/R ให้และเตือนเมื่อกด A ให้คนที่ยังบาดเจ็บอยู่
+let activeInjuryMap = new Map();
+// ฟอร์มรายงานบาดเจ็บสั้นที่กำลังเปิดอยู่ใต้แถวนักกีฬา (เปิดทีละคน): สถานะที่กดไว้ยังไม่บันทึกจนกว่าจะกดบันทึก/ข้าม
+let injuryFormState = null; // { playerId, status, description, severity, error }
+const dismissedHealHints = new Set(); // playerId ที่โค้ชปิดคำถาม "หายแล้วใช่ไหม" ไว้ในหน้านี้
 let myTeam = null;
 // ทีมของบัญชีผู้บริหารทีมจริง (ไม่ใช่การสวมบทบาทของผู้ดูแลระบบ) — เก็บแยกจาก myTeam เพราะ myTeam ต้องเป็น
 // null สำหรับผู้บริหารทีมจริงเสมอ (renderDrawerItems ใช้ myTeam ที่มีค่าเป็นสัญญาณว่า "มีเครื่องมือจัดการทีมเต็มรูปแบบ"
@@ -4045,7 +4058,7 @@ async function loadExistingAttendance(sessionId) {
   const map = new Map();
   snapshot.forEach((docSnap) => {
     const data = docSnap.data();
-    map.set(data.playerId, { status: data.status, scores: data.scores || {}, updatedAt: data.updatedAt });
+    map.set(data.playerId, { status: data.status, scores: data.scores || {}, updatedAt: data.updatedAt, injuryReportId: data.injuryReportId ?? null });
   });
   return map;
 }
@@ -4128,10 +4141,14 @@ function renderRoster(existingMap) {
         ? `<span class="badge badge-neutral">${escapeHtml(existing.status)}</span>`
         : '<span class="text-slate-400">-</span>';
     } else {
+      // ถ้าเปิดฟอร์มรายงานบาดเจ็บค้างอยู่ ให้ปุ่มที่กดไว้เป็นสีเต็มทันที (ยังไม่บันทึกสถานะจนกว่าจะกดบันทึก/ข้ามในฟอร์ม)
+      const staged = injuryFormState && injuryFormState.playerId === p.id ? injuryFormState : null;
       statusTd.appendChild(
-        createSegmentedGroup(STATUS_OPTIONS, existing.status, (status) => saveStatus(p.id, status))
+        createSegmentedGroup(STATUS_OPTIONS, staged ? staged.status : existing.status, (status) => onStatusTap(p, status))
       );
     }
+    const injuryExtras = buildInjuryExtras(p, existing, locked);
+    if (injuryExtras) statusTd.appendChild(injuryExtras);
     tr.appendChild(statusTd);
 
     // ให้คะแนนได้เฉพาะสถานะ "มา (A)" เท่านั้น — I (บาดเจ็บ) / R (พักฟื้น) / P (ลา) ไม่จำเป็นต้องให้คะแนน (ตรงกับ
@@ -4176,8 +4193,216 @@ function renderRoster(existingMap) {
     tr.appendChild(avgTd);
 
     rosterBody.appendChild(tr);
+    if (!locked && injuryFormState && injuryFormState.playerId === p.id) {
+      rosterBody.appendChild(buildInjuryFormRow(p, injuryFormState));
+    }
   }
   applyDataLabels(rosterBody);
+}
+
+// ---------- เชื่อมรายงานบาดเจ็บกับเช็คชื่อ (ตรรกะล้วนอยู่ที่ injury-attendance.js) ----------
+function currentSessionDate() {
+  return (currentSessionData && currentSessionData.date) || dateInput.value;
+}
+
+async function loadTeamInjuries() {
+  const snap = await getDocs(query(collection(db, "injuryReports"), where("team", "==", myTeam)));
+  const list = [];
+  snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
+  return list;
+}
+
+function makeButton(text, className, onClick) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = className;
+  btn.textContent = text;
+  btn.addEventListener("click", onClick);
+  return btn;
+}
+
+// ข้อมูลเสริมใต้ปุ่มสถานะของแถว: รายงานที่ผูกอยู่ (I/R) / คำถาม "หายแล้วใช่ไหม" (กด A ทั้งที่ยังมีรายงานค้าง) / ลิงก์สร้างรายงาน (I/R ที่ยังไม่มีรายงาน)
+function buildInjuryExtras(p, existing, locked) {
+  const injury = activeInjuryMap.get(p.id);
+  const status = existing.status;
+  const wrap = document.createElement("div");
+  wrap.className = "mt-2 space-y-1";
+  if (injury && (status === "I" || status === "R")) {
+    const info = describeInjury(injury, currentSessionDate());
+    const line = document.createElement("p");
+    line.className = "text-xs text-slate-600";
+    line.innerHTML = `${icon("heart-pulse")} ${escapeHtml(info.text)}${info.overdue ? ' <span class="badge badge-warning">เลยวันคาดว่ากลับแล้ว</span>' : ""}`;
+    const note = document.createElement("p");
+    note.className = "text-xs text-slate-400";
+    note.textContent = `${existing.injuryReportId ? "ผูกกับรายงานบาดเจ็บ · " : ""}แก้สถานะได้ถ้าไม่ตรงความจริง`;
+    wrap.append(line, note);
+    return wrap;
+  }
+  if (locked) return null;
+  if (injury && status === "A" && !dismissedHealHints.has(p.id)) {
+    const box = document.createElement("div");
+    box.className = "rounded-lg bg-amber-50 text-amber-800 px-3 py-2 text-sm space-y-2";
+    const msg = document.createElement("p");
+    msg.textContent = `มีรายงานบาดเจ็บที่ยังไม่หาย: ${injury.description || "-"} · หายแล้วใช่ไหม?`;
+    const actions = document.createElement("div");
+    actions.className = "flex gap-2 flex-wrap";
+    actions.append(
+      makeButton("เปลี่ยนรายงานเป็นหายแล้ว", "btn btn-secondary btn-sm", () => healInjuryFromRoster(p)),
+      makeButton("ยังไม่หาย (ปรับเป็น R)", "btn btn-secondary btn-sm", () =>
+        commitAttendanceChange(p.id, { status: "R", injuryReportId: injury.id })
+      ),
+      makeButton("ซ่อน", "btn btn-ghost btn-sm", () => {
+        dismissedHealHints.add(p.id);
+        renderRoster(currentAttendanceMap);
+      })
+    );
+    box.append(msg, actions);
+    wrap.appendChild(box);
+    return wrap;
+  }
+  if (!injury && (status === "I" || status === "R") && !(injuryFormState && injuryFormState.playerId === p.id)) {
+    const row = document.createElement("div");
+    row.className = "flex items-center gap-2 flex-wrap text-xs text-slate-500";
+    row.append(
+      "ยังไม่มีรายงานบาดเจ็บ",
+      makeButton("สร้างรายงาน", "btn btn-ghost btn-sm", () => {
+        injuryFormState = { playerId: p.id, status, description: "", severity: INJURY_SEVERITIES[0], error: "" };
+        renderRoster(currentAttendanceMap);
+      })
+    );
+    wrap.appendChild(row);
+    return wrap;
+  }
+  return null;
+}
+
+// แตะปุ่มสถานะ: I/R ที่ยังไม่มีรายงานบาดเจ็บค้างอยู่ → เปิดฟอร์มสั้นก่อน (ยังไม่บันทึกสถานะ) ส่วนอื่นบันทึกทันทีเหมือนเดิม
+function onStatusTap(p, status) {
+  const prev = currentAttendanceMap.get(p.id) || {};
+  const injury = activeInjuryMap.get(p.id);
+  injuryFormState = null;
+  if (status === "I" || status === "R") {
+    if (injury) {
+      commitAttendanceChange(p.id, { status, injuryReportId: injury.id });
+      return;
+    }
+    injuryFormState = { playerId: p.id, status, description: "", severity: INJURY_SEVERITIES[0], error: "" };
+    renderRoster(currentAttendanceMap);
+    return;
+  }
+  // เปลี่ยนเป็น A/P: ล้างลิงก์รายงานเดิมของวันนี้ (ถ้ามี) — ตัวรายงานบาดเจ็บเองไม่ถูกแตะ
+  commitAttendanceChange(p.id, prev.injuryReportId ? { status, injuryReportId: null } : { status });
+}
+
+function buildInjuryFormRow(p, st) {
+  const tr = document.createElement("tr");
+  const td = document.createElement("td");
+  td.colSpan = 7;
+  const box = document.createElement("div");
+  box.className = "rounded-lg bg-slate-50 px-3 py-3 space-y-2";
+  const title = document.createElement("p");
+  title.className = "text-sm font-semibold text-slate-800";
+  title.textContent = `${p.nickname ?? p.fullName ?? "นักกีฬา"} ยังไม่มีรายงานบาดเจ็บ — บันทึกสั้นๆ ตอนนี้เลย (แก้รายละเอียดเพิ่มได้ภายหลังที่หน้ารายงานอาการบาดเจ็บ)`;
+  const fields = document.createElement("div");
+  fields.className = "flex gap-3 flex-wrap items-end";
+  const descWrap = document.createElement("div");
+  descWrap.className = "flex-1 min-w-[200px]";
+  descWrap.innerHTML = '<label class="field-label">อาการ</label>';
+  const desc = document.createElement("input");
+  desc.type = "text";
+  desc.className = "field-input";
+  desc.placeholder = "เช่น ข้อเท้าพลิก";
+  desc.value = st.description;
+  desc.addEventListener("input", () => {
+    st.description = desc.value;
+  });
+  descWrap.appendChild(desc);
+  const sevWrap = document.createElement("div");
+  sevWrap.innerHTML = '<label class="field-label">ความรุนแรง</label>';
+  const sev = document.createElement("select");
+  sev.className = "field-input";
+  sev.innerHTML = INJURY_SEVERITIES.map((s) => `<option value="${s}">${s}</option>`).join("");
+  sev.value = st.severity;
+  sev.addEventListener("change", () => {
+    st.severity = sev.value;
+  });
+  sevWrap.appendChild(sev);
+  fields.append(descWrap, sevWrap);
+  const error = document.createElement("p");
+  error.className = "text-xs text-red-600";
+  error.textContent = st.error;
+  const actions = document.createElement("div");
+  actions.className = "flex gap-2 flex-wrap";
+  actions.append(
+    makeButton("บันทึกรายงานบาดเจ็บ", "btn btn-primary btn-sm", () => submitQuickInjury(p, true)),
+    makeButton("บันทึกเฉพาะสถานะ", "btn btn-secondary btn-sm", () => submitQuickInjury(p, false)),
+    makeButton("ยกเลิก", "btn btn-ghost btn-sm", () => {
+      injuryFormState = null;
+      renderRoster(currentAttendanceMap);
+    })
+  );
+  box.append(title, fields, error, actions);
+  td.appendChild(box);
+  tr.appendChild(td);
+  return tr;
+}
+
+// withReport = สร้างรายงานบาดเจ็บ + บันทึกสถานะที่ผูกกับรายงาน / ไม่ใช่ = บันทึกสถานะอย่างเดียว (กันไม่ให้ฟอร์มขวางโค้ชที่รีบ)
+async function submitQuickInjury(p, withReport) {
+  const st = injuryFormState;
+  if (!st || st.playerId !== p.id) return;
+  if (!withReport) {
+    injuryFormState = null;
+    commitAttendanceChange(p.id, { status: st.status });
+    return;
+  }
+  const payload = buildQuickInjuryReport({
+    team: myTeam,
+    player: p,
+    playerName: playerLabel(p),
+    date: currentSessionDate(),
+    description: st.description,
+    severity: st.severity,
+    attendanceStatus: st.status,
+    coachId: auth.currentUser.uid,
+    coachName: myCoachName || auth.currentUser.email
+  });
+  if (!payload) {
+    st.error = "กรอกอาการสั้นๆ ก่อนบันทึก (หรือกด \"บันทึกเฉพาะสถานะ\")";
+    renderRoster(currentAttendanceMap);
+    return;
+  }
+  try {
+    setAttendanceStatus("กำลังบันทึกรายงานบาดเจ็บ...");
+    const ref = await addDoc(collection(db, "injuryReports"), { ...payload, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+    activeInjuryMap.set(p.id, { id: ref.id, ...payload });
+    injuryFormState = null;
+    commitAttendanceChange(p.id, { status: st.status, injuryReportId: ref.id });
+  } catch (err) {
+    console.error(err);
+    st.error = "บันทึกรายงานไม่สำเร็จ: " + err.message;
+    renderRoster(currentAttendanceMap);
+    setAttendanceStatus("บันทึกรายงานบาดเจ็บไม่สำเร็จ: " + err.message, true);
+  }
+}
+
+// กด A ให้คนที่ยังมีรายงานค้าง แล้วโค้ชยืนยันว่า "หายแล้ว" — วันนี้ถือเป็นวันกลับมาซ้อมจริง (actualReturnDate)
+async function healInjuryFromRoster(p) {
+  const injury = activeInjuryMap.get(p.id);
+  if (!injury) return;
+  try {
+    await updateDoc(doc(db, "injuryReports", injury.id), {
+      status: INJURY_STATUS_HEALED,
+      actualReturnDate: currentSessionDate(),
+      updatedAt: serverTimestamp()
+    });
+    activeInjuryMap.delete(p.id);
+    renderRoster(currentAttendanceMap);
+    setAttendanceStatus(`อัปเดตรายงานบาดเจ็บของ ${p.nickname ?? p.fullName ?? "นักกีฬา"} เป็น "หายแล้ว" ✓`);
+  } catch (err) {
+    console.error(err);
+    setAttendanceStatus("อัปเดตรายงานบาดเจ็บไม่สำเร็จ: " + err.message, true);
+  }
 }
 
 // บันทึกการแตะสถานะ/คะแนน: อัปเดตหน้าจอทันทีจากสถานะปัจจุบัน แล้วต่อคิวเขียน Firestore เบื้องหลัง (ตรรกะอยู่ที่
@@ -4251,10 +4476,6 @@ function commitAttendanceChange(playerId, change) {
   );
 }
 
-function saveStatus(playerId, status) {
-  commitAttendanceChange(playerId, { status });
-}
-
 function saveScoreCategory(playerId, categoryKey, value) {
   commitAttendanceChange(playerId, { category: categoryKey, value });
 }
@@ -4279,7 +4500,7 @@ function showNoSessionView() {
   rosterWrap.classList.add("hidden");
 }
 
-async function renderSession(session, dateStr) {
+async function renderSession(session, dateStr, { autoFill = false } = {}) {
   currentSessionId = session.id;
   currentSessionData = session.data;
 
@@ -4290,14 +4511,31 @@ async function renderSession(session, dateStr) {
   }
   showRosterView();
   const existingMap = await loadExistingAttendance(session.id);
+  // รายงานบาดเจ็บเป็นข้อมูลเสริม — โหลดไม่ได้ก็ยังเช็คชื่อได้ตามปกติ (แค่ไม่มีการเติม I/R และคำเตือน)
+  try {
+    activeInjuryMap = activeInjuryByPlayer(await loadTeamInjuries(), dateStr);
+  } catch (err) {
+    console.error(err);
+    activeInjuryMap = new Map();
+  }
+  injuryFormState = null;
   renderRoster(existingMap);
   setAttendanceStatus(`พร้อมเช็คชื่อวันที่ ${dateStr} (ทีม ${myTeam})`);
+  // เติม I/R ให้นักกีฬาที่มีรายงานบาดเจ็บค้างอยู่และยังไม่มีสถานะของวันนั้น — เฉพาะตอนโค้ชกด "โหลด/สร้างวันซ้อมนี้" (ไม่เขียนข้อมูลตอนแค่เรียกดู)
+  // และไม่เติมถ้าตารางล็อกแล้ว โค้ชแก้สถานะที่เติมให้ได้เองเหมือนปกติ
+  const locked =
+    rosterLockState({ complete: isRosterComplete(existingMap), sessionDate: dateStr, today: todayBangkok(), isAdmin: currentIsAdmin }) === "locked";
+  if (autoFill && !locked) {
+    for (const item of planInjuryAutoFill(players, existingMap, activeInjuryMap)) {
+      commitAttendanceChange(item.playerId, { status: item.status, injuryReportId: item.injuryReportId });
+    }
+  }
 }
 
 async function loadSessionForDate(dateStr) {
   setAttendanceStatus("กำลังโหลด...");
   const session = await findOrCreateSession(dateStr);
-  await renderSession(session, dateStr);
+  await renderSession(session, dateStr, { autoFill: true });
 }
 
 // เรียกดูวันที่ที่เลือกแบบอ่านอย่างเดียว (ไม่สร้างวันซ้อมใหม่ถ้ายังไม่เคยมี) — ใช้ตอนโค้ชแค่อยากย้อนดูประวัติว่า

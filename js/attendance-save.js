@@ -14,6 +14,8 @@ export function applyAttendanceChange(prev, change, now = () => new Date()) {
   if ("status" in change) {
     const next = { ...base, status: change.status, updatedAt };
     if (change.status !== "A") next.scores = {};
+    // injuryReportId = ลิงก์ไปรายงานบาดเจ็บที่ทำให้สถานะเป็น I/R (null = ล้างลิงก์ ไม่ส่งมา = ไม่แตะค่าเดิม)
+    if ("injuryReportId" in change) next.injuryReportId = change.injuryReportId;
     return next;
   }
   return { ...base, scores: { ...(base.scores || {}), [change.category]: change.value }, updatedAt };
@@ -24,7 +26,9 @@ export function applyAttendanceChange(prev, change, now = () => new Date()) {
 // I/R/P ตั้งใจให้แทนที่ทั้ง map ด้วยค่าว่าง (SDK ใส่ path ที่เป็น map ว่างเข้า field mask จึงล้างของเดิมจริง)
 export function firestoreFieldsForChange(change) {
   if ("status" in change) {
-    return change.status !== "A" ? { status: change.status, scores: {} } : { status: change.status };
+    const fields = change.status !== "A" ? { status: change.status, scores: {} } : { status: change.status };
+    if ("injuryReportId" in change) fields.injuryReportId = change.injuryReportId;
+    return fields;
   }
   return { scores: { [change.category]: change.value } };
 }
