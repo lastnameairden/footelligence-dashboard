@@ -9,7 +9,18 @@ import {
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import { db, auth } from "./firebase-init.js";
 import { icon } from "./icons.js";
-import { injuryStatsHtml } from "./injury-stats-view.js";
+import { injuryStatsHtml, injuryTrendHtml } from "./injury-stats-view.js";
+import { buildInjuryStats } from "./injury-form.js";
+import {
+  PERIOD_MODES,
+  currentPeriodKey,
+  formatDelta,
+  monthShortLabel,
+  monthlyCounts,
+  periodFor,
+  rowsInPeriod,
+  shiftPeriodKey
+} from "./injury-period.js";
 import {
   applyDataLabels,
   computeAvgScore,
@@ -33,6 +44,7 @@ import {
   ageGroupNumber,
   coachPositionLabel,
   escapeHtml,
+  dateRangeQuery,
   monthQuery,
   todayBangkok,
   thisMonthBangkok,
@@ -98,6 +110,11 @@ const dashboardMatchBody = document.getElementById("dashboard-match-body");
 const dashboardMatchPagination = document.getElementById("dashboard-match-pagination");
 const injuryReportsStatCardsEl = document.getElementById("injury-reports-stat-cards");
 const injuryStatsPanelEl = document.getElementById("injury-stats-panel");
+const injuryTrendEl = document.getElementById("injury-trend");
+const injuryPeriodModeEl = document.getElementById("injury-period-mode");
+const injuryPeriodPrevBtn = document.getElementById("injury-period-prev");
+const injuryPeriodNextBtn = document.getElementById("injury-period-next");
+const injuryPeriodLabelEl = document.getElementById("injury-period-label");
 const dashboardInjuryBody = document.getElementById("dashboard-injury-body");
 const dashboardInjuryPagination = document.getElementById("dashboard-injury-pagination");
 const headerAttendanceLink = document.getElementById("header-attendance-link");
@@ -1249,16 +1266,9 @@ async function loadMatchAndInjuryReports(scopeTeam) {
   matchReportsStatCardsEl.innerHTML = "";
   dashboardMatchBody.innerHTML =
     '<tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>';
-  injuryReportsStatCardsEl.innerHTML = "";
-  dashboardInjuryBody.innerHTML =
-    '<tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>';
+  const matchSnap = await getDocs(monthQuery("matchReports", scopeTeam, CURRENT_MONTH_STR));
 
-  const [matchSnap, injurySnap] = await Promise.all([
-    getDocs(monthQuery("matchReports", scopeTeam, CURRENT_MONTH_STR)),
-    getDocs(monthQuery("injuryReports", scopeTeam, CURRENT_MONTH_STR))
-  ]);
-
-  // Dashboard หลักแสดงเฉพาะเดือนปัจจุบัน — ดูข้อมูลย้อนหลังได้ที่เมนู "พิมพ์สรุป Dashboard" แทน
+  // ผลการแข่งขันแสดงเฉพาะเดือนปัจจุบัน — ดูข้อมูลย้อนหลังได้ที่เมนู "พิมพ์สรุป Dashboard" แทน (ส่วนอาการบาดเจ็บเลือกช่วงเวลาได้เอง ดู loadInjuryReports)
   const matches = [];
   matchSnap.forEach((d) => matches.push(d.data()));
   const monthMatches = matches.filter((m) => isInCurrentMonth(m.date));
@@ -1276,23 +1286,99 @@ async function loadMatchAndInjuryReports(scopeTeam) {
 
   dashboardMatchTable.setRows(monthMatches);
 
-  const injuries = [];
-  injurySnap.forEach((d) => injuries.push(d.data()));
-  const monthInjuries = injuries.filter((i) => isInCurrentMonth(i.date));
-  monthInjuries.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  loadInjuryReports(scopeTeam);
+}
 
-  const activeCount = monthInjuries.filter((i) => i.status !== "หายแล้ว").length;
-  const recoveredCount = monthInjuries.filter((i) => i.status === "หายแล้ว").length;
-  const severeCount = monthInjuries.filter((i) => i.severity === "รุนแรง").length;
+// ---------- รายงานอาการบาดเจ็บ: เลือกช่วงเวลา เดือน/เทอม/ปีการศึกษา (ตรรกะล้วนอยู่ที่ injury-period.js) ----------
+let injuryPeriodMode = "month";
+let injuryPeriodKey = currentPeriodKey("month", todayBangkok());
+let injuryScopeTeam = null;
+let injuryLoadToken = 0; // กดเลื่อนช่วงรัวๆ — ใช้เฉพาะผลของการโหลดล่าสุด
+
+const INJURY_DELTA_TONE_CLASS = { good: "text-emerald-600", bad: "text-red-600", neutral: "text-slate-400" };
+const injuryDeltaHint = (current, previous) => {
+  const d = formatDelta(current, previous, { lowerIsBetter: true });
+  return `<p class="text-xs ${INJURY_DELTA_TONE_CLASS[d.tone]}">${d.text}</p>`;
+};
+
+function renderInjuryPeriodControls(period) {
+  injuryPeriodModeEl.innerHTML = "";
+  for (const m of PERIOD_MODES) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = m.label;
+    btn.className = "segmented-btn" + (m.key === injuryPeriodMode ? " active" : "");
+    btn.addEventListener("click", () => {
+      if (m.key === injuryPeriodMode) return;
+      injuryPeriodMode = m.key;
+      injuryPeriodKey = currentPeriodKey(m.key, todayBangkok());
+      loadInjuryReports(injuryScopeTeam);
+    });
+    injuryPeriodModeEl.appendChild(btn);
+  }
+  const latest = injuryPeriodKey === currentPeriodKey(injuryPeriodMode, todayBangkok());
+  injuryPeriodNextBtn.disabled = latest;
+  injuryPeriodNextBtn.classList.toggle("opacity-40", latest);
+  const range = period.months.length > 1 ? `${monthShortLabel(period.startMonth)} ${period.startMonth.slice(0, 4)} – ${monthShortLabel(period.endMonth)} ${period.endMonth.slice(0, 4)}` : "";
+  const ongoing = latest && period.months.length > 1 ? " · ข้อมูลถึงวันนี้" : "";
+  injuryPeriodLabelEl.textContent = `${period.label}${range ? ` (${range})` : ""}${ongoing} · เทียบกับช่วงก่อนหน้า`;
+}
+
+injuryPeriodPrevBtn.addEventListener("click", () => {
+  injuryPeriodKey = shiftPeriodKey(injuryPeriodMode, injuryPeriodKey, -1);
+  loadInjuryReports(injuryScopeTeam);
+});
+injuryPeriodNextBtn.addEventListener("click", () => {
+  if (injuryPeriodNextBtn.disabled) return;
+  injuryPeriodKey = shiftPeriodKey(injuryPeriodMode, injuryPeriodKey, 1);
+  loadInjuryReports(injuryScopeTeam);
+});
+
+async function loadInjuryReports(scopeTeam) {
+  injuryScopeTeam = scopeTeam;
+  const token = ++injuryLoadToken;
+  const period = periodFor(injuryPeriodMode, injuryPeriodKey);
+  const previous = periodFor(injuryPeriodMode, shiftPeriodKey(injuryPeriodMode, injuryPeriodKey, -1));
+  renderInjuryPeriodControls(period);
+  injuryReportsStatCardsEl.innerHTML = "";
+  injuryTrendEl.innerHTML = "";
+  injuryStatsPanelEl.innerHTML = "";
+  dashboardInjuryBody.innerHTML =
+    '<tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>';
+
+  // ดึงครั้งเดียวครอบทั้งช่วงที่เลือกและช่วงก่อนหน้า (ใช้เทียบ) แล้วแยกฝั่ง client
+  let all;
+  try {
+    const snap = await getDocs(dateRangeQuery("injuryReports", scopeTeam, previous.start, period.end));
+    all = [];
+    snap.forEach((d) => all.push(d.data()));
+  } catch (err) {
+    console.error(err);
+    if (token === injuryLoadToken) {
+      dashboardInjuryBody.innerHTML = `<tr><td colspan="8" class="px-4 py-6 text-center text-red-600">โหลดรายงานบาดเจ็บไม่สำเร็จ: ${escapeHtml(err.message)}</td></tr>`;
+    }
+    return;
+  }
+  if (token !== injuryLoadToken) return;
+
+  const rows = rowsInPeriod(all, period).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  const prevRows = rowsInPeriod(all, previous);
+  const stats = buildInjuryStats(rows);
+  const prevStats = buildInjuryStats(prevRows);
+  const hasPrev = prevRows.length > 0;
+  const severe = rows.filter((i) => i.severity === "รุนแรง").length;
+  const prevSevere = prevRows.filter((i) => i.severity === "รุนแรง").length;
+  const avgText = stats.avgDaysOut === null ? "-" : `${Math.round(stats.avgDaysOut * 10) / 10}<span class="text-sm font-normal text-slate-500"> วัน</span>`;
 
   injuryReportsStatCardsEl.innerHTML =
-    statCard("รายการทั้งหมด", monthInjuries.length) +
-    statCard("ยังไม่หาย", activeCount) +
-    statCard("หายแล้ว", recoveredCount) +
-    statCard("รุนแรง", severeCount);
-  injuryStatsPanelEl.innerHTML = injuryStatsHtml(monthInjuries);
+    statCard("รายการทั้งหมด", rows.length, injuryDeltaHint(rows.length, hasPrev ? prevRows.length : null)) +
+    statCard("ยังไม่หาย", stats.active, '<p class="text-xs text-slate-400">ณ ตอนนี้</p>') +
+    statCard("รุนแรง", severe, injuryDeltaHint(severe, hasPrev ? prevSevere : null)) +
+    statCard("หยุดซ้อมเฉลี่ย", avgText, injuryDeltaHint(stats.avgDaysOut, prevStats.avgDaysOut));
+  injuryTrendEl.innerHTML = period.months.length > 1 ? injuryTrendHtml(monthlyCounts(rows, period.months), monthShortLabel) : "";
+  injuryStatsPanelEl.innerHTML = injuryStatsHtml(rows, { summaryCards: false });
 
-  dashboardInjuryTable.setRows(monthInjuries);
+  dashboardInjuryTable.setRows(rows);
 }
 
 // วาดภาพรวมของทีมที่เลือกอยู่ (การ์ดสรุป/พาย/กราฟแท่ง/ตาราง) เฉพาะตำแหน่งที่เลือก ("player" = ทุกตำแหน่ง

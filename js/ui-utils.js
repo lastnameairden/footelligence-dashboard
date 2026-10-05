@@ -50,11 +50,14 @@ export function teamDateRangeQuery(collectionName, team, startDate, endDate) {
 
 // ดึงทั้งเดือนของ "ทีมเดียว" (scopeTeam) หรือ "ทุกทีม" (scopeTeam ว่าง — ใช้ได้เฉพาะผู้ดูแลระบบ ซึ่ง rules ไม่ผูกกับ team)
 // กรณีทุกทีมเป็น range บนฟิลด์เดียว (date) ใช้ single-field index อัตโนมัติ ไม่ต้องมี composite index เพิ่ม
-export function monthQuery(collectionName, scopeTeam, month) {
-  const { start, end } = monthDateRange(month);
+export function dateRangeQuery(collectionName, scopeTeam, start, end) {
   return scopeTeam
     ? teamDateRangeQuery(collectionName, scopeTeam, start, end)
     : query(collection(db, collectionName), where("date", ">=", start), where("date", "<=", end));
+}
+export function monthQuery(collectionName, scopeTeam, month) {
+  const { start, end } = monthDateRange(month);
+  return dateRangeQuery(collectionName, scopeTeam, start, end);
 }
 
 // URL ที่มาจากข้อมูล (รูปนักกีฬา/รูปแนบรายงาน) ก่อนใส่ใน src/href — รับเฉพาะ https:// แล้ว escape ตัวอักษรพิเศษ ถ้าไม่ใช่
@@ -148,11 +151,13 @@ export function teamLogoImg(team, className = "w-6 h-6 object-contain inline-blo
 }
 
 // การ์ดตัวเลขสรุปแบบสั้นๆ (label + value) ใช้ในหน้าสรุปภาพรวมต่างๆ
-export function statCard(label, value) {
+// hintHtml = บรรทัดเล็กใต้ตัวเลข (เช่น เทียบกับช่วงก่อน) ไม่ใส่ก็ได้
+export function statCard(label, value, hintHtml = "") {
   return `
     <div class="stat-card">
       <p class="stat-label">${label}</p>
       <p class="stat-value">${value}</p>
+      ${hintHtml}
     </div>
   `;
 }
