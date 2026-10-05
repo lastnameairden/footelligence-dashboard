@@ -1151,6 +1151,27 @@
               <div id="match-lineup-dropdown" class="hidden absolute z-20 mt-1 w-full max-h-56 overflow-y-auto card"></div>
             </div>
             <div id="match-lineup-chips" class="flex flex-wrap gap-2 mt-3"></div>
+            <p id="match-lineup-gk-note" class="text-sm mt-1"></p>
+
+            <!-- ดึงผู้เล่นจากรุ่นอายุอื่นขึ้นมาเล่นเป็นตัวจริง: มีไหม / รุ่นไหน / กี่คน (ระบบนับให้จากรายชื่อที่เลือก) -->
+            <div class="mt-4 flex flex-wrap items-center gap-3">
+              <span class="text-sm font-semibold text-slate-700">มีผู้เล่นจากรุ่นอายุอื่นขึ้นมาเล่นไหม?</span>
+              <div id="match-guest-segmented" class="segmented"></div>
+            </div>
+            <div id="match-guest-panel" class="hidden mt-3 card card-pad bg-amber-50">
+              <div class="flex flex-wrap items-end gap-3">
+                <div>
+                  <label class="field-label">รุ่นอายุที่ดึงขึ้นมา</label>
+                  <select id="match-guest-age-group" class="field-input"></select>
+                </div>
+                <div class="relative flex-1 min-w-[220px]">
+                  <label class="field-label">เลือกผู้เล่นจากรุ่นนั้น</label>
+                  <input id="match-guest-search" type="text" class="field-input" placeholder="พิมพ์ชื่อเพื่อค้นหาและเลือกผู้เล่นจากรุ่นนั้น..." autocomplete="off" />
+                  <div id="match-guest-dropdown" class="hidden absolute z-20 mt-1 w-full max-h-56 overflow-y-auto card"></div>
+                </div>
+              </div>
+            </div>
+            <p id="match-lineup-summary" class="text-sm text-amber-800 mt-2"></p>
           </div>
 
           <div class="sm:col-span-2">
