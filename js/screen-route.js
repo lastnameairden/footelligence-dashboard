@@ -7,7 +7,7 @@
 //   ผู้ดูแลระบบ (แผงควบคุม):         admin=<coaches|progress|...>         ← รูปแบบเดิมของ deep link ทั้งหมด ใช้ต่อได้เหมือนเดิม
 //   ผู้ดูแลระบบสวมบทบาทจัดการทีม:   admin=team&team=<ทีม>&as=<coach|executive>[&coach=<id>][&ret=<coaches|manage-team>][&screen=..][&d=..]
 
-export const COACH_SCREEN_KEYS = ["daily", "checkin", "report", "match", "injury", "plan", "players"];
+export const COACH_SCREEN_KEYS = ["daily", "checkin", "report", "match", "injury", "plan", "players", "fitness"];
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 

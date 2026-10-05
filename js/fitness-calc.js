@@ -38,12 +38,23 @@ export function ageNumberOf(ageGroup) {
   return m ? Number(m[1]) : null;
 }
 
+// ลดภาระนักกีฬา: รอบ Baseline (พ.ค.) ทดสอบความอดทนทั้ง Yo-Yo IR1C และ 30-15 IFT (U12–U13 ได้ทั้งคู่) รอบอื่นใช้ตัวเดียวตามรุ่น —
+// U12 ลงมาใช้ Yo-Yo IR1C ส่วน U13 ขึ้นไปใช้ 30-15 IFT (ตั้งเป็น false ถ้าต้องการให้ทดสอบทั้งคู่ทุกรอบ)
+export const SINGLE_ENDURANCE_AFTER_BASELINE = true;
+const YOYO_LAST_AGE = 12;
+
 // รายการที่ใช้กับรุ่นอายุนี้ในรอบนี้: อยู่ใน testCodes ของรอบ (ไม่มี testCodes = ทั้งชุดตามรูปแบบ) และอยู่ในช่วงอายุของรายการ
 export function testsForRound(round, ageGroup) {
   const age = ageNumberOf(ageGroup);
   if (age === null) return [];
   const codes = new Set(round?.testCodes && round.testCodes.length > 0 ? round.testCodes : round?.mode === "selective" ? SELECTIVE_TEST_CODES : FULL_TEST_CODES);
-  return FITNESS_TESTS.filter((t) => codes.has(t.code) && age >= t.minAge && age <= t.maxAge);
+  let list = FITNESS_TESTS.filter((t) => codes.has(t.code) && age >= t.minAge && age <= t.maxAge);
+  // roundType ที่ระบุและไม่ใช่ Baseline เท่านั้น (ไม่ระบุ = ไม่ตัด เพื่อไม่กระทบรอบ/ข้อมูลที่ไม่มีชนิดรอบ)
+  if (SINGLE_ENDURANCE_AFTER_BASELINE && round?.roundType && round.roundType !== "baseline") {
+    const drop = age <= YOYO_LAST_AGE ? "ift_3015" : "yoyo_ir1c";
+    list = list.filter((t) => t.code !== drop);
+  }
+  return list;
 }
 
 export function defaultTestCodes(mode) {
@@ -216,4 +227,38 @@ export function validateRoundForm({ season, roundType, mode, openDate, closeDate
   const clash = overlappingRound({ openDate, makeupUntil: addDays(closeDate, MAKEUP_DAYS) }, rounds);
   if (clash) return `ช่วงนี้ซ้อนกับรอบ "${roundLabel(clash)}" (${thaiDateShort(clash.openDate)} – ${thaiDateShort(clash.makeupUntil)} รวมช่วงซ่อม)`;
   return null;
+}
+
+// ---------- ตรวจค่าผิดปกติตอนกรอก (เตือนอย่างเดียว ไม่บล็อก) ----------
+// ช่วงที่เป็นไปได้ของ "ค่าที่ใช้" ต่อรายการ — เกินช่วงนี้เกือบแน่ว่าพิมพ์ผิด (เช่น จุดทศนิยมหาย)
+export const PLAUSIBLE_RANGE = {
+  height: [100, 215],
+  sitting_height: [45, 120],
+  weight: [15, 120],
+  broad_jump: [80, 320],
+  cmj: [10, 70],
+  sprint_10: [1.4, 3.5],
+  sprint_30: [3.5, 7.5],
+  cod_505_l: [1.8, 4.5],
+  cod_505_r: [1.8, 4.5],
+  rsa_6x30: [3.5, 8],
+  yoyo_ir1c: [0, 2800],
+  ift_3015: [8, 25]
+};
+
+// tests = ผลของนักกีฬาหนึ่งคน { รหัส: { trials: [...] } } คืน { รหัส: ข้อความเตือน } เฉพาะช่องที่ต้องตรวจซ้ำ — ใช้เฉพาะรอบเดียวกัน
+// (ไม่เทียบกับรอบก่อน) ทุกครั้งที่วัดหลายครั้ง ตรวจทุกครั้งที่กรอก ไม่ใช่แค่ค่าที่ใช้
+export function plausibilityWarnings(tests) {
+  const warnings = {};
+  const nums = (code) => toNumbers(tests?.[code]?.trials);
+  for (const [code, [lo, hi]] of Object.entries(PLAUSIBLE_RANGE)) {
+    const test = FITNESS_TEST_BY_CODE[code];
+    if (nums(code).some((n) => n < lo || n > hi)) warnings[code] = `ค่าดูผิดปกติ (ปกติ ${lo}–${hi} ${test.unit}) ตรวจซ้ำ`;
+  }
+  const height = nums("height")[0];
+  const sitting = nums("sitting_height")[0];
+  if (height !== undefined && sitting !== undefined && sitting >= height) {
+    warnings.sitting_height = "ส่วนสูงนั่งต้องน้อยกว่าส่วนสูงยืน ตรวจซ้ำ";
+  }
+  return warnings;
 }

@@ -66,6 +66,7 @@ import {
 } from "./ui-utils.js";
 import { openAdminMeetings, renderCoachMeetingCard, loadCoachMeetingNotifications } from "./coach-meetings-ui.js";
 import { openAdminFitnessRounds } from "./fitness-rounds-ui.js";
+import { openFitnessEntry } from "./fitness-entry-ui.js";
 import { isEvaluationComplete } from "./masc-data.js";
 import { applyAttendanceChange, firestoreFieldsForChange, createSaveQueue, rosterLockState } from "./attendance-save.js";
 import {
@@ -263,6 +264,7 @@ const adminReportCardStatus = document.getElementById("admin-report-card-status"
 const adminMascRoundsSection = document.getElementById("admin-masc-rounds-section");
 const adminMeetingsSection = document.getElementById("admin-meetings-section");
 const adminFitnessRoundsSection = document.getElementById("admin-fitness-rounds-section");
+const fitnessEntrySection = document.getElementById("fitness-entry-section");
 const adminMascRoundPeriodSelect = document.getElementById("admin-masc-round-period-select");
 const adminMascRoundStartInput = document.getElementById("admin-masc-round-start-input");
 const adminMascRoundEndInput = document.getElementById("admin-masc-round-end-input");
@@ -610,6 +612,7 @@ function hideAllScreens() {
   adminMascRoundsSection.classList.add("hidden");
   adminMeetingsSection.classList.add("hidden");
   adminFitnessRoundsSection.classList.add("hidden");
+  fitnessEntrySection.classList.add("hidden");
   adminPlayerAuditSection.classList.add("hidden");
   addPlayerSection.classList.add("hidden");
   checkinSection.classList.add("hidden");
@@ -848,6 +851,7 @@ function renderDrawerItems() {
       navDrawerItems.appendChild(drawerItem(icon("football"), "รายงานผลการแข่งขัน", openMatchReportSection));
       navDrawerItems.appendChild(drawerItem(icon("heart-pulse"), "รายงานอาการบาดเจ็บ", openInjuryReportSection));
       navDrawerItems.appendChild(drawerItem(icon("clipboard-list"), "แผนการฝึกซ้อมรายวัน", openTrainingPlanSection));
+      navDrawerItems.appendChild(drawerItem(icon("trending-up"), "ผลทดสอบสมรรถภาพ", openFitnessEntrySection));
       navDrawerItems.appendChild(
         drawerItem(icon("dna"), "การประเมิน MASC", () => {
           // แนบ ageGroups/coachPosition ไปด้วยถ้ากำลังสวมบทบาทเป็นโค้ชคนใดคนหนึ่งอยู่ (myAgeGroups มีค่า) เพื่อให้
@@ -891,6 +895,7 @@ function renderDrawerItems() {
     navDrawerItems.appendChild(drawerItem(icon("football"), "รายงานผลการแข่งขัน", openMatchReportSection));
     navDrawerItems.appendChild(drawerItem(icon("heart-pulse"), "รายงานอาการบาดเจ็บ", openInjuryReportSection));
     navDrawerItems.appendChild(drawerItem(icon("clipboard-list"), "แผนการฝึกซ้อมรายวัน", openTrainingPlanSection));
+      navDrawerItems.appendChild(drawerItem(icon("trending-up"), "ผลทดสอบสมรรถภาพ", openFitnessEntrySection));
     navDrawerItems.appendChild(drawerItem(icon("dna"), "การประเมิน MASC", () => (window.location.href = "./masc.html")));
     navDrawerItems.appendChild(drawerDivider());
     navDrawerItems.appendChild(drawerItem(icon("bar-chart"), "Dashboard", goToDashboard));
@@ -1203,6 +1208,18 @@ adminMascRoundCorrectionCancelBtn.addEventListener("click", () => {
   exitMascCorrectionMode();
   adminMascRoundStatus.textContent = "";
 });
+
+function openFitnessEntrySection() {
+  hideAllScreens();
+  fitnessEntrySection.classList.remove("hidden");
+  openFitnessEntry({
+    team: myTeam,
+    coachId: auth.currentUser.uid,
+    coachName: myCoachName || auth.currentUser.email,
+    ageGroups: myAgeGroups,
+    isAdmin: currentIsAdmin
+  });
+}
 
 function openAdminFitnessRoundsSection() {
   hideAllScreens();
@@ -3555,6 +3572,7 @@ const ROUTE_SCREENS = [
   { el: injuryReportSection, key: "injury", kind: "coach" },
   { el: trainingPlanSection, key: "plan", kind: "coach" },
   { el: addPlayerSection, key: "players", kind: "coach" },
+  { el: fitnessEntrySection, key: "fitness", kind: "coach" },
   { el: executiveSection, key: "executive", kind: "executive" },
   { el: executivePlayersSection, key: "executive-players", kind: "executive" },
   { el: adminCoachesSection, key: "coaches", kind: "admin" },
@@ -3655,6 +3673,9 @@ function openCoachScreen(screen, date) {
       break;
     case "players":
       openAddPlayerSection();
+      break;
+    case "fitness":
+      openFitnessEntrySection();
       break;
     default:
       if (d) dailyDateInput.value = d;

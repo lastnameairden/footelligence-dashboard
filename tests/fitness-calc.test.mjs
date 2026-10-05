@@ -14,6 +14,7 @@ import {
   defaultTestCodes,
   formatResult,
   overlappingRound,
+  plausibilityWarnings,
   resultValue,
   roundLabel,
   roundState,
@@ -164,4 +165,28 @@ test("bestSeasonFor picks the first academic year whose round has not finished y
   assert.equal(bestSeasonFor("baseline", "2026-06-14"), "2027/28");
   // ม.ค.–เม.ย. ยังนับเป็นปีการศึกษาที่เริ่มปีก่อน
   assert.equal(bestSeasonFor("final", "2027-02-05"), "2026/27");
+});
+test("after Baseline each age uses a single endurance test (U12 Yo-Yo, U13+ 30-15); Baseline keeps both", () => {
+  const base = { roundType: "baseline", mode: "full" };
+  assert.deepEqual(codesFor(base, "U13").slice(-2), ["yoyo_ir1c", "ift_3015"]);
+  assert.deepEqual(codesFor(base, "U12").slice(-2), ["yoyo_ir1c", "ift_3015"]);
+  const nov = { roundType: "reeval", mode: "full" };
+  assert.ok(codesFor(nov, "U12").includes("yoyo_ir1c") && !codesFor(nov, "U12").includes("ift_3015"));
+  assert.ok(codesFor(nov, "U13").includes("ift_3015") && !codesFor(nov, "U13").includes("yoyo_ir1c"));
+  assert.ok(codesFor(nov, "U10").includes("yoyo_ir1c"), "U10-U11 only have Yo-Yo");
+  assert.ok(codesFor(nov, "U16").includes("ift_3015"));
+  // ไม่ระบุ roundType = ไม่ตัด
+  assert.ok(codesFor({ mode: "full" }, "U13").includes("yoyo_ir1c"));
+  assert.equal(codesFor({ roundType: "final", mode: "selective" }, "U13").includes("ift_3015"), false);
+});
+
+test("plausibilityWarnings flags out-of-range trials and a sitting height not below standing height", () => {
+  assert.deepEqual(plausibilityWarnings({}), {});
+  assert.deepEqual(plausibilityWarnings({ height: { trials: [149.7] }, sitting_height: { trials: [75.1] }, sprint_10: { trials: [2.1, 2.08] } }), {});
+  const w = plausibilityWarnings({ height: { trials: [14.97] }, sprint_10: { trials: [2.1, 21] }, broad_jump: { trials: [186, 191] } });
+  assert.deepEqual(Object.keys(w).sort(), ["height", "sprint_10"]);
+  assert.match(w.height, /ผิดปกติ/);
+  assert.match(plausibilityWarnings({ height: { trials: [150] }, sitting_height: { trials: [150] } }).sitting_height, /น้อยกว่าส่วนสูงยืน/);
+  assert.deepEqual(plausibilityWarnings({ height: { trials: [150] }, sitting_height: { trials: [] } }), {});
+  assert.deepEqual(plausibilityWarnings({ height: { trials: ["", null] } }), {});
 });

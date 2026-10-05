@@ -1075,6 +1075,61 @@
       </div>
     </section>
 
+    <!-- กรอกผลทดสอบสมรรถภาพ (ตารางนักกีฬาของรุ่น × รายการทดสอบ เฉพาะรอบที่เปิดอยู่) -->
+    <section id="fitness-entry-section" class="hidden space-y-4">
+      <button data-back class="btn btn-ghost px-0">← กลับหน้า Daily</button>
+
+      <div class="page-heading">
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="m3 17 6-6 4 4 8-9"/><path d="M15 6h6v6"/></svg></div>
+        <div>
+          <h2>ผลทดสอบสมรรถภาพ</h2>
+          <p>กรอกผลของรอบที่เปิดอยู่ บันทึกอัตโนมัติเมื่อออกจากช่อง · ช่องว่าง = ไม่ได้ทดสอบรอบนี้</p>
+        </div>
+      </div>
+
+      <div id="fitness-entry-banner" class="hidden"></div>
+      <p id="fitness-entry-status" class="text-sm text-slate-500"></p>
+
+      <div id="fitness-entry-controls" class="hidden space-y-4">
+        <div class="flex flex-wrap items-end gap-4">
+          <div>
+            <label class="field-label">รุ่นอายุ</label>
+            <select id="fitness-entry-age" class="field-input"></select>
+          </div>
+          <span id="fitness-entry-progress" class="badge badge-info"></span>
+          <span id="fitness-entry-summary" class="text-xs text-slate-400"></span>
+          <span id="fitness-entry-save-status" class="text-sm text-slate-500"></span>
+        </div>
+        <div class="card card-pad">
+          <p class="field-label mb-2">สภาพการทดสอบ (ใช้กับทั้งรุ่น แก้ได้)</p>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="field-label">วันที่ทดสอบ</label>
+              <input id="fitness-entry-date" type="date" class="field-input" />
+            </div>
+            <div>
+              <label class="field-label">พื้นผิว</label>
+              <select id="fitness-entry-surface" class="field-input">
+                <option value="หญ้าเทียม">หญ้าเทียม</option>
+                <option value="หญ้าจริง">หญ้าจริง</option>
+                <option value="ในร่ม">ในร่ม</option>
+              </select>
+            </div>
+            <div>
+              <label class="field-label">รองเท้า</label>
+              <select id="fitness-entry-footwear" class="field-input">
+                <option value="รองเท้าสตั๊ด">รองเท้าสตั๊ด</option>
+                <option value="รองเท้าวิ่ง">รองเท้าวิ่ง</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <p id="fitness-entry-warnings" class="text-sm text-amber-700"></p>
+      </div>
+
+      <div id="fitness-entry-grid-wrap"></div>
+      <p class="text-xs text-slate-400">ส่วนสูงยืน ส่วนสูงนั่ง และน้ำหนักวัดครั้งเดียว (ช่อง "ผล") · รายการกระโดด/วิ่งวัดหลายครั้ง ระบบเลือกค่าที่ดีที่สุดให้ในช่อง "ใช้" · เลื่อนไปทางขวาเพื่อดูรายการถัดไป · กด Enter เพื่อลงแถวถัดไป</p>
+    </section>
     <!-- หน้าจอรายงานการฝึกซ้อม (รูปถ่าย + รายชื่อนักกีฬาที่ไม่ได้เข้าซ้อม + พิกัด GPS) -->
     <section id="report-section" class="hidden space-y-6">
       <button data-back class="btn btn-ghost px-0">← กลับหน้า Daily</button>
