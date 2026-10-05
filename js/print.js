@@ -28,6 +28,7 @@ import {
   teamDateRangeQuery,
   thisMonthBangkok
 } from "./ui-utils.js";
+import { injuryStatsHtml } from "./injury-stats-view.js";
 
 const statusEl = document.getElementById("status-message");
 const accessGate = document.getElementById("access-gate");
@@ -55,6 +56,7 @@ const printMatchCards = document.getElementById("print-match-cards");
 const printMatchSummaryCards = document.getElementById("print-match-summary-cards");
 const printMatchBody = document.getElementById("print-match-body");
 const printInjuryCards = document.getElementById("print-injury-cards");
+const printInjuryStats = document.getElementById("print-injury-stats");
 const printInjurySummaryCards = document.getElementById("print-injury-summary-cards");
 const printInjuryBody = document.getElementById("print-injury-body");
 
@@ -853,6 +855,7 @@ async function loadPrintExtras(team, ageGroup, month) {
     statCard("หายแล้ว", injuries.filter((i) => i.status === "หายแล้ว").length) +
     statCard("รุนแรง", injuries.filter((i) => i.severity === "รุนแรง").length);
 
+  printInjuryStats.innerHTML = injuryStatsHtml(injuries);
   printInjurySummaryCards.innerHTML = buildInjurySummaryCardsHtml(injuries);
 
   if (injuries.length === 0) {

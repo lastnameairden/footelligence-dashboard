@@ -85,6 +85,18 @@ import {
   ownGroupCandidates,
   summarizeLineup
 } from "./match-lineup.js";
+import {
+  BODY_REGIONS,
+  CONTEXTS,
+  MECHANISMS,
+  SIDES,
+  contextFor,
+  detectRecurrence,
+  diffDays,
+  formStatusFor,
+  injuryDetailLabels,
+  storedStatusFor
+} from "./injury-form.js";
 import { buildRouteHash, parseRouteHash, isValidRouteDate } from "./screen-route.js";
 import { icon } from "./icons.js";
 
@@ -5577,6 +5589,196 @@ matchReportForm.addEventListener("submit", async (e) => {
 let editingInjuryId = null;
 let injurySelectedPlayerId = null;
 
+// ---------- รายงานบาดเจ็บแบบละเอียด: ตำแหน่ง/ข้าง/ประเภท/กลไก/เกิดที่ไหน/บาดเจ็บซ้ำ/วันกลับมาซ้อมจริง/ความคืบหน้า (ตรรกะล้วนอยู่ที่ injury-form.js) ----------
+// ทุกช่องใหม่เว้นว่างได้ — โค้ชที่รีบกรอกแค่อาการ+ความรุนแรงเหมือนเดิม และรายงานเก่าที่ไม่มีช่องเหล่านี้ยังเปิดแก้ไขได้ตามปกติ
+let injuryReportsCache = []; // รายงานของทีม (โหลดตอนเปิดหน้ารายการ) ใช้ตรวจบาดเจ็บซ้ำและแสดงความคืบหน้า
+let injuryRegion = null;
+let injurySide = null;
+let injuryMechanism = null;
+let injuryContext = null;
+let injuryRecurrenceTouched = false; // โค้ชติ๊ก/เอาติ๊ก "บาดเจ็บซ้ำ" เองแล้ว — ระบบไม่เปลี่ยนให้อีก
+const injuryDateInput = document.getElementById("injury-date");
+const injuryStatusSelect = document.getElementById("injury-status");
+const injuryTypeSelect = document.getElementById("injury-type");
+const injuryRegionChipsEl = document.getElementById("injury-region-chips");
+const injurySideWrap = document.getElementById("injury-side-segmented");
+const injuryMechanismWrap = document.getElementById("injury-mechanism-segmented");
+const injuryContextWrap = document.getElementById("injury-context-segmented");
+const injuryRecurrenceHint = document.getElementById("injury-recurrence-hint");
+const injuryRecurrenceCheckbox = document.getElementById("injury-recurrence");
+const injuryActualReturnWrap = document.getElementById("injury-actual-return-wrap");
+const injuryActualReturnInput = document.getElementById("injury-actual-return");
+const injuryDaysOutEl = document.getElementById("injury-days-out");
+const injuryProgressSection = document.getElementById("injury-progress-section");
+const injuryProgressList = document.getElementById("injury-progress-list");
+const injuryProgressInput = document.getElementById("injury-progress-input");
+const injuryProgressAddBtn = document.getElementById("injury-progress-add-btn");
+const injuryProgressStatus = document.getElementById("injury-progress-status");
+
+// กดตัวเลือกเดิมซ้ำ = ล้างค่า (ช่องเหล่านี้เว้นว่างได้)
+function injuryChoiceGroup(wrap, options, active, onChange) {
+  wrap.innerHTML = "";
+  wrap.appendChild(createSegmentedGroup(options, active, (v) => onChange(active === v ? null : v)));
+}
+
+function renderInjuryChoiceControls() {
+  injuryRegionChipsEl.innerHTML = "";
+  injuryRegionChipsEl.appendChild(
+    createChipToggleGroup(BODY_REGIONS, new Set(injuryRegion ? [injuryRegion] : []), (r) => {
+      injuryRegion = injuryRegion === r ? null : r;
+      renderInjuryChoiceControls();
+      refreshInjuryRecurrence();
+    })
+  );
+  injuryChoiceGroup(injurySideWrap, SIDES, injurySide, (v) => {
+    injurySide = v;
+    renderInjuryChoiceControls();
+    refreshInjuryRecurrence();
+  });
+  injuryChoiceGroup(injuryMechanismWrap, MECHANISMS, injuryMechanism, (v) => {
+    injuryMechanism = v;
+    renderInjuryChoiceControls();
+  });
+  injuryChoiceGroup(injuryContextWrap, CONTEXTS, injuryContext, (v) => {
+    injuryContext = v;
+    renderInjuryChoiceControls();
+  });
+}
+
+// เจอรายงานเก่าของนักกีฬาคนเดียวกัน ตำแหน่งและข้างเดียวกัน → ขึ้นข้อความและติ๊ก "บาดเจ็บซ้ำ" ให้ (ถ้าโค้ชยังไม่แตะเอง)
+function refreshInjuryRecurrence() {
+  const found = detectRecurrence(injuryReportsCache, {
+    playerId: injurySelectedPlayerId,
+    bodyRegion: injuryRegion,
+    side: injurySide,
+    date: injuryDateInput.value,
+    excludeId: editingInjuryId
+  });
+  if (found) {
+    const where = `${injuryRegion}${injurySide && injurySide !== "ไม่เกี่ยวข้อง" ? ` (${injurySide})` : ""}`;
+    injuryRecurrenceHint.textContent = `เคยมีรายงานบาดเจ็บ ${where} ของนักกีฬาคนนี้เมื่อ ${found.date}${found.status === "หายแล้ว" ? " (หายแล้ว)" : ""} · ระบบทำเครื่องหมาย "บาดเจ็บซ้ำ" ให้ แก้ได้ถ้าไม่ใช่`;
+    injuryRecurrenceHint.classList.remove("hidden");
+  } else {
+    injuryRecurrenceHint.classList.add("hidden");
+  }
+  if (!injuryRecurrenceTouched) injuryRecurrenceCheckbox.checked = !!found;
+}
+injuryRecurrenceCheckbox.addEventListener("change", () => {
+  injuryRecurrenceTouched = true;
+});
+
+function updateInjuryDaysOut() {
+  if (injuryStatusSelect.value === "หายแล้ว") {
+    const n = diffDays(injuryDateInput.value, injuryActualReturnInput.value);
+    injuryDaysOutEl.textContent = n === null ? "ใส่วันที่กลับมาซ้อมจริง ระบบจะนับจำนวนวันที่หยุดให้" : `หยุดไป ${n} วัน (นับจากวันบาดเจ็บถึงวันกลับมาซ้อมจริง ระบบคำนวณให้เอง)`;
+  } else {
+    injuryDaysOutEl.textContent = "ยังไม่หาย · พอกลับมาซ้อมแล้วเลือก \"หายแล้ว\" ระบบจะถามวันที่กลับมาซ้อมจริงและนับจำนวนวันที่หยุดให้";
+  }
+}
+
+// prefill = เปลี่ยนสถานะเป็น "หายแล้ว" ด้วยมือ → ใส่วันนี้เป็นวันกลับมาซ้อมจริงให้ก่อน (ตอนเปิดแก้ไขรายงานเก่าไม่เติมให้ กันบันทึกวันผิดโดยไม่รู้ตัว)
+function updateInjuryStatusFields(prefill = false) {
+  const healed = injuryStatusSelect.value === "หายแล้ว";
+  injuryActualReturnWrap.classList.toggle("hidden", !healed);
+  if (healed && prefill && !injuryActualReturnInput.value) injuryActualReturnInput.value = todayBangkok();
+  updateInjuryDaysOut();
+}
+injuryStatusSelect.addEventListener("change", () => updateInjuryStatusFields(true));
+injuryActualReturnInput.addEventListener("change", updateInjuryDaysOut);
+injuryDateInput.addEventListener("change", () => {
+  refreshInjuryRecurrence();
+  updateInjuryDaysOut();
+});
+
+function resetInjuryFormExtras() {
+  injuryRegion = null;
+  injurySide = null;
+  injuryMechanism = null;
+  injuryContext = null;
+  injuryRecurrenceTouched = false;
+  injuryTypeSelect.value = "";
+  injuryRecurrenceCheckbox.checked = false;
+  injuryRecurrenceHint.classList.add("hidden");
+  injuryActualReturnInput.value = "";
+  renderInjuryChoiceControls();
+  updateInjuryStatusFields();
+  renderInjuryProgress();
+}
+
+function loadInjuryFormExtras(inj) {
+  injuryRegion = inj.bodyRegion ?? null;
+  injurySide = inj.side ?? null;
+  injuryMechanism = inj.mechanism ?? null;
+  injuryContext = contextFor(inj);
+  injuryTypeSelect.value = inj.injuryType ?? "";
+  injuryRecurrenceCheckbox.checked = !!inj.isRecurrence;
+  injuryRecurrenceTouched = true;
+  injuryActualReturnInput.value = inj.actualReturnDate ?? "";
+  renderInjuryChoiceControls();
+  refreshInjuryRecurrence();
+  updateInjuryStatusFields();
+  renderInjuryProgress();
+}
+
+// รายละเอียดสั้นๆ ใต้อาการในตารางรายการ (ตำแหน่ง ประเภท กลไก บาดเจ็บซ้ำ จำนวนวันที่หยุด ความคืบหน้า)
+function injuryDetailHtml(inj) {
+  const { tags, daysText } = injuryDetailLabels(inj, todayBangkok());
+  const parts = [...tags, daysText];
+  const noteCount = (inj.progressNotes || []).length;
+  if (noteCount > 0) parts.push(`ความคืบหน้า ${noteCount} รายการ`);
+  const shown = parts.filter(Boolean);
+  return shown.length > 0 ? `<div class="text-xs text-slate-500 mt-1">${shown.map(escapeHtml).join(" · ")}</div>` : "";
+}
+
+// ความคืบหน้าการรักษา (แสดงเฉพาะตอนเปิดแก้ไขรายงานที่บันทึกแล้ว)
+function renderInjuryProgress() {
+  const record = editingInjuryId ? injuryReportsCache.find((r) => r.id === editingInjuryId) : null;
+  injuryProgressSection.classList.toggle("hidden", !record);
+  injuryProgressStatus.textContent = "";
+  if (!record) return;
+  const notes = record.progressNotes || [];
+  injuryProgressList.innerHTML =
+    notes.length === 0
+      ? '<p class="text-sm text-slate-400">ยังไม่มีบันทึกความคืบหน้า</p>'
+      : notes
+          .map(
+            (n) =>
+              `<p class="text-sm text-slate-700"><span class="font-semibold">${escapeHtml(n.date ?? "")}</span> · ${escapeHtml(n.note ?? "")} <span class="text-slate-400">— ${escapeHtml(n.by ?? "")}</span></p>`
+          )
+          .join("");
+}
+
+injuryProgressInput.addEventListener("input", () => {
+  injuryProgressStatus.textContent = "";
+});
+injuryProgressAddBtn.addEventListener("click", async () => {
+  const record = editingInjuryId ? injuryReportsCache.find((r) => r.id === editingInjuryId) : null;
+  if (!record) return;
+  const note = injuryProgressInput.value.trim();
+  if (!note) {
+    injuryProgressStatus.textContent = "พิมพ์ความคืบหน้าสั้นๆ ก่อนเพิ่ม";
+    return;
+  }
+  injuryProgressAddBtn.disabled = true;
+  try {
+    const progressNotes = [
+      ...(record.progressNotes || []),
+      { date: todayBangkok(), note, by: myCoachName || auth.currentUser.email }
+    ];
+    await updateDoc(doc(db, "injuryReports", record.id), { progressNotes, updatedAt: serverTimestamp() });
+    record.progressNotes = progressNotes;
+    injuryProgressInput.value = "";
+    renderInjuryProgress();
+    await renderInjuryReportList();
+  } catch (err) {
+    console.error(err);
+    injuryProgressStatus.textContent = "บันทึกไม่สำเร็จ: " + err.message;
+  } finally {
+    injuryProgressAddBtn.disabled = false;
+  }
+});
+renderInjuryChoiceControls();
+updateInjuryStatusFields();
 // เฉพาะนักกีฬารุ่นอายุเดียวกับที่เลือกไว้ (ใช้ playerLabel() ที่นิยามไว้แล้วในส่วนรายงานผลการแข่งขัน)
 function eligibleInjuryPlayers() {
   const ageGroup = injuryAgeGroupSelect.value;
@@ -5588,6 +5790,7 @@ function selectInjuryPlayer(p) {
   injurySelectedPlayerId = p.id;
   injuryPlayerSearchInput.value = playerLabel(p);
   injuryPlayerDropdown.classList.add("hidden");
+  refreshInjuryRecurrence();
 }
 
 function renderInjuryPlayerDropdown(searchText) {
@@ -5625,6 +5828,7 @@ function renderInjuryPlayerDropdown(searchText) {
 
 injuryPlayerSearchInput.addEventListener("input", () => {
   injurySelectedPlayerId = null; // พิมพ์ใหม่ = ยกเลิกตัวที่เคยเลือกไว้ ต้องเลือกใหม่จาก dropdown
+  refreshInjuryRecurrence();
   renderInjuryPlayerDropdown(injuryPlayerSearchInput.value);
 });
 injuryPlayerSearchInput.addEventListener("focus", () => {
@@ -5638,6 +5842,7 @@ injuryAgeGroupSelect.addEventListener("change", () => {
   injurySelectedPlayerId = null;
   injuryPlayerSearchInput.value = "";
   injuryPlayerDropdown.classList.add("hidden");
+  refreshInjuryRecurrence();
 });
 
 async function renderInjuryReportList() {
@@ -5647,6 +5852,7 @@ async function renderInjuryReportList() {
   const reports = [];
   snap.forEach((d) => reports.push({ id: d.id, ...d.data() }));
   reports.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  injuryReportsCache = reports;
 
   if (reports.length === 0) {
     injuryReportListBody.innerHTML =
@@ -5661,7 +5867,7 @@ async function renderInjuryReportList() {
       <td class="emphasis">${escapeHtml(inj.date ?? "-")}</td>
       <td>${escapeHtml(inj.playerName ?? "-")}</td>
       <td>${escapeHtml(inj.ageGroup ?? "-")}</td>
-      <td>${escapeHtml(inj.description ?? "-")}</td>
+      <td>${escapeHtml(inj.description ?? "-")}${injuryDetailHtml(inj)}</td>
       <td>${injurySeverityBadge(inj.severity)}</td>
       <td>${injuryStatusBadge(inj.status)}</td>
       <td>${escapeHtml(inj.expectedReturn ?? "-")}</td>
@@ -5692,8 +5898,9 @@ function startEditInjury(inj) {
   document.getElementById("injury-date").value = inj.date ?? "";
   document.getElementById("injury-description").value = inj.description ?? "";
   document.getElementById("injury-severity").value = inj.severity ?? "เล็กน้อย";
-  document.getElementById("injury-status").value = inj.status ?? "กำลังพักฟื้น";
+  document.getElementById("injury-status").value = formStatusFor(inj.status);
   document.getElementById("injury-expected-return").value = inj.expectedReturn ?? "";
+  loadInjuryFormExtras(inj);
   document.getElementById("injury-notes").value = inj.notes ?? "";
   injuryReportSubmitBtn.textContent = "บันทึกการแก้ไข";
   cancelEditInjuryBtn.classList.remove("hidden");
@@ -5705,6 +5912,7 @@ function startEditInjury(inj) {
 function stopEditInjury() {
   editingInjuryId = null;
   injuryReportForm.reset();
+  resetInjuryFormExtras();
   injurySelectedPlayerId = null;
   injuryPlayerDropdown.classList.add("hidden");
   injuryReportSubmitBtn.textContent = "บันทึกอาการบาดเจ็บ";
@@ -5755,7 +5963,9 @@ injuryReportForm.addEventListener("submit", async (e) => {
   const date = document.getElementById("injury-date").value;
   const description = document.getElementById("injury-description").value.trim();
   const severity = document.getElementById("injury-severity").value;
-  const status = document.getElementById("injury-status").value;
+  const formStatus = document.getElementById("injury-status").value;
+  const status = storedStatusFor(formStatus, injuryContext);
+  const actualReturn = document.getElementById("injury-actual-return").value;
   const expectedReturn = document.getElementById("injury-expected-return").value;
   const notes = document.getElementById("injury-notes").value.trim();
 
@@ -5769,6 +5979,13 @@ injuryReportForm.addEventListener("submit", async (e) => {
     severity,
     status,
     expectedReturn: expectedReturn || null,
+    bodyRegion: injuryRegion,
+    side: injurySide,
+    injuryType: injuryTypeSelect.value || null,
+    mechanism: injuryMechanism,
+    context: injuryContext,
+    isRecurrence: injuryRecurrenceCheckbox.checked,
+    actualReturnDate: formStatus === "หายแล้ว" && actualReturn ? actualReturn : null,
     notes: notes || null,
     coachId: auth.currentUser.uid,
     coachName: myCoachName || auth.currentUser.email,
@@ -5785,8 +6002,9 @@ injuryReportForm.addEventListener("submit", async (e) => {
       injuryReportStatus.className = "text-sm text-emerald-600";
       stopEditInjury();
     } else {
-      await addDoc(collection(db, "injuryReports"), { ...payload, createdAt: serverTimestamp() });
+      await addDoc(collection(db, "injuryReports"), { ...payload, progressNotes: [], createdAt: serverTimestamp() });
       injuryReportForm.reset();
+      resetInjuryFormExtras();
       injurySelectedPlayerId = null;
       injuryPlayerDropdown.classList.add("hidden");
       injuryReportStatus.innerHTML = `บันทึกอาการบาดเจ็บสำเร็จ ${icon("check")}`;

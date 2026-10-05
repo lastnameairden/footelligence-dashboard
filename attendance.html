@@ -1258,6 +1258,39 @@
             <label class="field-label">ลักษณะอาการบาดเจ็บ</label>
             <input id="injury-description" type="text" required class="field-input" placeholder="เช่น ข้อเท้าพลิก, กล้ามเนื้อต้นขาอักเสบ" />
           </div>
+          <div class="sm:col-span-2">
+            <label class="field-label">ตำแหน่งที่บาดเจ็บ (ถ้าทราบ)</label>
+            <div id="injury-region-chips" class="flex flex-wrap gap-2"></div>
+          </div>
+          <div>
+            <label class="field-label">ข้าง</label>
+            <div id="injury-side-segmented" class="segmented"></div>
+          </div>
+          <div>
+            <label class="field-label">ประเภทอาการ</label>
+            <select id="injury-type" class="field-input">
+              <option value="">-- ไม่ระบุ --</option>
+              <option value="กล้ามเนื้อ">กล้ามเนื้อ</option>
+              <option value="เอ็น/ข้อต่อ">เอ็น/ข้อต่อ</option>
+              <option value="กระดูก">กระดูก</option>
+              <option value="ฟกช้ำ/แผล">ฟกช้ำ/แผล</option>
+              <option value="ศีรษะ/สมอง">ศีรษะ/สมอง</option>
+              <option value="อื่นๆ">อื่นๆ</option>
+            </select>
+          </div>
+          <div id="injury-recurrence-hint" class="hidden sm:col-span-2 rounded-lg bg-amber-50 text-amber-800 px-3 py-2 text-sm"></div>
+          <label class="sm:col-span-2 flex items-center gap-2 text-sm text-slate-700">
+            <input id="injury-recurrence" type="checkbox" />
+            บาดเจ็บซ้ำ (ตำแหน่งเดียวกับที่เคยบาดเจ็บ — ระบบติ๊กให้เมื่อพบรายงานเก่า แก้ได้)
+          </label>
+          <div>
+            <label class="field-label">กลไกการบาดเจ็บ</label>
+            <div id="injury-mechanism-segmented" class="segmented"></div>
+          </div>
+          <div>
+            <label class="field-label">เกิดที่ไหน</label>
+            <div id="injury-context-segmented" class="segmented"></div>
+          </div>
           <div>
             <label class="field-label">ความรุนแรง</label>
             <select id="injury-severity" class="field-input">
@@ -1269,8 +1302,7 @@
           <div>
             <label class="field-label">สถานะ</label>
             <select id="injury-status" class="field-input">
-              <option value="บาดเจ็บขณะแข่งขัน">บาดเจ็บขณะแข่งขัน</option>
-              <option value="บาดเจ็บขณะฝึกซ้อม">บาดเจ็บขณะฝึกซ้อม</option>
+              <option value="บาดเจ็บ">บาดเจ็บ</option>
               <option value="กำลังพักฟื้น">กำลังพักฟื้น</option>
               <option value="หายแล้ว">หายแล้ว</option>
             </select>
@@ -1279,6 +1311,11 @@
             <label class="field-label">คาดว่าจะกลับมาซ้อมได้ (ถ้าทราบ)</label>
             <input id="injury-expected-return" type="date" class="field-input" />
           </div>
+          <div id="injury-actual-return-wrap" class="hidden sm:col-span-2">
+            <label class="field-label">วันที่กลับมาซ้อมจริง</label>
+            <input id="injury-actual-return" type="date" class="field-input" />
+          </div>
+          <p id="injury-days-out" class="sm:col-span-2 text-sm text-slate-500"></p>
           <div class="sm:col-span-2">
             <label class="field-label">หมายเหตุ (ถ้ามี)</label>
             <textarea id="injury-notes" rows="3" class="field-input" placeholder="รายละเอียดเพิ่มเติม เช่น การรักษา แพทย์ที่ดูแล"></textarea>
@@ -1289,6 +1326,17 @@
             <p id="injury-report-status" class="text-sm text-slate-500"></p>
           </div>
         </form>
+      </div>
+
+      <!-- บันทึกความคืบหน้าการรักษา (แสดงเฉพาะตอนเปิดแก้ไขรายงานที่บันทึกแล้ว) -->
+      <div id="injury-progress-section" class="hidden card card-pad space-y-3">
+        <h3 class="font-semibold text-slate-900">บันทึกความคืบหน้าการรักษา</h3>
+        <div id="injury-progress-list" class="space-y-2"></div>
+        <div class="flex gap-2 flex-wrap">
+          <input id="injury-progress-input" type="text" class="field-input flex-1" placeholder="เช่น พบแพทย์แล้ว เริ่มวิ่งเบาได้" />
+          <button type="button" id="injury-progress-add-btn" class="btn btn-secondary">เพิ่มบันทึก</button>
+        </div>
+        <p id="injury-progress-status" class="text-xs text-red-600 min-h-[1rem]"></p>
       </div>
 
       <div>

@@ -9,6 +9,7 @@ import {
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import { db, auth } from "./firebase-init.js";
 import { icon } from "./icons.js";
+import { injuryStatsHtml } from "./injury-stats-view.js";
 import {
   applyDataLabels,
   computeAvgScore,
@@ -96,6 +97,7 @@ const matchReportsStatCardsEl = document.getElementById("match-reports-stat-card
 const dashboardMatchBody = document.getElementById("dashboard-match-body");
 const dashboardMatchPagination = document.getElementById("dashboard-match-pagination");
 const injuryReportsStatCardsEl = document.getElementById("injury-reports-stat-cards");
+const injuryStatsPanelEl = document.getElementById("injury-stats-panel");
 const dashboardInjuryBody = document.getElementById("dashboard-injury-body");
 const dashboardInjuryPagination = document.getElementById("dashboard-injury-pagination");
 const headerAttendanceLink = document.getElementById("header-attendance-link");
@@ -1288,6 +1290,7 @@ async function loadMatchAndInjuryReports(scopeTeam) {
     statCard("ยังไม่หาย", activeCount) +
     statCard("หายแล้ว", recoveredCount) +
     statCard("รุนแรง", severeCount);
+  injuryStatsPanelEl.innerHTML = injuryStatsHtml(monthInjuries);
 
   dashboardInjuryTable.setRows(monthInjuries);
 }
