@@ -193,3 +193,79 @@ export function googleCalendarUrl(meeting) {
   if (meeting.meetLink) params.set("location", meeting.meetLink);
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
+
+// ---------- วาระ/ไฟล์ก่อนประชุม และสรุปความรู้หลังประชุม แยกตามสายโค้ช ----------
+// สายมี 4 ส่วน: ส่วนกลาง (ทุกคนในกลุ่ม) + 3 สายตามตำแหน่งที่โค้ชลงทะเบียนไว้ ข้อมูลอยู่ใน sections.<สาย> ของเอกสารนัด
+// (หัวข้อ plan + ไฟล์ files ก่อนประชุม / สรุป know, use, hw, mind หลังประชุม) โค้ชเห็นส่วนกลางกับสายของตัวเองเป็นหลัก
+export const MEETING_SECTIONS = [
+  { key: "all", label: "ส่วนกลาง" },
+  { key: "player", label: "โค้ชผู้เล่น" },
+  { key: "gk", label: "โค้ชประตู" },
+  { key: "fit", label: "ฟิตเนสโค้ช" }
+];
+
+export const MEETING_RECAP_FIELDS = [
+  { key: "know", label: "ความรู้ที่ได้วันนี้", placeholder: "สรุปแก่นความรู้ 2-3 ข้อ" },
+  { key: "use", label: "นำไปใช้ในสนามอย่างไร", placeholder: "ตัวอย่างเกม/แบบฝึกที่ลองใช้ได้ทันที" },
+  { key: "hw", label: "การบ้านก่อนครั้งหน้า", placeholder: "1-2 ข้อ ทำได้จริงภายใน 1 เดือน" },
+  { key: "mind", label: "ความคิดของแอดมิน", placeholder: "สิ่งที่สังเกตจากการพูดคุย แนวทางต่อยอด คำชม" }
+];
+
+export const MEETING_MAX_FILES_PER_SECTION = 3;
+export const MEETING_MAX_FILE_BYTES = 10 * 1024 * 1024; // ต้องตรงกับ storage.rules
+
+// ตำแหน่งที่ลงทะเบียน (coachPosition) → สายของการประชุม; ไม่มีตำแหน่ง = ไม่อยู่ในสายใด (เห็นแต่ส่วนกลาง)
+export function coachTrackOf(position) {
+  if (position === "gk_coach") return "gk";
+  if (position === "fitness_coach") return "fit";
+  if (position === "head_coach" || position === "assistant_coach") return "player";
+  return null;
+}
+
+// ส่วนที่โค้ชคนนี้ควรเห็น: ส่วนกลาง + สายของตัวเอง
+export function sectionsForTrack(track) {
+  return track ? ["all", track] : ["all"];
+}
+
+// คืนข้อความ error ถ้าแนบไฟล์นี้ไม่ได้ ไม่งั้นคืน null — ชนิดไฟล์ตรวจที่ฝั่งหน้าเว็บ (เหตุผลเดียวกับ storage.rules)
+export function validateMeetingFile(file, existingCount) {
+  if (existingCount >= MEETING_MAX_FILES_PER_SECTION) return `แนบได้สูงสุด ${MEETING_MAX_FILES_PER_SECTION} ไฟล์ต่อส่วน`;
+  if (file.size > MEETING_MAX_FILE_BYTES) return `"${file.name}" ใหญ่เกินไป (จำกัดไม่เกิน 10MB)`;
+  const okType = /^image\//.test(file.type) || file.type === "application/pdf";
+  if (!okType) return `"${file.name}" ต้องเป็นรูปภาพหรือ PDF เท่านั้น`;
+  return null;
+}
+
+export function meetingFilePath(meetingId, section, fileName, now) {
+  const safe = String(fileName).replace(/[^\w.\-ก-๙]/g, "_");
+  return `coachMeetings/${meetingId}/${section}/${now}_${safe}`;
+}
+
+export function sectionHasRecap(section) {
+  return MEETING_RECAP_FIELDS.some((f) => section && String(section[f.key] || "").trim() !== "");
+}
+
+export function sectionHasPlan(section) {
+  return !!section && (String(section.plan || "").trim() !== "" || (section.files || []).length > 0);
+}
+
+// สรุปประชุมล่าสุดที่ส่งให้โค้ชแล้ว (วันประชุมไม่เกินวันนี้) และมีเนื้อหาในส่วนที่โค้ชคนนี้เห็นจริง
+export function latestPublishedRecap(meetings, coachId, todayStr, track) {
+  const keys = sectionsForTrack(track);
+  return (
+    meetings
+      .filter(
+        (m) =>
+          m.recapPublished === true &&
+          m.date <= todayStr &&
+          (m.coachIds || []).includes(coachId) &&
+          keys.some((k) => sectionHasRecap((m.sections || {})[k]))
+      )
+      .sort((a, b) => b.date.localeCompare(a.date))[0] || null
+  );
+}
+
+// เอกสาร "รับทราบสรุปประชุม" ใช้ id นี้เสมอ (1 คน 1 นัด) — กฎ Firestore บังคับรูปแบบเดียวกัน
+export function ackDocId(meetingId, coachId) {
+  return `${meetingId}_${coachId}`;
+}

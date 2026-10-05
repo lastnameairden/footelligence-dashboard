@@ -1,48 +1,68 @@
 // หน้าจอของระบบนัดประชุมโค้ชรายสัปดาห์ (ตรรกะล้วนๆ อยู่ที่ coach-meetings.js)
-//   - ผู้ดูแลระบบ: สร้างตารางประจำเดือน เลือกวันพุธ/พฤหัสบดีรายสัปดาห์ ใส่ลิงก์ Google Meet ย้ายโค้ชข้ามสัปดาห์ และบันทึกผลเข้าประชุม
-//   - โค้ช: การ์ด "ประชุมครั้งถัดไป" บนหน้า Daily + แจ้งเตือนที่กระดิ่งก่อนวันประชุม
+//   - ผู้ดูแลระบบ: สร้างตารางประจำเดือน เลือกวันพุธ/พฤหัสบดีรายสัปดาห์ ใส่ลิงก์ Google Meet ย้ายโค้ชข้ามสัปดาห์ บันทึกผลเข้าประชุม
+//     เขียนวาระ+แนบไฟล์ก่อนประชุม (แยกส่วนกลาง/สายโค้ชผู้เล่น/โค้ชประตู/ฟิตเนสโค้ช) และสรุปความรู้ การบ้าน ความคิดแอดมินหลังประชุม
+//   - โค้ช: การ์ด "ประชุมครั้งถัดไป" (วาระ+ไฟล์ของส่วนกลางและสายตัวเอง) + สรุปประชุมล่าสุดที่แอดมินส่งให้ + แจ้งเตือนที่กระดิ่ง
 import {
   collection,
   getDocs,
   query,
   where,
   doc,
+  setDoc,
   updateDoc,
   writeBatch,
   deleteField,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
-import { db } from "./firebase-init.js";
-import { icon } from "./icons.js";
 import {
-  escapeHtml,
-  safeHttpUrl,
-  ageGroupSortKey,
-  teamDateRangeQuery,
-  todayBangkok,
-  thisMonthBangkok
-} from "./ui-utils.js";
+  ref as storageRef,
+  uploadBytes,
+  getDownloadURL,
+  deleteObject
+} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-storage.js";
+import { db, storage } from "./firebase-init.js";
+import { icon } from "./icons.js";
+import { escapeHtml, safeHttpUrl, ageGroupSortKey, teamDateRangeQuery, todayBangkok, thisMonthBangkok } from "./ui-utils.js";
 import {
   MEETING_TEAM_SLOTS,
   MEETING_WEEKS_PER_MONTH,
   MEETING_WEEKDAY_LABELS,
   DEFAULT_MEETING_WEEKDAYS,
   MEETING_ATTENDANCE_LABELS,
+  MEETING_SECTIONS,
+  MEETING_RECAP_FIELDS,
+  ackDocId,
   addDaysToDate,
   addMonthsToMonth,
   buildTeamMeetingDocs,
+  coachTrackOf,
   daysUntil,
   describeDaysUntil,
   googleCalendarUrl,
   isValidMeetingLink,
+  latestPublishedRecap,
   meetingDate,
+  meetingFilePath,
   meetingWeekdayOf,
   nextAttendanceStatus,
   nextMeetingForCoach,
+  sectionHasPlan,
+  sectionHasRecap,
+  sectionsForTrack,
   summarizeMeetingAttendance,
   thaiMeetingDateLabel,
-  thaiMonthLabel
+  thaiMonthLabel,
+  validateMeetingFile
 } from "./coach-meetings.js";
+
+// สีของป้ายสายโค้ช (เขียน class เต็มๆ เพื่อให้ Tailwind สแกนเจอ)
+const SECTION_TEXT_CLASS = {
+  all: "text-slate-600",
+  player: "text-blue-700",
+  gk: "text-emerald-700",
+  fit: "text-amber-700"
+};
+const sectionLabel = (key) => MEETING_SECTIONS.find((s) => s.key === key)?.label ?? key;
 
 // ---------- ฝั่งผู้ดูแลระบบ ----------
 const monthLabelEl = document.getElementById("admin-meetings-month-label");
@@ -53,8 +73,12 @@ const bodyEl = document.getElementById("admin-meetings-body");
 
 let viewMonth = thisMonthBangkok();
 let selectedWeek = 1;
-let coachesByTeam = new Map(); // team -> [{ id, name, ageGroups }] เรียงตามรุ่นอายุ
+let coachesByTeam = new Map(); // team -> [{ id, name, ageGroups, coachPosition }] เรียงตามรุ่นอายุ
 let meetings = new Map(); // `${team}|${week}` -> { id, ...data }
+let acksByMeeting = new Map(); // meetingId -> Set(coachId) ที่กด "รับทราบ" สรุปแล้ว
+// ข้อความที่พิมพ์ค้างไว้ในช่องวาระ/สรุป (ยังไม่กดบันทึก) — เก็บไว้เพราะทุกการกระทำโหลดหน้าใหม่ จะได้ไม่หายระหว่างสลับแท็บ/บันทึกอย่างอื่น
+const drafts = new Map(); // `${meetingId}|${section}` -> { plan, know, use, hw, mind }
+const activeSection = new Map(); // meetingId -> section key ที่เปิดอยู่
 
 function setStatus(text, isError = false) {
   statusEl.textContent = text;
@@ -62,21 +86,23 @@ function setStatus(text, isError = false) {
 }
 
 const meetingKey = (team, week) => `${team}|${week}`;
+const findMeetingById = (id) => [...meetings.values()].find((x) => x.id === id);
 
 async function reload() {
   monthLabelEl.textContent = thaiMonthLabel(viewMonth);
   bodyEl.innerHTML = '<p class="text-sm text-slate-400">กำลังโหลด...</p>';
   try {
-    const [coachSnap, meetingSnap] = await Promise.all([
+    const [coachSnap, meetingSnap, ackSnap] = await Promise.all([
       getDocs(query(collection(db, "coaches"), where("role", "==", "coach"))),
-      getDocs(query(collection(db, "coachMeetings"), where("month", "==", viewMonth)))
+      getDocs(query(collection(db, "coachMeetings"), where("month", "==", viewMonth))),
+      getDocs(query(collection(db, "coachMeetingAcks"), where("month", "==", viewMonth)))
     ]);
     const teams = new Set(MEETING_TEAM_SLOTS.map((s) => s.team));
     coachesByTeam = new Map(MEETING_TEAM_SLOTS.map((s) => [s.team, []]));
     coachSnap.forEach((d) => {
       const c = d.data();
       if (c.status !== "approved" || !teams.has(c.team)) return;
-      coachesByTeam.get(c.team).push({ id: d.id, name: c.name ?? "-", ageGroups: c.ageGroups || [] });
+      coachesByTeam.get(c.team).push({ id: d.id, name: c.name ?? "-", ageGroups: c.ageGroups || [], coachPosition: c.coachPosition || null });
     });
     for (const list of coachesByTeam.values()) {
       list.sort((a, b) => ageGroupSortKey(a.ageGroups) - ageGroupSortKey(b.ageGroups) || a.name.localeCompare(b.name));
@@ -85,6 +111,12 @@ async function reload() {
     meetingSnap.forEach((d) => {
       const m = { id: d.id, ...d.data() };
       meetings.set(meetingKey(m.team, m.week), m);
+    });
+    acksByMeeting = new Map();
+    ackSnap.forEach((d) => {
+      const a = d.data();
+      if (!acksByMeeting.has(a.meetingId)) acksByMeeting.set(a.meetingId, new Set());
+      acksByMeeting.get(a.meetingId).add(a.coachId);
     });
     render();
   } catch (err) {
@@ -123,6 +155,60 @@ function unassignedCoaches() {
     }
   }
   return out;
+}
+
+// ชื่อโค้ชในนัดนี้ที่อยู่ในสายที่เลือก (ส่วนกลาง = ทุกคน)
+function membersOfSection(m, sec) {
+  const roster = new Map((coachesByTeam.get(m.team) || []).map((c) => [c.id, c]));
+  const names = m.coachNames || [];
+  return (m.coachIds || [])
+    .map((id, i) => ({ name: names[i] ?? id, track: coachTrackOf(roster.get(id)?.coachPosition) }))
+    .filter((c) => sec === "all" || c.track === sec)
+    .map((c) => c.name);
+}
+
+function fileTagsHtml(m, sec, files, removable) {
+  return files
+    .map((f, i) => {
+      const href = safeHttpUrl(f.url);
+      const name = escapeHtml(f.name);
+      const remove = removable
+        ? ` <button type="button" class="text-slate-400" data-action="remove-file" data-doc="${escapeHtml(m.id)}" data-sec="${sec}" data-index="${i}" aria-label="ลบไฟล์ ${name}">${icon("close")}</button>`
+        : "";
+      return `<span class="badge badge-neutral">${icon("paperclip")} ${href ? `<a href="${href}" target="_blank" rel="noopener noreferrer">${name}</a>` : name}${remove}</span>`;
+    })
+    .join(" ");
+}
+
+function sectionFormHtml(m, sec) {
+  const saved = (m.sections || {})[sec] || {};
+  const draft = drafts.get(`${m.id}|${sec}`) || {};
+  const val = (field) => escapeHtml(draft[field] ?? saved[field] ?? "");
+  const mine = membersOfSection(m, sec);
+  const who = sec === "all" ? "โค้ชทุกคนในกลุ่มเห็น" : `โค้ชสาย${sectionLabel(sec)}ในกลุ่มนี้: ${mine.length ? escapeHtml(mine.join(", ")) : "ไม่มี"}`;
+  const recap = MEETING_RECAP_FIELDS.map(
+    (f) => `<div>
+        <label class="field-label">${f.label}</label>
+        <textarea rows="2" class="field-input" data-field="${f.key}" data-doc="${escapeHtml(m.id)}" data-sec="${sec}" placeholder="${f.placeholder}">${val(f.key)}</textarea>
+      </div>`
+  ).join("");
+  return `
+    <div class="space-y-3" data-section-form>
+      <p class="text-xs text-slate-500">${who}</p>
+      <div>
+        <label class="field-label">ก่อนประชุม: หัวข้อที่จะให้ความรู้</label>
+        <textarea rows="3" class="field-input" data-field="plan" data-doc="${escapeHtml(m.id)}" data-sec="${sec}" placeholder="หัวข้อและประเด็นที่จะพูดในส่วนนี้">${val("plan")}</textarea>
+      </div>
+      <div class="flex items-center gap-2 flex-wrap">
+        ${fileTagsHtml(m, sec, saved.files || [], true)}
+        <button type="button" class="btn btn-secondary btn-sm" data-action="pick-file">${icon("paperclip")} แนบไฟล์</button>
+        <input type="file" class="hidden" accept="image/*,application/pdf" data-file-input data-doc="${escapeHtml(m.id)}" data-sec="${sec}" />
+      </div>
+      <p class="text-xs text-slate-400">PDF หรือรูปภาพ ไม่เกิน 10MB ต่อไฟล์ แนบได้สูงสุด 3 ไฟล์ต่อส่วน โค้ชเห็นทันทีที่แนบ</p>
+      <p class="text-xs font-semibold text-slate-600 pt-1">หลังประชุม: สรุปให้โค้ช</p>
+      ${recap}
+      <div><button type="button" class="btn btn-primary btn-sm" data-action="save-section" data-doc="${escapeHtml(m.id)}" data-sec="${sec}">บันทึกส่วน${sectionLabel(sec)}</button></div>
+    </div>`;
 }
 
 function render() {
@@ -188,6 +274,12 @@ function render() {
       .filter((w) => w !== selectedWeek && meetings.has(meetingKey(slot.team, w)))
       .map((w) => `<option value="${w}">สัปดาห์ ${w}</option>`)
       .join("");
+    const sec = activeSection.get(m.id) || "all";
+    const tabs = MEETING_SECTIONS.map((s) => {
+      const filled = sectionHasPlan((m.sections || {})[s.key]) || sectionHasRecap((m.sections || {})[s.key]);
+      return `<button type="button" class="badge ${s.key === sec ? "badge-info" : "badge-neutral"} cursor-pointer" data-action="sec-tab" data-doc="${escapeHtml(m.id)}" data-sec="${s.key}">${s.label}${filled ? " ●" : ""}</button>`;
+    }).join(" ");
+    const acked = acksByMeeting.get(m.id)?.size || 0;
     html += `
       <div class="card card-pad space-y-3" data-slot-doc="${escapeHtml(m.id)}">
         <div class="flex items-center gap-2 flex-wrap">
@@ -211,6 +303,16 @@ function render() {
         </div>`
             : ""
         }
+        <div class="border-t border-slate-100 pt-3 space-y-3">
+          <p class="font-semibold text-slate-900 text-sm">วาระและสรุปการประชุม</p>
+          <div class="flex flex-wrap gap-2">${tabs}</div>
+          ${sectionFormHtml(m, sec)}
+          <label class="flex items-center gap-2 text-sm text-slate-700">
+            <input type="checkbox" data-action="publish" data-doc="${escapeHtml(m.id)}"${m.recapPublished ? " checked" : ""} />
+            ส่งสรุปให้โค้ชแล้ว (โค้ชจะเห็นความรู้ การบ้าน และความคิดแอดมินของส่วนกลางและสายตัวเอง)
+          </label>
+          ${m.recapPublished ? `<p class="text-xs text-slate-500">โค้ชกดรับทราบแล้ว ${acked}/${(m.coachIds || []).length} คน</p>` : ""}
+        </div>
       </div>`;
   }
   html += "</div>";
@@ -243,7 +345,7 @@ async function withStatus(label, fn) {
   }
 }
 
-// สร้าง/แบ่งกลุ่มใหม่ทุกทีม — คงวันพุธ/พฤหัสบดีและลิงก์เดิมไว้ (ถ้ามี) แต่ล้างผลเข้าประชุมเพราะกลุ่มเปลี่ยน
+// สร้างตารางครั้งแรก = เขียนเอกสารใหม่ทั้งหมด / แบ่งกลุ่มใหม่ = แก้เฉพาะรายชื่อกับผลเข้าประชุมของนัดเดิม (คงวัน ลิงก์ วาระ ไฟล์ และสรุปไว้)
 function buildAllDocs() {
   const docs = [];
   for (const slot of MEETING_TEAM_SLOTS) {
@@ -264,9 +366,38 @@ function buildAllDocs() {
 async function writeAllDocs() {
   const batch = writeBatch(db);
   for (const d of buildAllDocs()) {
-    batch.set(doc(db, "coachMeetings", d.id), { ...d.data, updatedAt: serverTimestamp() });
+    const ref = doc(db, "coachMeetings", d.id);
+    if (findMeetingById(d.id)) {
+      batch.update(ref, {
+        coachIds: d.data.coachIds,
+        coachNames: d.data.coachNames,
+        attendance: {},
+        updatedAt: serverTimestamp()
+      });
+    } else {
+      batch.set(ref, { ...d.data, updatedAt: serverTimestamp() });
+    }
   }
   await batch.commit();
+}
+
+async function uploadSectionFile(m, sec, file) {
+  const existing = ((m.sections || {})[sec] || {}).files || [];
+  const problem = validateMeetingFile(file, existing.length);
+  if (problem) {
+    setStatus(problem, true);
+    return;
+  }
+  await withStatus("กำลังอัปโหลดไฟล์...", async () => {
+    const filePath = meetingFilePath(m.id, sec, file.name, Date.now());
+    const fileRef = storageRef(storage, filePath);
+    await uploadBytes(fileRef, file);
+    const url = await getDownloadURL(fileRef);
+    await updateDoc(doc(db, "coachMeetings", m.id), {
+      [`sections.${sec}.files`]: [...existing, { name: file.name, url, path: filePath }],
+      updatedAt: serverTimestamp()
+    });
+  });
 }
 
 const actions = {
@@ -288,12 +419,12 @@ const actions = {
     }),
   generate: () => withStatus("กำลังสร้างตารางประชุม...", writeAllDocs),
   regroup: () => {
-    if (!confirm("แบ่งกลุ่มโค้ชใหม่ทั้งหมด? การย้ายโค้ชและผลเข้าประชุมที่บันทึกไว้ของเดือนนี้จะถูกล้าง (วันและลิงก์ Meet คงเดิม)")) return;
+    if (!confirm("แบ่งกลุ่มโค้ชใหม่ทั้งหมด? การย้ายโค้ชและผลเข้าประชุมที่บันทึกไว้ของเดือนนี้จะถูกล้าง (วัน ลิงก์ Meet วาระ ไฟล์ และสรุปคงเดิม)")) return;
     return withStatus("กำลังแบ่งกลุ่มใหม่...", writeAllDocs);
   },
   attendance: (el) =>
     withStatus("กำลังบันทึกผลเข้าประชุม...", async () => {
-      const m = [...meetings.values()].find((x) => x.id === el.dataset.doc);
+      const m = findMeetingById(el.dataset.doc);
       if (!m) return;
       const next = nextAttendanceStatus((m.attendance || {})[el.dataset.coach] || "");
       await updateDoc(doc(db, "coachMeetings", m.id), {
@@ -316,7 +447,7 @@ const actions = {
     const card = el.closest("[data-slot-doc]");
     const coachId = card.querySelector("[data-move-coach]").value;
     const toWeek = Number(card.querySelector("[data-move-week]").value);
-    const from = [...meetings.values()].find((x) => x.id === el.dataset.doc);
+    const from = findMeetingById(el.dataset.doc);
     const to = from && meetings.get(meetingKey(from.team, toWeek));
     if (!from || !to || !coachId) return;
     // เขียนรายการ id/ชื่อทั้งชุดใหม่แทน arrayRemove/arrayUnion เพราะชื่อโค้ชซ้ำกันได้ (arrayUnion จะตัดชื่อซ้ำทิ้ง ทำให้จำนวนชื่อไม่ตรงกับจำนวน id)
@@ -355,7 +486,46 @@ const actions = {
         updatedAt: serverTimestamp()
       })
     );
-  }
+  },
+  "sec-tab": (el) => {
+    activeSection.set(el.dataset.doc, el.dataset.sec);
+    render();
+  },
+  "pick-file": (el) => el.parentElement.querySelector("[data-file-input]").click(),
+  "remove-file": (el) => {
+    const m = findMeetingById(el.dataset.doc);
+    const sec = el.dataset.sec;
+    const files = (((m || {}).sections || {})[sec] || {}).files || [];
+    const target = files[Number(el.dataset.index)];
+    if (!m || !target || !confirm(`ลบไฟล์ "${target.name}"?`)) return;
+    return withStatus("กำลังลบไฟล์...", async () => {
+      await updateDoc(doc(db, "coachMeetings", m.id), {
+        [`sections.${sec}.files`]: files.filter((_, i) => i !== Number(el.dataset.index)),
+        updatedAt: serverTimestamp()
+      });
+      try {
+        await deleteObject(storageRef(storage, target.path));
+      } catch (err) {
+        console.warn("ลบไฟล์ใน Storage ไม่สำเร็จ (ไม่บล็อกการทำงานหลัก):", err);
+      }
+    });
+  },
+  "save-section": (el) => {
+    const sec = el.dataset.sec;
+    const docId = el.dataset.doc;
+    const updates = { updatedAt: serverTimestamp() };
+    for (const ta of el.closest("[data-section-form]").querySelectorAll("textarea[data-field]")) {
+      updates[`sections.${sec}.${ta.dataset.field}`] = ta.value.trim();
+    }
+    return withStatus("กำลังบันทึก...", async () => {
+      await updateDoc(doc(db, "coachMeetings", docId), updates);
+      drafts.delete(`${docId}|${sec}`);
+    });
+  },
+  publish: (el) =>
+    withStatus(el.checked ? "กำลังส่งสรุปให้โค้ช..." : "กำลังเก็บสรุปคืน...", () =>
+      updateDoc(doc(db, "coachMeetings", el.dataset.doc), { recapPublished: el.checked, updatedAt: serverTimestamp() })
+    )
 };
 
 bodyEl.addEventListener("click", (e) => {
@@ -364,6 +534,23 @@ bodyEl.addEventListener("click", (e) => {
   // ปุ่มวันพุธ/พฤหัสบดีอยู่ในแถวที่คลิกเลือกสัปดาห์ได้ — ทำงานของปุ่มอย่างเดียว ไม่ให้แถวทำซ้ำ
   e.stopPropagation();
   actions[el.dataset.action]?.(el);
+});
+
+// เก็บข้อความที่กำลังพิมพ์ไว้ทุกครั้ง เพื่อไม่ให้หายเมื่อสลับแท็บสาย/บันทึกอย่างอื่นแล้วหน้าโหลดใหม่
+bodyEl.addEventListener("input", (e) => {
+  const ta = e.target.closest("textarea[data-field]");
+  if (!ta) return;
+  const key = `${ta.dataset.doc}|${ta.dataset.sec}`;
+  drafts.set(key, { ...(drafts.get(key) || {}), [ta.dataset.field]: ta.value });
+});
+
+bodyEl.addEventListener("change", (e) => {
+  const input = e.target.closest("input[data-file-input]");
+  if (!input) return;
+  const file = input.files[0];
+  input.value = "";
+  const m = findMeetingById(input.dataset.doc);
+  if (file && m) uploadSectionFile(m, input.dataset.sec, file);
 });
 
 function changeMonth(delta) {
@@ -379,68 +566,181 @@ export function openAdminMeetings() {
 }
 
 // ---------- ฝั่งโค้ช ----------
-let cachedNext = { key: "", at: 0, value: null };
+let cached = { key: "", at: 0, value: null };
 
-// นัดประชุมครั้งถัดไปของโค้ชคนนี้ (ค้นเฉพาะทีมตัวเองในช่วง 62 วันข้างหน้า — กฎ Firestore ต้อง where(team) ตรงกับทีม)
-async function fetchNextMeeting(team, coachId) {
-  const key = `${team}|${coachId}`;
+// นัดครั้งถัดไป + สรุปประชุมล่าสุดที่ส่งให้แล้ว (ค้นเฉพาะทีมตัวเองในช่วง ±62 วัน — กฎ Firestore ต้อง where(team) ตรงกับทีม)
+async function fetchCoachMeetingData(team, coachId, track) {
+  const key = `${team}|${coachId}|${track}`;
   const now = Date.now();
-  if (cachedNext.key === key && now - cachedNext.at < 30000) return cachedNext.value;
+  if (cached.key === key && now - cached.at < 30000) return cached.value;
   const today = todayBangkok();
-  const snap = await getDocs(teamDateRangeQuery("coachMeetings", team, today, addDaysToDate(today, 62)));
+  const [meetingSnap, ackSnap] = await Promise.all([
+    getDocs(teamDateRangeQuery("coachMeetings", team, addDaysToDate(today, -62), addDaysToDate(today, 62))),
+    getDocs(query(collection(db, "coachMeetingAcks"), where("team", "==", team), where("coachId", "==", coachId)))
+  ]);
   const list = [];
-  snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
-  const value = nextMeetingForCoach(list, coachId, today);
-  cachedNext = { key, at: now, value };
+  meetingSnap.forEach((d) => list.push({ id: d.id, ...d.data() }));
+  const ackedIds = new Set();
+  ackSnap.forEach((d) => ackedIds.add(d.data().meetingId));
+  const recap = latestPublishedRecap(list, coachId, today, track);
+  const value = {
+    next: nextMeetingForCoach(list, coachId, today),
+    recap,
+    recapAcked: !!recap && ackedIds.has(recap.id)
+  };
+  cached = { key, at: now, value };
   return value;
 }
 
-export async function renderCoachMeetingCard(el, team, coachId) {
+function invalidateCoachMeetingCache() {
+  cached = { key: "", at: 0, value: null };
+}
+
+const preLine = 'style="white-space:pre-line"';
+
+function nextMeetingCardHtml(m, track) {
+  const left = daysUntil(m.date, todayBangkok());
+  const soon = left <= 2;
+  const link = safeHttpUrl(m.meetLink);
+  const blocks = sectionsForTrack(track)
+    .map((key) => {
+      const s = (m.sections || {})[key];
+      if (!sectionHasPlan(s)) return "";
+      return `<div class="mt-2">
+        <p class="text-xs font-semibold ${SECTION_TEXT_CLASS[key]}">${key === "all" ? "ส่วนกลาง (ทุกสาย)" : `สาย${sectionLabel(key)}`}</p>
+        ${s.plan ? `<p class="text-sm text-slate-700" ${preLine}>${escapeHtml(s.plan)}</p>` : ""}
+        <div class="flex gap-2 flex-wrap mt-1">${fileTagsHtml(m, key, s.files || [], false)}</div>
+      </div>`;
+    })
+    .join("");
+  return `
+    <div class="card card-pad ${soon ? "card-warning" : ""}">
+      <div class="flex items-center gap-4 flex-wrap">
+        <span class="icon-badge icon-badge-lg">${icon("calendar")}</span>
+        <div class="flex-1 min-w-[200px]">
+          <p class="font-semibold text-slate-900">ประชุมโค้ชครั้งถัดไป</p>
+          <p class="text-sm text-slate-700">${escapeHtml(thaiMeetingDateLabel(m.date))} · ${escapeHtml(m.startTime)}–${escapeHtml(m.endTime)} น. · ${escapeHtml(m.team)}</p>
+          <span class="badge ${soon ? "badge-warning" : "badge-neutral"} mt-1">${describeDaysUntil(left)}</span>
+          ${link ? "" : '<p class="text-xs text-slate-500 mt-1">ผู้ดูแลระบบยังไม่ได้ใส่ลิงก์ Google Meet</p>'}
+        </div>
+        <div class="flex gap-2 flex-wrap">
+          ${link ? `<a class="btn btn-primary btn-sm" href="${link}" target="_blank" rel="noopener noreferrer">เข้าร่วม Meet</a>` : ""}
+          <a class="btn btn-secondary btn-sm" href="${escapeHtml(googleCalendarUrl(m))}" target="_blank" rel="noopener noreferrer">เพิ่มลง Google Calendar</a>
+        </div>
+      </div>
+      ${blocks ? `<div class="border-t border-slate-100 mt-3 pt-1">${blocks}</div>` : ""}
+    </div>`;
+}
+
+function recapCardHtml(m, track, acked, canAck) {
+  const blocks = sectionsForTrack(track)
+    .map((key) => {
+      const s = (m.sections || {})[key];
+      if (!sectionHasRecap(s)) return "";
+      const rows = MEETING_RECAP_FIELDS.filter((f) => String(s[f.key] || "").trim())
+        .map(
+          (f) => `<div class="mt-2">
+          <p class="text-xs font-semibold text-slate-500">${f.label}</p>
+          <p class="text-sm text-slate-800" ${preLine}>${escapeHtml(s[f.key])}</p>
+        </div>`
+        )
+        .join("");
+      return `<div class="mt-3">
+        <p class="text-sm font-semibold ${SECTION_TEXT_CLASS[key]}">${key === "all" ? "ส่วนกลาง (ทุกสาย)" : `สาย${sectionLabel(key)}`}</p>${rows}</div>`;
+    })
+    .join("");
+  const ackPart = acked
+    ? '<span class="badge badge-success mt-3">รับทราบแล้ว</span>'
+    : canAck
+      ? `<div class="mt-3"><button type="button" class="btn btn-secondary btn-sm" data-action="ack" data-meeting="${escapeHtml(m.id)}" data-month="${escapeHtml(m.month)}" data-team="${escapeHtml(m.team)}">รับทราบ</button></div>`
+      : "";
+  return `
+    <div class="card card-pad ${acked ? "" : "ring-2 ring-blue-500"}">
+      <div class="flex items-center justify-between gap-2 flex-wrap">
+        <p class="font-semibold text-slate-900">สรุปการประชุมเมื่อ ${escapeHtml(thaiMeetingDateLabel(m.date))}</p>
+        ${acked ? "" : '<span class="badge badge-info">ใหม่</span>'}
+      </div>
+      ${blocks}
+      ${ackPart}
+    </div>`;
+}
+
+const cardArgs = new WeakMap();
+
+async function onCardClick(e) {
+  const btn = e.target.closest('[data-action="ack"]');
+  if (!btn) return;
+  const args = cardArgs.get(e.currentTarget);
+  if (!args) return;
+  btn.disabled = true;
+  try {
+    await setDoc(doc(db, "coachMeetingAcks", ackDocId(btn.dataset.meeting, args.coachId)), {
+      team: btn.dataset.team,
+      meetingId: btn.dataset.meeting,
+      coachId: args.coachId,
+      month: btn.dataset.month,
+      createdAt: serverTimestamp()
+    });
+    invalidateCoachMeetingCache();
+    await renderCoachMeetingCard(e.currentTarget, args.team, args.coachId, args.opts);
+  } catch (err) {
+    console.error(err);
+    btn.disabled = false;
+    alert("บันทึกการรับทราบไม่สำเร็จ: " + err.message);
+  }
+}
+
+// opts = { position: ตำแหน่งโค้ช (กำหนดสาย), canAck: false เมื่อผู้ดูแลระบบสวมบทบาทดูแทนโค้ช (กดรับทราบแทนไม่ได้) }
+export async function renderCoachMeetingCard(el, team, coachId, opts = {}) {
+  cardArgs.set(el, { team, coachId, opts });
+  if (!el.dataset.bound) {
+    el.dataset.bound = "1";
+    el.addEventListener("click", onCardClick);
+  }
   el.classList.add("hidden");
   el.innerHTML = "";
   if (!coachId) return;
   try {
-    const m = await fetchNextMeeting(team, coachId);
-    if (!m) return;
-    const left = daysUntil(m.date, todayBangkok());
-    const soon = left <= 2;
-    const link = safeHttpUrl(m.meetLink);
-    el.className = `card card-pad flex items-center gap-4 flex-wrap ${soon ? "card-warning" : ""}`;
-    el.innerHTML = `
-      <span class="icon-badge icon-badge-lg">${icon("calendar")}</span>
-      <div class="flex-1 min-w-[200px]">
-        <p class="font-semibold text-slate-900">ประชุมโค้ชครั้งถัดไป</p>
-        <p class="text-sm text-slate-700">${escapeHtml(thaiMeetingDateLabel(m.date))} · ${escapeHtml(m.startTime)}–${escapeHtml(m.endTime)} น. · ${escapeHtml(m.team)}</p>
-        <span class="badge ${soon ? "badge-warning" : "badge-neutral"} mt-1">${describeDaysUntil(left)}</span>
-        ${link ? "" : '<p class="text-xs text-slate-500 mt-1">ผู้ดูแลระบบยังไม่ได้ใส่ลิงก์ Google Meet</p>'}
-      </div>
-      <div class="flex gap-2 flex-wrap">
-        ${link ? `<a class="btn btn-primary btn-sm" href="${link}" target="_blank" rel="noopener noreferrer">เข้าร่วม Meet</a>` : ""}
-        <a class="btn btn-secondary btn-sm" href="${escapeHtml(googleCalendarUrl(m))}" target="_blank" rel="noopener noreferrer">เพิ่มลง Google Calendar</a>
-      </div>`;
-    el.classList.remove("hidden");
+    const track = coachTrackOf(opts.position);
+    const { next, recap, recapAcked } = await fetchCoachMeetingData(team, coachId, track);
+    if (!next && !recap) return;
+    el.className = "space-y-3";
+    el.innerHTML = (next ? nextMeetingCardHtml(next, track) : "") + (recap ? recapCardHtml(recap, track, recapAcked, opts.canAck !== false) : "");
   } catch (err) {
     // การ์ดเสริมของหน้า Daily — ไม่แสดง error ให้กวนใจ (เหมือนตัวเตือนงานประจำวัน)
     console.error(err);
   }
 }
 
-// รายการสำหรับกระดิ่งของโค้ช: แจ้งเมื่อนัดประชุมของตัวเองเหลือไม่เกิน 3 วัน (read: true = ไม่มีปุ่ม "อ่านแล้ว" เพราะโค้ชเขียน
-// สถานะอ่านลง Firestore ไม่ได้ — รายการหายเองเมื่อพ้นวันประชุม)
-export async function loadCoachMeetingNotifications(team, coachId) {
-  const m = await fetchNextMeeting(team, coachId);
-  if (!m) return [];
-  const left = daysUntil(m.date, todayBangkok());
-  if (left > 3) return [];
-  return [
-    {
-      key: "coach_meeting",
-      icon: icon("calendar"),
-      level: "action",
-      read: true,
-      title: `ประชุมโค้ช${describeDaysUntil(left)}`,
-      detail: `${escapeHtml(thaiMeetingDateLabel(m.date))} · ${escapeHtml(m.startTime)}–${escapeHtml(m.endTime)} น. · ${escapeHtml(m.team)}`,
-      link: "./attendance.html#screen=daily"
+// รายการสำหรับกระดิ่งของโค้ช: นัดของตัวเองที่เหลือไม่เกิน 3 วัน + สรุปประชุมที่ยังไม่กดรับทราบ (read: true = ไม่มีปุ่ม "อ่านแล้ว"
+// เพราะโค้ชเขียนสถานะอ่านลง Firestore ไม่ได้ — รายการหายเองเมื่อพ้นวันประชุม/กดรับทราบแล้ว)
+export async function loadCoachMeetingNotifications(team, coachId, position) {
+  const { next, recap, recapAcked } = await fetchCoachMeetingData(team, coachId, coachTrackOf(position));
+  const items = [];
+  if (next) {
+    const left = daysUntil(next.date, todayBangkok());
+    if (left <= 3) {
+      items.push({
+        key: "coach_meeting",
+        icon: icon("calendar"),
+        level: "action",
+        read: true,
+        title: `ประชุมโค้ช${describeDaysUntil(left)}`,
+        detail: `${escapeHtml(thaiMeetingDateLabel(next.date))} · ${escapeHtml(next.startTime)}–${escapeHtml(next.endTime)} น. · ${escapeHtml(next.team)}`,
+        link: "./attendance.html#screen=daily"
+      });
     }
-  ];
+  }
+  if (recap && !recapAcked) {
+    items.push({
+      key: "coach_meeting_recap",
+      icon: icon("book"),
+      level: "info",
+      read: true,
+      title: "มีสรุปการประชุมใหม่จากแอดมิน",
+      detail: `${escapeHtml(thaiMeetingDateLabel(recap.date))} · ${escapeHtml(recap.team)}`,
+      link: "./attendance.html#screen=daily"
+    });
+  }
+  return items;
 }

@@ -591,7 +591,7 @@ function showDaily() {
   }
   loadDailyData(dailyDateInput.value);
   checkTodayReminders();
-  renderCoachMeetingCard(dailyMeetingCard, myTeam, meetingCoachId());
+  renderCoachMeetingCard(dailyMeetingCard, myTeam, meetingCoachId(), { position: myCoachPosition, canAck: !currentIsAdmin });
   loadExecutiveNotes(myTeam, dailyExecutiveNotesList);
 }
 
@@ -665,7 +665,7 @@ function meetingCoachId() {
 async function refreshCoachNotifications() {
   if (!myTeam || !meetingCoachId()) return;
   try {
-    currentNotifications = await loadCoachMeetingNotifications(myTeam, meetingCoachId());
+    currentNotifications = await loadCoachMeetingNotifications(myTeam, meetingCoachId(), myCoachPosition);
     renderAdminNotifications(notificationList, currentNotifications);
     notificationBadge.classList.toggle("hidden", currentNotifications.length === 0);
   } catch (err) {

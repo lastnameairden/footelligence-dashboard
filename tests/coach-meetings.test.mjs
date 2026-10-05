@@ -3,6 +3,17 @@ import assert from "node:assert/strict";
 import {
   MEETING_TEAM_SLOTS,
   MEETING_MAX_MINUTES,
+  MEETING_MAX_FILES_PER_SECTION,
+  MEETING_MAX_FILE_BYTES,
+  MEETING_SECTIONS,
+  ackDocId,
+  coachTrackOf,
+  latestPublishedRecap,
+  meetingFilePath,
+  sectionHasPlan,
+  sectionHasRecap,
+  sectionsForTrack,
+  validateMeetingFile,
   addDaysToDate,
   addMonthsToMonth,
   assignCoachesToWeeks,
@@ -182,4 +193,58 @@ test("googleCalendarUrl carries Bangkok time, the slot and the Meet link", () =>
   assert.match(url.searchParams.get("text"), /THAWEE SC/);
   const noLink = new URL(googleCalendarUrl({ team: "THAWEE SC", date: "2026-10-21", startTime: "09:00", endTime: "09:25", meetLink: "" }));
   assert.equal(noLink.searchParams.get("location"), null);
+});
+
+test("coachTrackOf maps registered positions to the three meeting tracks", () => {
+  assert.equal(coachTrackOf("gk_coach"), "gk");
+  assert.equal(coachTrackOf("fitness_coach"), "fit");
+  assert.equal(coachTrackOf("head_coach"), "player");
+  assert.equal(coachTrackOf("assistant_coach"), "player");
+  assert.equal(coachTrackOf(null), null);
+  assert.equal(coachTrackOf("something"), null);
+  assert.deepEqual(MEETING_SECTIONS.map((s) => s.key), ["all", "player", "gk", "fit"]);
+  assert.deepEqual(sectionsForTrack("gk"), ["all", "gk"]);
+  assert.deepEqual(sectionsForTrack(null), ["all"]);
+});
+
+test("validateMeetingFile: only images/PDF, at most 10MB, at most 3 per section", () => {
+  const ok = { name: "a.pdf", size: 1000, type: "application/pdf" };
+  assert.equal(validateMeetingFile(ok, 0), null);
+  assert.equal(validateMeetingFile({ name: "a.png", size: 1000, type: "image/png" }, 2), null);
+  assert.match(validateMeetingFile(ok, MEETING_MAX_FILES_PER_SECTION), /สูงสุด 3 ไฟล์/);
+  assert.match(validateMeetingFile({ ...ok, size: MEETING_MAX_FILE_BYTES + 1 }, 0), /10MB/);
+  assert.match(validateMeetingFile({ name: "a.exe", size: 10, type: "application/x-msdownload" }, 0), /รูปภาพหรือ PDF/);
+  assert.equal(MEETING_MAX_FILE_BYTES, 10 * 1024 * 1024);
+});
+
+test("meetingFilePath keeps files under the meeting folder with a safe name", () => {
+  assert.equal(meetingFilePath("2026-10_0_3", "gk", "สรุป ครอส (1).pdf", 1760000000000), "coachMeetings/2026-10_0_3/gk/1760000000000_สรุป_ครอส__1_.pdf");
+});
+
+test("sectionHasPlan / sectionHasRecap ignore blank text", () => {
+  assert.equal(sectionHasPlan(undefined), false);
+  assert.equal(sectionHasPlan({ plan: "  " }), false);
+  assert.equal(sectionHasPlan({ plan: "หัวข้อ" }), true);
+  assert.equal(sectionHasPlan({ plan: "", files: [{ name: "a" }] }), true);
+  assert.equal(sectionHasRecap({ know: "", hw: " " }), false);
+  assert.equal(sectionHasRecap({ mind: "ดีมาก" }), true);
+});
+
+test("latestPublishedRecap: newest published meeting up to today that has content for the coach's track", () => {
+  const mk = (id, date, extra) => ({ id, date, coachIds: ["me"], recapPublished: true, sections: {}, ...extra });
+  const list = [
+    mk("old", "2026-09-02", { sections: { all: { know: "เก่า" } } }),
+    mk("new", "2026-09-23", { sections: { gk: { hw: "การบ้านประตู" } } }),
+    mk("draft", "2026-10-01", { recapPublished: false, sections: { all: { know: "ร่าง" } } }),
+    mk("future", "2026-10-21", { sections: { all: { know: "อนาคต" } } }),
+    mk("notme", "2026-09-30", { coachIds: ["other"], sections: { all: { know: "คนอื่น" } } })
+  ];
+  assert.equal(latestPublishedRecap(list, "me", "2026-10-05", "gk").id, "new");
+  // สายผู้เล่นไม่เห็นเนื้อหาของสายประตู จึงถอยไปนัดที่มีส่วนกลาง
+  assert.equal(latestPublishedRecap(list, "me", "2026-10-05", "player").id, "old");
+  assert.equal(latestPublishedRecap(list, "me", "2026-08-01", "gk"), null);
+});
+
+test("ackDocId is {meetingId}_{coachId} (the Firestore rule enforces the same shape)", () => {
+  assert.equal(ackDocId("2026-10_0_3", "uid1"), "2026-10_0_3_uid1");
 });

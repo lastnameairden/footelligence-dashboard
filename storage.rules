@@ -19,6 +19,13 @@ service firebase.storage {
       allow delete: if isSignedInCoach();
     }
 
+    // ไฟล์วาระ/เอกสารประกอบการประชุมโค้ชรายสัปดาห์ (รูป/PDF) แยกโฟลเดอร์ตามนัด — จำกัดไม่เกิน 10MB เหตุผลเรื่องชนิดไฟล์
+    // และการไม่แยกตามทีมเหมือนโฟลเดอร์ trainingPlans ด้านบน ผู้ดูแลระบบเท่านั้นที่มีปุ่มแนบ/ลบในหน้าเว็บ
+    match /coachMeetings/{meetingId}/{allPaths=**} {
+      allow read: if isSignedInCoach();
+      allow create, update: if isSignedInCoach() && request.resource.size < 10 * 1024 * 1024;
+      allow delete: if isSignedInCoach();
+    }
     // รูปภาพแนบรายงานการฝึกซ้อม — เปิดใช้เฉพาะทีม THAWEE SC ตามคำขอ (ทีมอื่นยังไม่ต้องมีฟีเจอร์นี้) — ยังคง
     // ล็อก team == 'THAWEE SC' ไว้ในชั้น rules ได้ตามปกติ เพราะเทียบจาก path ตรงๆ ไม่ต้องพึ่ง cross-service call
     match /trainingReports/{team}/{allPaths=**} {

@@ -107,6 +107,17 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    // "รับทราบสรุปการประชุม" ของโค้ช (1 คน 1 นัด id = {meetingId}_{uid}) — โค้ชสร้างได้เฉพาะของตัวเอง แก้/ลบไม่ได้ ผู้ดูแลระบบอ่านได้ทั้งหมด
+    // โค้ช/ผู้บริหารทีมอ่านได้เฉพาะของทีมตัวเอง (query ต้องมี where('team','==',ทีมตัวเอง))
+    match /coachMeetingAcks/{id} {
+      allow read: if isAdmin() || (canViewTeam() && ownsTeam());
+      allow create: if isAdmin()
+                    || (canManageTeam()
+                        && request.resource.data.coachId == request.auth.uid
+                        && request.resource.data.team == myTeam()
+                        && id == request.resource.data.meetingId + '_' + request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
     // แผนการฝึกซ้อมรายวัน — โค้ชจัดการได้เฉพาะแผนของทีมตัวเอง ผู้บริหารทีมดูได้อย่างเดียว
     match /trainingPlans/{id} {
       allow read: if isAdmin() || (canViewTeam() && ownsTeam());
