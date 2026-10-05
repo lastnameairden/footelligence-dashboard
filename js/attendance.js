@@ -65,6 +65,7 @@ import {
   isRecordOfCoach
 } from "./ui-utils.js";
 import { openAdminMeetings, renderCoachMeetingCard, loadCoachMeetingNotifications } from "./coach-meetings-ui.js";
+import { openAdminFitnessRounds } from "./fitness-rounds-ui.js";
 import { isEvaluationComplete } from "./masc-data.js";
 import { applyAttendanceChange, firestoreFieldsForChange, createSaveQueue, rosterLockState } from "./attendance-save.js";
 import {
@@ -261,6 +262,7 @@ const adminGenerateReportCardBtn = document.getElementById("admin-generate-repor
 const adminReportCardStatus = document.getElementById("admin-report-card-status");
 const adminMascRoundsSection = document.getElementById("admin-masc-rounds-section");
 const adminMeetingsSection = document.getElementById("admin-meetings-section");
+const adminFitnessRoundsSection = document.getElementById("admin-fitness-rounds-section");
 const adminMascRoundPeriodSelect = document.getElementById("admin-masc-round-period-select");
 const adminMascRoundStartInput = document.getElementById("admin-masc-round-start-input");
 const adminMascRoundEndInput = document.getElementById("admin-masc-round-end-input");
@@ -607,6 +609,7 @@ function hideAllScreens() {
   adminReportCardSection.classList.add("hidden");
   adminMascRoundsSection.classList.add("hidden");
   adminMeetingsSection.classList.add("hidden");
+  adminFitnessRoundsSection.classList.add("hidden");
   adminPlayerAuditSection.classList.add("hidden");
   addPlayerSection.classList.add("hidden");
   checkinSection.classList.add("hidden");
@@ -871,6 +874,7 @@ function renderDrawerItems() {
       navDrawerItems.appendChild(drawerItem(icon("book"), "สมุดพกนักกีฬา", openAdminReportCardSection));
       navDrawerItems.appendChild(drawerItem(icon("dna"), "กำหนดรอบการประเมิน MASC", openAdminMascRoundsSection));
       navDrawerItems.appendChild(drawerItem(icon("calendar"), "นัดประชุมโค้ชรายสัปดาห์", openAdminMeetingsSection));
+      navDrawerItems.appendChild(drawerItem(icon("trending-up"), "รอบทดสอบสมรรถภาพ", openAdminFitnessRoundsSection));
       navDrawerItems.appendChild(drawerItem(icon("trending-up"), "พัฒนาการนักกีฬา", () => (window.location.href = "./development.html")));
       navDrawerItems.appendChild(drawerDivider());
       navDrawerItems.appendChild(drawerItem(icon("home"), "ภาพรวมทุกทีม (Dashboard)", goToDashboard));
@@ -1199,6 +1203,12 @@ adminMascRoundCorrectionCancelBtn.addEventListener("click", () => {
   exitMascCorrectionMode();
   adminMascRoundStatus.textContent = "";
 });
+
+function openAdminFitnessRoundsSection() {
+  hideAllScreens();
+  adminFitnessRoundsSection.classList.remove("hidden");
+  openAdminFitnessRounds();
+}
 
 function openAdminMeetingsSection() {
   hideAllScreens();
@@ -3558,7 +3568,8 @@ const ROUTE_SCREENS = [
   { el: adminPrintSection, key: "print", kind: "admin" },
   { el: adminReportCardSection, key: "report-card", kind: "admin" },
   { el: adminMascRoundsSection, key: "masc-rounds", kind: "admin" },
-  { el: adminMeetingsSection, key: "meetings", kind: "admin" }
+  { el: adminMeetingsSection, key: "meetings", kind: "admin" },
+  { el: adminFitnessRoundsSection, key: "fitness-rounds", kind: "admin" }
 ];
 let routeSyncEnabled = false;
 
@@ -3743,7 +3754,8 @@ onAuthStateChanged(auth, async (user) => {
         "player-audit": openAdminPlayerAuditSection,
         "report-card": openAdminReportCardSection,
         "masc-rounds": openAdminMascRoundsSection,
-        meetings: openAdminMeetingsSection
+        meetings: openAdminMeetingsSection,
+        "fitness-rounds": openAdminFitnessRoundsSection
       };
       const route = parseRouteHash(window.location.hash);
       if (route.admin === "team" && (await restoreAdminTeamContext(route))) {

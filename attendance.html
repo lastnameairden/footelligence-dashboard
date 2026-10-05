@@ -632,6 +632,71 @@
       <div id="admin-meetings-body" class="space-y-3"></div>
     </section>
 
+    <!-- รอบทดสอบสมรรถภาพ (ผู้ดูแลระบบเปิด/ปิดรอบ — โค้ชกรอกผลเฉพาะรอบที่เปิดอยู่) -->
+    <section id="admin-fitness-rounds-section" class="hidden space-y-6">
+      <button data-admin-back class="btn btn-ghost px-0">← กลับหน้า Dashboard</button>
+      <div class="page-heading">
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="m3 17 6-6 4 4 8-9"/><path d="M15 6h6v6"/></svg></div>
+        <div>
+          <h2>รอบทดสอบสมรรถภาพ</h2>
+          <p>เปิดรอบ Baseline / Monitoring / Re-evaluation / Final ให้โค้ชกรอกผลทดสอบ (กรอกได้ภายใน 2 สัปดาห์ของรอบ + ทดสอบซ่อมอีก 14 วัน)</p>
+        </div>
+      </div>
+
+      <div class="card card-pad space-y-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="field-label">ปีการศึกษา</label>
+            <select id="fitness-round-season" class="field-input"></select>
+          </div>
+          <div>
+            <label class="field-label">รอบ</label>
+            <select id="fitness-round-type" class="field-input"></select>
+          </div>
+          <div>
+            <label class="field-label">รูปแบบ</label>
+            <div id="fitness-round-mode" class="segmented"></div>
+            <p class="text-xs text-slate-400 mt-1">Full = ทุกรายการ · Selective = ส่วนสูง น้ำหนัก กระโดด สปรินต์ (ไม่มีความอดทน/COD/RSA)</p>
+          </div>
+          <div></div>
+          <div>
+            <label class="field-label">เปิดรอบ</label>
+            <input id="fitness-round-open" type="date" class="field-input" />
+          </div>
+          <div>
+            <label class="field-label">ปิดรอบ</label>
+            <input id="fitness-round-close" type="date" class="field-input" />
+            <p id="fitness-round-makeup" class="text-xs text-slate-400 mt-1"></p>
+          </div>
+        </div>
+        <div>
+          <label class="field-label">รายการที่ใช้ในรอบนี้ (ระบบติ๊กให้ตามรูปแบบ กดเพื่อเพิ่ม/เอาออก — รุ่นอายุที่ไม่เข้าเกณฑ์ของแต่ละรายการจะไม่เห็นรายการนั้นอยู่แล้ว)</label>
+          <div id="fitness-round-tests" class="chip-toggle-group"></div>
+        </div>
+        <div class="flex items-center gap-4">
+          <button type="button" id="fitness-round-submit" class="btn btn-primary">เปิดรอบ</button>
+          <p id="fitness-round-status" class="text-sm text-slate-500"></p>
+        </div>
+      </div>
+
+      <div class="card table-wrap">
+        <table class="pro-table">
+          <thead>
+            <tr>
+              <th>รอบ</th>
+              <th>รูปแบบ</th>
+              <th>ช่วงกรอก</th>
+              <th>ทดสอบซ่อมถึง</th>
+              <th>สถานะ</th>
+              <th>ดำเนินการ</th>
+            </tr>
+          </thead>
+          <tbody id="fitness-round-list-body">
+            <tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
     <!-- จัดการข้อมูลทีม -->
     <section id="admin-manage-team-section" class="hidden space-y-6">
       <button data-admin-back class="btn btn-ghost px-0">← กลับหน้า Dashboard</button>

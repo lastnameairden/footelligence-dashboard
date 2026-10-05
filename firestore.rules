@@ -180,6 +180,32 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // รอบทดสอบสมรรถภาพ (Baseline/Monitoring/Re-evaluation/Final) ที่ผู้ดูแลระบบเปิด — โค้ช/ผู้บริหารทีมอ่านได้เพื่อรู้ว่ารอบไหนเปิดอยู่
+    // แก้ไข/สร้าง/ลบได้เฉพาะผู้ดูแลระบบ
+    match /fitnessRounds/{id} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ผลทดสอบสมรรถภาพ 1 เอกสาร ต่อนักกีฬา ต่อรอบ (id = {roundId}_{playerId}) — โค้ชกรอก/แก้ได้เฉพาะนักกีฬาของทีมตัวเองและเฉพาะรอบที่
+    // แอดมินยังเปิดอยู่จริง (status = open และวันนี้ตามเวลาไทยอยู่ในช่วงวันเปิด–ทดสอบซ่อมถึง) เหมือนกติกาของรอบ MASC ด้านบน
+    // ส่วนที่ว่า "ช่วงซ่อมแก้ได้เฉพาะคนที่ยังไม่มีผล" บังคับที่หน้าเว็บ — ผู้บริหารทีมดูได้อย่างเดียว ลบได้เฉพาะผู้ดูแลระบบ
+    function isOpenFitnessRound(roundId) {
+      return roundId is string
+             && exists(/databases/$(database)/documents/fitnessRounds/$(roundId))
+             && get(/databases/$(database)/documents/fitnessRounds/$(roundId)).data.status == 'open'
+             && get(/databases/$(database)/documents/fitnessRounds/$(roundId)).data.openDate <= todayBangkok()
+             && todayBangkok() <= get(/databases/$(database)/documents/fitnessRounds/$(roundId)).data.makeupUntil;
+    }
+    match /fitnessResults/{id} {
+      allow read: if isAdmin() || (canViewTeam() && ownsTeam());
+      allow create: if isAdmin() || (canManageTeam() && request.resource.data.team == myTeam()
+                                     && id == request.resource.data.roundId + '_' + request.resource.data.playerId
+                                     && isOpenFitnessRound(request.resource.data.get('roundId', null)));
+      allow update: if isAdmin() || (canManageTeam() && ownsTeam() && request.resource.data.team == myTeam()
+                                     && isOpenFitnessRound(resource.data.get('roundId', null)));
+      allow delete: if isAdmin();
+    }
     // รอบการประเมิน MASC ที่ผู้ดูแลระบบกำหนด (ช่วงวันที่เริ่ม-สิ้นสุด ใช้ทั้งองค์กรพร้อมกันทุกทีม) — โค้ช/
     // ผู้บริหารทีมทุกคนต้องอ่านได้เพื่อเห็นรอบปัจจุบันในหน้า MASC ของตัวเอง แก้ไข/สร้างได้เฉพาะผู้ดูแลระบบ
     match /mascRounds/{id} {

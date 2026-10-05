@@ -1714,6 +1714,7 @@ function renderDrawerItems() {
     navDrawerItems.appendChild(drawerItem(icon("book"), "สมุดพกนักกีฬา", "./attendance.html#admin=report-card"));
     navDrawerItems.appendChild(drawerItem(icon("dna"), "กำหนดรอบการประเมิน MASC", "./attendance.html#admin=masc-rounds"));
     navDrawerItems.appendChild(drawerItem(icon("calendar"), "นัดประชุมโค้ชรายสัปดาห์", "./attendance.html#admin=meetings"));
+    navDrawerItems.appendChild(drawerItem(icon("trending-up"), "รอบทดสอบสมรรถภาพ", "./attendance.html#admin=fitness-rounds"));
     navDrawerItems.appendChild(drawerItem(icon("trending-up"), "พัฒนาการนักกีฬา", "./development.html"));
     // "กลับภาพรวมทุกทีม" มีประโยชน์เฉพาะตอนกำลังดูทีมใดทีมหนึ่งอยู่ (มี ?team= เจาะจงทีมจริงในนี้) — ถ้าอยู่ที่
     // ภาพรวมทุกทีมอยู่แล้ว (หน้าแรกสุด ไม่มี ?team= หรือมีแต่ไม่ตรงชื่อทีมไหนเลย) กดแล้วจะแค่โหลดหน้าเดิมซ้ำ

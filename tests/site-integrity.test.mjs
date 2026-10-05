@@ -46,7 +46,8 @@ const PAGE_OF_SCRIPT = {
   "js/report-card.js": "report-card.html",
   "js/player.js": "player.html",
   "js/development.js": "development.html",
-  "js/coach-meetings-ui.js": "attendance.html"
+  "js/coach-meetings-ui.js": "attendance.html",
+  "js/fitness-rounds-ui.js": "attendance.html"
 };
 test("every getElementById id used by a page script exists in that page's HTML", () => {
   for (const [script, page] of Object.entries(PAGE_OF_SCRIPT)) {
