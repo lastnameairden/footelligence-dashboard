@@ -100,6 +100,13 @@ service cloud.firestore {
       allow delete: if isAdmin() || (canManageTeam() && ownsTeam());
     }
 
+    // นัดประชุมโค้ชรายสัปดาห์ (1 เอกสาร = 1 ทีม × 1 สัปดาห์ของเดือน) — ผู้ดูแลระบบเป็นผู้สร้าง/แก้ไข/บันทึกผลเข้าประชุมเท่านั้น
+    // โค้ชและผู้บริหารทีมอ่านได้เฉพาะของทีมตัวเอง (query ต้องมี where('team','==',ทีมตัวเอง) ตามหมายเหตุด้านบน)
+    match /coachMeetings/{id} {
+      allow read: if isAdmin() || (canViewTeam() && ownsTeam());
+      allow create, update, delete: if isAdmin();
+    }
+
     // แผนการฝึกซ้อมรายวัน — โค้ชจัดการได้เฉพาะแผนของทีมตัวเอง ผู้บริหารทีมดูได้อย่างเดียว
     match /trainingPlans/{id} {
       allow read: if isAdmin() || (canViewTeam() && ownsTeam());

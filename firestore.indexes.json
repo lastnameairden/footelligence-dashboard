@@ -83,6 +83,20 @@
                                            "order":  "ASCENDING"
                                        }
                                    ]
+                    },
+                    {
+                        "collectionGroup":  "coachMeetings",
+                        "queryScope":  "COLLECTION",
+                        "fields":  [
+                                       {
+                                           "fieldPath":  "team",
+                                           "order":  "ASCENDING"
+                                       },
+                                       {
+                                           "fieldPath":  "date",
+                                           "order":  "ASCENDING"
+                                       }
+                                   ]
                     }
                 ],
     "fieldOverrides":  [

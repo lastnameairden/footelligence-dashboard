@@ -64,6 +64,7 @@ import {
   TEAM_TRAINING_WEEKDAYS,
   isRecordOfCoach
 } from "./ui-utils.js";
+import { openAdminMeetings, renderCoachMeetingCard, loadCoachMeetingNotifications } from "./coach-meetings-ui.js";
 import { isEvaluationComplete } from "./masc-data.js";
 import { applyAttendanceChange, firestoreFieldsForChange, createSaveQueue, rosterLockState } from "./attendance-save.js";
 import { buildRouteHash, parseRouteHash, isValidRouteDate } from "./screen-route.js";
@@ -128,6 +129,7 @@ const dailyLoadBtn = document.getElementById("daily-load-btn");
 const dailyStatus = document.getElementById("daily-status");
 const dailyDateHeading = document.getElementById("daily-date-heading");
 const dailyReminderBanner = document.getElementById("daily-reminder-banner");
+const dailyMeetingCard = document.getElementById("daily-meeting-card");
 const dailyExecutiveNotesList = document.getElementById("daily-executive-notes-list");
 const dailyAttendanceBody = document.getElementById("daily-attendance-body");
 const dailyAttendancePagination = document.getElementById("daily-attendance-pagination");
@@ -228,6 +230,7 @@ const adminReportCardEndSelect = document.getElementById("admin-report-card-end-
 const adminGenerateReportCardBtn = document.getElementById("admin-generate-report-card-btn");
 const adminReportCardStatus = document.getElementById("admin-report-card-status");
 const adminMascRoundsSection = document.getElementById("admin-masc-rounds-section");
+const adminMeetingsSection = document.getElementById("admin-meetings-section");
 const adminMascRoundPeriodSelect = document.getElementById("admin-masc-round-period-select");
 const adminMascRoundStartInput = document.getElementById("admin-masc-round-start-input");
 const adminMascRoundEndInput = document.getElementById("admin-masc-round-end-input");
@@ -568,6 +571,7 @@ function hideAllScreens() {
   adminPrintSection.classList.add("hidden");
   adminReportCardSection.classList.add("hidden");
   adminMascRoundsSection.classList.add("hidden");
+  adminMeetingsSection.classList.add("hidden");
   adminPlayerAuditSection.classList.add("hidden");
   addPlayerSection.classList.add("hidden");
   checkinSection.classList.add("hidden");
@@ -587,6 +591,7 @@ function showDaily() {
   }
   loadDailyData(dailyDateInput.value);
   checkTodayReminders();
+  renderCoachMeetingCard(dailyMeetingCard, myTeam, meetingCoachId());
   loadExecutiveNotes(myTeam, dailyExecutiveNotesList);
 }
 
@@ -652,8 +657,24 @@ navDrawerOverlay.addEventListener("click", closeDrawer);
 // ---------- การแจ้งเตือน (เฉพาะผู้ดูแลระบบ — โค้ช/ผู้บริหารทีมมีปุ่มกระดิ่งแต่ยังไม่เปิดใช้งาน) ----------
 let currentNotifications = [];
 
+function meetingCoachId() {
+  return currentIsAdmin ? adminViewingCoachId : auth.currentUser?.uid || null;
+}
+
+// กระดิ่งของโค้ช: แจ้งนัดประชุมโค้ชที่เหลือไม่เกิน 3 วัน (ผู้บริหารทีมยังไม่เปิดใช้งาน)
+async function refreshCoachNotifications() {
+  if (!myTeam || !meetingCoachId()) return;
+  try {
+    currentNotifications = await loadCoachMeetingNotifications(myTeam, meetingCoachId());
+    renderAdminNotifications(notificationList, currentNotifications);
+    notificationBadge.classList.toggle("hidden", currentNotifications.length === 0);
+  } catch (err) {
+    console.error(err);
+  }
+}
+
 async function refreshNotifications() {
-  if (!currentIsAdmin) return;
+  if (!currentIsAdmin) return refreshCoachNotifications();
   notificationList.innerHTML = '<p class="text-slate-400 text-sm text-center py-6">กำลังโหลด...</p>';
   try {
     currentNotifications = await loadAdminNotifications();
@@ -814,6 +835,7 @@ function renderDrawerItems() {
       navDrawerItems.appendChild(drawerItem(icon("printer"), "พิมพ์สรุปผลงานโค้ช", openAdminPrintSection));
       navDrawerItems.appendChild(drawerItem(icon("book"), "สมุดพกนักกีฬา", openAdminReportCardSection));
       navDrawerItems.appendChild(drawerItem(icon("dna"), "กำหนดรอบการประเมิน MASC", openAdminMascRoundsSection));
+      navDrawerItems.appendChild(drawerItem(icon("calendar"), "นัดประชุมโค้ชรายสัปดาห์", openAdminMeetingsSection));
       navDrawerItems.appendChild(drawerItem(icon("trending-up"), "พัฒนาการนักกีฬา", () => (window.location.href = "./development.html")));
       navDrawerItems.appendChild(drawerDivider());
       navDrawerItems.appendChild(drawerItem(icon("home"), "ภาพรวมทุกทีม (Dashboard)", goToDashboard));
@@ -1142,6 +1164,12 @@ adminMascRoundCorrectionCancelBtn.addEventListener("click", () => {
   exitMascCorrectionMode();
   adminMascRoundStatus.textContent = "";
 });
+
+function openAdminMeetingsSection() {
+  hideAllScreens();
+  adminMeetingsSection.classList.remove("hidden");
+  openAdminMeetings();
+}
 
 function openAdminMascRoundsSection() {
   hideAllScreens();
@@ -3492,7 +3520,8 @@ const ROUTE_SCREENS = [
   { el: adminDashboardSection, key: "dashboard", kind: "admin" },
   { el: adminPrintSection, key: "print", kind: "admin" },
   { el: adminReportCardSection, key: "report-card", kind: "admin" },
-  { el: adminMascRoundsSection, key: "masc-rounds", kind: "admin" }
+  { el: adminMascRoundsSection, key: "masc-rounds", kind: "admin" },
+  { el: adminMeetingsSection, key: "meetings", kind: "admin" }
 ];
 let routeSyncEnabled = false;
 
@@ -3676,7 +3705,8 @@ onAuthStateChanged(auth, async (user) => {
         print: openAdminPrintSection,
         "player-audit": openAdminPlayerAuditSection,
         "report-card": openAdminReportCardSection,
-        "masc-rounds": openAdminMascRoundsSection
+        "masc-rounds": openAdminMascRoundsSection,
+        meetings: openAdminMeetingsSection
       };
       const route = parseRouteHash(window.location.hash);
       if (route.admin === "team" && (await restoreAdminTeamContext(route))) {
@@ -3728,6 +3758,7 @@ onAuthStateChanged(auth, async (user) => {
     const restored = parseRouteHash(window.location.hash);
     openCoachScreen(restored.screen, restored.date);
     enableRouteSync();
+    refreshCoachNotifications();
   } catch (err) {
     console.error(err);
     setAttendanceStatus("โหลดข้อมูลโค้ชไม่สำเร็จ: " + err.message, true);
