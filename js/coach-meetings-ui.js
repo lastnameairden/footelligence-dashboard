@@ -32,6 +32,7 @@ import {
   MEETING_SECTIONS,
   MEETING_RECAP_FIELDS,
   ackDocId,
+  coachVisibleRecapFields,
   addDaysToDate,
   addMonthsToMonth,
   buildTeamMeetingDocs,
@@ -44,7 +45,6 @@ import {
   meetingDate,
   meetingFilePath,
   meetingWeekdayOf,
-  nextAttendanceStatus,
   nextMeetingForCoach,
   sectionHasPlan,
   sectionHasRecap,
@@ -188,7 +188,7 @@ function sectionFormHtml(m, sec) {
   const who = sec === "all" ? "โค้ชทุกคนในกลุ่มเห็น" : `โค้ชสาย${sectionLabel(sec)}ในกลุ่มนี้: ${mine.length ? escapeHtml(mine.join(", ")) : "ไม่มี"}`;
   const recap = MEETING_RECAP_FIELDS.map(
     (f) => `<div>
-        <label class="field-label">${f.label}</label>
+        <label class="field-label">${f.label}${f.adminOnly ? ` <span class="badge badge-neutral">${icon("lock")} บันทึกส่วนตัว โค้ชไม่เห็น</span>` : ""}</label>
         <textarea rows="2" class="field-input" data-field="${f.key}" data-doc="${escapeHtml(m.id)}" data-sec="${sec}" placeholder="${f.placeholder}">${val(f.key)}</textarea>
       </div>`
   ).join("");
@@ -205,7 +205,7 @@ function sectionFormHtml(m, sec) {
         <input type="file" class="hidden" accept="image/*,application/pdf" data-file-input data-doc="${escapeHtml(m.id)}" data-sec="${sec}" />
       </div>
       <p class="text-xs text-slate-400">PDF หรือรูปภาพ ไม่เกิน 10MB ต่อไฟล์ แนบได้สูงสุด 3 ไฟล์ต่อส่วน โค้ชเห็นทันทีที่แนบ</p>
-      <p class="text-xs font-semibold text-slate-600 pt-1">หลังประชุม: สรุปให้โค้ช</p>
+      <p class="text-xs font-semibold text-slate-600 pt-1">หลังประชุม: สรุปให้โค้ช (ยกเว้นช่อง "ความคิดของแอดมิน" ที่โค้ชไม่เห็น)</p>
       ${recap}
       <div><button type="button" class="btn btn-primary btn-sm" data-action="save-section" data-doc="${escapeHtml(m.id)}" data-sec="${sec}">บันทึกส่วน${sectionLabel(sec)}</button></div>
     </div>`;
@@ -250,7 +250,6 @@ function render() {
       <h3 class="font-semibold text-slate-900">สัปดาห์ ${selectedWeek} · ${escapeHtml(thaiMeetingDateLabel(dateOfWeek(selectedWeek)))}</h3>
       <button type="button" class="btn btn-secondary btn-sm ml-auto" data-action="regroup">${icon("refresh")} แบ่งกลุ่มใหม่อัตโนมัติ</button>
     </div>
-    <p class="text-xs text-slate-500">แตะชื่อโค้ชเพื่อบันทึกผล: ยังไม่บันทึก → เข้าร่วม → ลา → ขาด</p>
     <div class="space-y-3">`;
 
   for (const slot of MEETING_TEAM_SLOTS) {
@@ -261,22 +260,35 @@ function render() {
     }
     const sum = summarizeMeetingAttendance(m);
     const names = m.coachNames || [];
-    const chips = (m.coachIds || [])
+    // แถวละโค้ช มีปุ่มเลือกผลชัดเจน 3 ปุ่ม (เข้าร่วม/ลา/ขาด) ปุ่มที่เลือกอยู่เป็นสีเต็ม กดซ้ำเพื่อล้าง
+    const statusStyles = {
+      attended: "bg-emerald-600 text-white",
+      leave: "bg-amber-500 text-white",
+      absent: "bg-red-600 text-white"
+    };
+    const rows = (m.coachIds || [])
       .map((id, i) => {
-        const s = (m.attendance || {})[id] || "";
-        const cls = s === "attended" ? "badge-success" : s === "leave" ? "badge-warning" : s === "absent" ? "badge-danger" : "badge-neutral";
-        const label = s ? ` · ${MEETING_ATTENDANCE_LABELS[s]}` : "";
-        return `<button type="button" class="badge ${cls} cursor-pointer" data-action="attendance" data-doc="${escapeHtml(m.id)}" data-coach="${escapeHtml(id)}">${escapeHtml(names[i] ?? id)}${label}</button>`;
+        const current = (m.attendance || {})[id] || "";
+        const buttons = ["attended", "leave", "absent"]
+          .map((status) => {
+            const cls = status === current ? statusStyles[status] : "bg-white text-slate-600";
+            return `<button type="button" class="px-3 py-1 text-sm ${cls}" data-action="attendance-set" data-doc="${escapeHtml(m.id)}" data-coach="${escapeHtml(id)}" data-status="${status}" aria-pressed="${status === current}">${MEETING_ATTENDANCE_LABELS[status]}</button>`;
+          })
+          .join("");
+        return `<div class="flex items-center gap-3 flex-wrap">
+          <span class="text-sm font-medium text-slate-800 w-32">${escapeHtml(names[i] ?? id)}</span>
+          <span class="inline-flex rounded-lg border border-slate-200 overflow-hidden">${buttons}</span>
+          ${current ? "" : '<span class="text-xs text-slate-400">ยังไม่บันทึก</span>'}
+        </div>`;
       })
-      .join(" ");
-    const moveOptions = (m.coachIds || []).map((id, i) => `<option value="${escapeHtml(id)}">${escapeHtml(names[i] ?? id)}</option>`).join("");
+      .join("");    const moveOptions = (m.coachIds || []).map((id, i) => `<option value="${escapeHtml(id)}">${escapeHtml(names[i] ?? id)}</option>`).join("");
     const weekOptions = Array.from({ length: MEETING_WEEKS_PER_MONTH }, (_, i) => i + 1)
       .filter((w) => w !== selectedWeek && meetings.has(meetingKey(slot.team, w)))
       .map((w) => `<option value="${w}">สัปดาห์ ${w}</option>`)
       .join("");
     const sec = activeSection.get(m.id) || "all";
     const tabs = MEETING_SECTIONS.map((s) => {
-      const filled = sectionHasPlan((m.sections || {})[s.key]) || sectionHasRecap((m.sections || {})[s.key]);
+      const filled = sectionHasPlan((m.sections || {})[s.key]) || sectionHasRecap((m.sections || {})[s.key], { includeAdminOnly: true });
       return `<button type="button" class="badge ${s.key === sec ? "badge-info" : "badge-neutral"} cursor-pointer" data-action="sec-tab" data-doc="${escapeHtml(m.id)}" data-sec="${s.key}">${s.label}${filled ? " ●" : ""}</button>`;
     }).join(" ");
     const acked = acksByMeeting.get(m.id)?.size || 0;
@@ -284,10 +296,13 @@ function render() {
       <div class="card card-pad space-y-3" data-slot-doc="${escapeHtml(m.id)}">
         <div class="flex items-center gap-2 flex-wrap">
           <span class="font-semibold text-slate-900">${escapeHtml(slot.team)}</span>
-          <span class="text-sm text-slate-500">${icon("clock")} ${escapeHtml(m.startTime)}–${escapeHtml(m.endTime)} น.</span>
+          <span class="text-sm text-slate-500 whitespace-nowrap">${icon("clock")} ${escapeHtml(m.startTime)}–${escapeHtml(m.endTime)} น.</span>
           <span class="text-xs text-slate-500 ml-auto">เข้าร่วม ${sum.attended} · ลา ${sum.leave} · ขาด ${sum.absent} · รอบันทึก ${sum.pending}</span>
         </div>
-        <div class="flex flex-wrap gap-2">${chips || '<span class="text-sm text-slate-400">ไม่มีโค้ชในกลุ่มนี้</span>'}</div>
+        <div class="space-y-2">
+          <p class="text-xs font-semibold text-slate-600">ผลเข้าประชุม (เลือกได้ทีละคน กดซ้ำที่ปุ่มเดิมเพื่อล้าง)</p>
+          ${rows || '<span class="text-sm text-slate-400">ไม่มีโค้ชในกลุ่มนี้</span>'}
+        </div>
         <div class="flex items-center gap-2 flex-wrap">
           <input type="text" class="field-input flex-1" data-link-input placeholder="https://meet.google.com/abc-defg-hij" value="${escapeHtml(m.meetLink || "")}" />
           <button type="button" class="btn btn-secondary btn-sm" data-action="save-link" data-doc="${escapeHtml(m.id)}">บันทึกลิงก์</button>
@@ -296,9 +311,9 @@ function render() {
           moveOptions && weekOptions
             ? `<div class="flex items-center gap-2 flex-wrap">
           <span class="text-xs text-slate-500">ย้ายโค้ช</span>
-          <select class="field-input" data-move-coach>${moveOptions}</select>
+          <select class="field-input" style="width:auto" data-move-coach>${moveOptions}</select>
           <span class="text-xs text-slate-500">ไป</span>
-          <select class="field-input" data-move-week>${weekOptions}</select>
+          <select class="field-input" style="width:auto" data-move-week>${weekOptions}</select>
           <button type="button" class="btn btn-secondary btn-sm" data-action="move" data-doc="${escapeHtml(m.id)}">ย้าย</button>
         </div>`
             : ""
@@ -309,7 +324,7 @@ function render() {
           ${sectionFormHtml(m, sec)}
           <label class="flex items-center gap-2 text-sm text-slate-700">
             <input type="checkbox" data-action="publish" data-doc="${escapeHtml(m.id)}"${m.recapPublished ? " checked" : ""} />
-            ส่งสรุปให้โค้ชแล้ว (โค้ชจะเห็นความรู้ การบ้าน และความคิดแอดมินของส่วนกลางและสายตัวเอง)
+            ส่งสรุปให้โค้ชแล้ว (โค้ชจะเห็นความรู้ การนำไปใช้ และการบ้านของส่วนกลางและสายตัวเอง ไม่เห็นความคิดของแอดมิน)
           </label>
           ${m.recapPublished ? `<p class="text-xs text-slate-500">โค้ชกดรับทราบแล้ว ${acked}/${(m.coachIds || []).length} คน</p>` : ""}
         </div>
@@ -422,13 +437,14 @@ const actions = {
     if (!confirm("แบ่งกลุ่มโค้ชใหม่ทั้งหมด? การย้ายโค้ชและผลเข้าประชุมที่บันทึกไว้ของเดือนนี้จะถูกล้าง (วัน ลิงก์ Meet วาระ ไฟล์ และสรุปคงเดิม)")) return;
     return withStatus("กำลังแบ่งกลุ่มใหม่...", writeAllDocs);
   },
-  attendance: (el) =>
+  "attendance-set": (el) =>
     withStatus("กำลังบันทึกผลเข้าประชุม...", async () => {
       const m = findMeetingById(el.dataset.doc);
       if (!m) return;
-      const next = nextAttendanceStatus((m.attendance || {})[el.dataset.coach] || "");
+      const status = el.dataset.status;
+      const current = (m.attendance || {})[el.dataset.coach] || "";
       await updateDoc(doc(db, "coachMeetings", m.id), {
-        [`attendance.${el.dataset.coach}`]: next || deleteField(),
+        [`attendance.${el.dataset.coach}`]: current === status ? deleteField() : status,
         updatedAt: serverTimestamp()
       });
     }),
@@ -637,7 +653,7 @@ function recapCardHtml(m, track, acked, canAck) {
     .map((key) => {
       const s = (m.sections || {})[key];
       if (!sectionHasRecap(s)) return "";
-      const rows = MEETING_RECAP_FIELDS.filter((f) => String(s[f.key] || "").trim())
+      const rows = coachVisibleRecapFields().filter((f) => String(s[f.key] || "").trim())
         .map(
           (f) => `<div class="mt-2">
           <p class="text-xs font-semibold text-slate-500">${f.label}</p>

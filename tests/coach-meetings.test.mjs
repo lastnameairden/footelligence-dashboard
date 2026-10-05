@@ -8,6 +8,7 @@ import {
   MEETING_SECTIONS,
   ackDocId,
   coachTrackOf,
+  coachVisibleRecapFields,
   latestPublishedRecap,
   meetingFilePath,
   sectionHasPlan,
@@ -25,7 +26,6 @@ import {
   meetingDate,
   meetingDocId,
   meetingWeekdayOf,
-  nextAttendanceStatus,
   nextMeetingForCoach,
   summarizeMeetingAttendance,
   thaiMeetingDateLabel,
@@ -139,15 +139,6 @@ test("date helpers", () => {
   assert.equal(thaiMonthLabel("2026-10"), "ตุลาคม 2026");
 });
 
-test("attendance status cycles: none → attended → leave → absent → none", () => {
-  assert.equal(nextAttendanceStatus(""), "attended");
-  assert.equal(nextAttendanceStatus(undefined), "attended");
-  assert.equal(nextAttendanceStatus("attended"), "leave");
-  assert.equal(nextAttendanceStatus("leave"), "absent");
-  assert.equal(nextAttendanceStatus("absent"), "");
-  assert.equal(nextAttendanceStatus("something-else"), "");
-});
-
 test("summarizeMeetingAttendance counts only coaches still in the group", () => {
   const m = { coachIds: ["a", "b", "c", "d"], attendance: { a: "attended", b: "leave", c: "absent", gone: "attended" } };
   assert.deepEqual(summarizeMeetingAttendance(m), { attended: 1, leave: 1, absent: 1, pending: 1, total: 4 });
@@ -227,7 +218,11 @@ test("sectionHasPlan / sectionHasRecap ignore blank text", () => {
   assert.equal(sectionHasPlan({ plan: "หัวข้อ" }), true);
   assert.equal(sectionHasPlan({ plan: "", files: [{ name: "a" }] }), true);
   assert.equal(sectionHasRecap({ know: "", hw: " " }), false);
-  assert.equal(sectionHasRecap({ mind: "ดีมาก" }), true);
+  assert.equal(sectionHasRecap({ hw: "ฝึก 1 สัปดาห์" }), true);
+  // ความคิดของแอดมินเป็นบันทึกส่วนตัว ไม่นับว่ามีสรุปให้โค้ชดู (แต่แอดมินยังเห็นว่าแท็บนั้นมีข้อมูล)
+  assert.equal(sectionHasRecap({ mind: "ดีมาก" }), false);
+  assert.equal(sectionHasRecap({ mind: "ดีมาก" }, { includeAdminOnly: true }), true);
+  assert.deepEqual(coachVisibleRecapFields().map((f) => f.key), ["know", "use", "hw"]);
 });
 
 test("latestPublishedRecap: newest published meeting up to today that has content for the coach's track", () => {

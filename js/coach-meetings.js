@@ -152,13 +152,6 @@ export function isValidMeetingLink(url) {
 export const MEETING_ATTENDANCE_STATUSES = ["attended", "leave", "absent"];
 export const MEETING_ATTENDANCE_LABELS = { attended: "เข้าร่วม", leave: "ลา", absent: "ขาด" };
 
-// แตะชื่อโค้ชวนไปเรื่อยๆ: ยังไม่บันทึก → เข้าร่วม → ลา → ขาด → ยังไม่บันทึก
-export function nextAttendanceStatus(current) {
-  if (!current) return "attended";
-  const i = MEETING_ATTENDANCE_STATUSES.indexOf(current);
-  return i < 0 || i === MEETING_ATTENDANCE_STATUSES.length - 1 ? "" : MEETING_ATTENDANCE_STATUSES[i + 1];
-}
-
 export function summarizeMeetingAttendance(meeting) {
   const ids = meeting.coachIds || [];
   const att = meeting.attendance || {};
@@ -208,7 +201,8 @@ export const MEETING_RECAP_FIELDS = [
   { key: "know", label: "ความรู้ที่ได้วันนี้", placeholder: "สรุปแก่นความรู้ 2-3 ข้อ" },
   { key: "use", label: "นำไปใช้ในสนามอย่างไร", placeholder: "ตัวอย่างเกม/แบบฝึกที่ลองใช้ได้ทันที" },
   { key: "hw", label: "การบ้านก่อนครั้งหน้า", placeholder: "1-2 ข้อ ทำได้จริงภายใน 1 เดือน" },
-  { key: "mind", label: "ความคิดของแอดมิน", placeholder: "สิ่งที่สังเกตจากการพูดคุย แนวทางต่อยอด คำชม" }
+  // adminOnly = บันทึกส่วนตัวของแอดมิน ไม่แสดงให้โค้ชเห็น (ฝั่งโค้ชกรองออกด้วย coachVisibleRecapFields)
+  { key: "mind", label: "ความคิดของแอดมิน", placeholder: "สิ่งที่สังเกตจากการพูดคุย แนวทางต่อยอด คำชม", adminOnly: true }
 ];
 
 export const MEETING_MAX_FILES_PER_SECTION = 3;
@@ -241,8 +235,13 @@ export function meetingFilePath(meetingId, section, fileName, now) {
   return `coachMeetings/${meetingId}/${section}/${now}_${safe}`;
 }
 
-export function sectionHasRecap(section) {
-  return MEETING_RECAP_FIELDS.some((f) => section && String(section[f.key] || "").trim() !== "");
+// ช่องสรุปที่โค้ชเห็นได้ (ไม่รวมบันทึกส่วนตัวของแอดมิน)
+export const coachVisibleRecapFields = () => MEETING_RECAP_FIELDS.filter((f) => !f.adminOnly);
+
+// ค่าเริ่มต้นนับเฉพาะช่องที่โค้ชเห็น (ใช้ตัดสินว่าจะแสดงการ์ดสรุป/ส่งแจ้งเตือนให้โค้ชไหม) — includeAdminOnly ใช้ฝั่งแอดมินเพื่อติดจุดบนแท็บที่มีข้อมูล
+export function sectionHasRecap(section, { includeAdminOnly = false } = {}) {
+  const fields = includeAdminOnly ? MEETING_RECAP_FIELDS : coachVisibleRecapFields();
+  return fields.some((f) => section && String(section[f.key] || "").trim() !== "");
 }
 
 export function sectionHasPlan(section) {
