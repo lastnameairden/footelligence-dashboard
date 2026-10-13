@@ -14,6 +14,7 @@ import {
   defaultTestCodes,
   formatResult,
   overlappingRound,
+  parseParentHeights,
   plausibilityWarnings,
   resultValue,
   roundLabel,
@@ -189,4 +190,17 @@ test("plausibilityWarnings flags out-of-range trials and a sitting height not be
   assert.match(plausibilityWarnings({ height: { trials: [150] }, sitting_height: { trials: [150] } }).sitting_height, /น้อยกว่าส่วนสูงยืน/);
   assert.deepEqual(plausibilityWarnings({ height: { trials: [150] }, sitting_height: { trials: [] } }), {});
   assert.deepEqual(plausibilityWarnings({ height: { trials: ["", null] } }), {});
+});
+test("parseParentHeights: optional, range-checked, one parent is enough, source defaults to self-reported", () => {
+  assert.deepEqual(parseParentHeights({ father: "", mother: "", source: "วัดจริง" }), { value: null, error: null });
+  assert.deepEqual(parseParentHeights({ father: "175", mother: "161.5", source: "วัดจริง" }), {
+    value: { father: 175, mother: 161.5, source: "วัดจริง" },
+    error: null
+  });
+  assert.deepEqual(parseParentHeights({ father: "175", mother: "", source: "x" }).value, { father: 175, mother: null, source: "แจ้งเอง" });
+  assert.match(parseParentHeights({ father: "17.5", mother: "160" }).error, /พ่อ.*120–230/);
+  assert.match(parseParentHeights({ father: "175", mother: "abc" }).error, /แม่/);
+  assert.equal(parseParentHeights({ father: "175.04", mother: "" }).value.father, 175);
+  assert.equal(parseParentHeights({ father: 230, mother: 120 }).error, null);
+  assert.match(parseParentHeights({ father: 231, mother: 120 }).error, /พ่อ/);
 });

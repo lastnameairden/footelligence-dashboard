@@ -67,6 +67,7 @@ import {
 import { openAdminMeetings, renderCoachMeetingCard, loadCoachMeetingNotifications } from "./coach-meetings-ui.js";
 import { openAdminFitnessRounds } from "./fitness-rounds-ui.js";
 import { openFitnessEntry } from "./fitness-entry-ui.js";
+import { parseParentHeights } from "./fitness-calc.js";
 import { isEvaluationComplete } from "./masc-data.js";
 import { applyAttendanceChange, firestoreFieldsForChange, createSaveQueue, rosterLockState } from "./attendance-save.js";
 import {
@@ -3905,6 +3906,10 @@ function startEditPlayer(p) {
   document.getElementById("player-birthday").value = p.birthday ?? "";
   document.getElementById("player-age-group").value = p.ageGroup ?? "";
   document.getElementById("player-position").value = p.position ?? "";
+  document.getElementById("player-sex").value = p.sex ?? "";
+  document.getElementById("player-father-height").value = p.parentHeights?.father ?? "";
+  document.getElementById("player-mother-height").value = p.parentHeights?.mother ?? "";
+  document.getElementById("player-parent-height-source").value = p.parentHeights?.source ?? "แจ้งเอง";
   applyAgeGroupLock();
   playerPhotoInput.value = "";
   playerExistingPhotoUrl = p.photoUrl ?? null;
@@ -3987,6 +3992,17 @@ addPlayerForm.addEventListener("submit", async (e) => {
   }
   const ageGroup = document.getElementById("player-age-group").value;
   const position = document.getElementById("player-position").value.trim();
+  const sex = document.getElementById("player-sex").value;
+  const parentHeights = parseParentHeights({
+    father: document.getElementById("player-father-height").value,
+    mother: document.getElementById("player-mother-height").value,
+    source: document.getElementById("player-parent-height-source").value
+  });
+  if (parentHeights.error) {
+    addPlayerStatus.textContent = parentHeights.error;
+    addPlayerStatus.className = "text-sm text-red-600";
+    return;
+  }
   const numberNum = numberVal ? Number(numberVal) : null;
 
   // เบอร์/ลำดับห้ามซ้ำกันภายในรุ่นอายุเดียวกัน (ต่างรุ่นอายุใช้เบอร์เดียวกันได้ปกติ) — เช็คจากรายชื่อนักกีฬา
@@ -4023,6 +4039,8 @@ addPlayerForm.addEventListener("submit", async (e) => {
     birthday: birthday || null,
     ageGroup: ageGroup || null,
     position: position || null,
+    sex: sex || null,
+    parentHeights: parentHeights.value,
     team: myTeam
   };
 

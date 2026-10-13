@@ -262,3 +262,30 @@ export function plausibilityWarnings(tests) {
   }
   return warnings;
 }
+// ---------- ข้อมูลในโปรไฟล์นักกีฬาที่ใช้คำนวณช่วงการเติบโต ----------
+// เพศและส่วนสูงพ่อ-แม่เก็บครั้งเดียวในโปรไฟล์ (players.sex, players.parentHeights) — ไม่บังคับกรอก; ค่าที่คำนวณจากข้อมูลนี้ไม่เก็บ
+export const PLAYER_SEX_OPTIONS = ["ชาย", "หญิง"];
+export const PARENT_HEIGHT_SOURCES = ["วัดจริง", "แจ้งเอง"];
+export const PARENT_HEIGHT_RANGE = [120, 230]; // ซม.
+
+// รับค่าจากช่องกรอก (สตริง) → { value, error }: value = { father, mother, source } หรือ null เมื่อเว้นว่างทั้งคู่ (ล้างค่า)
+// กรอกได้ฝั่งเดียว (ช่องที่ว่างเป็น null) — การคำนวณที่ต้องใช้ทั้งสองคนจะข้ามเด็กที่ข้อมูลไม่ครบเอง
+export function parseParentHeights({ father, mother, source }) {
+  const [lo, hi] = PARENT_HEIGHT_RANGE;
+  const read = (raw, who) => {
+    const text = String(raw ?? "").trim();
+    if (text === "") return { n: null };
+    const n = Number(text);
+    if (!Number.isFinite(n) || n < lo || n > hi) return { error: `ส่วนสูง${who}ต้องอยู่ระหว่าง ${lo}–${hi} ซม.` };
+    return { n: Math.round(n * 10) / 10 };
+  };
+  const f = read(father, "พ่อ");
+  if (f.error) return { value: null, error: f.error };
+  const m = read(mother, "แม่");
+  if (m.error) return { value: null, error: m.error };
+  if (f.n === null && m.n === null) return { value: null, error: null };
+  return {
+    value: { father: f.n, mother: m.n, source: PARENT_HEIGHT_SOURCES.includes(source) ? source : "แจ้งเอง" },
+    error: null
+  };
+}

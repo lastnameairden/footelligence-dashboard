@@ -980,7 +980,25 @@
               </optgroup>
             </select>
           </div>
+          <div>
+            <label class="field-label">เพศ (ถ้ามี)</label>
+            <select id="player-sex" class="field-input">
+              <option value="">-- ไม่ระบุ --</option>
+              <option value="ชาย">ชาย</option>
+              <option value="หญิง">หญิง</option>
+            </select>
+          </div>
           <div class="sm:col-span-2">
+            <label class="field-label">ส่วนสูงพ่อ-แม่ (ถ้ามี — ใช้ประเมินช่วงการเติบโต เก็บครั้งเดียว ไม่แสดงในสมุดพก)</label>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <input id="player-father-height" type="number" min="120" max="230" step="0.1" class="field-input" placeholder="ส่วนสูงพ่อ (ซม.)" />
+              <input id="player-mother-height" type="number" min="120" max="230" step="0.1" class="field-input" placeholder="ส่วนสูงแม่ (ซม.)" />
+              <select id="player-parent-height-source" class="field-input">
+                <option value="วัดจริง">วัดจริง</option>
+                <option value="แจ้งเอง" selected>แจ้งเอง (ผู้ปกครองบอก)</option>
+              </select>
+            </div>
+          </div>          <div class="sm:col-span-2">
             <label class="field-label">รูปนักกีฬา (ถ้ามี ไม่เกิน 5MB)</label>
             <input id="player-photo-input" type="file" accept="image/*" class="field-input" />
             <p id="player-photo-status" class="text-sm text-slate-500 mt-1"></p>
