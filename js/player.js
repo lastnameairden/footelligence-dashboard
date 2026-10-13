@@ -26,6 +26,8 @@ import {
   escapeHtml,
   safeHttpUrl
 } from "./ui-utils.js";
+import { buildFitnessSeries } from "./fitness-profile.js";
+import { coachFitnessHtml } from "./fitness-view.js";
 
 const statusEl = document.getElementById("status-message");
 const accessGate = document.getElementById("access-gate");
@@ -40,6 +42,7 @@ const categoryBars = document.getElementById("category-bars");
 const attendanceHistoryBody = document.getElementById("attendance-history-body");
 const matchHistoryBody = document.getElementById("match-history-body");
 const injuryHistoryBody = document.getElementById("injury-history-body");
+const fitnessProfileWrap = document.getElementById("fitness-profile-wrap");
 const sendToExecutiveBtn = document.getElementById("send-to-executive-btn");
 
 let currentPlayer = null;
@@ -154,6 +157,25 @@ function renderInjuryHistory(reports) {
   applyDataLabels(injuryHistoryBody);
 }
 
+// สมรรถภาพและการเติบโต: โหลดแยกจากข้อมูลหลักของหน้านี้ — ถ้าโหลดไม่ได้ ส่วนอื่นยังแสดงตามปกติ
+async function renderFitnessProfile(player) {
+  try {
+    const [roundSnap, resultSnap] = await Promise.all([
+      getDocs(collection(db, "fitnessRounds")),
+      getDocs(query(collection(db, "fitnessResults"), where("team", "==", player.team), where("playerId", "==", player.id)))
+    ]);
+    const rounds = [];
+    roundSnap.forEach((d) => rounds.push({ id: d.id, ...d.data() }));
+    const results = [];
+    resultSnap.forEach((d) => results.push(d.data()));
+    fitnessProfileWrap.innerHTML = coachFitnessHtml({ player, series: buildFitnessSeries(rounds, results) });
+    applyDataLabels(fitnessProfileWrap.querySelector("tbody"));
+  } catch (err) {
+    console.error(err);
+    fitnessProfileWrap.innerHTML = `<p class="text-sm text-red-600">โหลดข้อมูลสมรรถภาพไม่สำเร็จ: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
 async function loadPlayerData(playerId) {
   setStatus("กำลังโหลดข้อมูล...");
   const playerDoc = await getDoc(doc(db, "players", playerId));
@@ -205,6 +227,7 @@ async function loadPlayerData(playerId) {
   renderAttendanceHistory(attendanceRecords);
   renderMatchHistory(matchReports);
   renderInjuryHistory(injuryReports);
+  renderFitnessProfile(player);
 
   accessGate.classList.add("hidden");
   playerContent.classList.remove("hidden");

@@ -29,6 +29,8 @@ import {
 } from "./ui-utils.js";
 import { CRITERIA, SECT, categoryRawScore, isEvaluationComplete, scoreToGrade } from "./masc-data.js";
 import { icon } from "./icons.js";
+import { FITNESS_SUMMARY_PRESETS, buildFitnessSeries } from "./fitness-profile.js";
+import { parentFitnessSectionsHtml } from "./fitness-view.js";
 
 const UNASSIGNED_AGE_GROUP = "ไม่ระบุรุ่นอายุ";
 const DEFAULT_ACCENT = "#0f172a";
@@ -130,7 +132,37 @@ async function saveComment(player, team, start, end, commentText, indicatorEl) {
       comment: commentText,
       updatedAt: serverTimestamp(),
       updatedBy: currentAdminName
-    });
+    }, { merge: true });
+    indicatorEl.innerHTML = `บันทึกแล้ว ${icon("check")}`;
+    indicatorEl.className = "text-xs text-emerald-600 no-print";
+  } catch (err) {
+    console.error(err);
+    indicatorEl.textContent = "บันทึกไม่สำเร็จ: " + err.message;
+    indicatorEl.className = "text-xs text-red-600 no-print";
+  }
+}
+
+// บันทึกสรุปจากโค้ชฟิตเนส (จุดเด่น/ควรพัฒนา/ทำที่บ้านได้) ของหน้าสมรรถภาพในสมุดพก — เอกสารเดียวกับคำเห็นโค้ช (merge ไม่ทับกัน)
+async function saveFitnessSummary(player, team, start, end, summary, indicatorEl) {
+  const docId = `${player.id}_${start}_${end}`;
+  indicatorEl.textContent = "กำลังบันทึก...";
+  indicatorEl.className = "text-xs text-slate-400 no-print";
+  try {
+    await setDoc(
+      doc(db, "playerReportCards", docId),
+      {
+        playerId: player.id,
+        playerName: player.nickname || player.fullName || "-",
+        team,
+        ageGroup: player.ageGroup || null,
+        startMonth: start,
+        endMonth: end,
+        fitnessSummary: summary,
+        updatedAt: serverTimestamp(),
+        updatedBy: currentAdminName
+      },
+      { merge: true }
+    );
     indicatorEl.innerHTML = `บันทึกแล้ว ${icon("check")}`;
     indicatorEl.className = "text-xs text-emerald-600 no-print";
   } catch (err) {
@@ -696,6 +728,115 @@ function buildPlayerPage(player, data, scope) {
   return page;
 }
 
+// หน้าที่ 2 ของสมุดพก: "ร่างกายและการเคลื่อนไหว" (การเติบโต / ผลทดสอบ / MASC-M ที่โค้ชประเมิน / สรุปจากโค้ชฟิตเนส) — ผู้ปกครองอ่าน
+// จึงใช้ภาษาง่าย ไม่แสดงตัวเลขช่วงการเติบโตหรืออันดับ ไม่ใช้สีแดงกับผลที่ต่ำ (ดู fitness-view.js)
+function buildFitnessPage(player, data, scope) {
+  const { team, start, end } = scope;
+  const accent = TEAM_COLORS[team] || DEFAULT_ACCENT;
+  const mascM = mascGradesFor(data.mascEvaluation).find((g) => g.key === "M")?.grade ?? null;
+  const sections = parentFitnessSectionsHtml({ player, series: data.series, mascM });
+
+  const page = document.createElement("div");
+  page.className = "report-card-page card overflow-hidden";
+  page.style.setProperty("--accent", accent);
+
+  const header = document.createElement("div");
+  header.className = "flex items-center justify-between px-4 py-2 text-white";
+  header.style.background = accent;
+  header.innerHTML = `
+    <div class="flex items-center gap-2">
+      <div class="w-8 h-8 rounded-full bg-white flex items-center justify-center overflow-hidden flex-shrink-0">${teamLogoImg(team, "w-6 h-6 object-contain")}</div>
+      <div>
+        <p class="text-sm font-bold leading-tight">${escapeHtml(player.nickname || player.fullName || "-")} <span class="font-normal opacity-80">• ร่างกายและการเคลื่อนไหว</span></p>
+        <p class="text-[10px] opacity-90 leading-tight">${escapeHtml(team)} • รอบการประเมิน ${monthRangeLabel(start, end)}</p>
+      </div>
+    </div>`;
+  page.appendChild(header);
+
+  const sectionTitle = (text) => {
+    const h = document.createElement("h4");
+    h.className = "text-xs font-semibold pl-2 mb-1";
+    h.style.borderLeft = `3px solid ${accent}`;
+    h.textContent = text;
+    return h;
+  };
+  const block = (title, html) => {
+    const wrap = document.createElement("div");
+    wrap.appendChild(sectionTitle(title));
+    const body = document.createElement("div");
+    body.innerHTML = html;
+    wrap.appendChild(body);
+    return wrap;
+  };
+
+  const body = document.createElement("div");
+  body.className = "grid grid-cols-2 gap-3 p-3";
+  const left = document.createElement("div");
+  left.className = "space-y-3";
+  left.append(block("1. การเติบโต", sections.growthSection), block("2. ผลทดสอบสมรรถภาพ", sections.testSection));
+  const right = document.createElement("div");
+  right.className = "space-y-3";
+  right.appendChild(block("3. การเคลื่อนไหว (โค้ชประเมิน)", sections.mascSection));
+
+  // ส่วนที่ 4: สรุปจากโค้ชฟิตเนส — เลือกข้อความสำเร็จรูป/พิมพ์เองได้ บันทึกอัตโนมัติเมื่อออกจากช่อง
+  const summaryWrap = document.createElement("div");
+  summaryWrap.appendChild(sectionTitle("4. สรุปจากโค้ชฟิตเนส"));
+  const saved = data.fitnessSummary || {};
+  const fields = [
+    { key: "strength", label: "จุดเด่น" },
+    { key: "improve", label: "ควรพัฒนา" },
+    { key: "home", label: "ทำที่บ้านได้" }
+  ];
+  const textareas = {};
+  const indicator = document.createElement("p");
+  indicator.className = "text-[10px] text-slate-400 no-print";
+  const save = () =>
+    saveFitnessSummary(player, team, start, end, Object.fromEntries(fields.map((f) => [f.key, textareas[f.key].value.trim()])), indicator);
+  for (const f of fields) {
+    const row = document.createElement("div");
+    row.className = "mb-1.5";
+    const label = document.createElement("p");
+    label.className = "text-[10px] font-semibold text-slate-600";
+    label.textContent = f.label;
+    const printText = document.createElement("p");
+    printText.className = "print-only text-[10px] whitespace-pre-wrap";
+    printText.textContent = saved[f.key] || "-";
+    const ta = document.createElement("textarea");
+    ta.className = "field-input w-full no-print text-xs";
+    ta.rows = 2;
+    ta.value = saved[f.key] || "";
+    ta.placeholder = "เลือกจากข้อความสำเร็จรูปด้านล่าง หรือพิมพ์เอง";
+    ta.addEventListener("blur", () => {
+      printText.textContent = ta.value.trim() || "-";
+      save();
+    });
+    textareas[f.key] = ta;
+    const chips = document.createElement("div");
+    chips.className = "flex flex-wrap gap-1 no-print mt-1";
+    for (const preset of FITNESS_SUMMARY_PRESETS[f.key]) {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "chip-toggle";
+      chip.style.fontSize = "10px";
+      chip.textContent = preset;
+      chip.addEventListener("click", () => {
+        ta.value = ta.value.trim() ? `${ta.value.trim()}\n${preset}` : preset;
+        printText.textContent = ta.value.trim();
+        save();
+      });
+      chips.appendChild(chip);
+    }
+    row.append(label, printText, ta, chips);
+    summaryWrap.appendChild(row);
+  }
+  summaryWrap.appendChild(indicator);
+  right.appendChild(summaryWrap);
+
+  body.append(left, right);
+  page.appendChild(body);
+  return page;
+}
+
 async function loadReportCards(team, ageGroup, start, end) {
   setStatus("กำลังโหลดข้อมูล...");
 
@@ -707,7 +848,7 @@ async function loadReportCards(team, ageGroup, start, end) {
   const prevStartDate = `${prevPeriod.start}-01`;
   const prevEndDate = lastDayOfMonth(prevPeriod.end);
 
-  const [playersSnap, attendanceSnap, matchSnap, injurySnap, commentsSnap, evaluationsSnap] = await Promise.all([
+  const [playersSnap, attendanceSnap, matchSnap, injurySnap, commentsSnap, evaluationsSnap, fitnessRoundsSnap, fitnessResultsSnap] = await Promise.all([
     getDocs(query(collection(db, "players"), where("team", "==", team))),
     // attendance ต้องครอบคลุมทั้งรอบที่เลือกและรอบก่อนหน้า (ใช้เทียบพัฒนาการ) ส่วนแข่งขัน/บาดเจ็บใช้เฉพาะรอบที่เลือก
     getDocs(teamDateRangeQuery("attendance", team, prevStartDate, endDate)),
@@ -721,7 +862,10 @@ async function loadReportCards(team, ageGroup, start, end) {
         where("endMonth", "==", end)
       )
     ),
-    getDocs(query(collection(db, "playerEvaluations"), where("team", "==", team)))
+    getDocs(query(collection(db, "playerEvaluations"), where("team", "==", team))),
+    // ผลทดสอบสมรรถภาพทุกรอบของทีม (เทียบรอบก่อน/รอบนี้ในหน้าที่ 2 ของสมุดพก) — โหลดไม่ได้ก็ไม่ให้สมุดพกหน้าหลักล้ม
+    getDocs(collection(db, "fitnessRounds")).catch(() => null),
+    getDocs(query(collection(db, "fitnessResults"), where("team", "==", team))).catch(() => null)
   ]);
 
   let players = [];
@@ -760,6 +904,19 @@ async function loadReportCards(team, ageGroup, start, end) {
 
   const evaluations = [];
   evaluationsSnap.forEach((d) => evaluations.push(d.data()));
+
+  // รอบทดสอบที่เริ่มไม่เกินสิ้นรอบสมุดพก (ผลของรอบที่ยังไม่ถึงไม่นำมาแสดง)
+  const fitnessRounds = [];
+  fitnessRoundsSnap?.forEach((d) => {
+    const r = { id: d.id, ...d.data() };
+    if ((r.openDate || "") <= endDate) fitnessRounds.push(r);
+  });
+  const fitnessResultsByPlayer = new Map();
+  fitnessResultsSnap?.forEach((d) => {
+    const r = d.data();
+    if (!fitnessResultsByPlayer.has(r.playerId)) fitnessResultsByPlayer.set(r.playerId, []);
+    fitnessResultsByPlayer.get(r.playerId).push(r);
+  });
 
   const monthLabel = monthRangeLabel(start, end);
   const scopeText =
@@ -822,6 +979,14 @@ async function loadReportCards(team, ageGroup, start, end) {
       mascEvaluation
     }, { team, start, end });
     reportCardPages.appendChild(page);
+
+    // หน้าที่ 2: ร่างกายและการเคลื่อนไหว (เฉพาะนักกีฬาที่มีผลทดสอบอย่างน้อยหนึ่งรอบ)
+    const fitnessSeries = buildFitnessSeries(fitnessRounds, fitnessResultsByPlayer.get(player.id) || []);
+    if (fitnessSeries.length > 0) {
+      reportCardPages.appendChild(
+        buildFitnessPage(player, { series: fitnessSeries, mascEvaluation, fitnessSummary: existingComment?.fitnessSummary }, { team, start, end })
+      );
+    }
   }
 
   if (excludedPlayers.length > 0) {
