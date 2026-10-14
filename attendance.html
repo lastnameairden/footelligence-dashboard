@@ -105,7 +105,13 @@
             <label class="flex items-center gap-2 text-sm text-slate-700">
               <input type="radio" name="register-role" value="executive" /> ผู้บริหารทีม
             </label>
+            <label class="flex items-center gap-2 text-sm text-slate-700">
+              <input type="radio" name="register-role" value="staff" /> ทีมหลังบ้าน
+            </label>
           </div>
+          <p id="register-staff-hint" class="hidden text-xs text-slate-500 mt-2">
+            ทีมหลังบ้านไม่ต้องเลือกทีมหรือรุ่นอายุ — ใช้อีเมลของตัวเองสมัคร แล้วรอผู้ดูแลระบบหลักอนุมัติและกำหนดสิทธิ์ให้ ก่อนเข้าใช้งานได้
+          </p>
         </div>
         <div id="register-age-group-wrap">
           <label class="field-label">ตำแหน่งโค้ช</label>
@@ -372,7 +378,13 @@
               <option value="coach">โค้ช</option>
               <option value="executive">ผู้บริหารทีม</option>
               <option value="admin">ผู้ดูแลระบบ</option>
+              <option value="staff">ทีมหลังบ้าน</option>
             </select>
+          </div>
+          <div id="edit-coach-permissions-wrap" class="hidden">
+            <label class="field-label">สิทธิ์ของทีมหลังบ้าน (ติ๊กรายข้อ)</label>
+            <div id="edit-coach-permissions" class="space-y-2"></div>
+            <p class="text-xs text-slate-400 mt-1">ทีมหลังบ้านไม่ผูกกับทีมใด และเข้าใช้นัดประชุม รอบทดสอบ รอบ MASC และบัญชีผู้ใช้ไม่ได้ (เฉพาะผู้ดูแลระบบหลัก)</p>
           </div>
           <div id="edit-coach-team-wrap">
             <label class="field-label">ทีม</label>

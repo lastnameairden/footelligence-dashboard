@@ -28,6 +28,7 @@ import {
   teamDateRangeQuery,
   thisMonthBangkok
 } from "./ui-utils.js";
+import { staffCan } from "./staff-perms.js";
 import { injuryStatsHtml } from "./injury-stats-view.js";
 
 const statusEl = document.getElementById("status-message");
@@ -890,8 +891,10 @@ onAuthStateChanged(auth, async (user) => {
     const coachDoc = await getDoc(doc(db, "coaches", user.uid));
     const data = coachDoc.exists() ? coachDoc.data() : null;
 
-    if (!data || data.status !== "approved" || data.role !== "admin") {
-      showAccessGate("หน้านี้ใช้ได้เฉพาะบัญชีผู้ดูแลระบบเท่านั้น");
+    // ผู้ดูแลระบบ หรือทีมหลังบ้านที่ได้สิทธิ์ดู (อ่านอย่างเดียว) เท่านั้น
+    const allowed = data && data.status === "approved" && (data.role === "admin" || (data.role === "staff" && staffCan(data.permissions, "view")));
+    if (!allowed) {
+      showAccessGate("หน้านี้ใช้ได้เฉพาะบัญชีผู้ดูแลระบบหรือทีมหลังบ้านที่ได้รับสิทธิ์ดูรายงานเท่านั้น");
       return;
     }
 

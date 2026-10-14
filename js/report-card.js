@@ -29,6 +29,7 @@ import {
 } from "./ui-utils.js";
 import { CRITERIA, SECT, categoryRawScore, isEvaluationComplete, scoreToGrade } from "./masc-data.js";
 import { icon } from "./icons.js";
+import { staffCan } from "./staff-perms.js";
 import { FITNESS_SUMMARY_PRESETS, buildFitnessSeries } from "./fitness-profile.js";
 import { parentFitnessSectionsHtml } from "./fitness-view.js";
 
@@ -48,6 +49,8 @@ const reportCardPages = document.getElementById("report-card-pages");
 const printBtn = document.getElementById("print-btn");
 
 let currentAdminName = null;
+// แก้คำเห็นโค้ช/สรุปจากโค้ชฟิตเนสได้เฉพาะผู้ดูแลระบบหลัก — ทีมหลังบ้านที่ได้สิทธิ์ดูเห็นสมุดพกและพิมพ์ได้ แต่ช่องข้อความถูกล็อก (กฎ Firestore ห้ามเขียนอยู่แล้ว)
+let canEditReportCards = true;
 
 function setStatus(message, isError = false) {
   statusEl.textContent = message;
@@ -703,12 +706,13 @@ function buildPlayerPage(player, data, scope) {
   commentTextarea.rows = 2;
   commentTextarea.placeholder = "เขียนข้อเสนอแนะสำหรับนักกีฬาคนนี้...";
   commentTextarea.value = data.comment || "";
+  commentTextarea.disabled = !canEditReportCards;
   commentPrintText.textContent = data.comment || "-";
   const commentIndicator = document.createElement("p");
   commentIndicator.className = "text-[10px] text-slate-400 no-print";
   commentTextarea.addEventListener("blur", () => {
     commentPrintText.textContent = commentTextarea.value.trim() || "-";
-    saveComment(player, team, start, end, commentTextarea.value.trim(), commentIndicator);
+    if (canEditReportCards) saveComment(player, team, start, end, commentTextarea.value.trim(), commentIndicator);
   });
   const commentCol = document.createElement("div");
   commentCol.append(commentPrintText, commentTextarea, commentIndicator);
@@ -805,10 +809,11 @@ function buildFitnessPage(player, data, scope) {
     ta.className = "field-input w-full no-print text-xs";
     ta.rows = 2;
     ta.value = saved[f.key] || "";
+    ta.disabled = !canEditReportCards;
     ta.placeholder = "เลือกจากข้อความสำเร็จรูปด้านล่าง หรือพิมพ์เอง";
     ta.addEventListener("blur", () => {
       printText.textContent = ta.value.trim() || "-";
-      save();
+      if (canEditReportCards) save();
     });
     textareas[f.key] = ta;
     const chips = document.createElement("div");
@@ -819,6 +824,7 @@ function buildFitnessPage(player, data, scope) {
       chip.className = "chip-toggle";
       chip.style.fontSize = "10px";
       chip.textContent = preset;
+      chip.disabled = !canEditReportCards;
       chip.addEventListener("click", () => {
         ta.value = ta.value.trim() ? `${ta.value.trim()}\n${preset}` : preset;
         printText.textContent = ta.value.trim();
@@ -1026,11 +1032,13 @@ onAuthStateChanged(auth, async (user) => {
     const coachDoc = await getDoc(doc(db, "coaches", user.uid));
     const data = coachDoc.exists() ? coachDoc.data() : null;
 
-    if (!data || data.status !== "approved" || data.role !== "admin") {
-      showAccessGate("หน้านี้ใช้ได้เฉพาะบัญชีผู้ดูแลระบบเท่านั้น");
+    const allowed = data && data.status === "approved" && (data.role === "admin" || (data.role === "staff" && staffCan(data.permissions, "view")));
+    if (!allowed) {
+      showAccessGate("หน้านี้ใช้ได้เฉพาะบัญชีผู้ดูแลระบบหรือทีมหลังบ้านที่ได้รับสิทธิ์ดูรายงานเท่านั้น");
       return;
     }
     currentAdminName = data.name || user.email;
+    canEditReportCards = data.role === "admin";
 
     // ใช้ URL hash (#team=...&ageGroup=...&start=...&end=...) แทน query string เพราะเซิร์ฟเวอร์ทดสอบในเครื่อง
     // (serve, clean-url) จะ redirect "report-card.html" ไปเป็น "report-card" และตัด query string ทิ้งระหว่างทาง

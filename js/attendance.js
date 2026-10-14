@@ -68,6 +68,7 @@ import { openAdminMeetings, renderCoachMeetingCard, loadCoachMeetingNotification
 import { openAdminFitnessRounds } from "./fitness-rounds-ui.js";
 import { openFitnessEntry } from "./fitness-entry-ui.js";
 import { parseParentHeights } from "./fitness-calc.js";
+import { STAFF_PERMISSIONS, canAccessAdminFeature, normalizePermissions, permissionsSummary, staffCan, staffLandingFeature } from "./staff-perms.js";
 import { isEvaluationComplete } from "./masc-data.js";
 import { applyAttendanceChange, firestoreFieldsForChange, createSaveQueue, rosterLockState } from "./attendance-save.js";
 import {
@@ -332,6 +333,8 @@ const editCoachSaveBtn = document.getElementById("edit-coach-save-btn");
 const editCoachResetPasswordBtn = document.getElementById("edit-coach-reset-password-btn");
 const editCoachDeleteBtn = document.getElementById("edit-coach-delete-btn");
 const editCoachCancelBtn = document.getElementById("edit-coach-cancel-btn");
+const editCoachPermissionsWrap = document.getElementById("edit-coach-permissions-wrap");
+const editCoachPermissionsEl = document.getElementById("edit-coach-permissions");
 const progressDateInput = document.getElementById("progress-date-input");
 const progressRefreshBtn = document.getElementById("progress-refresh-btn");
 const progressTableBody = document.getElementById("progress-table-body");
@@ -376,6 +379,11 @@ let adminViewingCoachId = null;
 let players = [];
 let editingPlayerId = null;
 let currentIsAdmin = false;
+// ทีมหลังบ้าน (role = staff): รายการสิทธิ์ของบัญชีนี้ — null = แอดมินหลัก (ไม่จำกัด) หน้าจอ "แอดมิน" ใช้ร่วมกัน แต่เมนู/ปุ่มซ่อนตามสิทธิ์
+// (ตัวบังคับจริงคือกฎ Firestore ดู staff-perms.js)
+let currentStaffPerms = null;
+const adminCan = (feature) => currentIsAdmin && canAccessAdminFeature(feature, currentStaffPerms);
+const isStaffSession = () => currentStaffPerms !== null;
 let currentReportId = null;
 
 const MAX_PLAYER_PHOTO_SIZE = 5 * 1024 * 1024; // ต้องตรงกับ storage.rules
@@ -513,6 +521,7 @@ tabRegister.addEventListener("click", () => {
 function updateRegisterAgeGroupVisibility() {
   const role = document.querySelector('input[name="register-role"]:checked').value;
   registerAgeGroupWrap.classList.toggle("hidden", role !== "coach");
+  document.getElementById("register-staff-hint").classList.toggle("hidden", role !== "staff");
 }
 for (const radio of document.querySelectorAll('input[name="register-role"]')) {
   radio.addEventListener("change", updateRegisterAgeGroupVisibility);
@@ -716,6 +725,7 @@ async function refreshCoachNotifications() {
 }
 
 async function refreshNotifications() {
+  if (isStaffSession()) return; // การแจ้งเตือนของแอดมินอ่านข้อมูลที่เฉพาะแอดมินหลักเข้าถึงได้ (adminNotificationReads ฯลฯ)
   if (!currentIsAdmin) return refreshCoachNotifications();
   notificationList.innerHTML = '<p class="text-slate-400 text-sm text-center py-6">กำลังโหลด...</p>';
   try {
@@ -817,12 +827,12 @@ function exitTeamManagementToAdminPanel() {
   adminViewingCoachId = null;
   // สลับป้ายบทบาท + ชื่อ/อีเมลกลับเป็นของผู้ดูแลระบบเองตามเดิม (ตรงข้ามกับที่เขียนทับด้วยข้อมูลของโค้ช/
   // ผู้บริหารทีมที่สวมบทบาทไว้ตอนเข้า enterTeamManagementMode / enterExecutiveViewMode)
-  coachRoleBadgeEl.textContent = "ผู้ดูแลระบบ";
-  coachRoleBadgeEl.className = "badge badge-info";
+  coachRoleBadgeEl.textContent = isStaffSession() ? "ทีมหลังบ้าน" : "ผู้ดูแลระบบ";
+  coachRoleBadgeEl.className = isStaffSession() ? "badge badge-warning" : "badge badge-info";
   coachNameEl.textContent = adminOwnName;
   coachEmailEl.textContent = adminOwnEmail;
   coachStatusBadgeEl.innerHTML = '<span class="badge badge-success">อนุมัติแล้ว</span>';
-  coachTeamEl.textContent = "เข้าถึงได้ทุกทีม";
+  coachTeamEl.textContent = isStaffSession() ? "เข้าถึงตามสิทธิ์ที่ได้รับ" : "เข้าถึงได้ทุกทีม";
   coachAgeGroupsWrap.classList.add("hidden");
   renderDrawerItems();
 }
@@ -853,7 +863,7 @@ function renderDrawerItems() {
       navDrawerItems.appendChild(drawerItem(icon("heart-pulse"), "รายงานอาการบาดเจ็บ", openInjuryReportSection));
       navDrawerItems.appendChild(drawerItem(icon("clipboard-list"), "แผนการฝึกซ้อมรายวัน", openTrainingPlanSection));
       navDrawerItems.appendChild(drawerItem(icon("trending-up"), "ผลทดสอบสมรรถภาพ", openFitnessEntrySection));
-      navDrawerItems.appendChild(
+      if (!isStaffSession()) navDrawerItems.appendChild(
         drawerItem(icon("dna"), "การประเมิน MASC", () => {
           // แนบ ageGroups/coachPosition ไปด้วยถ้ากำลังสวมบทบาทเป็นโค้ชคนใดคนหนึ่งอยู่ (myAgeGroups มีค่า) เพื่อให้
           // masc.html กรองรายชื่อนักกีฬาให้ตรงกับที่โค้ชคนนั้นเห็นจริง เหมือนกับทุกเมนูอื่นในโหมดนี้ — ถ้าเป็นการ
@@ -867,22 +877,32 @@ function renderDrawerItems() {
       navDrawerItems.appendChild(drawerDivider());
       navDrawerItems.appendChild(drawerItem(icon("shield"), "กลับแผงควบคุมผู้ดูแลระบบ", exitTeamManagementToAdminPanel));
     } else {
-      navDrawerItems.appendChild(drawerSectionLabel("ผู้ดูแลระบบ"));
-      navDrawerItems.appendChild(drawerItem(icon("users"), "รายชื่อโค้ชในระบบ", openAdminCoachesSection));
-      navDrawerItems.appendChild(drawerItem(icon("search"), "ตรวจสอบข้อมูลนักกีฬาที่ผิดปกติ", openAdminPlayerAuditSection));
-      navDrawerItems.appendChild(drawerItem(icon("trending-up"), "ความคืบหน้าเช็คชื่อรายวัน", openAdminProgressSection));
-      navDrawerItems.appendChild(drawerItem(icon("file-text"), "คำขอลงทะเบียนรออนุมัติ", openAdminApprovalsSection));
-      navDrawerItems.appendChild(drawerItem(icon("football"), "รายงานผลการแข่งขันทั้งหมด", openAdminMatchesSection));
-      navDrawerItems.appendChild(drawerItem(icon("heart-pulse"), "รายงานอาการบาดเจ็บทั้งหมด", openAdminInjuriesSection));
-      navDrawerItems.appendChild(drawerItem(icon("bar-chart"), "เลือกทีมเพื่อดู Dashboard", openAdminDashboardSection));
-      navDrawerItems.appendChild(drawerItem(icon("printer"), "พิมพ์สรุปผลงานโค้ช", openAdminPrintSection));
-      navDrawerItems.appendChild(drawerItem(icon("book"), "สมุดพกนักกีฬา", openAdminReportCardSection));
-      navDrawerItems.appendChild(drawerItem(icon("dna"), "กำหนดรอบการประเมิน MASC", openAdminMascRoundsSection));
-      navDrawerItems.appendChild(drawerItem(icon("calendar"), "นัดประชุมโค้ชรายสัปดาห์", openAdminMeetingsSection));
-      navDrawerItems.appendChild(drawerItem(icon("trending-up"), "รอบทดสอบสมรรถภาพ", openAdminFitnessRoundsSection));
-      navDrawerItems.appendChild(drawerItem(icon("trending-up"), "พัฒนาการนักกีฬา", () => (window.location.href = "./development.html")));
-      navDrawerItems.appendChild(drawerDivider());
-      navDrawerItems.appendChild(drawerItem(icon("home"), "ภาพรวมทุกทีม (Dashboard)", goToDashboard));
+      // เมนูของแผงผู้ดูแลระบบ: แอดมินหลักเห็นครบ ทีมหลังบ้านเห็นเฉพาะที่มีสิทธิ์ (ซ่อนเมนูอย่างเดียว — ตัวบังคับจริงคือกฎ Firestore)
+      navDrawerItems.appendChild(drawerSectionLabel(isStaffSession() ? "ทีมหลังบ้าน" : "ผู้ดูแลระบบ"));
+      const adminItems = [
+        ["coaches", "users", "รายชื่อโค้ชในระบบ", openAdminCoachesSection],
+        ["player-audit", "search", "ตรวจสอบข้อมูลนักกีฬาที่ผิดปกติ", openAdminPlayerAuditSection],
+        ["progress", "trending-up", "ความคืบหน้าเช็คชื่อรายวัน", openAdminProgressSection],
+        ["approvals", "file-text", "คำขอลงทะเบียนรออนุมัติ", openAdminApprovalsSection],
+        ["matches", "football", "รายงานผลการแข่งขันทั้งหมด", openAdminMatchesSection],
+        ["injuries", "heart-pulse", "รายงานอาการบาดเจ็บทั้งหมด", openAdminInjuriesSection],
+        ["dashboard", "bar-chart", "เลือกทีมเพื่อดู Dashboard", openAdminDashboardSection],
+        ["print", "printer", "พิมพ์สรุปผลงานโค้ช", openAdminPrintSection],
+        ["report-card", "book", "สมุดพกนักกีฬา", openAdminReportCardSection],
+        ["masc-rounds", "dna", "กำหนดรอบการประเมิน MASC", openAdminMascRoundsSection],
+        ["meetings", "calendar", "นัดประชุมโค้ชรายสัปดาห์", openAdminMeetingsSection],
+        ["fitness-rounds", "trending-up", "รอบทดสอบสมรรถภาพ", openAdminFitnessRoundsSection],
+        ["development", "trending-up", "พัฒนาการนักกีฬา", () => (window.location.href = "./development.html")]
+      ];
+      for (const [feature, iconName, label, handler] of adminItems) {
+        // "development" (หน้าพัฒนาการนักกีฬา) เป็นของแอดมินหลักเท่านั้น — ไม่อยู่ในตารางสิทธิ์ของทีมหลังบ้าน
+        if (feature === "development" ? isStaffSession() : !adminCan(feature)) continue;
+        navDrawerItems.appendChild(drawerItem(icon(iconName), label, handler));
+      }
+      if (adminCan("dashboard")) {
+        navDrawerItems.appendChild(drawerDivider());
+        navDrawerItems.appendChild(drawerItem(icon("home"), "ภาพรวมทุกทีม (Dashboard)", goToDashboard));
+      }
     }
     return;
   }
@@ -1633,6 +1653,7 @@ for (const btn of backButtons) {
 function roleLabel(role) {
   if (role === "admin") return '<span class="badge badge-info">ผู้ดูแลระบบ</span>';
   if (role === "executive") return '<span class="badge badge-neutral">ผู้บริหารทีม</span>';
+  if (role === "staff") return '<span class="badge badge-warning">ทีมหลังบ้าน</span>';
   return '<span class="badge badge-success">โค้ช</span>';
 }
 
@@ -1641,8 +1662,10 @@ async function loadPendingApprovals() {
     '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>';
   const q = query(collection(db, "coaches"), where("status", "==", "pending"));
   const snapshot = await getDocs(q);
-  const pending = [];
-  snapshot.forEach((docSnap) => pending.push({ id: docSnap.id, ...docSnap.data() }));
+  const allPending = [];
+  snapshot.forEach((docSnap) => allPending.push({ id: docSnap.id, ...docSnap.data() }));
+  // ทีมหลังบ้านที่มีสิทธิ์ coaches อนุมัติได้เฉพาะโค้ช/ผู้บริหารทีม — คำขอของทีมหลังบ้านและแอดมินเห็น/อนุมัติได้เฉพาะแอดมินหลัก
+  const pending = isStaffSession() ? allPending.filter((c) => c.role === "coach" || c.role === "executive") : allPending;
 
   if (pending.length === 0) {
     pendingApprovalsBody.innerHTML =
@@ -1659,20 +1682,44 @@ async function loadPendingApprovals() {
       <td>${roleLabel(c.role)}</td>
     `;
 
+    // คำขอของทีมหลังบ้านไม่ต้องเลือกทีม แต่ต้องติ๊กสิทธิ์รายข้อ (สิทธิ์ที่ติ๊กเป็นตัวกำหนดเมนูและข้อมูลที่เห็นหลังเข้าสู่ระบบ)
+    const isStaffRequest = c.role === "staff";
     const teamTd = document.createElement("td");
     const teamSelect = document.createElement("select");
-    teamSelect.className = "field-input w-48";
-    populateTeamSelect(teamSelect, "-- เลือกทีม --");
-    teamTd.appendChild(teamSelect);
+    const permBoxes = [];
+    if (isStaffRequest) {
+      teamTd.className = "space-y-1";
+      for (const perm of STAFF_PERMISSIONS) {
+        const label = document.createElement("label");
+        label.className = "flex items-start gap-2 text-sm text-slate-700";
+        const box = document.createElement("input");
+        box.type = "checkbox";
+        box.value = perm.key;
+        box.className = "mt-1";
+        permBoxes.push(box);
+        const text = document.createElement("span");
+        text.textContent = perm.label;
+        label.append(box, text);
+        teamTd.appendChild(label);
+      }
+    } else {
+      teamSelect.className = "field-input w-48";
+      populateTeamSelect(teamSelect, "-- เลือกทีม --");
+      teamTd.appendChild(teamSelect);
+    }
     tr.appendChild(teamTd);
 
     const actionTd = document.createElement("td");
     actionTd.className = "space-x-2";
 
     const approveBtn = document.createElement("button");
-    approveBtn.textContent = "กำหนดทีม + อนุมัติ";
+    approveBtn.textContent = isStaffRequest ? "อนุมัติ + บันทึกสิทธิ์" : "กำหนดทีม + อนุมัติ";
     approveBtn.className = "btn btn-success btn-sm";
-    approveBtn.addEventListener("click", () => approveCoach(c.id, teamSelect.value));
+    approveBtn.addEventListener("click", () =>
+      isStaffRequest
+        ? approveStaff(c.id, permBoxes.filter((b) => b.checked).map((b) => b.value))
+        : approveCoach(c.id, teamSelect.value)
+    );
 
     const rejectBtn = document.createElement("button");
     rejectBtn.textContent = "ปฏิเสธ";
@@ -1695,6 +1742,27 @@ async function approveCoach(coachId, team) {
   }
   try {
     await updateDoc(doc(db, "coaches", coachId), { status: "approved", team });
+    adminStatus.innerHTML = `อนุมัติเรียบร้อย ${icon("check")}`;
+    adminStatus.className = "text-sm text-emerald-600 w-full";
+    await loadPendingApprovals();
+    await loadCoachDirectory();
+  } catch (err) {
+    console.error(err);
+    adminStatus.textContent = "อนุมัติไม่สำเร็จ: " + err.message;
+    adminStatus.className = "text-sm text-red-600 w-full";
+  }
+}
+
+// อนุมัติบัญชีทีมหลังบ้าน: ต้องติ๊กสิทธิ์อย่างน้อย 1 ข้อ (manageTeams ให้ view ด้วยเสมอ) ไม่ผูกทีม — เฉพาะแอดมินหลัก (กฎ Firestore)
+async function approveStaff(accountId, perms) {
+  const permissions = normalizePermissions(perms);
+  if (permissions.length === 0) {
+    adminStatus.textContent = "กรุณาติ๊กสิทธิ์อย่างน้อย 1 ข้อก่อนอนุมัติ";
+    adminStatus.className = "text-sm text-red-600 w-full";
+    return;
+  }
+  try {
+    await updateDoc(doc(db, "coaches", accountId), { status: "approved", team: null, permissions });
     adminStatus.innerHTML = `อนุมัติเรียบร้อย ${icon("check")}`;
     adminStatus.className = "text-sm text-emerald-600 w-full";
     await loadPendingApprovals();
@@ -1757,11 +1825,12 @@ function buildCoachRow(c, sessions, attendanceRecords, players) {
   nameBtn.className = "text-blue-600 hover:underline text-left";
   nameBtn.title = "คลิกเพื่อดูข้อมูล/หน้าจอของบัญชีนี้";
   nameBtn.addEventListener("click", () => {
-    if (c.team && c.role === "coach") {
+    // เข้าโหมดดูหน้าจอของบัญชีนั้นต้องมีสิทธิ์ manageTeams (แอดมินหลักมีเสมอ) — ทีมหลังบ้านที่มีแค่สิทธิ์ coaches คลิกชื่อแล้วเปิดหน้าแก้ไขบัญชีแทน
+    if (c.team && c.role === "coach" && adminCan("manage-team")) {
       enterTeamManagementMode(c.team, adminCoachesSection, c);
-    } else if (c.team && c.role === "executive") {
+    } else if (c.team && c.role === "executive" && adminCan("manage-team")) {
       enterExecutiveViewMode(c.team, adminCoachesSection, c);
-    } else {
+    } else if (!(isStaffSession() && (c.role === "admin" || c.role === "staff"))) {
       openEditCoachModal(c);
     }
   });
@@ -1775,10 +1844,10 @@ function buildCoachRow(c, sessions, attendanceRecords, players) {
   tr.appendChild(roleTd);
   tr.insertAdjacentHTML(
     "beforeend",
-    `<td>${c.role === "coach" ? coachPositionLabel(c.coachPosition) : "-"}</td>` +
+    `<td>${c.role === "coach" ? coachPositionLabel(c.coachPosition) : c.role === "staff" ? escapeHtml([].concat(permissionsSummary(c.permissions)).join(" · ")) : "-"}</td>` +
       `<td>${c.role === "coach" ? (c.ageGroups || []).join(", ") || "-" : "-"}</td>` +
       `<td>${statusBadge}</td>` +
-      `<td>${c.role === "admin" ? "-" : percentText}</td>`
+      `<td>${c.role === "admin" || c.role === "staff" ? "-" : percentText}</td>`
   );
 
   const actionTd = document.createElement("td");
@@ -1786,7 +1855,8 @@ function buildCoachRow(c, sessions, attendanceRecords, players) {
   editBtn.textContent = "แก้ไขบัญชี";
   editBtn.className = "btn btn-secondary btn-sm";
   editBtn.addEventListener("click", () => openEditCoachModal(c));
-  actionTd.appendChild(editBtn);
+  // บัญชีแอดมินและทีมหลังบ้านแก้ได้เฉพาะแอดมินหลัก (ทีมหลังบ้านที่จัดการโค้ชได้ ไม่เห็นปุ่มนี้ของบัญชีเหล่านั้น)
+  if (!(isStaffSession() && (c.role === "admin" || c.role === "staff"))) actionTd.appendChild(editBtn);
   tr.appendChild(actionTd);
 
   return tr;
@@ -1825,21 +1895,23 @@ function buildCoachGroupTable(coaches, sessions, attendanceRecords, players) {
 // ดูง่ายกว่าตารางรวมทุกทีมแบบเดิม — บัญชีที่ยังไม่มีทีม (ผู้ดูแลระบบ/รอกำหนดทีม) แยกไว้เป็นกลุ่มท้ายสุด
 async function loadCoachDirectory() {
   coachDirectoryGroups.innerHTML = '<p class="text-slate-400 text-sm">กำลังโหลด...</p>';
+  // ทีมหลังบ้านที่มีแค่สิทธิ์ coaches อ่านข้อมูลนักกีฬา/เช็คชื่อไม่ได้ — โหลดไม่ได้ก็ยังเห็นรายชื่อโค้ช แค่คอลัมน์ % ตรงเวลาเป็น "-"
+  const optional = (promise) => (isStaffSession() ? promise.catch(() => null) : promise);
   const [coachSnap, sessionSnap, attendanceSnap, playerSnap] = await Promise.all([
     getDocs(collection(db, "coaches")),
-    getDocs(collection(db, "sessions")),
-    getDocs(collection(db, "attendance")),
-    getDocs(collection(db, "players"))
+    optional(getDocs(collection(db, "sessions"))),
+    optional(getDocs(collection(db, "attendance"))),
+    optional(getDocs(collection(db, "players")))
   ]);
 
   const coaches = [];
   coachSnap.forEach((d) => coaches.push({ id: d.id, ...d.data() }));
   const sessions = [];
-  sessionSnap.forEach((d) => sessions.push({ id: d.id, ...d.data() }));
+  sessionSnap?.forEach((d) => sessions.push({ id: d.id, ...d.data() }));
   const attendanceRecords = [];
-  attendanceSnap.forEach((d) => attendanceRecords.push(d.data()));
+  attendanceSnap?.forEach((d) => attendanceRecords.push(d.data()));
   const players = [];
-  playerSnap.forEach((d) => players.push({ id: d.id, ...d.data() }));
+  playerSnap?.forEach((d) => players.push({ id: d.id, ...d.data() }));
 
   if (coaches.length === 0) {
     coachDirectoryGroups.innerHTML = '<p class="text-slate-400 text-sm">ยังไม่มีโค้ชในระบบ</p>';
@@ -1849,8 +1921,11 @@ async function loadCoachDirectory() {
   const teamGroups = new Map();
   for (const team of TEAMS) teamGroups.set(team, []);
   const unassignedGroup = [];
+  const staffGroup = [];
   for (const c of coaches) {
-    if (c.team && teamGroups.has(c.team)) {
+    if (c.role === "staff") {
+      staffGroup.push(c);
+    } else if (c.team && teamGroups.has(c.team)) {
       teamGroups.get(c.team).push(c);
     } else {
       unassignedGroup.push(c);
@@ -1890,8 +1965,9 @@ async function loadCoachDirectory() {
 
     const btnGroup = document.createElement("div");
     btnGroup.className = "flex gap-2 flex-wrap";
-    btnGroup.appendChild(sendSummaryBtn);
-    btnGroup.appendChild(viewTeamBtn);
+    // ส่งสรุปถึงผู้บริหารทีมเป็นงานของแอดมินหลัก / เข้าโหมดจัดการทีมต้องมีสิทธิ์ manageTeams
+    if (!isStaffSession()) btnGroup.appendChild(sendSummaryBtn);
+    if (adminCan("manage-team")) btnGroup.appendChild(viewTeamBtn);
 
     const groupWrap = document.createElement("div");
     groupWrap.className = "mb-2 flex items-center justify-between flex-wrap gap-2";
@@ -1900,6 +1976,15 @@ async function loadCoachDirectory() {
 
     coachDirectoryGroups.appendChild(groupWrap);
     coachDirectoryGroups.appendChild(buildCoachGroupTable(teamCoaches, sessions, attendanceRecords, players));
+  }
+
+  if (staffGroup.length > 0) {
+    staffGroup.sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
+    const staffHeading = document.createElement("h3");
+    staffHeading.className = "section-title text-sm mb-2";
+    staffHeading.innerHTML = `${icon("briefcase")} ทีมหลังบ้าน (${staffGroup.length} คน)`;
+    coachDirectoryGroups.appendChild(staffHeading);
+    coachDirectoryGroups.appendChild(buildCoachGroupTable(staffGroup, sessions, attendanceRecords, players));
   }
 
   if (unassignedGroup.length > 0) {
@@ -2588,14 +2673,44 @@ function openAdminPlayerAuditSection() {
 // จะทำให้ข้อมูลไม่ตรงกับอีเมลที่ใช้ล็อกอินจริง
 let editingCoachAccountId = null;
 
+let editingCoachAccount = null;
+
 function updateEditCoachFieldVisibility() {
   const role = editCoachRoleSelect.value;
-  editCoachTeamWrap.classList.toggle("hidden", role === "admin");
+  editCoachTeamWrap.classList.toggle("hidden", role === "admin" || role === "staff");
   editCoachAgeGroupWrap.classList.toggle("hidden", role !== "coach");
+  editCoachPermissionsWrap.classList.toggle("hidden", role !== "staff");
+}
+
+// ช่องติ๊กสิทธิ์ของทีมหลังบ้านในหน้าแก้ไขบัญชี (เฉพาะแอดมินหลักที่เปลี่ยนบทบาทเป็นทีมหลังบ้านหรือแก้สิทธิ์ได้)
+function renderEditCoachPermissions(selected) {
+  const current = new Set(normalizePermissions(selected));
+  editCoachPermissionsEl.innerHTML = "";
+  for (const perm of STAFF_PERMISSIONS) {
+    const label = document.createElement("label");
+    label.className = "flex items-start gap-2 text-sm text-slate-700";
+    const box = document.createElement("input");
+    box.type = "checkbox";
+    box.value = perm.key;
+    box.className = "mt-1 edit-coach-permission-checkbox";
+    box.checked = current.has(perm.key);
+    const text = document.createElement("span");
+    text.innerHTML = `<b class="font-medium">${escapeHtml(perm.label)}</b><br><span class="text-xs text-slate-400">${escapeHtml(perm.hint)}</span>`;
+    label.append(box, text);
+    editCoachPermissionsEl.appendChild(label);
+  }
 }
 
 function openEditCoachModal(c) {
   editingCoachAccountId = c.id;
+  editingCoachAccount = c;
+  // ทีมหลังบ้านที่จัดการโค้ชได้ ปรับบทบาทได้แค่ระหว่างโค้ช/ผู้บริหารทีม (เลื่อนเป็นแอดมินหรือทีมหลังบ้านเป็นของแอดมินหลัก — กฎ Firestore บังคับด้วย)
+  for (const opt of editCoachRoleSelect.options) {
+    const restricted = isStaffSession() && (opt.value === "admin" || opt.value === "staff");
+    opt.hidden = restricted;
+    opt.disabled = restricted;
+  }
+  renderEditCoachPermissions(c.permissions);
   editCoachNameInput.value = c.name || "";
   editCoachEmailInput.value = c.email || "";
   editCoachRoleSelect.value = c.role || "coach";
@@ -2633,6 +2748,7 @@ editCoachSaveBtn.addEventListener("click", async () => {
     editCoachModalStatus.className = "text-sm text-red-600";
     return;
   }
+  if (role === "staff" && !confirm(`ยืนยันตั้งบัญชี "${name}" เป็นทีมหลังบ้านตามสิทธิ์ที่ติ๊ก?`)) return;
   // เลื่อนขั้นเป็นผู้ดูแลระบบเป็นการกระทำที่มีผลกระทบสูง (ให้สิทธิ์เข้าถึงข้อมูลทุกทีมทันที) จึงขอยืนยันซ้ำ
   if (role === "admin") {
     const ok = confirm(`ยืนยันปรับบัญชี "${name}" เป็นผู้ดูแลระบบ? บัญชีนี้จะเข้าถึงข้อมูลของทุกทีมได้ทันที`);
@@ -2645,10 +2761,26 @@ editCoachSaveBtn.addEventListener("click", async () => {
     name,
     role,
     status: editCoachStatusSelect.value,
-    team: role === "admin" ? null : editCoachTeamSelect.value || null,
+    team: role === "admin" || role === "staff" ? null : editCoachTeamSelect.value || null,
     ageGroups: role === "coach" ? ageGroups : null,
     coachPosition: role === "coach" ? editCoachPositionSelect.value : null
   };
+  // สิทธิ์ทีมหลังบ้าน: แอดมินหลักเท่านั้นที่ตั้ง/ล้างได้ (ทีมหลังบ้านที่แก้บัญชีโค้ชต้องไม่ส่งฟิลด์ permissions — กฎ Firestore ห้ามแตะ)
+  if (!isStaffSession()) {
+    if (role === "staff") {
+      const perms = normalizePermissions(
+        Array.from(editCoachPermissionsEl.querySelectorAll(".edit-coach-permission-checkbox")).filter((b) => b.checked).map((b) => b.value)
+      );
+      if (perms.length === 0) {
+        editCoachModalStatus.textContent = "กรุณาติ๊กสิทธิ์อย่างน้อย 1 ข้อให้ทีมหลังบ้าน";
+        editCoachModalStatus.className = "text-sm text-red-600";
+        return;
+      }
+      payload.permissions = perms;
+    } else if (editingCoachAccount && "permissions" in editingCoachAccount) {
+      payload.permissions = null; // เปลี่ยนบทบาทออกจากทีมหลังบ้าน — ล้างสิทธิ์เดิมทิ้ง
+    }
+  }
   try {
     editCoachModalStatus.textContent = "กำลังบันทึก...";
     editCoachModalStatus.className = "text-sm text-slate-500";
@@ -3731,7 +3863,8 @@ onAuthStateChanged(auth, async (user) => {
 
     if (!data || data.status !== "approved") {
       currentIsAdmin = false;
-      renderCoachProfile(user, data, (data && data.team) || "รอผู้ดูแลระบบกำหนดทีม");
+      currentStaffPerms = null;
+      renderCoachProfile(user, data, (data && data.team) || (data && data.role === "staff" ? "รอผู้ดูแลระบบอนุมัติและกำหนดสิทธิ์" : "รอผู้ดูแลระบบกำหนดทีม"));
       coachAgeGroupsWrap.classList.add("hidden");
       hideAllScreens();
       pendingSection.classList.remove("hidden");
@@ -3742,12 +3875,16 @@ onAuthStateChanged(auth, async (user) => {
     hamburgerBtn.classList.remove("hidden");
     notificationBellBtn.classList.remove("hidden");
 
-    currentIsAdmin = data.role === "admin";
+    // ทีมหลังบ้านใช้หน้าจอแผงผู้ดูแลระบบร่วมกัน แต่เมนู/ปุ่มซ่อนตามสิทธิ์ที่ได้รับ (currentStaffPerms; null = แอดมินหลัก)
+    const isStaffRole = data.role === "staff";
+    currentStaffPerms = isStaffRole ? normalizePermissions(data.permissions) : null;
+    currentIsAdmin = data.role === "admin" || isStaffRole;
+    if (isStaffRole) notificationBellBtn.classList.add("hidden"); // การแจ้งเตือนเป็นของแอดมินหลัก
 
     if (currentIsAdmin) {
-      coachRoleBadgeEl.textContent = "ผู้ดูแลระบบ";
-      coachRoleBadgeEl.className = "badge badge-info";
-      renderCoachProfile(user, data, "เข้าถึงได้ทุกทีม");
+      coachRoleBadgeEl.textContent = isStaffRole ? "ทีมหลังบ้าน" : "ผู้ดูแลระบบ";
+      coachRoleBadgeEl.className = isStaffRole ? "badge badge-warning" : "badge badge-info";
+      renderCoachProfile(user, data, isStaffRole ? "เข้าถึงตามสิทธิ์ที่ได้รับ" : "เข้าถึงได้ทุกทีม");
       coachAgeGroupsWrap.classList.add("hidden");
       // เก็บชื่อ/อีเมลของผู้ดูแลระบบเองไว้ใช้คืนค่ากลับตอนออกจากโหมดสวมบทบาท (ดู exitTeamManagementToAdminPanel)
       adminOwnName = coachNameEl.textContent;
@@ -3755,7 +3892,7 @@ onAuthStateChanged(auth, async (user) => {
       myTeam = null;
       adminReturnSection = null;
       renderDrawerItems();
-      refreshNotifications();
+      if (!isStaffRole) refreshNotifications();
 
       // หน้าแรกของผู้ดูแลระบบคือ Dashboard เสมอ — หน้านี้ (attendance.html) จะไม่แสดงแผงควบคุมเองโดย
       // อัตโนมัติอีกต่อไป เข้าถึงเครื่องมือแต่ละอย่างได้ผ่าน deep link #admin=... เท่านั้น (ลิงก์จากเมนู ☰
@@ -3780,16 +3917,27 @@ onAuthStateChanged(auth, async (user) => {
         "fitness-rounds": openAdminFitnessRoundsSection
       };
       const route = parseRouteHash(window.location.hash);
-      if (route.admin === "team" && (await restoreAdminTeamContext(route))) {
+      if (route.admin === "team" && adminCan("team") && (await restoreAdminTeamContext(route))) {
         enableRouteSync();
         return;
       }
       const adminDeepLink = route.admin;
-      if (adminDeepLink && adminDeepLinks[adminDeepLink]) {
+      // ลิงก์ตรงไปหน้าที่ไม่มีสิทธิ์ ถือเหมือนไม่ได้ระบุหน้า (ตกไปหน้าแรกของบัญชีนั้น) — เมนูที่ซ่อนไว้ก็เข้าทาง URL ไม่ได้ด้วย
+      if (adminDeepLink && adminDeepLinks[adminDeepLink] && adminCan(adminDeepLink)) {
         adminDeepLinks[adminDeepLink]();
         enableRouteSync();
-      } else {
+      } else if (!isStaffRole || staffLandingFeature(currentStaffPerms) === "dashboard") {
         window.location.href = `${window.location.origin}/`;
+      } else {
+        // ทีมหลังบ้านที่ไม่มีสิทธิ์ดู Dashboard: เปิดเครื่องมือแรกที่มีสิทธิ์ (ไม่มีสิทธิ์ใดเลย = หน้ารออนุมัติ)
+        const landing = staffLandingFeature(currentStaffPerms);
+        if (landing && adminDeepLinks[landing]) {
+          adminDeepLinks[landing]();
+          enableRouteSync();
+        } else {
+          hideAllScreens();
+          pendingSection.classList.remove("hidden");
+        }
       }
       return;
     }

@@ -10,6 +10,7 @@ import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/
 import { db, auth } from "./firebase-init.js";
 import { icon } from "./icons.js";
 import { injuryStatsHtml, injuryTrendHtml } from "./injury-stats-view.js";
+import { canAccessAdminFeature, normalizePermissions, staffCan } from "./staff-perms.js";
 import { buildInjuryStats } from "./injury-form.js";
 import {
   PERIOD_MODES,
@@ -136,7 +137,8 @@ const navDrawerEmailEl = document.getElementById("nav-drawer-email");
 const navDrawerRoleBadgeEl = document.getElementById("nav-drawer-role-badge");
 const drawerLogoutBtn = document.getElementById("drawer-logout-btn");
 
-let currentViewerRole = null; // "admin" | "coach" | "executive"
+let currentViewerRole = null; // "admin" | "coach" | "executive" | "staff" (ทีมหลังบ้าน)
+let currentStaffPerms = null; // สิทธิ์ของทีมหลังบ้าน (null = ไม่ใช่ทีมหลังบ้าน)
 let currentAdminName = null;
 let currentTrainingPlanRows = [];
 
@@ -1724,6 +1726,27 @@ function renderDrawerItems() {
       navDrawerItems.appendChild(drawerDivider());
       navDrawerItems.appendChild(drawerItem(icon("refresh"), "กลับภาพรวมทุกทีม", "/"));
     }
+  } else if (currentViewerRole === "staff") {
+    // ทีมหลังบ้าน: เห็นเฉพาะเครื่องมือที่ได้รับสิทธิ์ (ซ่อนเมนูอย่างเดียว — ตัวบังคับจริงคือกฎ Firestore ดู staff-perms.js)
+    navDrawerItems.appendChild(drawerSectionLabel("ทีมหลังบ้าน"));
+    const staffItems = [
+      ["coaches", "users", "รายชื่อโค้ชในระบบ", "./attendance.html#admin=coaches"],
+      ["player-audit", "search", "ตรวจสอบข้อมูลนักกีฬาที่ผิดปกติ", "./attendance.html#admin=player-audit"],
+      ["progress", "trending-up", "ความคืบหน้าเช็คชื่อรายวัน", "./attendance.html#admin=progress"],
+      ["approvals", "file-text", "คำขอลงทะเบียนรออนุมัติ", "./attendance.html#admin=approvals"],
+      ["matches", "football", "รายงานผลการแข่งขันทั้งหมด", "./attendance.html#admin=matches"],
+      ["injuries", "heart-pulse", "รายงานอาการบาดเจ็บทั้งหมด", "./attendance.html#admin=injuries"],
+      ["print", "printer", "พิมพ์สรุปผลงานโค้ช", "./attendance.html#admin=print"],
+      ["report-card", "book", "สมุดพกนักกีฬา", "./attendance.html#admin=report-card"]
+    ];
+    for (const [feature, iconName, label, href] of staffItems) {
+      if (canAccessAdminFeature(feature, currentStaffPerms)) navDrawerItems.appendChild(drawerItem(icon(iconName), label, href));
+    }
+    const staffTeamFromUrl = new URLSearchParams(window.location.search).get("team");
+    if (staffTeamFromUrl && TEAMS.includes(staffTeamFromUrl)) {
+      navDrawerItems.appendChild(drawerDivider());
+      navDrawerItems.appendChild(drawerItem(icon("refresh"), "กลับภาพรวมทุกทีม", "/"));
+    }
   } else if (currentViewerRole === "coach") {
     navDrawerItems.appendChild(drawerSectionLabel("เมนู"));
     navDrawerItems.appendChild(drawerItem(icon("calendar"), "กลับหน้า Daily", "./attendance.html"));
@@ -1759,8 +1782,14 @@ onAuthStateChanged(auth, async (user) => {
       return;
     }
 
+    // ทีมหลังบ้านที่ไม่มีสิทธิ์ดู Dashboard → ส่งไปหน้าเครื่องมือที่มีสิทธิ์ (หน้าเช็คชื่อ/แผงจัดการเลือกหน้าแรกให้เอง)
+    if (data.role === "staff" && !staffCan(data.permissions, "view")) {
+      window.location.href = "./attendance.html";
+      return;
+    }
     loginGate.classList.add("hidden");
     currentViewerRole = data.role;
+    currentStaffPerms = data.role === "staff" ? normalizePermissions(data.permissions) : null;
     if (currentViewerRole === "admin") {
       currentAdminName = data.name || user.email;
       refreshNotifications();
@@ -1780,13 +1809,16 @@ onAuthStateChanged(auth, async (user) => {
     renderDrawerItems();
 
     const isAdmin = data.role === "admin";
+    // ทีมหลังบ้าน (ที่ผ่านด่านสิทธิ์ดูด้านบนแล้ว) เห็นภาพรวมทุกทีมเหมือนแอดมิน แต่ปุ่มส่งข้อความ/แจ้งเตือน/ค้นหาเป็นของแอดมินหลักเท่านั้น
+    const seesAllTeams = isAdmin || data.role === "staff";
+    if (data.role === "staff") notificationBellBtn.classList.add("hidden");
     // ปุ่มค้นหาโค้ช/นักกีฬาข้างกระดิ่ง แสดงเฉพาะผู้ดูแลระบบ (โค้ช/ผู้บริหารทีมมีทีมเดียวอยู่แล้ว ไม่จำเป็นต้องค้นข้ามทีม
     // และ Firestore rules ก็จำกัดให้เห็นผู้เล่นแค่ทีมตัวเองด้วย ค้นข้ามทีมจะได้ผลลัพธ์ไม่ครบ)
     adminSearchBtn.classList.toggle("hidden", !isAdmin);
     // ลิงก์ "← กลับเมนูหลัก" แบบเดิมไปหน้าเช็คชื่อตรงๆ ใช้ไม่ได้กับผู้ดูแลระบบอีกต่อไป (จะโดน redirect
     // กลับมาหน้านี้ทันที) จึงซ่อนไว้เฉพาะผู้ดูแลระบบ ให้ใช้เมนู ☰ แทน — โค้ช/ผู้บริหารทีมยังใช้ได้ตามปกติ
-    headerAttendanceLink.classList.toggle("hidden", isAdmin);
-    if (isAdmin) {
+    headerAttendanceLink.classList.toggle("hidden", seesAllTeams);
+    if (seesAllTeams) {
       // หน้าแรกสุดของผู้ดูแลระบบ (ไม่มี ?team= แนบมาเลย หรือแนบมาเป็น __ALL__) คือภาพรวมทุกทีมตรงๆ ทันที ไม่ต้อง
       // เลือกทีมก่อน — อยากดูแยกทีมไหนค่อยกดที่การ์ดทีมนั้นในภาพรวม (ลิงก์ไป ?team=ชื่อทีม) ปุ่ม "← กลับภาพรวม
       // ทุกทีม" จึงโชว์เฉพาะตอนดูทีมใดทีมหนึ่งอยู่เท่านั้น เพราะหน้าภาพรวมทุกทีมไม่มีหน้าก่อนหน้าให้ย้อนกลับแล้ว
