@@ -1,7 +1,8 @@
 // หน้าจอของระบบนัดประชุมโค้ชรายสัปดาห์ (ตรรกะล้วนๆ อยู่ที่ coach-meetings.js)
-//   - ผู้ดูแลระบบ: สร้างตารางประจำเดือน เลือกวันพุธ/พฤหัสบดีรายสัปดาห์ ใส่ลิงก์ Google Meet ย้ายโค้ชข้ามสัปดาห์ บันทึกผลเข้าประชุม
-//     เขียนวาระ+แนบไฟล์ก่อนประชุม (แยกส่วนกลาง/สายโค้ชผู้เล่น/โค้ชประตู/ฟิตเนสโค้ช) และสรุปความรู้ การบ้าน ความคิดแอดมินหลังประชุม
-//   - โค้ช: การ์ด "ประชุมครั้งถัดไป" (วาระ+ไฟล์ของส่วนกลางและสายตัวเอง) + สรุปประชุมล่าสุดที่แอดมินส่งให้ + แจ้งเตือนที่กระดิ่ง
+//   - ผู้ดูแลระบบหลัก: สร้างตารางประจำเดือน เลือกวันพุธ/พฤหัสบดีรายสัปดาห์ ใส่ลิงก์ Google Meet ย้ายโค้ชข้ามสัปดาห์ ยืนยันรายชื่อ/บันทึกผลเข้าประชุม
+//   - ผู้ดูแลระบบ + ทีมสต๊าฟ (สิทธิ์ meetings): เขียนวาระ+แนบไฟล์ก่อนประชุม (แยกส่วนกลาง/สายโค้ชผู้เล่น/โค้ชประตู/ฟิตเนสโค้ช)
+//     กรอกความคิดเห็นหลังประชุม (โค้ชไม่เห็น) และติดตามงานหลังประชุมที่โค้ชแต่ละคนส่ง
+//   - โค้ช: การ์ด "ประชุมครั้งถัดไป" (วาระ+ไฟล์ของส่วนกลางและสายตัวเอง) + งานหลังประชุม (ความรู้ที่ได้ / นำไปใช้ในสนาม) ส่งก่อนกำหนดสิ้นเดือน + แจ้งเตือนที่กระดิ่ง
 import {
   collection,
   getDocs,
@@ -20,7 +21,7 @@ import {
   getDownloadURL,
   deleteObject
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-storage.js";
-import { db, storage } from "./firebase-init.js";
+import { db, storage, auth } from "./firebase-init.js";
 import { icon } from "./icons.js";
 import { escapeHtml, safeHttpUrl, ageGroupSortKey, teamDateRangeQuery, todayBangkok, thisMonthBangkok } from "./ui-utils.js";
 import {
@@ -30,9 +31,13 @@ import {
   DEFAULT_MEETING_WEEKDAYS,
   MEETING_ATTENDANCE_LABELS,
   MEETING_SECTIONS,
-  MEETING_RECAP_FIELDS,
-  ackDocId,
-  coachVisibleRecapFields,
+  COACH_RECAP_FIELDS,
+  recapDeadline,
+  recapDocId,
+  recapStatus,
+  recapStatusView,
+  recapTasksForCoach,
+  validateRecapInput,
   addDaysToDate,
   addMonthsToMonth,
   buildTeamMeetingDocs,
@@ -41,13 +46,11 @@ import {
   describeDaysUntil,
   googleCalendarUrl,
   isValidMeetingLink,
-  latestPublishedRecap,
   meetingDate,
   meetingFilePath,
   meetingWeekdayOf,
   nextMeetingForCoach,
   sectionHasPlan,
-  sectionHasRecap,
   sectionsForTrack,
   summarizeMeetingAttendance,
   thaiMeetingDateLabel,
@@ -75,9 +78,12 @@ let viewMonth = thisMonthBangkok();
 let selectedWeek = 1;
 let coachesByTeam = new Map(); // team -> [{ id, name, ageGroups, coachPosition }] เรียงตามรุ่นอายุ
 let meetings = new Map(); // `${team}|${week}` -> { id, ...data }
-let acksByMeeting = new Map(); // meetingId -> Set(coachId) ที่กด "รับทราบ" สรุปแล้ว
-// ข้อความที่พิมพ์ค้างไว้ในช่องวาระ/สรุป (ยังไม่กดบันทึก) — เก็บไว้เพราะทุกการกระทำโหลดหน้าใหม่ จะได้ไม่หายระหว่างสลับแท็บ/บันทึกอย่างอื่น
-const drafts = new Map(); // `${meetingId}|${section}` -> { plan, know, use, hw, mind }
+let recaps = new Map(); // `${meetingId}_${coachId}` -> งานหลังประชุมที่โค้ชส่งแล้ว
+let comments = new Map(); // meetingId -> { all, player, gk, fit } ความคิดเห็นของแอดมิน/ทีมสต๊าฟ
+// ทีมสต๊าฟ (สิทธิ์ meetings) เห็นหน้าเดียวกับแอดมินแต่แก้ได้เฉพาะวาระ/ไฟล์/ความคิดเห็น — ลิงก์ Meet ผลเข้าประชุม และการแบ่งกลุ่มเป็นของแอดมินหลัก
+let staffMode = false;
+// ข้อความที่พิมพ์ค้างไว้ในช่องวาระ/ความคิดเห็น (ยังไม่กดบันทึก) — เก็บไว้เพราะทุกการกระทำโหลดหน้าใหม่ จะได้ไม่หายระหว่างสลับแท็บ/บันทึกอย่างอื่น
+const drafts = new Map(); // `${meetingId}|${section}` -> { plan, comment }
 const activeSection = new Map(); // meetingId -> section key ที่เปิดอยู่
 
 function setStatus(text, isError = false) {
@@ -92,10 +98,11 @@ async function reload() {
   monthLabelEl.textContent = thaiMonthLabel(viewMonth);
   bodyEl.innerHTML = '<p class="text-sm text-slate-400">กำลังโหลด...</p>';
   try {
-    const [coachSnap, meetingSnap, ackSnap] = await Promise.all([
+    const [coachSnap, meetingSnap, recapSnap, commentSnap] = await Promise.all([
       getDocs(query(collection(db, "coaches"), where("role", "==", "coach"))),
       getDocs(query(collection(db, "coachMeetings"), where("month", "==", viewMonth))),
-      getDocs(query(collection(db, "coachMeetingAcks"), where("month", "==", viewMonth)))
+      getDocs(query(collection(db, "coachMeetingRecaps"), where("month", "==", viewMonth))),
+      getDocs(query(collection(db, "coachMeetingComments"), where("month", "==", viewMonth)))
     ]);
     const teams = new Set(MEETING_TEAM_SLOTS.map((s) => s.team));
     coachesByTeam = new Map(MEETING_TEAM_SLOTS.map((s) => [s.team, []]));
@@ -112,12 +119,10 @@ async function reload() {
       const m = { id: d.id, ...d.data() };
       meetings.set(meetingKey(m.team, m.week), m);
     });
-    acksByMeeting = new Map();
-    ackSnap.forEach((d) => {
-      const a = d.data();
-      if (!acksByMeeting.has(a.meetingId)) acksByMeeting.set(a.meetingId, new Set());
-      acksByMeeting.get(a.meetingId).add(a.coachId);
-    });
+    recaps = new Map();
+    recapSnap.forEach((d) => recaps.set(d.id, d.data()));
+    comments = new Map();
+    commentSnap.forEach((d) => comments.set(d.id, d.data().comments || {}));
     render();
   } catch (err) {
     console.error(err);
@@ -183,21 +188,16 @@ function fileTagsHtml(m, sec, files, removable) {
 function sectionFormHtml(m, sec) {
   const saved = (m.sections || {})[sec] || {};
   const draft = drafts.get(`${m.id}|${sec}`) || {};
-  const val = (field) => escapeHtml(draft[field] ?? saved[field] ?? "");
+  const plan = escapeHtml(draft.plan ?? saved.plan ?? "");
+  const comment = escapeHtml(draft.comment ?? (comments.get(m.id) || {})[sec] ?? "");
   const mine = membersOfSection(m, sec);
   const who = sec === "all" ? "โค้ชทุกคนในกลุ่มเห็น" : `โค้ชสาย${sectionLabel(sec)}ในกลุ่มนี้: ${mine.length ? escapeHtml(mine.join(", ")) : "ไม่มี"}`;
-  const recap = MEETING_RECAP_FIELDS.map(
-    (f) => `<div>
-        <label class="field-label">${f.label}${f.adminOnly ? ` <span class="badge badge-neutral">${icon("lock")} บันทึกส่วนตัว โค้ชไม่เห็น</span>` : ""}</label>
-        <textarea rows="2" class="field-input" data-field="${f.key}" data-doc="${escapeHtml(m.id)}" data-sec="${sec}" placeholder="${f.placeholder}">${val(f.key)}</textarea>
-      </div>`
-  ).join("");
   return `
     <div class="space-y-3" data-section-form>
       <p class="text-xs text-slate-500">${who}</p>
       <div>
         <label class="field-label">ก่อนประชุม: หัวข้อที่จะให้ความรู้</label>
-        <textarea rows="3" class="field-input" data-field="plan" data-doc="${escapeHtml(m.id)}" data-sec="${sec}" placeholder="หัวข้อและประเด็นที่จะพูดในส่วนนี้">${val("plan")}</textarea>
+        <textarea rows="3" class="field-input" data-field="plan" data-doc="${escapeHtml(m.id)}" data-sec="${sec}" placeholder="หัวข้อและประเด็นที่จะพูดในส่วนนี้">${plan}</textarea>
       </div>
       <div class="flex items-center gap-2 flex-wrap">
         ${fileTagsHtml(m, sec, saved.files || [], true)}
@@ -205,16 +205,46 @@ function sectionFormHtml(m, sec) {
         <input type="file" class="hidden" accept="image/*,application/pdf" data-file-input data-doc="${escapeHtml(m.id)}" data-sec="${sec}" />
       </div>
       <p class="text-xs text-slate-400">PDF หรือรูปภาพ ไม่เกิน 10MB ต่อไฟล์ แนบได้สูงสุด 3 ไฟล์ต่อส่วน โค้ชเห็นทันทีที่แนบ</p>
-      <p class="text-xs font-semibold text-slate-600 pt-1">หลังประชุม: สรุปให้โค้ช (ยกเว้นช่อง "ความคิดของแอดมิน" ที่โค้ชไม่เห็น)</p>
-      ${recap}
+      <div>
+        <label class="field-label">ความคิดเห็นหลังประชุม <span class="badge badge-neutral">${icon("lock")} โค้ชไม่เห็น</span></label>
+        <textarea rows="2" class="field-input" data-field="comment" data-doc="${escapeHtml(m.id)}" data-sec="${sec}" placeholder="สิ่งที่สังเกตจากการประชุม แนวทางต่อยอด คำชม">${comment}</textarea>
+      </div>
       <div><button type="button" class="btn btn-primary btn-sm" data-action="save-section" data-doc="${escapeHtml(m.id)}" data-sec="${sec}">บันทึกส่วน${sectionLabel(sec)}</button></div>
     </div>`;
 }
 
+// ป้ายสถานะงานหลังประชุมของโค้ชคนหนึ่ง (ว่างถ้ายังไม่ถึงวันประชุม) — class เขียนเต็มเพื่อให้ Tailwind/เทสต์สแกนเจอ
+const RECAP_TONE_BADGE = {
+  success: "badge badge-success",
+  warning: "badge badge-warning",
+  danger: "badge badge-danger",
+  neutral: "badge badge-neutral"
+};
+
+function recapStatusBadge(status) {
+  if (status.state === "upcoming") return "";
+  const view = recapStatusView(status);
+  return `<span class="${RECAP_TONE_BADGE[view.tone]}">${escapeHtml(view.text)}</span>`;
+}
+
+// คำตอบที่โค้ชส่งแล้ว กางดูได้ในแถวของโค้ชคนนั้น
+function recapAnswerHtml(recap) {
+  const rows = COACH_RECAP_FIELDS.map(
+    (f) => `<div class="mt-2">
+        <p class="text-xs font-semibold text-slate-500">${f.label}</p>
+        <p class="text-sm text-slate-800" ${preLine}>${escapeHtml(recap[f.key] || "-")}</p>
+      </div>`
+  ).join("");
+  return `<details class="w-full"><summary class="text-xs text-blue-700 cursor-pointer">ดูคำตอบ</summary>${rows}</details>`;
+}
 function render() {
   setStatus("");
   if (meetings.size === 0) {
     const total = [...coachesByTeam.values()].reduce((n, l) => n + l.length, 0);
+    if (staffMode) {
+      bodyEl.innerHTML = `<div class="card card-pad text-center"><p class="text-sm text-slate-500">ยังไม่มีตารางประชุมของ${escapeHtml(thaiMonthLabel(viewMonth))} — ผู้ดูแลระบบหลักเป็นผู้สร้างตาราง</p></div>`;
+      return;
+    }
     bodyEl.innerHTML = `
       <div class="card card-pad text-center space-y-3">
         <p class="font-semibold text-slate-900">ยังไม่มีตารางประชุมของ${escapeHtml(thaiMonthLabel(viewMonth))}</p>
@@ -232,14 +262,18 @@ function render() {
     html += `
       <div class="card card-pad flex items-center gap-3 flex-wrap cursor-pointer ${selected ? "ring-2 ring-blue-500" : ""}" data-action="select-week" data-week="${w}">
         <span class="font-semibold text-slate-900 w-24">สัปดาห์ ${w}</span>
-        <span class="inline-flex rounded-lg border border-slate-200 overflow-hidden">
+        ${
+          staffMode
+            ? `<span class="badge badge-neutral">วัน${MEETING_WEEKDAY_LABELS[day]}</span>`
+            : `<span class="inline-flex rounded-lg border border-slate-200 overflow-hidden">
           ${["wed", "thu"]
             .map((d) => {
               const dayCls = d === day ? "bg-blue-50 text-blue-700 font-semibold" : "bg-white text-slate-600";
               return `<button type="button" data-action="weekday" data-week="${w}" data-day="${d}" class="px-3 py-1 text-sm ${dayCls}">${MEETING_WEEKDAY_LABELS[d]}</button>`;
             })
             .join("")}
-        </span>
+        </span>`
+        }
         <span class="text-sm text-slate-700">${escapeHtml(thaiMeetingDateLabel(dateOfWeek(w)))}</span>
         <span class="text-xs text-slate-500 ml-auto">โค้ช ${counts.join(" / ")} คน</span>
       </div>`;
@@ -248,7 +282,7 @@ function render() {
 
   html += `<div class="flex items-center gap-2 flex-wrap mt-4">
       <h3 class="font-semibold text-slate-900">สัปดาห์ ${selectedWeek} · ${escapeHtml(thaiMeetingDateLabel(dateOfWeek(selectedWeek)))}</h3>
-      <button type="button" class="btn btn-secondary btn-sm ml-auto" data-action="regroup">${icon("refresh")} แบ่งกลุ่มใหม่อัตโนมัติ</button>
+      ${staffMode ? "" : `<button type="button" class="btn btn-secondary btn-sm ml-auto" data-action="regroup">${icon("refresh")} แบ่งกลุ่มใหม่อัตโนมัติ</button>`}
     </div>
     <div class="space-y-3">`;
 
@@ -260,7 +294,8 @@ function render() {
     }
     const sum = summarizeMeetingAttendance(m);
     const names = m.coachNames || [];
-    // แถวละโค้ช มีปุ่มเลือกผลชัดเจน 3 ปุ่ม (เข้าร่วม/ลา/ขาด) ปุ่มที่เลือกอยู่เป็นสีเต็ม กดซ้ำเพื่อล้าง
+    const todayStr = todayBangkok();
+    // แถวละโค้ช มีปุ่มเลือกผลชัดเจน 3 ปุ่ม (เข้าร่วม/ลา/ขาด) ปุ่มที่เลือกอยู่เป็นสีเต็ม กดซ้ำเพื่อล้าง (เฉพาะแอดมินหลัก — ทีมสต๊าฟเห็นผลอย่างเดียว)
     const statusStyles = {
       attended: "bg-emerald-600 text-white",
       leave: "bg-amber-500 text-white",
@@ -275,23 +310,47 @@ function render() {
             return `<button type="button" class="px-3 py-1 text-sm ${cls}" data-action="attendance-set" data-doc="${escapeHtml(m.id)}" data-coach="${escapeHtml(id)}" data-status="${status}" aria-pressed="${status === current}">${MEETING_ATTENDANCE_LABELS[status]}</button>`;
           })
           .join("");
+        const attendanceControl = staffMode
+          ? `<span class="badge badge-neutral">${current ? MEETING_ATTENDANCE_LABELS[current] : "ยังไม่บันทึกผลเข้าประชุม"}</span>`
+          : `<span class="inline-flex rounded-lg border border-slate-200 overflow-hidden">${buttons}</span>${current ? "" : '<span class="text-xs text-slate-400">ยังไม่บันทึก</span>'}`;
+        const recap = recaps.get(recapDocId(m.id, id)) || null;
+        const recapBadge = recapStatusBadge(recapStatus(m, id, recap, todayStr));
         return `<div class="flex items-center gap-3 flex-wrap">
           <span class="text-sm font-medium text-slate-800 w-32">${escapeHtml(names[i] ?? id)}</span>
-          <span class="inline-flex rounded-lg border border-slate-200 overflow-hidden">${buttons}</span>
-          ${current ? "" : '<span class="text-xs text-slate-400">ยังไม่บันทึก</span>'}
+          ${attendanceControl}
+          ${recapBadge}
+          ${recap ? recapAnswerHtml(recap) : ""}
         </div>`;
       })
-      .join("");    const moveOptions = (m.coachIds || []).map((id, i) => `<option value="${escapeHtml(id)}">${escapeHtml(names[i] ?? id)}</option>`).join("");
+      .join("");
+    const moveOptions = (m.coachIds || []).map((id, i) => `<option value="${escapeHtml(id)}">${escapeHtml(names[i] ?? id)}</option>`).join("");
     const weekOptions = Array.from({ length: MEETING_WEEKS_PER_MONTH }, (_, i) => i + 1)
       .filter((w) => w !== selectedWeek && meetings.has(meetingKey(slot.team, w)))
       .map((w) => `<option value="${w}">สัปดาห์ ${w}</option>`)
       .join("");
     const sec = activeSection.get(m.id) || "all";
     const tabs = MEETING_SECTIONS.map((s) => {
-      const filled = sectionHasPlan((m.sections || {})[s.key]) || sectionHasRecap((m.sections || {})[s.key], { includeAdminOnly: true });
+      const filled = sectionHasPlan((m.sections || {})[s.key]) || String((comments.get(m.id) || {})[s.key] || "").trim() !== "";
       return `<button type="button" class="badge ${s.key === sec ? "badge-info" : "badge-neutral"} cursor-pointer" data-action="sec-tab" data-doc="${escapeHtml(m.id)}" data-sec="${s.key}">${s.label}${filled ? " ●" : ""}</button>`;
     }).join(" ");
-    const acked = acksByMeeting.get(m.id)?.size || 0;
+    const safeLink = safeHttpUrl(m.meetLink);
+    const linkControl = staffMode
+      ? `<p class="text-sm text-slate-600">${icon("link")} ${safeLink ? `<a href="${safeLink}" target="_blank" rel="noopener noreferrer">${escapeHtml(m.meetLink)}</a>` : "ผู้ดูแลระบบหลักยังไม่ได้ใส่ลิงก์ Google Meet"}</p>`
+      : `<div class="flex items-center gap-2 flex-wrap">
+          <input type="text" class="field-input flex-1" data-link-input placeholder="https://meet.google.com/abc-defg-hij" value="${escapeHtml(m.meetLink || "")}" />
+          <button type="button" class="btn btn-secondary btn-sm" data-action="save-link" data-doc="${escapeHtml(m.id)}">บันทึกลิงก์</button>
+        </div>`;
+    const moveControl =
+      !staffMode && moveOptions && weekOptions
+        ? `<div class="flex items-center gap-2 flex-wrap">
+          <span class="text-xs text-slate-500">ย้ายโค้ช</span>
+          <select class="field-input" style="width:auto" data-move-coach>${moveOptions}</select>
+          <span class="text-xs text-slate-500">ไป</span>
+          <select class="field-input" style="width:auto" data-move-week>${weekOptions}</select>
+          <button type="button" class="btn btn-secondary btn-sm" data-action="move" data-doc="${escapeHtml(m.id)}">ย้าย</button>
+        </div>`
+        : "";
+    const rowsHeading = staffMode ? "ผลเข้าประชุม + งานหลังประชุมของโค้ช" : "ผลเข้าประชุม (เลือกได้ทีละคน กดซ้ำที่ปุ่มเดิมเพื่อล้าง) + งานหลังประชุมของโค้ช";
     html += `
       <div class="card card-pad space-y-3" data-slot-doc="${escapeHtml(m.id)}">
         <div class="flex items-center gap-2 flex-wrap">
@@ -300,39 +359,21 @@ function render() {
           <span class="text-xs text-slate-500 ml-auto">เข้าร่วม ${sum.attended} · ลา ${sum.leave} · ขาด ${sum.absent} · รอบันทึก ${sum.pending}</span>
         </div>
         <div class="space-y-2">
-          <p class="text-xs font-semibold text-slate-600">ผลเข้าประชุม (เลือกได้ทีละคน กดซ้ำที่ปุ่มเดิมเพื่อล้าง)</p>
+          <p class="text-xs font-semibold text-slate-600">${rowsHeading}</p>
           ${rows || '<span class="text-sm text-slate-400">ไม่มีโค้ชในกลุ่มนี้</span>'}
+          <p class="text-xs text-slate-400">โค้ชส่งงานได้ถึง ${escapeHtml(thaiMeetingDateLabel(recapDeadline(m.month)))} (ก่อน 2 วันสุดท้ายของเดือน) ผู้ที่ลา/ขาดไม่ต้องส่ง</p>
         </div>
-        <div class="flex items-center gap-2 flex-wrap">
-          <input type="text" class="field-input flex-1" data-link-input placeholder="https://meet.google.com/abc-defg-hij" value="${escapeHtml(m.meetLink || "")}" />
-          <button type="button" class="btn btn-secondary btn-sm" data-action="save-link" data-doc="${escapeHtml(m.id)}">บันทึกลิงก์</button>
-        </div>
-        ${
-          moveOptions && weekOptions
-            ? `<div class="flex items-center gap-2 flex-wrap">
-          <span class="text-xs text-slate-500">ย้ายโค้ช</span>
-          <select class="field-input" style="width:auto" data-move-coach>${moveOptions}</select>
-          <span class="text-xs text-slate-500">ไป</span>
-          <select class="field-input" style="width:auto" data-move-week>${weekOptions}</select>
-          <button type="button" class="btn btn-secondary btn-sm" data-action="move" data-doc="${escapeHtml(m.id)}">ย้าย</button>
-        </div>`
-            : ""
-        }
+        ${linkControl}
+        ${moveControl}
         <div class="border-t border-slate-100 pt-3 space-y-3">
-          <p class="font-semibold text-slate-900 text-sm">วาระและสรุปการประชุม</p>
+          <p class="font-semibold text-slate-900 text-sm">วาระก่อนประชุม และความคิดเห็นหลังประชุม</p>
           <div class="flex flex-wrap gap-2">${tabs}</div>
           ${sectionFormHtml(m, sec)}
-          <label class="flex items-center gap-2 text-sm text-slate-700">
-            <input type="checkbox" data-action="publish" data-doc="${escapeHtml(m.id)}"${m.recapPublished ? " checked" : ""} />
-            ส่งสรุปให้โค้ชแล้ว (โค้ชจะเห็นความรู้ การนำไปใช้ และการบ้านของส่วนกลางและสายตัวเอง ไม่เห็นความคิดของแอดมิน)
-          </label>
-          ${m.recapPublished ? `<p class="text-xs text-slate-500">โค้ชกดรับทราบแล้ว ${acked}/${(m.coachIds || []).length} คน</p>` : ""}
         </div>
       </div>`;
   }
   html += "</div>";
-
-  const missing = unassignedCoaches();
+  const missing = staffMode ? [] : unassignedCoaches();
   if (missing.length > 0) {
     html += `<div class="card card-warning card-pad space-y-2 mt-4">
       <p class="text-sm font-semibold text-amber-800">${icon("alert-triangle")} โค้ชที่ยังไม่อยู่ในนัดเดือนนี้</p>
@@ -526,27 +567,43 @@ const actions = {
       }
     });
   },
+  // วาระ (ก่อนประชุม) เขียนลงเอกสารนัด / ความคิดเห็น (หลังประชุม) เขียนแยกที่ coachMeetingComments ที่โค้ชอ่านไม่ได้ — บันทึกพร้อมกันในชุดเดียว
   "save-section": (el) => {
     const sec = el.dataset.sec;
     const docId = el.dataset.doc;
-    const updates = { updatedAt: serverTimestamp() };
-    for (const ta of el.closest("[data-section-form]").querySelectorAll("textarea[data-field]")) {
-      updates[`sections.${sec}.${ta.dataset.field}`] = ta.value.trim();
-    }
+    const m = findMeetingById(docId);
+    if (!m) return;
+    const form = el.closest("[data-section-form]");
+    const plan = form.querySelector('textarea[data-field="plan"]').value.trim();
+    const comment = form.querySelector('textarea[data-field="comment"]').value.trim();
     return withStatus("กำลังบันทึก...", async () => {
-      await updateDoc(doc(db, "coachMeetings", docId), updates);
+      const batch = writeBatch(db);
+      batch.update(doc(db, "coachMeetings", docId), { [`sections.${sec}.plan`]: plan, updatedAt: serverTimestamp() });
+      batch.set(
+        doc(db, "coachMeetingComments", docId),
+        {
+          meetingId: docId,
+          team: m.team,
+          month: m.month,
+          comments: { [sec]: comment },
+          updatedAt: serverTimestamp(),
+          updatedBy: auth.currentUser?.uid || ""
+        },
+        { merge: true }
+      );
+      await batch.commit();
       drafts.delete(`${docId}|${sec}`);
     });
-  },
-  publish: (el) =>
-    withStatus(el.checked ? "กำลังส่งสรุปให้โค้ช..." : "กำลังเก็บสรุปคืน...", () =>
-      updateDoc(doc(db, "coachMeetings", el.dataset.doc), { recapPublished: el.checked, updatedAt: serverTimestamp() })
-    )
+  }
 };
+
+// ทีมสต๊าฟแก้ได้เฉพาะวาระ/ไฟล์/ความคิดเห็น (กฎ Firestore บังคับอีกชั้น) — action อื่นของแอดมินหลักถูกปิดไว้ที่นี่ด้วย
+const STAFF_ALLOWED_ACTIONS = new Set(["select-week", "sec-tab", "pick-file", "remove-file", "save-section"]);
 
 bodyEl.addEventListener("click", (e) => {
   const el = e.target.closest("[data-action]");
   if (!el || !bodyEl.contains(el)) return;
+  if (staffMode && !STAFF_ALLOWED_ACTIONS.has(el.dataset.action)) return;
   // ปุ่มวันพุธ/พฤหัสบดีอยู่ในแถวที่คลิกเลือกสัปดาห์ได้ — ทำงานของปุ่มอย่างเดียว ไม่ให้แถวทำซ้ำ
   e.stopPropagation();
   actions[el.dataset.action]?.(el);
@@ -555,7 +612,7 @@ bodyEl.addEventListener("click", (e) => {
 // เก็บข้อความที่กำลังพิมพ์ไว้ทุกครั้ง เพื่อไม่ให้หายเมื่อสลับแท็บสาย/บันทึกอย่างอื่นแล้วหน้าโหลดใหม่
 bodyEl.addEventListener("input", (e) => {
   const ta = e.target.closest("textarea[data-field]");
-  if (!ta) return;
+  if (!ta || !bodyEl.contains(ta)) return;
   const key = `${ta.dataset.doc}|${ta.dataset.sec}`;
   drafts.set(key, { ...(drafts.get(key) || {}), [ta.dataset.field]: ta.value });
 });
@@ -577,33 +634,37 @@ function changeMonth(delta) {
 prevBtn.addEventListener("click", () => changeMonth(-1));
 nextBtn.addEventListener("click", () => changeMonth(1));
 
-export function openAdminMeetings() {
+// opts.staffMode = true เมื่อเปิดโดยทีมหลังบ้าน (สิทธิ์ meetings) — ซ่อนเครื่องมือที่เป็นของแอดมินหลัก
+export function openAdminMeetings(opts = {}) {
+  staffMode = opts.staffMode === true;
   return reload();
 }
 
 // ---------- ฝั่งโค้ช ----------
 let cached = { key: "", at: 0, value: null };
 
-// นัดครั้งถัดไป + สรุปประชุมล่าสุดที่ส่งให้แล้ว (ค้นเฉพาะทีมตัวเองในช่วง ±62 วัน — กฎ Firestore ต้อง where(team) ตรงกับทีม)
+// เก็บงานหลังประชุมที่ส่งแล้วไว้แสดง (แก้ไขได้) ไม่เกินกี่วันหลังวันประชุม — ที่ยังไม่ส่งแสดงจนกว่าจะส่ง
+const RECENT_SUBMITTED_DAYS = 35;
+
+// นัดครั้งถัดไป + งานหลังประชุมของตัวเอง (ค้นเฉพาะทีมตัวเองในช่วง ±62 วัน — กฎ Firestore ต้อง where(team) ตรงกับทีม และงานต้อง where(coachId) ของตัวเอง)
 async function fetchCoachMeetingData(team, coachId, track) {
   const key = `${team}|${coachId}|${track}`;
   const now = Date.now();
   if (cached.key === key && now - cached.at < 30000) return cached.value;
   const today = todayBangkok();
-  const [meetingSnap, ackSnap] = await Promise.all([
+  const [meetingSnap, recapSnap] = await Promise.all([
     getDocs(teamDateRangeQuery("coachMeetings", team, addDaysToDate(today, -62), addDaysToDate(today, 62))),
-    getDocs(query(collection(db, "coachMeetingAcks"), where("team", "==", team), where("coachId", "==", coachId)))
+    getDocs(query(collection(db, "coachMeetingRecaps"), where("team", "==", team), where("coachId", "==", coachId)))
   ]);
   const list = [];
   meetingSnap.forEach((d) => list.push({ id: d.id, ...d.data() }));
-  const ackedIds = new Set();
-  ackSnap.forEach((d) => ackedIds.add(d.data().meetingId));
-  const recap = latestPublishedRecap(list, coachId, today, track);
-  const value = {
-    next: nextMeetingForCoach(list, coachId, today),
-    recap,
-    recapAcked: !!recap && ackedIds.has(recap.id)
-  };
+  const recapsByMeeting = new Map();
+  recapSnap.forEach((d) => recapsByMeeting.set(d.data().meetingId, d.data()));
+  const recentFrom = addDaysToDate(today, -RECENT_SUBMITTED_DAYS);
+  const tasks = recapTasksForCoach(list, coachId, recapsByMeeting, today).filter(
+    (t) => t.status.state === "pending" || t.status.state === "overdue" || t.meeting.date >= recentFrom
+  );
+  const value = { next: nextMeetingForCoach(list, coachId, today), tasks };
   cached = { key, at: now, value };
   return value;
 }
@@ -611,9 +672,7 @@ async function fetchCoachMeetingData(team, coachId, track) {
 function invalidateCoachMeetingCache() {
   cached = { key: "", at: 0, value: null };
 }
-
 const preLine = 'style="white-space:pre-line"';
-
 function nextMeetingCardHtml(m, track) {
   const left = daysUntil(m.date, todayBangkok());
   const soon = left <= 2;
@@ -648,65 +707,91 @@ function nextMeetingCardHtml(m, track) {
     </div>`;
 }
 
-function recapCardHtml(m, track, acked, canAck) {
-  const blocks = sectionsForTrack(track)
-    .map((key) => {
-      const s = (m.sections || {})[key];
-      if (!sectionHasRecap(s)) return "";
-      const rows = coachVisibleRecapFields().filter((f) => String(s[f.key] || "").trim())
-        .map(
-          (f) => `<div class="mt-2">
-          <p class="text-xs font-semibold text-slate-500">${f.label}</p>
-          <p class="text-sm text-slate-800" ${preLine}>${escapeHtml(s[f.key])}</p>
-        </div>`
-        )
-        .join("");
-      return `<div class="mt-3">
-        <p class="text-sm font-semibold ${SECTION_TEXT_CLASS[key]}">${key === "all" ? "ส่วนกลาง (ทุกสาย)" : `สาย${sectionLabel(key)}`}</p>${rows}</div>`;
-    })
-    .join("");
-  const ackPart = acked
-    ? '<span class="badge badge-success mt-3">รับทราบแล้ว</span>'
-    : canAck
-      ? `<div class="mt-3"><button type="button" class="btn btn-secondary btn-sm" data-action="ack" data-meeting="${escapeHtml(m.id)}" data-month="${escapeHtml(m.month)}" data-team="${escapeHtml(m.team)}">รับทราบ</button></div>`
-      : "";
-  return `
-    <div class="card card-pad ${acked ? "" : "ring-2 ring-blue-500"}">
-      <div class="flex items-center justify-between gap-2 flex-wrap">
-        <p class="font-semibold text-slate-900">สรุปการประชุมเมื่อ ${escapeHtml(thaiMeetingDateLabel(m.date))}</p>
-        ${acked ? "" : '<span class="badge badge-info">ใหม่</span>'}
-      </div>
-      ${blocks}
-      ${ackPart}
-    </div>`;
+// การ์ดงานหลังประชุมของโค้ช: ยังไม่ส่ง = ฟอร์มเปิดอยู่ / ส่งแล้ว = พับไว้ กางเพื่อแก้ไขได้ — canSubmit=false เมื่อแอดมินสวมบทบาทดูแทนโค้ช (ส่งแทนไม่ได้)
+function recapTaskCardHtml(task, coachId, canSubmit) {
+  const { meeting: m, recap, status } = task;
+  const view = recapStatusView(status);
+  const badge = `<span class="${RECAP_TONE_BADGE[view.tone]}">${escapeHtml(view.text)}</span>`;
+  const idx = (m.coachIds || []).indexOf(coachId);
+  const coachName = (m.coachNames || [])[idx] ?? "-";
+  const done = !!recap;
+  const fields = COACH_RECAP_FIELDS.map((f, i) => {
+    const value = recap ? recap[f.key] || "" : "";
+    const control = canSubmit
+      ? `<textarea rows="3" class="field-input" data-recap-field="${f.key}" placeholder="${f.placeholder}">${escapeHtml(value)}</textarea>`
+      : `<p class="text-sm text-slate-800" ${preLine}>${escapeHtml(value || "-")}</p>`;
+    return `<div class="mt-3"><label class="field-label">${i + 1}. ${f.label}</label>${control}</div>`;
+  }).join("");
+  const action = canSubmit
+    ? `<p class="text-sm text-red-600 mt-2 hidden" data-recap-error></p>
+       <div class="mt-3"><button type="button" class="btn btn-primary btn-sm" data-action="submit-recap">${done ? "บันทึกการแก้ไข" : "ส่งงาน"}</button></div>`
+    : '<p class="text-xs text-slate-500 mt-3">ผู้ดูแลระบบดูแทนโค้ช — ส่งงานแทนไม่ได้</p>';
+  const deadlineText = `ส่งได้ถึง ${thaiMeetingDateLabel(status.deadline)}`;
+  const attrs = `data-recap-card data-meeting="${escapeHtml(m.id)}" data-month="${escapeHtml(m.month)}" data-team="${escapeHtml(m.team)}" data-name="${escapeHtml(coachName)}" data-exists="${done ? "1" : ""}"`;
+  const body = `${fields}${action}`;
+  if (done) {
+    return `<details class="card card-pad" ${attrs}>
+      <summary class="cursor-pointer flex items-center gap-2 flex-wrap">
+        <span class="font-semibold text-slate-900">งานหลังประชุมเมื่อ ${escapeHtml(thaiMeetingDateLabel(m.date))}</span>${badge}
+      </summary>${body}</details>`;
+  }
+  const overdue = status.state === "overdue";
+  const ringCls = overdue ? "card-warning" : "ring-2 ring-blue-500";
+  return `<div class="card card-pad ${ringCls}" ${attrs}>
+      <div class="flex items-center gap-2 flex-wrap">
+        <p class="font-semibold text-slate-900">งานหลังประชุมเมื่อ ${escapeHtml(thaiMeetingDateLabel(m.date))}</p>${badge}
+        <span class="text-xs text-slate-500 ml-auto">${escapeHtml(deadlineText)} (ก่อน 2 วันสุดท้ายของเดือน)</span>
+      </div>${body}</div>`;
 }
 
 const cardArgs = new WeakMap();
 
 async function onCardClick(e) {
-  const btn = e.target.closest('[data-action="ack"]');
+  const btn = e.target.closest('[data-action="submit-recap"]');
   if (!btn) return;
   const args = cardArgs.get(e.currentTarget);
-  if (!args) return;
+  const card = btn.closest("[data-recap-card]");
+  if (!args || !card) return;
+  const errorEl = card.querySelector("[data-recap-error]");
+  const input = {};
+  for (const ta of card.querySelectorAll("textarea[data-recap-field]")) input[ta.dataset.recapField] = ta.value;
+  const result = validateRecapInput(input);
+  if (result.error) {
+    errorEl.textContent = result.error;
+    errorEl.classList.remove("hidden");
+    return;
+  }
+  errorEl.classList.add("hidden");
   btn.disabled = true;
   try {
-    await setDoc(doc(db, "coachMeetingAcks", ackDocId(btn.dataset.meeting, args.coachId)), {
-      team: btn.dataset.team,
-      meetingId: btn.dataset.meeting,
-      coachId: args.coachId,
-      month: btn.dataset.month,
-      createdAt: serverTimestamp()
-    });
+    const ref = doc(db, "coachMeetingRecaps", recapDocId(card.dataset.meeting, args.coachId));
+    if (card.dataset.exists) {
+      await updateDoc(ref, { ...result.values, updatedAt: serverTimestamp() });
+    } else {
+      await setDoc(ref, {
+        team: card.dataset.team,
+        meetingId: card.dataset.meeting,
+        coachId: args.coachId,
+        coachName: card.dataset.name,
+        month: card.dataset.month,
+        ...result.values,
+        submittedOn: todayBangkok(),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+    }
     invalidateCoachMeetingCache();
     await renderCoachMeetingCard(e.currentTarget, args.team, args.coachId, args.opts);
+    args.opts.onChange?.();
   } catch (err) {
     console.error(err);
     btn.disabled = false;
-    alert("บันทึกการรับทราบไม่สำเร็จ: " + err.message);
+    errorEl.textContent = "ส่งงานไม่สำเร็จ: " + err.message;
+    errorEl.classList.remove("hidden");
   }
 }
 
-// opts = { position: ตำแหน่งโค้ช (กำหนดสาย), canAck: false เมื่อผู้ดูแลระบบสวมบทบาทดูแทนโค้ช (กดรับทราบแทนไม่ได้) }
+// opts = { position: ตำแหน่งโค้ช (กำหนดสาย), canSubmit: false เมื่อผู้ดูแลระบบสวมบทบาทดูแทนโค้ช, onChange: เรียกหลังส่งงานสำเร็จ (ให้กระดิ่งรีเฟรช) }
 export async function renderCoachMeetingCard(el, team, coachId, opts = {}) {
   cardArgs.set(el, { team, coachId, opts });
   if (!el.dataset.bound) {
@@ -718,20 +803,20 @@ export async function renderCoachMeetingCard(el, team, coachId, opts = {}) {
   if (!coachId) return;
   try {
     const track = coachTrackOf(opts.position);
-    const { next, recap, recapAcked } = await fetchCoachMeetingData(team, coachId, track);
-    if (!next && !recap) return;
+    const { next, tasks } = await fetchCoachMeetingData(team, coachId, track);
+    if (!next && tasks.length === 0) return;
     el.className = "space-y-3";
-    el.innerHTML = (next ? nextMeetingCardHtml(next, track) : "") + (recap ? recapCardHtml(recap, track, recapAcked, opts.canAck !== false) : "");
+    el.innerHTML = (next ? nextMeetingCardHtml(next, track) : "") + tasks.map((t) => recapTaskCardHtml(t, coachId, opts.canSubmit !== false)).join("");
   } catch (err) {
     // การ์ดเสริมของหน้า Daily — ไม่แสดง error ให้กวนใจ (เหมือนตัวเตือนงานประจำวัน)
     console.error(err);
   }
 }
 
-// รายการสำหรับกระดิ่งของโค้ช: นัดของตัวเองที่เหลือไม่เกิน 3 วัน + สรุปประชุมที่ยังไม่กดรับทราบ (read: true = ไม่มีปุ่ม "อ่านแล้ว"
-// เพราะโค้ชเขียนสถานะอ่านลง Firestore ไม่ได้ — รายการหายเองเมื่อพ้นวันประชุม/กดรับทราบแล้ว)
+// รายการสำหรับกระดิ่งของโค้ช: นัดของตัวเองที่เหลือไม่เกิน 3 วัน + งานหลังประชุมที่ยังไม่ส่ง (read: true = ไม่มีปุ่ม "อ่านแล้ว"
+// เพราะโค้ชเขียนสถานะอ่านลง Firestore ไม่ได้ — รายการหายเองเมื่อพ้นวันประชุม/ส่งงานแล้ว)
 export async function loadCoachMeetingNotifications(team, coachId, position) {
-  const { next, recap, recapAcked } = await fetchCoachMeetingData(team, coachId, coachTrackOf(position));
+  const { next, tasks } = await fetchCoachMeetingData(team, coachId, coachTrackOf(position));
   const items = [];
   if (next) {
     const left = daysUntil(next.date, todayBangkok());
@@ -747,14 +832,16 @@ export async function loadCoachMeetingNotifications(team, coachId, position) {
       });
     }
   }
-  if (recap && !recapAcked) {
+  for (const t of tasks) {
+    if (t.status.state !== "pending" && t.status.state !== "overdue") continue;
+    const overdue = t.status.state === "overdue";
     items.push({
-      key: "coach_meeting_recap",
+      key: `coach_meeting_recap_${t.meeting.id}`,
       icon: icon("book"),
-      level: "info",
+      level: overdue ? "urgent" : "action",
       read: true,
-      title: "มีสรุปการประชุมใหม่จากแอดมิน",
-      detail: `${escapeHtml(thaiMeetingDateLabel(recap.date))} · ${escapeHtml(recap.team)}`,
+      title: overdue ? "งานหลังประชุมเลยกำหนดส่งแล้ว" : "ส่งงานหลังประชุม (ความรู้ที่ได้ / นำไปใช้ในสนาม)",
+      detail: `ประชุมเมื่อ ${escapeHtml(thaiMeetingDateLabel(t.meeting.date))} · ส่งได้ถึง ${escapeHtml(thaiMeetingDateLabel(t.status.deadline))}`,
       link: "./attendance.html#screen=daily"
     });
   }

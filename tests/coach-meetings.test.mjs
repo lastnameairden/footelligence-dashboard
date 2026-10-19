@@ -6,14 +6,18 @@ import {
   MEETING_MAX_FILES_PER_SECTION,
   MEETING_MAX_FILE_BYTES,
   MEETING_SECTIONS,
-  ackDocId,
+  COACH_RECAP_FIELDS,
+  COACH_RECAP_MAX_CHARS,
   coachTrackOf,
-  coachVisibleRecapFields,
-  latestPublishedRecap,
   meetingFilePath,
+  recapDeadline,
+  recapDocId,
+  recapStatus,
+  recapStatusView,
+  recapTasksForCoach,
   sectionHasPlan,
-  sectionHasRecap,
   sectionsForTrack,
+  validateRecapInput,
   validateMeetingFile,
   addDaysToDate,
   addMonthsToMonth,
@@ -212,34 +216,68 @@ test("meetingFilePath keeps files under the meeting folder with a safe name", ()
   assert.equal(meetingFilePath("2026-10_0_3", "gk", "สรุป ครอส (1).pdf", 1760000000000), "coachMeetings/2026-10_0_3/gk/1760000000000_สรุป_ครอส__1_.pdf");
 });
 
-test("sectionHasPlan / sectionHasRecap ignore blank text", () => {
+test("sectionHasPlan ignores blank text", () => {
   assert.equal(sectionHasPlan(undefined), false);
   assert.equal(sectionHasPlan({ plan: "  " }), false);
   assert.equal(sectionHasPlan({ plan: "หัวข้อ" }), true);
   assert.equal(sectionHasPlan({ plan: "", files: [{ name: "a" }] }), true);
-  assert.equal(sectionHasRecap({ know: "", hw: " " }), false);
-  assert.equal(sectionHasRecap({ hw: "ฝึก 1 สัปดาห์" }), true);
-  // ความคิดของแอดมินเป็นบันทึกส่วนตัว ไม่นับว่ามีสรุปให้โค้ชดู (แต่แอดมินยังเห็นว่าแท็บนั้นมีข้อมูล)
-  assert.equal(sectionHasRecap({ mind: "ดีมาก" }), false);
-  assert.equal(sectionHasRecap({ mind: "ดีมาก" }, { includeAdminOnly: true }), true);
-  assert.deepEqual(coachVisibleRecapFields().map((f) => f.key), ["know", "use", "hw"]);
 });
 
-test("latestPublishedRecap: newest published meeting up to today that has content for the coach's track", () => {
-  const mk = (id, date, extra) => ({ id, date, coachIds: ["me"], recapPublished: true, sections: {}, ...extra });
+test("recapDocId is {meetingId}_{coachId} (the Firestore rule enforces the same shape)", () => {
+  assert.equal(recapDocId("2026-10_0_3", "uid1"), "2026-10_0_3_uid1");
+});
+
+test("recapDeadline: two days before the last day of the month are off-limits, so the last day to submit is last day - 2", () => {
+  assert.equal(recapDeadline("2026-10"), "2026-10-29");
+  assert.equal(recapDeadline("2026-11"), "2026-11-28");
+  assert.equal(recapDeadline("2026-02"), "2026-02-26");
+  assert.equal(recapDeadline("2028-02"), "2028-02-27", "leap year");
+  assert.equal(recapDeadline("2026-12"), "2026-12-29");
+});
+
+test("recapStatus: upcoming, pending, overdue, submitted, late, excused", () => {
+  const m = { id: "m1", month: "2026-10", date: "2026-10-21", coachIds: ["me", "gone"], attendance: { gone: "absent" } };
+  assert.equal(recapStatus(m, "me", null, "2026-10-20").state, "upcoming");
+  const sameDay = recapStatus(m, "me", null, "2026-10-21");
+  assert.deepEqual([sameDay.state, sameDay.daysLeft, sameDay.deadline], ["pending", 8, "2026-10-29"]);
+  assert.equal(recapStatus(m, "me", null, "2026-10-29").daysLeft, 0);
+  const late = recapStatus(m, "me", null, "2026-10-31");
+  assert.deepEqual([late.state, late.daysLeft], ["overdue", -2]);
+  assert.equal(recapStatus(m, "me", { submittedOn: "2026-10-29" }, "2026-10-31").state, "submitted", "the deadline day itself is on time");
+  assert.equal(recapStatus(m, "me", { submittedOn: "2026-10-30" }, "2026-10-31").state, "late");
+  assert.equal(recapStatus(m, "gone", null, "2026-11-05").state, "excused");
+  assert.equal(recapStatus(m, "gone", { submittedOn: "2026-10-22" }, "2026-11-05").state, "submitted", "a submission always counts, even from someone marked absent");
+  assert.equal(recapStatus({ ...m, attendance: { me: "leave" } }, "me", null, "2026-10-25").state, "excused");
+});
+
+test("recapStatusView words and tones", () => {
+  assert.deepEqual(recapStatusView({ state: "submitted" }), { text: "ส่งแล้ว", tone: "success" });
+  assert.equal(recapStatusView({ state: "late" }).tone, "warning");
+  assert.deepEqual(recapStatusView({ state: "pending", daysLeft: 8 }), { text: "ยังไม่ส่ง · เหลือ 8 วัน", tone: "warning" });
+  assert.match(recapStatusView({ state: "pending", daysLeft: 0 }).text, /ถึงวันนี้/);
+  assert.deepEqual(recapStatusView({ state: "overdue", daysLeft: -2 }), { text: "เลยกำหนด 2 วัน", tone: "danger" });
+  assert.equal(recapStatusView({ state: "excused" }).tone, "neutral");
+});
+
+test("validateRecapInput needs both fields, trims them and caps the length", () => {
+  assert.deepEqual(COACH_RECAP_FIELDS.map((f) => f.key), ["know", "use"]);
+  assert.deepEqual(validateRecapInput({ know: "  ก  ", use: "ข" }), { values: { know: "ก", use: "ข" } });
+  assert.match(validateRecapInput({ know: "ก", use: "  " }).error, /นำไปใช้ในสนามอย่างไร/);
+  assert.match(validateRecapInput({ use: "ข" }).error, /ความรู้ที่ได้วันนี้/);
+  assert.match(validateRecapInput({ know: "ก".repeat(COACH_RECAP_MAX_CHARS + 1), use: "ข" }).error, /ยาวเกิน/);
+  assert.equal(COACH_RECAP_MAX_CHARS, 2000);
+});
+
+test("recapTasksForCoach: only meetings that already happened, newest first, without excused ones", () => {
+  const mk = (id, date, extra) => ({ id, month: date.slice(0, 7), date, coachIds: ["me"], attendance: {}, ...extra });
   const list = [
-    mk("old", "2026-09-02", { sections: { all: { know: "เก่า" } } }),
-    mk("new", "2026-09-23", { sections: { gk: { hw: "การบ้านประตู" } } }),
-    mk("draft", "2026-10-01", { recapPublished: false, sections: { all: { know: "ร่าง" } } }),
-    mk("future", "2026-10-21", { sections: { all: { know: "อนาคต" } } }),
-    mk("notme", "2026-09-30", { coachIds: ["other"], sections: { all: { know: "คนอื่น" } } })
+    mk("sep", "2026-09-16"),
+    mk("oct", "2026-10-14"),
+    mk("future", "2026-10-28"),
+    mk("excused", "2026-10-07", { attendance: { me: "leave" } }),
+    mk("notme", "2026-10-08", { coachIds: ["other"] })
   ];
-  assert.equal(latestPublishedRecap(list, "me", "2026-10-05", "gk").id, "new");
-  // สายผู้เล่นไม่เห็นเนื้อหาของสายประตู จึงถอยไปนัดที่มีส่วนกลาง
-  assert.equal(latestPublishedRecap(list, "me", "2026-10-05", "player").id, "old");
-  assert.equal(latestPublishedRecap(list, "me", "2026-08-01", "gk"), null);
-});
-
-test("ackDocId is {meetingId}_{coachId} (the Firestore rule enforces the same shape)", () => {
-  assert.equal(ackDocId("2026-10_0_3", "uid1"), "2026-10_0_3_uid1");
+  const recaps = new Map([["sep", { submittedOn: "2026-09-20" }]]);
+  const tasks = recapTasksForCoach(list, "me", recaps, "2026-10-15");
+  assert.deepEqual(tasks.map((t) => [t.meeting.id, t.status.state]), [["oct", "pending"], ["sep", "submitted"]]);
 });

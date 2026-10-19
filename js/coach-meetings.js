@@ -187,9 +187,11 @@ export function googleCalendarUrl(meeting) {
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
 
-// ---------- วาระ/ไฟล์ก่อนประชุม และสรุปความรู้หลังประชุม แยกตามสายโค้ช ----------
+// ---------- วาระ/ไฟล์ก่อนประชุม (แอดมิน+ทีมสต๊าฟกรอก) แยกตามสายโค้ช ----------
 // สายมี 4 ส่วน: ส่วนกลาง (ทุกคนในกลุ่ม) + 3 สายตามตำแหน่งที่โค้ชลงทะเบียนไว้ ข้อมูลอยู่ใน sections.<สาย> ของเอกสารนัด
-// (หัวข้อ plan + ไฟล์ files ก่อนประชุม / สรุป know, use, hw, mind หลังประชุม) โค้ชเห็นส่วนกลางกับสายของตัวเองเป็นหลัก
+// (หัวข้อ plan + ไฟล์ files) โค้ชเห็นส่วนกลางกับสายของตัวเอง
+// ความคิดเห็นหลังประชุมของแอดมิน/ทีมสต๊าฟเก็บแยกที่ coachMeetingComments/{meetingId} (โค้ชอ่านไม่ได้ตามกฎ Firestore)
+// ส่วน sections.<สาย>.know/use/hw/mind เป็นข้อมูลรุ่นเก่า ไม่เขียน/ไม่แสดงอีกแล้ว
 export const MEETING_SECTIONS = [
   { key: "all", label: "ส่วนกลาง" },
   { key: "player", label: "โค้ชผู้เล่น" },
@@ -197,13 +199,14 @@ export const MEETING_SECTIONS = [
   { key: "fit", label: "ฟิตเนสโค้ช" }
 ];
 
-export const MEETING_RECAP_FIELDS = [
+// งานหลังประชุมที่ "โค้ชแต่ละคน" กรอกเอง (collection coachMeetingRecaps/{meetingId}_{coachId}) ภายในกำหนดส่งของเดือนนั้น
+export const COACH_RECAP_FIELDS = [
   { key: "know", label: "ความรู้ที่ได้วันนี้", placeholder: "สรุปแก่นความรู้ 2-3 ข้อ" },
-  { key: "use", label: "นำไปใช้ในสนามอย่างไร", placeholder: "ตัวอย่างเกม/แบบฝึกที่ลองใช้ได้ทันที" },
-  { key: "hw", label: "การบ้านก่อนครั้งหน้า", placeholder: "1-2 ข้อ ทำได้จริงภายใน 1 เดือน" },
-  // adminOnly = บันทึกส่วนตัวของแอดมิน ไม่แสดงให้โค้ชเห็น (ฝั่งโค้ชกรองออกด้วย coachVisibleRecapFields)
-  { key: "mind", label: "ความคิดของแอดมิน", placeholder: "สิ่งที่สังเกตจากการพูดคุย แนวทางต่อยอด คำชม", adminOnly: true }
+  { key: "use", label: "นำไปใช้ในสนามอย่างไร", placeholder: "ตัวอย่างเกม/แบบฝึกที่ลองใช้ได้ทันที" }
 ];
+export const COACH_RECAP_MAX_CHARS = 2000; // ต้องตรงกับ firestore.rules
+// ต้องส่งก่อน 2 วันสุดท้ายของเดือนที่ประชุม = ส่งได้ถึงวัน (วันสุดท้ายของเดือน − 2) เช่น ตุลาคมส่งได้ถึงวันที่ 29
+export const COACH_RECAP_DEADLINE_DAYS_BEFORE_MONTH_END = 2;
 
 export const MEETING_MAX_FILES_PER_SECTION = 3;
 export const MEETING_MAX_FILE_BYTES = 10 * 1024 * 1024; // ต้องตรงกับ storage.rules
@@ -235,36 +238,74 @@ export function meetingFilePath(meetingId, section, fileName, now) {
   return `coachMeetings/${meetingId}/${section}/${now}_${safe}`;
 }
 
-// ช่องสรุปที่โค้ชเห็นได้ (ไม่รวมบันทึกส่วนตัวของแอดมิน)
-export const coachVisibleRecapFields = () => MEETING_RECAP_FIELDS.filter((f) => !f.adminOnly);
-
-// ค่าเริ่มต้นนับเฉพาะช่องที่โค้ชเห็น (ใช้ตัดสินว่าจะแสดงการ์ดสรุป/ส่งแจ้งเตือนให้โค้ชไหม) — includeAdminOnly ใช้ฝั่งแอดมินเพื่อติดจุดบนแท็บที่มีข้อมูล
-export function sectionHasRecap(section, { includeAdminOnly = false } = {}) {
-  const fields = includeAdminOnly ? MEETING_RECAP_FIELDS : coachVisibleRecapFields();
-  return fields.some((f) => section && String(section[f.key] || "").trim() !== "");
-}
-
 export function sectionHasPlan(section) {
   return !!section && (String(section.plan || "").trim() !== "" || (section.files || []).length > 0);
 }
 
-// สรุปประชุมล่าสุดที่ส่งให้โค้ชแล้ว (วันประชุมไม่เกินวันนี้) และมีเนื้อหาในส่วนที่โค้ชคนนี้เห็นจริง
-export function latestPublishedRecap(meetings, coachId, todayStr, track) {
-  const keys = sectionsForTrack(track);
-  return (
-    meetings
-      .filter(
-        (m) =>
-          m.recapPublished === true &&
-          m.date <= todayStr &&
-          (m.coachIds || []).includes(coachId) &&
-          keys.some((k) => sectionHasRecap((m.sections || {})[k]))
-      )
-      .sort((a, b) => b.date.localeCompare(a.date))[0] || null
-  );
+// ---------- งานหลังประชุมของโค้ช (ความรู้ที่ได้ + นำไปใช้ในสนาม) ----------
+// เอกสารงานของโค้ชใช้ id นี้เสมอ (1 คน 1 นัด) — กฎ Firestore บังคับรูปแบบเดียวกัน
+export function recapDocId(meetingId, coachId) {
+  return `${meetingId}_${coachId}`;
 }
 
-// เอกสาร "รับทราบสรุปประชุม" ใช้ id นี้เสมอ (1 คน 1 นัด) — กฎ Firestore บังคับรูปแบบเดียวกัน
-export function ackDocId(meetingId, coachId) {
-  return `${meetingId}_${coachId}`;
+// วันสุดท้ายที่ส่งงานของนัดในเดือน month ("YYYY-MM") = วันสุดท้ายของเดือน ลบ 2 วัน
+export function recapDeadline(month) {
+  const [y, m] = month.split("-").map(Number);
+  const lastDay = formatUtcDate(new Date(Date.UTC(y, m, 0)));
+  return addDaysToDate(lastDay, -COACH_RECAP_DEADLINE_DAYS_BEFORE_MONTH_END);
+}
+
+// สถานะงานหลังประชุมของโค้ชหนึ่งคนในนัดหนึ่ง — recap = เอกสารที่ส่งแล้ว (ถ้ามี) ใช้ submittedOn (วันที่ไทย yyyy-mm-dd) เทียบกำหนดส่ง
+//   submitted / late = ส่งแล้ว (ตรงเวลา / หลังกำหนด)  excused = แอดมินบันทึกว่าลา/ขาด ไม่ต้องส่ง  upcoming = ยังไม่ถึงวันประชุม
+//   pending = ถึงวันประชุมแล้วและยังอยู่ในกำหนด  overdue = เลยกำหนดแล้วยังไม่ส่ง
+export function recapStatus(meeting, coachId, recap, todayStr) {
+  const deadline = recapDeadline(meeting.month);
+  if (recap && recap.submittedOn) {
+    return { state: recap.submittedOn > deadline ? "late" : "submitted", deadline, daysLeft: null };
+  }
+  const attendance = (meeting.attendance || {})[coachId];
+  if (attendance === "leave" || attendance === "absent") return { state: "excused", deadline, daysLeft: null };
+  if (todayStr < meeting.date) return { state: "upcoming", deadline, daysLeft: null };
+  const daysLeft = daysUntil(deadline, todayStr);
+  return { state: daysLeft < 0 ? "overdue" : "pending", deadline, daysLeft };
+}
+
+// ข้อความ+โทนสีของสถานะ (tone = success / warning / danger / neutral)
+export function recapStatusView(status) {
+  switch (status.state) {
+    case "submitted":
+      return { text: "ส่งแล้ว", tone: "success" };
+    case "late":
+      return { text: "ส่งแล้ว (เลยกำหนด)", tone: "warning" };
+    case "excused":
+      return { text: "ลา/ขาด · ไม่ต้องส่ง", tone: "neutral" };
+    case "upcoming":
+      return { text: "ยังไม่ถึงวันประชุม", tone: "neutral" };
+    case "pending":
+      return { text: status.daysLeft === 0 ? "ยังไม่ส่ง · ส่งได้ถึงวันนี้" : `ยังไม่ส่ง · เหลือ ${status.daysLeft} วัน`, tone: "warning" };
+    default:
+      return { text: `เลยกำหนด ${Math.abs(status.daysLeft)} วัน`, tone: "danger" };
+  }
+}
+
+// ตรวจข้อความที่โค้ชกรอก: ต้องมีทั้งสองช่อง ไม่ยาวเกิน COACH_RECAP_MAX_CHARS — คืน { error } หรือ { values } (ตัดช่องว่างหัวท้ายแล้ว)
+export function validateRecapInput(input) {
+  const values = {};
+  for (const f of COACH_RECAP_FIELDS) {
+    const text = String((input || {})[f.key] ?? "").trim();
+    if (!text) return { error: `กรอก "${f.label}" ก่อนส่ง` };
+    if (text.length > COACH_RECAP_MAX_CHARS) return { error: `"${f.label}" ยาวเกิน ${COACH_RECAP_MAX_CHARS} ตัวอักษร` };
+    values[f.key] = text;
+  }
+  return { values };
+}
+
+// นัดที่โค้ชต้องดูแลงานหลังประชุม: ถึงวันประชุมแล้ว ไม่ใช่ลา/ขาด (หรือส่งไปแล้ว) เรียงจากล่าสุดก่อน — recapsByMeeting = Map(meetingId → เอกสารงาน)
+export function recapTasksForCoach(meetings, coachId, recapsByMeeting, todayStr) {
+  return meetings
+    .filter((m) => (m.coachIds || []).includes(coachId))
+    .map((m) => ({ meeting: m, recap: recapsByMeeting.get(m.id) || null }))
+    .map((t) => ({ ...t, status: recapStatus(t.meeting, coachId, t.recap, todayStr) }))
+    .filter((t) => t.status.state !== "upcoming" && t.status.state !== "excused")
+    .sort((a, b) => b.meeting.date.localeCompare(a.meeting.date));
 }

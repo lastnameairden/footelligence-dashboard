@@ -1,4 +1,4 @@
-﻿import { test } from "node:test";
+import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -56,15 +56,24 @@ test("canAccessAdminFeature: main admin (perms = null) can open everything; staf
 
 test("admin-only tools are never reachable by staff, whatever permissions they hold", () => {
   const all = [...STAFF_PERMISSION_KEYS];
-  for (const feature of ["masc-rounds", "meetings", "fitness-rounds", "development", "unknown-feature"]) {
+  for (const feature of ["masc-rounds", "fitness-rounds", "development", "unknown-feature"]) {
     assert.equal(canAccessAdminFeature(feature, all), false, feature);
   }
+});
+
+test("meetings permission opens only the meetings tool", () => {
+  assert.equal(canAccessAdminFeature("meetings", ["meetings"]), true);
+  assert.equal(canAccessAdminFeature("meetings", ["view", "coaches", "manageTeams"]), false);
+  assert.equal(canAccessAdminFeature("dashboard", ["meetings"]), false);
+  assert.equal(canAccessAdminFeature("coaches", ["meetings"]), false);
+  assert.equal(staffLandingFeature(["meetings"]), "meetings");
 });
 
 test("staffLandingFeature: Dashboard if they can view, else the first tool they may open", () => {
   assert.equal(staffLandingFeature(["view"]), "dashboard");
   assert.equal(staffLandingFeature(["manageTeams"]), "dashboard");
   assert.equal(staffLandingFeature(["coaches"]), "coaches");
+  assert.equal(staffLandingFeature(["meetings", "coaches"]), "coaches");
   assert.equal(staffLandingFeature([]), null);
 });
 
@@ -94,6 +103,16 @@ test("rules: staff can register as pending but registration never carries permis
     const end = block.indexOf("\n    }");
     assert.ok(!/canManageAll|hasPerm/.test(block.slice(0, end)), `${name} must stay admin-only for writes`);
   }
+  // นัดประชุม: สร้าง/ลบเฉพาะแอดมินหลัก ทีมสต๊าฟ (meetings) แก้ได้แค่ sections + updatedAt — ลิงก์ ผลเข้าประชุม และรายชื่อห้ามแตะ
   const meetings = rules.slice(rules.indexOf("match /coachMeetings/"), rules.indexOf("match /coachMeetingAcks/"));
-  assert.match(meetings, /allow create, update, delete: if isAdmin\(\);/);
+  assert.match(meetings, /allow create, delete: if isAdmin\(\);/);
+  assert.match(meetings, /hasPerm\('meetings'\)[\s\S]*affectedKeys\(\)\.hasOnly\(\['sections', 'updatedAt'\]\)/);
+  // ความคิดเห็นหลังประชุมโค้ชอ่านไม่ได้เลย / งานหลังประชุมโค้ชเขียนได้เฉพาะของตัวเอง
+  const comments = rules.slice(rules.indexOf("match /coachMeetingComments/"), rules.indexOf("match /trainingPlans/"));
+  assert.match(comments, /allow read: if isAdmin\(\) \|\| hasPerm\('meetings'\);/);
+  assert.ok(!/canManageTeam|canViewTeam|canViewAll/.test(comments), "coaches must not read comments");
+  const recaps = rules.slice(rules.indexOf("match /coachMeetingRecaps/"), rules.indexOf("match /coachMeetingComments/"));
+  assert.match(recaps, /request\.resource\.data\.coachId == request\.auth\.uid/);
+  assert.match(recaps, /resource\.data\.coachId == request\.auth\.uid[\s\S]*hasOnly\(\['know', 'use', 'updatedAt'\]\)/);
+  assert.match(recaps, /allow delete: if isAdmin\(\);/);
 });

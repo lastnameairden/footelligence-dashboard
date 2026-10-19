@@ -116,11 +116,15 @@ service cloud.firestore {
       allow delete: if canManageAll() || (canManageTeam() && ownsTeam());
     }
 
-    // นัดประชุมโค้ชรายสัปดาห์ (1 เอกสาร = 1 ทีม × 1 สัปดาห์ของเดือน) — ผู้ดูแลระบบเป็นผู้สร้าง/แก้ไข/บันทึกผลเข้าประชุมเท่านั้น
+    // นัดประชุมโค้ชรายสัปดาห์ (1 เอกสาร = 1 ทีม × 1 สัปดาห์ของเดือน) — ผู้ดูแลระบบหลักสร้าง/ลบ/ใส่ลิงก์ Meet/บันทึกผลเข้าประชุม/แบ่งกลุ่ม
+    // ทีมหลังบ้านที่มีสิทธิ์ meetings แก้ได้เฉพาะ sections (วาระ+ไฟล์แนบ) กับ updatedAt เท่านั้น
     // โค้ชและผู้บริหารทีมอ่านได้เฉพาะของทีมตัวเอง (query ต้องมี where('team','==',ทีมตัวเอง) ตามหมายเหตุด้านบน)
     match /coachMeetings/{id} {
-      allow read: if canViewAll() || (canViewTeam() && ownsTeam());
-      allow create, update, delete: if isAdmin();
+      allow read: if canViewAll() || hasPerm('meetings') || (canViewTeam() && ownsTeam());
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin()
+                    || (hasPerm('meetings')
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sections', 'updatedAt']));
     }
 
     // "รับทราบสรุปการประชุม" ของโค้ช (1 คน 1 นัด id = {meetingId}_{uid}) — โค้ชสร้างได้เฉพาะของตัวเอง แก้/ลบไม่ได้ ผู้ดูแลระบบอ่านได้ทั้งหมด
@@ -134,6 +138,36 @@ service cloud.firestore {
                         && id == request.resource.data.meetingId + '_' + request.auth.uid);
       allow update, delete: if isAdmin();
     }
+
+    // งานหลังประชุมของโค้ชแต่ละคน (ความรู้ที่ได้ + นำไปใช้ในสนาม) id = {meetingId}_{uid} — โค้ชสร้าง/แก้ได้เฉพาะของตัวเอง
+    // (แก้ได้แค่ know/use/updatedAt) อ่านได้เฉพาะของตัวเอง (query ต้องมี where('team',...) และ where('coachId','==',uid))
+    // ผู้ดูแลระบบหลักและทีมหลังบ้านที่มีสิทธิ์ meetings อ่านได้ทั้งหมด ลบได้เฉพาะแอดมินหลัก
+    match /coachMeetingRecaps/{id} {
+      allow read: if isAdmin() || hasPerm('meetings')
+                  || (canManageTeam() && resource.data.coachId == request.auth.uid);
+      allow create: if canManageTeam()
+                    && request.resource.data.keys().hasOnly(['team', 'meetingId', 'coachId', 'coachName', 'month', 'know', 'use', 'submittedOn', 'createdAt', 'updatedAt'])
+                    && request.resource.data.coachId == request.auth.uid
+                    && request.resource.data.team == myTeam()
+                    && id == request.resource.data.meetingId + '_' + request.auth.uid
+                    && request.resource.data.know is string && request.resource.data.know.size() > 0 && request.resource.data.know.size() <= 2000
+                    && request.resource.data.use is string && request.resource.data.use.size() > 0 && request.resource.data.use.size() <= 2000;
+      allow update: if canManageTeam()
+                    && resource.data.coachId == request.auth.uid
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['know', 'use', 'updatedAt'])
+                    && request.resource.data.know is string && request.resource.data.know.size() > 0 && request.resource.data.know.size() <= 2000
+                    && request.resource.data.use is string && request.resource.data.use.size() > 0 && request.resource.data.use.size() <= 2000;
+      allow delete: if isAdmin();
+    }
+
+    // ความคิดเห็นหลังประชุมของแอดมิน/ทีมสต๊าฟ (1 นัด 1 เอกสาร id = meetingId, comments.<สาย>) — โค้ชอ่านไม่ได้เลย
+    match /coachMeetingComments/{id} {
+      allow read: if isAdmin() || hasPerm('meetings');
+      allow create, update: if (isAdmin() || hasPerm('meetings'))
+                            && request.resource.data.keys().hasOnly(['meetingId', 'team', 'month', 'comments', 'updatedAt', 'updatedBy']);
+      allow delete: if isAdmin();
+    }
+
     // แผนการฝึกซ้อมรายวัน — โค้ชจัดการได้เฉพาะแผนของทีมตัวเอง ผู้บริหารทีมดูได้อย่างเดียว
     match /trainingPlans/{id} {
       allow read: if canViewAll() || (canViewTeam() && ownsTeam());

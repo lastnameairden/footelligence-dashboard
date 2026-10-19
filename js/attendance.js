@@ -642,7 +642,11 @@ function showDaily() {
   }
   loadDailyData(dailyDateInput.value);
   checkTodayReminders();
-  renderCoachMeetingCard(dailyMeetingCard, myTeam, meetingCoachId(), { position: myCoachPosition, canAck: !currentIsAdmin });
+  renderCoachMeetingCard(dailyMeetingCard, myTeam, meetingCoachId(), {
+    position: myCoachPosition,
+    canSubmit: !currentIsAdmin,
+    onChange: () => refreshNotifications()
+  });
   loadExecutiveNotes(myTeam, dailyExecutiveNotesList);
 }
 
@@ -1251,7 +1255,7 @@ function openAdminFitnessRoundsSection() {
 function openAdminMeetingsSection() {
   hideAllScreens();
   adminMeetingsSection.classList.remove("hidden");
-  openAdminMeetings();
+  openAdminMeetings({ staffMode: isStaffSession() });
 }
 
 function openAdminMascRoundsSection() {

@@ -5,8 +5,9 @@
 //   view         → อ่านข้อมูลทุกทีม (Dashboard, พิมพ์สรุปผลงานโค้ช, สมุดพก) — อ่านอย่างเดียว
 //   coaches      → อนุมัติคำขอลงทะเบียน/จัดการบัญชีโค้ชและผู้บริหารทีม (ไม่รวมบัญชีแอดมิน/ทีมหลังบ้าน)
 //   manageTeams  → แก้ข้อมูลนักกีฬา/เช็คชื่อ/รายงานแทนโค้ช (เข้าโหมดจัดการทีม) — รวมสิทธิ์ view ในตัว
-// ส่วนที่ไม่เปิดให้ทีมหลังบ้านเลย (เฉพาะแอดมินหลัก): บัญชีแอดมิน/ทีมหลังบ้านและสิทธิ์, นัดประชุมโค้ช, รอบทดสอบสมรรถภาพ, รอบ MASC,
-// การแจ้งเตือนของแอดมิน, พัฒนาการนักกีฬา
+//   meetings     → นัดประชุมโค้ช: กรอกวาระ/แนบไฟล์ก่อนประชุม + ความคิดเห็นหลังประชุม และดูงานที่โค้ชส่ง (ไม่แตะลิงก์ Meet/ผลเข้าประชุม/จัดกลุ่ม)
+// ส่วนที่ไม่เปิดให้ทีมหลังบ้านเลย (เฉพาะแอดมินหลัก): บัญชีแอดมิน/ทีมหลังบ้านและสิทธิ์, สร้างตาราง/ลิงก์/ผลเข้าประชุมโค้ช, รอบทดสอบสมรรถภาพ,
+// รอบ MASC, การแจ้งเตือนของแอดมิน, พัฒนาการนักกีฬา
 
 export const STAFF_PERMISSIONS = [
   {
@@ -26,6 +27,12 @@ export const STAFF_PERMISSIONS = [
     label: "แก้ข้อมูลนักกีฬา เช็คชื่อ และรายงานแทนโค้ช",
     hint: "เข้าโหมดจัดการทีมเหมือนแอดมิน (รวมสิทธิ์ดูทุกทีม)",
     short: "แก้ข้อมูลแทนโค้ช"
+  },
+  {
+    key: "meetings",
+    label: "นัดประชุมโค้ช: เตรียมวาระ/แนบไฟล์ และกรอกความคิดเห็นหลังประชุม",
+    hint: "เห็นงานที่โค้ชส่ง — แก้ลิงก์ Meet ผลเข้าประชุม และการแบ่งกลุ่มไม่ได้",
+    short: "วาระ/ความเห็นประชุมโค้ช"
   }
 ];
 export const STAFF_PERMISSION_KEYS = STAFF_PERMISSIONS.map((p) => p.key);
@@ -63,7 +70,7 @@ export const ADMIN_FEATURE_REQUIREMENTS = {
   print: "view",
   "report-card": "view",
   "masc-rounds": "admin",
-  meetings: "admin",
+  meetings: "meetings",
   "fitness-rounds": "admin"
 };
 
@@ -78,5 +85,5 @@ export function canAccessAdminFeature(feature, perms) {
 // หน้าแรกของทีมหลังบ้านหลังเข้าสู่ระบบ: ดูได้ → Dashboard ("dashboard") ไม่งั้นเครื่องมือแรกที่มีสิทธิ์ (ไม่มีเลย = null)
 export function staffLandingFeature(perms) {
   if (staffCan(perms, "view")) return "dashboard";
-  return ["coaches", "approvals"].find((f) => canAccessAdminFeature(f, perms)) || null;
+  return ["coaches", "approvals", "meetings"].find((f) => canAccessAdminFeature(f, perms)) || null;
 }
