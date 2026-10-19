@@ -139,21 +139,22 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
-    // งานหลังประชุมของโค้ชแต่ละคน (ความรู้ที่ได้ + นำไปใช้ในสนาม) id = {meetingId}_{uid} — โค้ชสร้าง/แก้ได้เฉพาะของตัวเอง
+    // งานหลังประชุมของโค้ชแต่ละคน (ความรู้ที่ได้ + นำไปใช้ในสนาม) id = {meetingId}_{coachId} — โค้ชสร้าง/แก้ได้เฉพาะของตัวเอง
     // (แก้ได้แค่ know/use/updatedAt) อ่านได้เฉพาะของตัวเอง (query ต้องมี where('team',...) และ where('coachId','==',uid))
-    // ผู้ดูแลระบบหลักและทีมหลังบ้านที่มีสิทธิ์ meetings อ่านได้ทั้งหมด ลบได้เฉพาะแอดมินหลัก
+    // ผู้ดูแลระบบหลัก (และทีมหลังบ้านสิทธิ์ manageTeams) กรอก/แก้แทนโค้ชได้เหมือนข้อมูลอื่นในโหมดจัดการทีม
+    // ทีมหลังบ้านที่มีสิทธิ์ meetings อ่านได้ทั้งหมด ลบได้เฉพาะแอดมินหลัก
     match /coachMeetingRecaps/{id} {
-      allow read: if isAdmin() || hasPerm('meetings')
+      allow read: if canManageAll() || hasPerm('meetings')
                   || (canManageTeam() && resource.data.coachId == request.auth.uid);
-      allow create: if canManageTeam()
+      allow create: if (canManageAll()
+                        || (canManageTeam()
+                            && request.resource.data.coachId == request.auth.uid
+                            && request.resource.data.team == myTeam()))
                     && request.resource.data.keys().hasOnly(['team', 'meetingId', 'coachId', 'coachName', 'month', 'know', 'use', 'submittedOn', 'createdAt', 'updatedAt'])
-                    && request.resource.data.coachId == request.auth.uid
-                    && request.resource.data.team == myTeam()
-                    && id == request.resource.data.meetingId + '_' + request.auth.uid
+                    && id == request.resource.data.meetingId + '_' + request.resource.data.coachId
                     && request.resource.data.know is string && request.resource.data.know.size() > 0 && request.resource.data.know.size() <= 2000
                     && request.resource.data.use is string && request.resource.data.use.size() > 0 && request.resource.data.use.size() <= 2000;
-      allow update: if canManageTeam()
-                    && resource.data.coachId == request.auth.uid
+      allow update: if (canManageAll() || (canManageTeam() && resource.data.coachId == request.auth.uid))
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['know', 'use', 'updatedAt'])
                     && request.resource.data.know is string && request.resource.data.know.size() > 0 && request.resource.data.know.size() <= 2000
                     && request.resource.data.use is string && request.resource.data.use.size() > 0 && request.resource.data.use.size() <= 2000;

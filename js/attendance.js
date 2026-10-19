@@ -64,7 +64,7 @@ import {
   TEAM_TRAINING_WEEKDAYS,
   isRecordOfCoach
 } from "./ui-utils.js";
-import { openAdminMeetings, renderCoachMeetingCard, loadCoachMeetingNotifications } from "./coach-meetings-ui.js";
+import { openAdminMeetings, renderCoachMeetingCard, renderCoachMeetingTasks, loadCoachMeetingNotifications, loadCoachMeetingOverview } from "./coach-meetings-ui.js";
 import { openAdminFitnessRounds } from "./fitness-rounds-ui.js";
 import { openFitnessEntry } from "./fitness-entry-ui.js";
 import { parseParentHeights } from "./fitness-calc.js";
@@ -158,6 +158,8 @@ const trainingPlanFileStatus = document.getElementById("training-plan-file-statu
 const trainingPlanLateWarning = document.getElementById("training-plan-late-warning");
 const trainingPlanLateCountEl = document.getElementById("training-plan-late-count");
 const dailySection = document.getElementById("daily-section");
+const meetingTasksSection = document.getElementById("meeting-tasks-section");
+const meetingTasksBody = document.getElementById("meeting-tasks-body");
 const dailyDateInput = document.getElementById("daily-date-input");
 const dailyLoadBtn = document.getElementById("daily-load-btn");
 const dailyStatus = document.getElementById("daily-status");
@@ -631,8 +633,41 @@ function hideAllScreens() {
   injuryReportSection.classList.add("hidden");
   trainingPlanSection.classList.add("hidden");
   dailySection.classList.add("hidden");
+  meetingTasksSection.classList.add("hidden");
 }
 
+// ---------- งานหลังประชุม (เมนูของโค้ช) ----------
+// หน้าเฉพาะสำหรับกรอกงานหลังประชุมของโค้ช (ฟอร์มและตรรกะอยู่ที่ coach-meetings-ui.js) — ตัวเลขบนเมนูคือจำนวนนัดที่ยังไม่ได้ส่งงาน
+let meetingTaskCount = 0;
+
+async function refreshMeetingTaskCount() {
+  const coachId = meetingCoachId();
+  if (!myTeam || !coachId || currentIsAdmin) return;
+  try {
+    const { tasks } = await loadCoachMeetingOverview(myTeam, coachId, myCoachPosition);
+    meetingTaskCount = tasks.filter((t) => t.status.state === "pending" || t.status.state === "overdue").length;
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function openMeetingTasksSection() {
+  hideAllScreens();
+  meetingTasksSection.classList.remove("hidden");
+  const coachId = meetingCoachId();
+  if (!myTeam || !coachId) {
+    meetingTasksBody.innerHTML = '<div class="card card-pad text-sm text-slate-500">ยังไม่ทราบโค้ชที่ต้องส่งงาน</div>';
+    return;
+  }
+  await renderCoachMeetingTasks(meetingTasksBody, myTeam, coachId, {
+    position: myCoachPosition,
+    onChange: () => {
+      refreshNotifications();
+      refreshMeetingTaskCount();
+    }
+  });
+  refreshMeetingTaskCount();
+}
 // หน้าแรกหลังล็อกอินสำหรับโค้ช (และผู้ดูแลระบบที่กำลังจัดการทีมใดทีมหนึ่งอยู่) — แทนที่เมนูการ์ดแบบเดิม
 function showDaily() {
   hideAllScreens();
@@ -644,8 +679,10 @@ function showDaily() {
   checkTodayReminders();
   renderCoachMeetingCard(dailyMeetingCard, myTeam, meetingCoachId(), {
     position: myCoachPosition,
-    canSubmit: !currentIsAdmin,
-    onChange: () => refreshNotifications()
+    onChange: () => {
+      refreshNotifications();
+      refreshMeetingTaskCount();
+    }
   });
   loadExecutiveNotes(myTeam, dailyExecutiveNotesList);
 }
@@ -914,6 +951,8 @@ function renderDrawerItems() {
   if (myTeam) {
     navDrawerItems.appendChild(drawerSectionLabel(`ทีม: ${teamLogoImg(myTeam)}${myTeam}`));
     navDrawerItems.appendChild(drawerItem(icon("calendar"), "Daily", showDaily));
+    const taskBadge = meetingTaskCount > 0 ? ` <span class="badge badge-warning">${meetingTaskCount}</span>` : "";
+    navDrawerItems.appendChild(drawerItem(icon("book"), `งานหลังประชุม${taskBadge}`, openMeetingTasksSection));
     navDrawerItems.appendChild(drawerItem(icon("user"), "เพิ่ม/แก้ไขนักกีฬา", openAddPlayerSection));
     navDrawerItems.appendChild(drawerItem(icon("check-circle"), "เช็คชื่อ + ให้คะแนน", openCheckinSection));
     navDrawerItems.appendChild(drawerItem(icon("file-text"), "รายงานการฝึกซ้อม", openReportSection));
@@ -3703,6 +3742,7 @@ function renderCoachProfile(user, data, teamText) {
 // รูปแบบและการแปลงอยู่ที่ screen-route.js ที่นี่ผูกกับ DOM/สถานะของหน้า — ข้อมูลที่กรอกค้างในฟอร์มยังไม่ถูกเก็บ (กลับมาเป็นฟอร์มว่าง)
 const ROUTE_SCREENS = [
   { el: dailySection, key: "daily", kind: "coach" },
+  { el: meetingTasksSection, key: "meeting-tasks", kind: "coach" },
   { el: checkinSection, key: "checkin", kind: "coach" },
   { el: reportSection, key: "report", kind: "coach" },
   { el: matchReportSection, key: "match", kind: "coach" },
@@ -3813,6 +3853,9 @@ function openCoachScreen(screen, date) {
       break;
     case "fitness":
       openFitnessEntrySection();
+      break;
+    case "meeting-tasks":
+      openMeetingTasksSection();
       break;
     default:
       if (d) dailyDateInput.value = d;
@@ -3982,6 +4025,7 @@ onAuthStateChanged(auth, async (user) => {
     openCoachScreen(restored.screen, restored.date);
     enableRouteSync();
     refreshCoachNotifications();
+    refreshMeetingTaskCount();
   } catch (err) {
     console.error(err);
     setAttendanceStatus("โหลดข้อมูลโค้ชไม่สำเร็จ: " + err.message, true);

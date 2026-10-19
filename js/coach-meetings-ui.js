@@ -669,15 +669,18 @@ async function fetchCoachMeetingData(team, coachId, track) {
   return value;
 }
 
+// นัดครั้งถัดไป + งานหลังประชุมของโค้ช (ใช้ร่วมกับหน้า "สิ่งที่ต้องทำ") — { next, tasks }
+export function loadCoachMeetingOverview(team, coachId, position) {
+  return fetchCoachMeetingData(team, coachId, coachTrackOf(position));
+}
+
 function invalidateCoachMeetingCache() {
   cached = { key: "", at: 0, value: null };
 }
 const preLine = 'style="white-space:pre-line"';
-function nextMeetingCardHtml(m, track) {
-  const left = daysUntil(m.date, todayBangkok());
-  const soon = left <= 2;
-  const link = safeHttpUrl(m.meetLink);
-  const blocks = sectionsForTrack(track)
+// วาระ + ไฟล์แนบที่แอดมิน/ทีมสต๊าฟใส่ไว้ของนัดนี้ — เฉพาะส่วนกลางและสายของโค้ชคนนี้ (ว่าง = ไม่มีอะไรให้แสดง) ไม่รวมความคิดเห็นหลังประชุมที่โค้ชไม่เห็น
+function agendaBlocksHtml(m, track) {
+  return sectionsForTrack(track)
     .map((key) => {
       const s = (m.sections || {})[key];
       if (!sectionHasPlan(s)) return "";
@@ -688,6 +691,13 @@ function nextMeetingCardHtml(m, track) {
       </div>`;
     })
     .join("");
+}
+
+function nextMeetingCardHtml(m, track) {
+  const left = daysUntil(m.date, todayBangkok());
+  const soon = left <= 2;
+  const link = safeHttpUrl(m.meetLink);
+  const blocks = agendaBlocksHtml(m, track);
   return `
     <div class="card card-pad ${soon ? "card-warning" : ""}">
       <div class="flex items-center gap-4 flex-wrap">
@@ -708,7 +718,7 @@ function nextMeetingCardHtml(m, track) {
 }
 
 // การ์ดงานหลังประชุมของโค้ช: ยังไม่ส่ง = ฟอร์มเปิดอยู่ / ส่งแล้ว = พับไว้ กางเพื่อแก้ไขได้ — canSubmit=false เมื่อแอดมินสวมบทบาทดูแทนโค้ช (ส่งแทนไม่ได้)
-function recapTaskCardHtml(task, coachId, canSubmit) {
+function recapTaskCardHtml(task, coachId, canSubmit, track) {
   const { meeting: m, recap, status } = task;
   const view = recapStatusView(status);
   const badge = `<span class="${RECAP_TONE_BADGE[view.tone]}">${escapeHtml(view.text)}</span>`;
@@ -728,7 +738,15 @@ function recapTaskCardHtml(task, coachId, canSubmit) {
     : '<p class="text-xs text-slate-500 mt-3">ผู้ดูแลระบบดูแทนโค้ช — ส่งงานแทนไม่ได้</p>';
   const deadlineText = `ส่งได้ถึง ${thaiMeetingDateLabel(status.deadline)}`;
   const attrs = `data-recap-card data-meeting="${escapeHtml(m.id)}" data-month="${escapeHtml(m.month)}" data-team="${escapeHtml(m.team)}" data-name="${escapeHtml(coachName)}" data-exists="${done ? "1" : ""}"`;
-  const body = `${fields}${action}`;
+  const agenda = agendaBlocksHtml(m, track);
+  const agendaPart = agenda
+    ? `<div class="mt-3 rounded-lg bg-slate-50 p-3"><p class="text-sm font-semibold text-slate-900">วาระและเอกสารจากทีมงาน</p>${agenda}</div>`
+    : "";
+  const meetLink = safeHttpUrl(m.meetLink);
+  const linkPart = meetLink
+    ? `<div class="mt-3"><a class="btn btn-secondary btn-sm" href="${meetLink}" target="_blank" rel="noopener noreferrer">${icon("link")} ลิงก์เข้าประชุม Google Meet</a></div>`
+    : "";
+  const body = `${linkPart}${agendaPart}${fields}${action}`;
   if (done) {
     return `<details class="card card-pad" ${attrs}>
       <summary class="cursor-pointer flex items-center gap-2 flex-wrap">
@@ -781,7 +799,7 @@ async function onCardClick(e) {
       });
     }
     invalidateCoachMeetingCache();
-    await renderCoachMeetingCard(e.currentTarget, args.team, args.coachId, args.opts);
+    await args.rerender();
     args.opts.onChange?.();
   } catch (err) {
     console.error(err);
@@ -793,7 +811,7 @@ async function onCardClick(e) {
 
 // opts = { position: ตำแหน่งโค้ช (กำหนดสาย), canSubmit: false เมื่อผู้ดูแลระบบสวมบทบาทดูแทนโค้ช, onChange: เรียกหลังส่งงานสำเร็จ (ให้กระดิ่งรีเฟรช) }
 export async function renderCoachMeetingCard(el, team, coachId, opts = {}) {
-  cardArgs.set(el, { team, coachId, opts });
+  cardArgs.set(el, { team, coachId, opts, rerender: () => renderCoachMeetingCard(el, team, coachId, opts) });
   if (!el.dataset.bound) {
     el.dataset.bound = "1";
     el.addEventListener("click", onCardClick);
@@ -806,10 +824,34 @@ export async function renderCoachMeetingCard(el, team, coachId, opts = {}) {
     const { next, tasks } = await fetchCoachMeetingData(team, coachId, track);
     if (!next && tasks.length === 0) return;
     el.className = "space-y-3";
-    el.innerHTML = (next ? nextMeetingCardHtml(next, track) : "") + tasks.map((t) => recapTaskCardHtml(t, coachId, opts.canSubmit !== false)).join("");
+    el.innerHTML = (next ? nextMeetingCardHtml(next, track) : "") + tasks.map((t) => recapTaskCardHtml(t, coachId, opts.canSubmit !== false, coachTrackOf(opts.position))).join("");
   } catch (err) {
     // การ์ดเสริมของหน้า Daily — ไม่แสดง error ให้กวนใจ (เหมือนตัวเตือนงานประจำวัน)
     console.error(err);
+  }
+}
+
+// หน้า "งานหลังประชุม" (เมนูของโค้ช): แสดงเฉพาะงานหลังประชุม — ยังไม่ส่ง = ฟอร์มเปิดอยู่ / ส่งแล้ว = พับไว้ กางแก้ไขได้ (ย้อนหลังไม่เกิน RECENT_SUBMITTED_DAYS วัน)
+export async function renderCoachMeetingTasks(el, team, coachId, opts = {}) {
+  cardArgs.set(el, { team, coachId, opts, rerender: () => renderCoachMeetingTasks(el, team, coachId, opts) });
+  if (!el.dataset.bound) {
+    el.dataset.bound = "1";
+    el.addEventListener("click", onCardClick);
+  }
+  el.innerHTML = '<p class="text-sm text-slate-400">กำลังโหลด...</p>';
+  try {
+    invalidateCoachMeetingCache();
+    const track = coachTrackOf(opts.position);
+    const { next, tasks } = await fetchCoachMeetingData(team, coachId, track);
+    // นัดครั้งถัดไป (วาระ+ไฟล์ที่ทีมงานแนบไว้) อยู่บนสุด ตามด้วยงานหลังประชุมของแต่ละนัด (แต่ละงานแสดงวาระ+ไฟล์ของนัดนั้นด้วย)
+    el.innerHTML =
+      (next ? nextMeetingCardHtml(next, track) : "") +
+      (tasks.length > 0
+        ? tasks.map((t) => recapTaskCardHtml(t, coachId, opts.canSubmit !== false, track)).join("")
+        : '<div class="card card-pad text-sm text-slate-500">ยังไม่มีงานหลังประชุมที่ต้องส่ง — งานจะขึ้นที่นี่หลังวันประชุมของคุณ</div>');
+  } catch (err) {
+    console.error(err);
+    el.innerHTML = `<div class="card card-pad text-sm text-red-600">โหลดงานหลังประชุมไม่สำเร็จ: ${escapeHtml(err.message)}</div>`;
   }
 }
 

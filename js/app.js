@@ -1750,6 +1750,7 @@ function renderDrawerItems() {
   } else if (currentViewerRole === "coach") {
     navDrawerItems.appendChild(drawerSectionLabel("เมนู"));
     navDrawerItems.appendChild(drawerItem(icon("calendar"), "กลับหน้า Daily", "./attendance.html"));
+    navDrawerItems.appendChild(drawerItem(icon("book"), "งานหลังประชุม", "./attendance.html#screen=meeting-tasks"));
   } else {
     navDrawerItems.appendChild(drawerSectionLabel("เมนู"));
     navDrawerItems.appendChild(drawerItem(icon("clipboard-list"), "กลับหน้าหลัก", "./attendance.html"));
