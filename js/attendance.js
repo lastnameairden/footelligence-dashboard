@@ -4865,7 +4865,8 @@ function playerDetailRows(p) {
     ...positionExtraRows(p),
     ["เพศ", escapeHtml(p.sex ?? "-")],
     ["ส่วนสูงพ่อ / แม่", escapeHtml(parents)],
-    ...contactExtraRows(p)
+    // ผู้ปกครอง/เบอร์ติดต่อเป็นข้อมูลส่วนบุคคล — หน้าทีมของทีมหลังบ้านไม่แสดง (ซ่อนที่หน้าจอ ยังไม่ใช่การจำกัดที่กฎ Firestore)
+    ...(staffSpace() ? [] : contactExtraRows(p))
   ]
     .map(([label, html]) => `<div class="player-detail-row"><dt>${label}</dt><dd>${html}</dd></div>`)
     .join("");
@@ -4884,7 +4885,7 @@ function openPlayerDetail(id) {
     <div class="player-detail-photo">${playerPhotoHtml(p)}</div>
     <div class="flex-1 min-w-[240px]">
       <h2 class="text-xl font-bold">${escapeHtml(playerDisplayName(p))}${p.number != null ? ` <span class="badge badge-neutral">เบอร์ ${escapeHtml(p.number)}</span>` : ""}</h2>
-      ${healthAlertHtml(p)}
+      ${staffSpace() ? "" : healthAlertHtml(p)}
       <dl class="mt-2">${playerDetailRows(p)}</dl>
       <div class="flex gap-2 flex-wrap mt-4">
         <button type="button" class="btn btn-secondary" data-detail-action="edit">${icon("edit")} แก้ไขข้อมูล</button>
