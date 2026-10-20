@@ -78,6 +78,7 @@ import { filterPlans, filterReportsByMonths, groupByMonth, monthOptionsOf, month
 import { COACH_MENU, activeChildFor, childMatchesScreen, menuItem, menuKeyForScreen } from "./coach-menu.js";
 import { initPhysical, showAthleteResults, showInstruction, showTestingForm } from "./physical-ui.js";
 import { initProfile, showProfile } from "./coach-profile-ui.js";
+import { athleteResultsNotification, fitnessRoundNotification, unreadNotesNotification } from "./coach-notifications.js";
 import { initResults, showResults } from "./injury-results-ui.js";
 import { ageGroupsOf, birthYearLabel, birthdayLabel, filterAndSortPlayers, playerDisplayName } from "./player-gallery.js";
 import { STAFF_PERMISSIONS, canAccessAdminFeature, normalizePermissions, permissionsSummary, staffCan, staffLandingFeature } from "./staff-perms.js";
@@ -902,7 +903,21 @@ function meetingCoachId() {
 async function refreshCoachNotifications() {
   if (!myTeam || !meetingCoachId()) return;
   try {
-    currentNotifications = await loadCoachMeetingNotifications(myTeam, meetingCoachId(), myCoachPosition);
+    // นัดประชุม/งานหลังประชุมเป็นรายการหลัก (ผิดพลาด = ไม่แสดงกระดิ่ง) ส่วนสมุดพก/รอบทดสอบ/ข้อความจากผู้ดูแลเป็นรายการเสริม — โหลดไม่ได้ก็ข้ามรายการนั้น
+    const today = todayBangkok();
+    const quiet = (p) => p.catch((err) => (console.error(err), []));
+    const [meetingItems, windows, rounds, notes] = await Promise.all([
+      loadCoachMeetingNotifications(myTeam, meetingCoachId(), myCoachPosition),
+      quiet(getDocs(collection(db, "athleteResultsWindows")).then((s) => s.docs.map((d) => ({ id: d.id, ...d.data() })))),
+      quiet(getDocs(collection(db, "fitnessRounds")).then((s) => s.docs.map((d) => ({ id: d.id, ...d.data() })))),
+      quiet(getDocs(query(collection(db, "executiveNotes"), where("team", "==", myTeam))).then((s) => s.docs.map((d) => ({ id: d.id, ...d.data() }))))
+    ]);
+    currentNotifications = [
+      ...meetingItems,
+      athleteResultsNotification(windows, myTeam, today),
+      fitnessRoundNotification(rounds, today),
+      unreadNotesNotification(notes)
+    ].filter(Boolean);
     renderAdminNotifications(notificationList, currentNotifications);
     notificationBadge.classList.toggle("hidden", currentNotifications.length === 0);
   } catch (err) {
@@ -950,6 +965,17 @@ notificationMarkAllReadBtn.addEventListener("click", async () => {
 // คลิกปุ่ม "✓" ในรายการเพื่อทำเครื่องหมายว่าอ่านแล้วทีละรายการ (event delegation เพราะรายการถูกสร้างใหม่
 // ทุกครั้งที่โหลดข้อมูล) กันไม่ให้คลิกไปโดนลิงก์ที่ห่ออยู่ด้วย (preventDefault + stopPropagation)
 notificationList.addEventListener("click", async (e) => {
+  // รายการของโค้ชที่ลิงก์ไปหน้าจอในเมนู (#screen=...) เปิดในหน้าเดิมเลย ไม่โหลดหน้าใหม่ (และไม่ทำให้แอดมินที่สวมบทบาทโค้ชหลุดบริบท)
+  const link = e.target.closest("a[href]");
+  if (link && !e.target.closest("[data-mark-read-index]") && coachNavVisible()) {
+    const screen = new URLSearchParams(link.getAttribute("href").split("#")[1] || "").get("screen");
+    if (screen && COACH_SCREEN_OPENERS[screen]) {
+      e.preventDefault();
+      notificationPanel.classList.add("hidden");
+      COACH_SCREEN_OPENERS[screen]();
+      return;
+    }
+  }
   const btn = e.target.closest("[data-mark-read-index]");
   if (!btn) return;
   e.preventDefault();
@@ -4138,6 +4164,7 @@ async function handleExecutiveNoteMarkRead(e) {
   try {
     await updateDoc(doc(db, "executiveNotes", btn.dataset.markReadId), { read: true });
     await loadExecutiveNotes(currentExecutiveNotesTeam, currentExecutiveNotesListEl);
+    refreshNotifications(); // กระดิ่งของโค้ชนับข้อความที่ยังไม่อ่าน
   } catch (err) {
     console.error(err);
     alert("อัปเดตไม่สำเร็จ: " + err.message);

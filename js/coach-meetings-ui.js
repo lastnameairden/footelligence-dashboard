@@ -935,7 +935,7 @@ export async function loadCoachMeetingNotifications(team, coachId, position) {
         read: true,
         title: `ประชุมโค้ช${describeDaysUntil(left)}`,
         detail: `${escapeHtml(thaiMeetingDateLabel(next.date))} · ${escapeHtml(next.startTime)}–${escapeHtml(next.endTime)} น. · ${escapeHtml(next.team)}`,
-        link: "./attendance.html#screen=daily"
+        link: "./attendance.html#screen=meeting-next"
       });
     }
   }
@@ -949,7 +949,7 @@ export async function loadCoachMeetingNotifications(team, coachId, position) {
       read: true,
       title: overdue ? "งานหลังประชุมเลยกำหนดส่งแล้ว" : "ส่งงานหลังประชุม (ความรู้ที่ได้ / นำไปใช้ในสนาม)",
       detail: `ประชุมเมื่อ ${escapeHtml(thaiMeetingDateLabel(t.meeting.date))} · ส่งได้ถึง ${escapeHtml(thaiMeetingDateLabel(t.status.deadline))}`,
-      link: "./attendance.html#screen=daily"
+      link: "./attendance.html#screen=meeting-tasks"
     });
   }
   return items;
