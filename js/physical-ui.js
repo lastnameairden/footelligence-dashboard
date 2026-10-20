@@ -172,6 +172,6 @@ export function initPhysical(c) {
   el("physical-instruction-age").addEventListener("change", renderInstruction);
   el("physical-form-age").addEventListener("change", renderTestingForm);
   el("physical-form-round").addEventListener("change", renderTestingForm);
-  el("physical-form-print-btn").addEventListener("click", () => printSheet("size: A4 landscape; margin: 7mm;"));
+  el("physical-form-print-btn").addEventListener("click", () => printSheet("size: A4 portrait; margin: 8mm;"));
   el("athlete-results-open-btn").addEventListener("click", openAthleteResults);
 }

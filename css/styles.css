@@ -664,7 +664,22 @@ table.pro-table td.emphasis { font-weight: 600; color: var(--text-1); }
 .instruction-img { width: 100%; max-height: 14rem; object-fit: contain; border-radius: 0.5rem; background: var(--surface-2); }
 .instruction-img-empty { display: flex; align-items: center; justify-content: center; min-height: 7rem; border: 1px dashed var(--border); color: var(--text-3); font-size: 0.8125rem; }
 @media (min-width: 640px) { .instruction-grid { grid-template-columns: 14rem 1fr; } }
-@media screen { .sheet-testing-table { min-width: 1100px; } }
+/* Physical Test Form: A4 แนวตั้ง — บนจอกว้าง 210 มม. (ลอยกลางกรอบ เลื่อนข้างได้ถ้าจอแคบ) ตอนพิมพ์ใช้ @page size: A4 portrait; margin: 8mm
+   (พื้นที่ 194 × 281 มม.) หนึ่ง .sheet-testing ต่อหนึ่งหน้ากระดาษ และทุกอย่างอยู่ในขอบ (ความสูงแถวมาจาก --row-h ที่คำนวณตามจำนวนนักกีฬา) */
+.sheet-testing { width: 210mm; max-width: none; box-sizing: border-box; padding: 8mm; margin: 0 auto 1rem; font-size: 0.72rem; line-height: 1.35; }
+.sheet-testing .sheet-head { padding-bottom: 1.2mm; }
+.sheet-testing .sheet-logo { width: 9mm; height: 9mm; }
+.sheet-testing .sheet-fields > div { margin: 0.6mm 0; line-height: 1.9; }
+.sheet-testing .sheet-table { table-layout: fixed; width: 100%; font-size: 0.65rem; margin-top: 1.5mm; }
+.sheet-testing .sheet-table th { font-size: 0.6rem; padding: 0.4mm 0.3mm; line-height: 1.15; overflow-wrap: anywhere; }
+.sheet-testing .sheet-table td { height: var(--row-h); padding: 0 0.3mm; line-height: 1; }
+.sheet-testing .sheet-note { margin: 1.5mm 0 0; font-size: 0.62rem; }
+.sheet-page-no { font-weight: 400; color: #666; margin-left: 0.4rem; }
+@media print {
+  body.printing-sheet .sheet-testing { width: 194mm; height: 279mm; padding: 0; margin: 0; overflow: hidden; font-size: 7.6pt; page-break-after: always; break-after: page; }
+  body.printing-sheet .sheet-testing:last-child { page-break-after: auto; break-after: auto; }
+  body.printing-sheet .sheet-testing .sheet-table tr { page-break-inside: avoid; }
+}
 /* Profile ของโค้ช + ซ่อนการ์ดชื่อโค้ชในหน้าเมนูโค้ช */
 .coach-bar-off { display: none !important; }
 .profile-head { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }

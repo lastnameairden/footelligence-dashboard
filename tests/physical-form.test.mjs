@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { FITNESS_TESTS, testsForRound } from "../js/fitness-calc.js";
 import { PHYSICAL_TEST_CONTENT, instructionCardHtml, instructionsHtml, safeImageSrc } from "../js/physical-test-content.js";
-import { TESTING_ROW_MM, defaultBlankRows, defaultRoundId, pickNote, roundOptions, testingFormHtml, testingRowHeightMm } from "../js/physical-form.js";
+import { PAGE_CONTENT_WIDTH_MM, TESTING_ROW_MM, defaultBlankRows, defaultRoundId, pickNote, roundOptions, testWidthMm, testingFormHtml, testingPages, testingRowHeightMm } from "../js/physical-form.js";
 
 const rounds = [
   { id: "r1", roundType: "baseline", openDate: "2026-05-17", closeDate: "2026-05-30", makeupUntil: "2026-06-13", mode: "full" },
@@ -56,8 +56,8 @@ test("defaultRoundId prefers the open round, then the latest, then none; options
 
 test("row height shrinks with more rows but stays within the printable limits", () => {
   assert.equal(testingRowHeightMm(10), TESTING_ROW_MM.max);
-  assert.equal(testingRowHeightMm(40), TESTING_ROW_MM.min);
-  assert.ok(testingRowHeightMm(20) < testingRowHeightMm(15));
+  assert.equal(testingRowHeightMm(80), TESTING_ROW_MM.min);
+  assert.ok(testingRowHeightMm(35) < testingRowHeightMm(30));
   assert.equal(defaultBlankRows(30), 2);
   assert.equal(defaultBlankRows(14), 3);
 });
@@ -67,24 +67,46 @@ const players = [
   { number: 3, nickname: "<b>x</b>" }
 ];
 
-test("testing form: columns follow the round tests, trial sub-columns match the trial counts, text is escaped", () => {
+test("testingPages: every page stays inside the A4 portrait width, tests keep their order and are never split", () => {
   const tests = testsForRound(rounds[0], "U16");
-  const html = testingFormHtml({ team: "THAWEE SC", ageGroup: "U16", roundText: "Baseline พ.ค. 2026", players, tests });
-  assert.match(html, /PHYSICAL TEST FORM/);
-  assert.match(html, /THAWEE SC · U16 · Baseline พ.ค. 2026/);
-  for (const t of tests) assert.ok(html.includes(t.label.replace("×", "×")), t.label);
-  const trialTotal = tests.reduce((n, t) => n + t.trials, 0);
-  const firstBody = html.split("<tbody>")[1].split("</tr>")[0];
-  assert.equal((firstBody.match(/<td/g) || []).length, 2 + trialTotal + 1);
-  const subHeaders = html.split("</tr><tr>")[1].split("</tr>")[0];
-  assert.equal((subHeaders.match(/<th>/g) || []).length, tests.filter((t) => t.trials > 1).reduce((n, t) => n + t.trials, 0));
-  assert.ok(!html.includes("<b>x</b>"));
-  assert.match(html, /พื้นผิว ☐ หญ้าเทียม/);
-  assert.match(html, /รองเท้า ☐ รองเท้าสตั๊ด/);
-  assert.match(html, /--row-h:\d+(\.\d)?mm/);
-  assert.equal((html.match(/sheet-blank/g) || []).length, 3);
+  const pages = testingPages(tests);
+  assert.ok(pages.length >= 2, "11 tests do not fit one portrait page");
+  assert.deepEqual(pages.flat().map((t) => t.code), tests.map((t) => t.code));
+  const fixedMm = 6 + 24 + 24;
+  for (const page of pages) assert.ok(fixedMm + page.reduce((n, t) => n + testWidthMm(t), 0) <= PAGE_CONTENT_WIDTH_MM, page.map((t) => t.code).join());
+  assert.deepEqual(testingPages([]), []);
+  const few = testingPages(tests.slice(0, 3));
+  assert.equal(few.length, 1, "a short test list stays on one page");
 });
 
+test("testing form: one A4 portrait sheet per page of tests, same players on every page, columns follow the trial counts, text is escaped", () => {
+  const tests = testsForRound(rounds[0], "U16");
+  const pages = testingPages(tests);
+  const html = testingFormHtml({ team: "THAWEE SC", ageGroup: "U16", roundText: "Baseline พ.ค. 2026", players, tests });
+  const sheets = html.split('<div class="sheet sheet-testing print-sheet"').slice(1);
+  assert.equal(sheets.length, pages.length);
+  assert.match(html, /PHYSICAL TEST FORM/);
+  assert.match(html, /THAWEE SC · U16 · Baseline พ.ค. 2026/);
+  assert.match(sheets[0], /หน้า 1\/2/);
+  assert.match(sheets[1], /หน้า 2\/2/);
+  sheets.forEach((sheet, i) => {
+    for (const t of pages[i]) assert.ok(sheet.includes(t.label), `${t.label} on page ${i + 1}`);
+    for (const t of pages.flat().filter((x) => !pages[i].includes(x))) assert.ok(!sheet.includes(`<th rowspan="2">${t.label}`) && !sheet.includes(`>${t.label}<br>`), `${t.label} only on its own page`);
+    const trialTotal = pages[i].reduce((n, t) => n + t.trials, 0);
+    const firstBody = sheet.split("<tbody>")[1].split("</tr>")[0];
+    assert.equal((firstBody.match(/<td/g) || []).length, 2 + trialTotal + 1, `row cells on page ${i + 1}`);
+    const subHeaders = sheet.split("</tr><tr>")[1].split("</tr>")[0];
+    assert.equal((subHeaders.match(/<th>/g) || []).length, pages[i].filter((t) => t.trials > 1).reduce((n, t) => n + t.trials, 0));
+    assert.ok(sheet.includes("เจเจ"), "players repeat on every page");
+    assert.equal((sheet.match(/sheet-blank/g) || []).length, 3);
+    assert.match(sheet, /พื้นผิว ☐ หญ้าเทียม/);
+    assert.match(sheet, /รองเท้า ☐ รองเท้าสตั๊ด/);
+    assert.match(sheet, /--row-h:\d+(\.\d)?mm/);
+  });
+  assert.ok(!html.includes("<b>x</b>"));
+  const single = testingFormHtml({ team: "THAWEE SC", ageGroup: "U16", players, tests: tests.slice(0, 3) });
+  assert.ok(!single.includes("หน้า 1/"), "no page label when there is only one page");
+});
 test("pickNote lists max/min tests and RSA only when present", () => {
   const u16 = testsForRound(rounds[0], "U16");
   assert.match(pickNote(u16), /Broad Jump สูงสุด/);

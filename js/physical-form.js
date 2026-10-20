@@ -1,5 +1,6 @@
-// Physical Test → Testing Form: แบบฟอร์มพิมพ์ A4 แนวนอนหน้าเดียวไว้จดผลระหว่างทดสอบสมรรถภาพ (ตรรกะล้วนๆ + สร้าง HTML เป็นสตริง ไม่พึ่ง DOM/Firebase)
+// Physical Test → Testing Form: แบบฟอร์มพิมพ์ A4 แนวตั้งไว้จดผลระหว่างทดสอบสมรรถภาพ (ตรรกะล้วนๆ + สร้าง HTML เป็นสตริง ไม่พึ่ง DOM/Firebase)
 // คอลัมน์ตามรายการทดสอบของรอบ+รุ่นอายุที่เลือก (testsForRound) จำนวนครั้งต่อรายการตาม FITNESS_TESTS แล้วกลับมากรอกที่ Data Entry
+// รายการทดสอบมากเกินความกว้างกระดาษแนวตั้งจะแบ่งเป็นหลายหน้า (แต่ละหน้ามีรายชื่อนักกีฬาชุดเดิม) ทุกหน้าอยู่ในขอบกระดาษ — ดู @media print ของ .sheet-testing ใน styles.css
 import { FOOTWEAR_OPTIONS, SURFACE_OPTIONS, currentEntryRound, roundLabel, roundState } from "./fitness-calc.js";
 import { escapeHtml, teamLogoImg } from "./ui-utils.js";
 
@@ -23,19 +24,49 @@ export function roundOptions(rounds, todayStr) {
   return list;
 }
 
-// ความสูงต่อแถวให้ทั้งตาราง (นักกีฬา + แถวว่าง) พอดีหน้าเดียว — งบความสูงที่เหลือหลังหัวฟอร์ม หัวตาราง 2 แถว และบรรทัดท้าย (มม.)
-export const TESTING_TABLE_BUDGET_MM = 132;
-export const TESTING_ROW_MM = { min: 3.9, max: 7.5 };
+// ---------- เลย์เอาต์กระดาษ A4 แนวตั้ง (พื้นที่พิมพ์ 194 × 281 มม. หลังหักขอบ 8 มม.) ----------
+export const PAGE_CONTENT_WIDTH_MM = 194;
+const NUMBER_COL_MM = 6;
+const NAME_COL_MM = 24;
+const REMARK_COL_MM = 24;
+const TRIAL_CELL_MM = 7.5; // ช่องจดเวลา/ระยะ 1 ครั้ง (เขียนทศนิยม 2 ตำแหน่งได้)
+const SINGLE_CELL_MM = 13; // รายการวัดครั้งเดียว (ส่วนสูง น้ำหนัก ความอดทน)
+
+export const testWidthMm = (t) => (t.trials > 1 ? t.trials * TRIAL_CELL_MM : SINGLE_CELL_MM);
+
+// แบ่งรายการทดสอบเป็นหน้าๆ ตามความกว้างที่เหลือ (เรียงตามลำดับเดิม ไม่ตัดรายการข้ามหน้า) — ไม่มีรายการ = []
+export function testingPages(tests) {
+  const available = PAGE_CONTENT_WIDTH_MM - NUMBER_COL_MM - NAME_COL_MM - REMARK_COL_MM;
+  const pages = [];
+  let current = [];
+  let used = 0;
+  for (const t of tests) {
+    const w = testWidthMm(t);
+    if (current.length > 0 && used + w > available) {
+      pages.push(current);
+      current = [];
+      used = 0;
+    }
+    current.push(t);
+    used += w;
+  }
+  if (current.length > 0) pages.push(current);
+  return pages;
+}
+
+// ความสูงต่อแถวให้ทั้งตาราง (นักกีฬา + แถวว่าง) พอดีหน้าเดียวต่อชุดรายการ — งบความสูงที่เหลือหลังหัวฟอร์ม หัวตาราง 2 แถว และบรรทัดท้าย (มม.)
+export const TESTING_TABLE_BUDGET_MM = 200;
+export const TESTING_ROW_MM = { min: 4.6, max: 8.5 };
 export function testingRowHeightMm(rowCount) {
   const h = TESTING_TABLE_BUDGET_MM / Math.max(rowCount, 1);
   return Math.round(Math.min(TESTING_ROW_MM.max, Math.max(TESTING_ROW_MM.min, h)) * 10) / 10;
 }
 
-export const defaultBlankRows = (playerCount) => (playerCount >= 26 ? 2 : 3);
+export const defaultBlankRows = (playerCount) => (playerCount >= 28 ? 2 : 3);
 
 const PICK_TEXT = { max: "สูงสุด", min: "ต่ำสุด" };
 
-// บรรทัดท้ายฟอร์ม: ค่าที่ระบบใช้ของแต่ละรายการหลายครั้ง
+// บรรทัดท้ายฟอร์ม: ค่าที่ระบบใช้ของแต่ละรายการที่วัดหลายครั้ง
 export function pickNote(tests) {
   const parts = tests.filter((t) => PICK_TEXT[t.pick]).map((t) => `${t.label} ${PICK_TEXT[t.pick]}`);
   if (tests.some((t) => t.pick === "rsa")) parts.push("RSA คำนวณเที่ยวดีที่สุด/เฉลี่ย/% ที่ช้าลง");
@@ -44,7 +75,7 @@ export function pickNote(tests) {
 
 const cells = (n) => "<td></td>".repeat(n);
 
-export function testingFormHtml({ team, ageGroup, roundText = "", players, tests, blankRows = defaultBlankRows(players.length) }) {
+function pageHtml({ team, ageGroup, roundText, players, tests, blankRows, pageNo, pageCount, allTests }) {
   const fixed = (w) => `<span class="sheet-line" style="width:${w}mm"></span>`;
   const options = (list) => list.map((o) => `${BOX} ${escapeHtml(o)}`).join(" ");
   const trialCells = tests.reduce((n, t) => n + Math.max(t.trials, 1), 0);
@@ -61,16 +92,26 @@ export function testingFormHtml({ team, ageGroup, roundText = "", players, tests
   const row = (p) => `<tr><td>${escapeHtml(p?.number ?? "")}</td><td class="l">${escapeHtml(p?.nickname ?? "")}</td>${cells(trialCells)}<td></td></tr>`;
   const body = players.map(row).join("") + Array.from({ length: blankRows }, () => '<tr class="sheet-blank"><td></td><td class="l"></td>' + cells(trialCells) + "<td></td></tr>").join("");
   const rowH = testingRowHeightMm(players.length + blankRows);
-  const note = pickNote(tests);
-  return `<div class="sheet sheet-form sheet-testing print-sheet" style="--row-h:${rowH}mm">
-    <div class="sheet-head"><div class="sheet-brand">${teamLogoImg(team, "sheet-logo")}<div><b>PHYSICAL TEST FORM</b> <span>${escapeHtml(team)} · ${escapeHtml(ageGroup)}${roundText ? ` · ${escapeHtml(roundText)}` : ""}</span></div></div>
-      <div class="sheet-vs sheet-row">วันที่ ${fixed(26)} สถานที่ ${fixed(34)} ผู้ทดสอบ ${fixed(34)}</div></div>
-    <div class="sheet-fields"><div class="sheet-row"><span>พื้นผิว ${options(SURFACE_OPTIONS)}</span><span>&nbsp; รองเท้า ${options(FOOTWEAR_OPTIONS)}</span></div></div>
-    <table class="sheet-table sheet-form-table sheet-testing-table">
-      <colgroup><col style="width:6mm"><col style="width:22mm">${tests.map((t) => (t.trials > 1 ? `<col span="${t.trials}">` : `<col style="width:12mm">`)).join("")}<col style="width:26mm"></colgroup>
+  const cols = `<col style="width:${NUMBER_COL_MM}mm"><col style="width:${NAME_COL_MM}mm">${tests.map((t) => (t.trials > 1 ? `<col span="${t.trials}" style="width:${TRIAL_CELL_MM}mm">` : `<col style="width:${SINGLE_CELL_MM}mm">`)).join("")}<col>`;
+  const note = pickNote(allTests);
+  const pageLabel = pageCount > 1 ? ` <span class="sheet-page-no">หน้า ${pageNo}/${pageCount}</span>` : "";
+  return `<div class="sheet sheet-testing print-sheet" style="--row-h:${rowH}mm">
+    <div class="sheet-head"><div class="sheet-brand">${teamLogoImg(team, "sheet-logo")}<div><b>PHYSICAL TEST FORM</b> <span>${escapeHtml(team)} · ${escapeHtml(ageGroup)}${roundText ? ` · ${escapeHtml(roundText)}` : ""}</span>${pageLabel}</div></div></div>
+    <div class="sheet-fields">
+      <div class="sheet-row">วันที่ ${fixed(26)} สถานที่ ${fixed(40)} ผู้ทดสอบ ${fixed(40)}</div>
+      <div class="sheet-row"><span>พื้นผิว ${options(SURFACE_OPTIONS)}</span><span>&nbsp; รองเท้า ${options(FOOTWEAR_OPTIONS)}</span></div>
+    </div>
+    <table class="sheet-table sheet-testing-table">
+      <colgroup>${cols}</colgroup>
       <thead><tr><th rowspan="2">#</th><th rowspan="2" class="l">ชื่อเล่น</th>${head1}<th rowspan="2">ไม่ได้ทดสอบ / หมายเหตุ</th></tr><tr>${head2}</tr></thead>
       <tbody>${body}</tbody>
     </table>
-    <p class="sheet-note">ไม่ได้ทดสอบ: เขียนเหตุผล (บาดเจ็บ / ป่วย / ไม่มา / อื่นๆ) ในช่องท้ายตาราง ช่องว่างคือยังไม่ได้ทดสอบ ไม่ใช่ 0 · ${escapeHtml(note)}</p>
+    <p class="sheet-note">ไม่ได้ทดสอบ: เขียนเหตุผล (บาดเจ็บ / ป่วย / ไม่มา / อื่นๆ) ในช่องท้ายตาราง ช่องว่างคือยังไม่ได้ทดสอบ ไม่ใช่ 0${note ? ` · ${escapeHtml(note)}` : ""}</p>
   </div>`;
+}
+
+// ฟอร์มทั้งชุด: 1 กระดาษ (A4 แนวตั้ง) ต่อชุดรายการทดสอบ — ทุกหน้ามีรายชื่อนักกีฬาเหมือนกัน
+export function testingFormHtml({ team, ageGroup, roundText = "", players, tests, blankRows = defaultBlankRows(players.length) }) {
+  const pages = testingPages(tests);
+  return pages.map((pageTests, i) => pageHtml({ team, ageGroup, roundText, players, tests: pageTests, blankRows, pageNo: i + 1, pageCount: pages.length, allTests: tests })).join("");
 }
