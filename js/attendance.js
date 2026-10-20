@@ -78,6 +78,7 @@ import { filterPlans, filterReportsByMonths, groupByMonth, monthOptionsOf, month
 import { COACH_MENU, activeChildFor, childMatchesScreen, menuItem, menuKeyForScreen } from "./coach-menu.js";
 import { initPhysical, showAthleteResults, showInstruction, showTestingForm } from "./physical-ui.js";
 import { initProfile, showProfile } from "./coach-profile-ui.js";
+import { initResults, showResults } from "./injury-results-ui.js";
 import { ageGroupsOf, birthYearLabel, birthdayLabel, filterAndSortPlayers, playerDisplayName } from "./player-gallery.js";
 import { STAFF_PERMISSIONS, canAccessAdminFeature, normalizePermissions, permissionsSummary, staffCan, staffLandingFeature } from "./staff-perms.js";
 import { isEvaluationComplete } from "./masc-data.js";
@@ -222,6 +223,8 @@ const physicalInstructionSection = document.getElementById("physical-instruction
 const physicalFormSection = document.getElementById("physical-form-section");
 const athleteResultsSection = document.getElementById("athlete-results-section");
 const profileSection = document.getElementById("profile-section");
+const injuryMenuSection = document.getElementById("injury-menu-section");
+const injuryResultsSection = document.getElementById("injury-results-section");
 const dailyDateInput = document.getElementById("daily-date-input");
 const dailyLoadBtn = document.getElementById("daily-load-btn");
 const dailyStatus = document.getElementById("daily-status");
@@ -713,6 +716,8 @@ function hideAllScreens() {
   physicalFormSection.classList.add("hidden");
   athleteResultsSection.classList.add("hidden");
   profileSection.classList.add("hidden");
+  injuryMenuSection.classList.add("hidden");
+  injuryResultsSection.classList.add("hidden");
   playerGallerySection.classList.add("hidden");
   playerDetailSection.classList.add("hidden");
 }
@@ -1060,6 +1065,8 @@ const COACH_SCREEN_OPENERS = {
   "physical-form": () => openPhysicalForm(),
   "athlete-results": () => openAthleteResultsSection(),
   profile: () => openProfileSection(),
+  "injury-menu": () => openInjuryMenu(),
+  "injury-results": () => openInjuryResults(),
   masc: () => openMascPage(),
   "meeting-tasks": () => openMeetingTasksSection()
 };
@@ -2049,6 +2056,19 @@ function openMatchReportSection() {
   // โหลดนักกีฬาทุกรุ่น/ทุกตำแหน่งของทีมไว้ให้เลือก 11 ตัวจริง (รวม GK และผู้เล่นรุ่นอื่นที่ดึงขึ้นมา)
   loadMatchPlayerPool().then(renderMatchGuestControls);
 }
+
+// ---------- Injury/Sick (เมนู 8): หน้าเลือก → Recording (ฟอร์มเดิม) / Results (สรุปผลและกราฟ) ----------
+function openInjuryMenu() {
+  hideAllScreens();
+  injuryMenuSection.classList.remove("hidden");
+}
+function openInjuryResults() {
+  hideAllScreens();
+  injuryResultsSection.classList.remove("hidden");
+  showResults();
+}
+for (const btn of document.querySelectorAll("[data-injury-nav]")) btn.addEventListener("click", () => COACH_SCREEN_OPENERS[btn.dataset.injuryNav]?.());
+for (const btn of document.querySelectorAll("[data-injury-back]")) btn.addEventListener("click", openInjuryMenu);
 
 function openInjuryReportSection() {
   hideAllScreens();
@@ -4160,6 +4180,8 @@ const ROUTE_SCREENS = [
   { el: physicalFormSection, key: "physical-form", kind: "coach" },
   { el: athleteResultsSection, key: "athlete-results", kind: "coach" },
   { el: profileSection, key: "profile", kind: "coach" },
+  { el: injuryMenuSection, key: "injury-menu", kind: "coach" },
+  { el: injuryResultsSection, key: "injury-results", kind: "coach" },
   { el: executiveSection, key: "executive", kind: "executive" },
   { el: executivePlayersSection, key: "executive-players", kind: "executive" },
   { el: adminCoachesSection, key: "coaches", kind: "admin" },
@@ -4312,6 +4334,12 @@ function openCoachScreen(screen, date) {
       break;
     case "profile":
       openProfileSection();
+      break;
+    case "injury-menu":
+      openInjuryMenu();
+      break;
+    case "injury-results":
+      openInjuryResults();
       break;
     case "meeting-tasks":
       openMeetingTasksSection();
@@ -6809,6 +6837,16 @@ function startEditInjury(inj) {
   injuryReportStatus.className = "text-sm text-slate-500";
   injuryReportForm.scrollIntoView({ behavior: "smooth", block: "start" });
 }
+
+// Results → "แก้ไข": เปิด Recording ในโหมดแก้ไขรายการนั้น
+initResults({
+  team: () => myTeam,
+  ageGroups: () => myAgeGroups,
+  edit: (report) => {
+    openInjuryReportSection();
+    startEditInjury(report);
+  }
+});
 
 function stopEditInjury() {
   editingInjuryId = null;

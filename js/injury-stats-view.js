@@ -3,7 +3,7 @@
 import { escapeHtml } from "./ui-utils.js";
 import { buildInjuryStats } from "./injury-form.js";
 
-function barsHtml(list) {
+export function barsHtml(list) {
   if (list.length === 0) return '<p class="text-xs text-slate-400">ยังไม่มีรายงานที่ระบุข้อมูลนี้</p>';
   const max = Math.max(...list.map((x) => x.count));
   return list

@@ -981,6 +981,43 @@
       </div>
     </section>
 
+    <!-- Injury/Sick (เมนู 8): หน้าเลือก Recording / Results -->
+    <section id="injury-menu-section" class="hidden space-y-6">
+      <div class="page-heading">
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M20 8.5c0 4-4 6.5-8 9.5-4-3-8-5.5-8-9.5A4.5 4.5 0 0 1 8.5 4c1.4 0 2.7.7 3.5 1.8C12.8 4.7 14.1 4 15.5 4A4.5 4.5 0 0 1 20 8.5Z"/><path d="M4.5 10H8l1.5-3L12 12l1.5-4 1 2h4.5"/></svg></div>
+        <div>
+          <h2>Injury/Sick</h2>
+          <p>อาการบาดเจ็บของนักกีฬาในรุ่นที่ดูแล</p>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <button type="button" data-injury-nav="injury" class="card card-pad match-data-card"><span class="match-data-card-title">Recording</span><span class="match-data-card-text">บันทึกอาการบาดเจ็บ ความคืบหน้าการรักษา และแก้ไขรายการที่บันทึกไว้</span></button>
+        <button type="button" data-injury-nav="injury-results" class="card card-pad match-data-card"><span class="match-data-card-title">Results</span><span class="match-data-card-text">สรุปผลละเอียด กราฟ และรายการบาดเจ็บของรุ่นที่ดูแล</span></button>
+      </div>
+    </section>
+
+    <section id="injury-results-section" class="hidden space-y-4">
+      <button data-injury-back type="button" class="btn btn-ghost px-0">← กลับ Injury/Sick</button>
+      <div class="page-heading">
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></div>
+        <div>
+          <h2>Results · สรุปผลการบาดเจ็บ</h2>
+          <p>เลือกช่วงเวลาและรุ่นอายุเพื่อดูสถิติ กราฟ และรายการทั้งหมด</p>
+        </div>
+      </div>
+      <div class="card card-pad flex flex-wrap items-center gap-3">
+        <div id="injury-results-mode" class="segmented"></div>
+        <div class="flex items-center gap-1">
+          <button type="button" id="injury-results-prev" class="btn btn-secondary btn-sm" aria-label="ช่วงก่อนหน้า">‹</button>
+          <span id="injury-results-label" class="text-sm font-medium px-2"></span>
+          <button type="button" id="injury-results-next" class="btn btn-secondary btn-sm" aria-label="ช่วงถัดไป">›</button>
+        </div>
+        <div class="flex items-center gap-2"><label class="field-label mb-0">รุ่นอายุ</label><select id="injury-results-age" class="field-input" style="width:auto"></select></div>
+        <p id="injury-results-status" class="text-sm text-slate-500"></p>
+      </div>
+      <div id="injury-results-body" class="space-y-4"></div>
+    </section>
+
     <!-- Profile (เมนู 10): ข้อมูลโค้ชอย่างละเอียด อ่านอย่างเดียว -->
     <section id="profile-section" class="hidden space-y-6">
       <div class="page-heading">
@@ -1711,12 +1748,12 @@
 
     <!-- หน้าจอรายงานอาการบาดเจ็บ -->
     <section id="injury-report-section" class="hidden space-y-6">
-      <button data-back class="btn btn-ghost px-0">← กลับหน้า Daily</button>
+      <button data-injury-back type="button" class="btn btn-ghost px-0">← กลับ Injury/Sick</button>
 
       <div class="page-heading">
         <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M20 8.5c0 4-4 6.5-8 9.5-4-3-8-5.5-8-9.5A4.5 4.5 0 0 1 8.5 4c1.4 0 2.7.7 3.5 1.8C12.8 4.7 14.1 4 15.5 4A4.5 4.5 0 0 1 20 8.5Z"/><path d="M4.5 10H8l1.5-3L12 12l1.5-4 1 2h4.5"/></svg></div>
         <div>
-          <h2>รายงานอาการบาดเจ็บ</h2>
+          <h2>Recording · รายงานอาการบาดเจ็บ</h2>
           <p>บันทึกอาการบาดเจ็บของนักกีฬา ความรุนแรง และสถานะการพักฟื้น</p>
         </div>
       </div>

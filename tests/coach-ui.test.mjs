@@ -91,6 +91,13 @@ test("Evaluation menu: Footelligence Test (MASC), Physical Test with 3 sub-optio
   assert.equal(activeChildFor(null, "fitness"), null);
 });
 
+test("Injury/Sick menu: landing, Recording (old injury page) and Results; the old injury screen stays under it", () => {
+  const m = menuItem("injury-sick");
+  assert.equal(m.screen, "injury-menu");
+  assert.deepEqual(m.children.map((c) => [c.label, c.screen]), [["Recording", "injury"], ["Results", "injury-results"]]);
+  for (const s of ["injury-menu", "injury", "injury-results"]) assert.equal(menuKeyForScreen(s), "injury-sick", s);
+});
+
 test("birthYearLabel / birthdayLabel show Gregorian / Buddhist years", () => {
   assert.equal(birthYearLabel("2009-03-12"), "2009 / 2552");
   assert.equal(birthYearLabel(""), "-");

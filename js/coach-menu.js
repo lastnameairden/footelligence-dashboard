@@ -63,7 +63,18 @@ export const COACH_MENU = [
       { label: "Athlete Results", screen: "athlete-results" }
     ]
   },
-  { key: "injury-sick", label: "Injury/Sick", hint: "บาดเจ็บ / เจ็บป่วย", icon: "heart-pulse", screen: "injury", screens: ["injury"] },
+  {
+    key: "injury-sick",
+    label: "Injury/Sick",
+    hint: "บาดเจ็บ / เจ็บป่วย",
+    icon: "heart-pulse",
+    screen: "injury-menu",
+    screens: ["injury-menu", "injury", "injury-results"],
+    children: [
+      { label: "Recording", screen: "injury" },
+      { label: "Results", screen: "injury-results" }
+    ]
+  },
   { key: "meeting", label: "Meeting", hint: "นัดประชุม + งานหลังประชุม", icon: "book", screen: "meeting-tasks", screens: ["meeting-tasks"] },
   { key: "profile", label: "Profile", hint: "โปรไฟล์ของฉัน", icon: "user", screen: "profile", screens: ["profile"] }
 ];
