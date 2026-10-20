@@ -64,7 +64,7 @@ test("expectedStarters: 7/9/11 by format, or formation total + keeper for other"
   assert.equal(expectedStarters("other", "nope"), null);
 });
 
-const mk = (id, status, extra = {}) => ({ ...newRow({ id, nickname: id, ageGroup: "U16", position: "CM" }, "U16"), status, ...extra });
+const mk = (id, status, extra = {}) => ({ ...newRow({ id, nickname: id, ageGroup: "U16", position: "CM", number: Number(id.replace(/\D/g, "")) || null }, "U16"), status, ...extra });
 
 test("newRow marks players from another age group as guests", () => {
   assert.equal(newRow({ id: "a", ageGroup: "U15" }, "U16").guest, true);
@@ -299,4 +299,12 @@ test("cards and notes are cleared for a player who did not play", () => {
   let rows = [mk("A", "starter", { yellow: "1", red: "1", note: "x" })];
   rows = setStatus(rows, "A", "none");
   assert.deepEqual([rows[0].yellow, rows[0].red, rows[0].note], ["", "", ""]);
+});
+
+test("the shirt number is kept on the row, saved in players[] and restored", () => {
+  assert.equal(newRow({ id: "a", number: 7, ageGroup: "U16" }, "U16").number, 7);
+  assert.equal(newRow({ id: "a", ageGroup: "U16" }, "U16").number, null);
+  const payload = buildMatchDayPayload(validForm(), "U16");
+  assert.equal(payload.players.find((p) => p.id === "P5").number, 5);
+  assert.equal(formFromReport(payload).rows.find((r) => r.id === "P5").number, 5);
 });

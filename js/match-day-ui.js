@@ -145,6 +145,7 @@ function rowHtml(row, rows, played, subs) {
   const guestBadge = row.guest ? ` <span class="badge badge-info">${escapeHtml(row.ageGroup)}</span>` : "";
   const remove = row.guest ? `<button type="button" class="btn btn-ghost btn-sm text-red-600" data-guest-remove="${id}">✕ เอาออก</button>` : "";
   return `<tr>
+    <td>${row.number ?? "-"}</td>
     <td class="emphasis">${escapeHtml(row.nickname)}${guestBadge}</td>
     <td>${escapeHtml(row.fullName || "-")}</td>
     <td>${statusSel}</td>
@@ -167,10 +168,10 @@ function rosterHtml() {
   const subs = subInfo(rows);
   const own = rows.filter((r) => !r.guest);
   const guests = rows.filter((r) => r.guest);
-  const header = "<tr><th>ชื่อเล่น</th><th>ชื่อจริง</th><th>สถานะ</th><th>ตำแหน่ง</th><th>ประตู</th><th>Assist</th><th>ใบเหลือง</th><th>ใบแดง</th><th>เปลี่ยนตัว</th><th>ถูกเปลี่ยนแทนโดย</th><th>หมายเหตุ</th><th>คะแนน</th><th></th></tr>";
+  const header = "<tr><th>#</th><th>ชื่อเล่น</th><th>ชื่อจริง</th><th>สถานะ</th><th>ตำแหน่ง</th><th>ประตู</th><th>Assist</th><th>ใบเหลือง</th><th>ใบแดง</th><th>เปลี่ยนตัว</th><th>ถูกเปลี่ยนแทนโดย</th><th>หมายเหตุ</th><th>คะแนน</th><th></th></tr>";
   const body =
     own.map((r) => rowHtml(r, rows, played, subs)).join("") +
-    (guests.length > 0 ? `<tr class="match-divider"><td colspan="13">นักกีฬาจากรุ่นอื่น (เพิ่มต่อท้ายรายชื่อรุ่น ${escapeHtml(state.ageGroup)})</td></tr>${guests.map((r) => rowHtml(r, rows, played, subs)).join("")}` : "");
+    (guests.length > 0 ? `<tr class="match-divider"><td colspan="14">นักกีฬาจากรุ่นอื่น (เพิ่มต่อท้ายรายชื่อรุ่น ${escapeHtml(state.ageGroup)})</td></tr>${guests.map((r) => rowHtml(r, rows, played, subs)).join("")}` : "");
   return `<div class="card table-wrap"><table class="pro-table match-day-table"><thead>${header}</thead><tbody>${body}</tbody></table></div>`;
 }
 

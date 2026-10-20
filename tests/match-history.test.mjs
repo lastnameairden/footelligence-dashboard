@@ -25,7 +25,7 @@ const detailReport = {
   notes: "ดี",
   startingLineupNames: ["เจเจ", "เทอรี่"],
   players: [
-    { id: "gk", name: "เจเจ", status: "starter", played: true, position: "GK", rating: 3.5, goals: 0, assists: 0, yellowCards: 1, redCards: 0, minutes: 80 },
+    { id: "gk", number: 1, name: "เจเจ", status: "starter", played: true, position: "GK", rating: 3.5, goals: 0, assists: 0, yellowCards: 1, redCards: 0, minutes: 80 },
     { id: "st", name: "เทอรี่", status: "starter", played: true, position: "ST", rating: 3.5, goals: 2, assists: 0, yellowCards: 0, redCards: 0, minutes: 67, subOutMinute: "67:00", replacedById: "sb", note: "ยิงสองประตู" },
     { id: "sb", name: "นัท", status: "sub", played: true, position: "ST", rating: 2.5, goals: 1, assists: 1, yellowCards: 0, redCards: 0, minutes: 13, subInMinute: "67:00", replacesId: "st" },
     { id: "bn", name: "โชกุน", status: "none", played: false },
@@ -102,6 +102,8 @@ test("historyHtml groups by age group and makes every row clickable; reportSheet
   assert.match(sheet, /THAWEE SC <b>3 – 1<\/b> Bangkok FC U16/);
   assert.match(sheet, /ออก 67:00 \(แทนโดย นัท\)/);
   assert.match(sheet, /ยิงสองประตู/);
+  assert.match(sheet, /<td>1<\/td>\s*<td class="l">เจเจ/, "shirt number column");
+  assert.match(sheet, /11v11 · 80 นาที/, "match length in the info box");
   assert.match(sheet, /ไม่มีรายชื่อ — ไม่ได้ลงสนาม/);
   assert.match(sheet, /\(U15\)|>U15</);
   assert.match(sheet, /เกมรุกของคู่แข่ง<\/span> โยนยาว/);

@@ -55,7 +55,7 @@ export function reportSheetHtml(model, team) {
     ["วันที่", `${dateLabel(model.date)}${model.time ? ` · ${escapeHtml(model.time)} น.` : ""}`],
     ["สถานที่", escapeHtml(model.venue ?? "-")],
     ["รายการ", escapeHtml([model.competitionType, model.competition].filter(Boolean).join(" · ") || "-")],
-    ["ประเภท", escapeHtml(model.format)],
+    ["ประเภท", `${escapeHtml(model.format)}${model.lengthMinutes ? ` · ${model.lengthMinutes} นาที` : ""}`],
     ["แผนการเล่น", escapeHtml(model.formation ?? "-")]
   ]
     .map(([k, v]) => `<div><span class="sheet-k">${k}</span> <span class="sheet-v">${v}</span></div>`)
@@ -66,9 +66,10 @@ export function reportSheetHtml(model, team) {
     const body = model.rows
       .map((r) => {
         if (!r.played) {
-          return `<tr class="sheet-out"><td class="l">${escapeHtml(r.name)}${r.guest ? ` <span class="sheet-guest">${escapeHtml(r.ageGroup)}</span>` : ""}</td><td colspan="9" class="l">${escapeHtml(r.statusLabel)} — ไม่ได้ลงสนาม</td></tr>`;
+          return `<tr class="sheet-out"><td>${r.number ?? ""}</td><td class="l">${escapeHtml(r.name)}${r.guest ? ` <span class="sheet-guest">${escapeHtml(r.ageGroup)}</span>` : ""}</td><td colspan="9" class="l">${escapeHtml(r.statusLabel)} — ไม่ได้ลงสนาม</td></tr>`;
         }
         return `<tr>
+          <td>${r.number ?? ""}</td>
           <td class="l">${escapeHtml(r.name)}${r.guest ? ` <span class="sheet-guest">${escapeHtml(r.ageGroup)}</span>` : ""}<div class="sheet-sub">${escapeHtml(r.subNote)}</div></td>
           <td>${r.rating !== null ? `${r.rating} ${escapeHtml(starsText(r.rating))}` : "-"}</td>
           <td class="l">${escapeHtml(r.note)}</td>
@@ -84,9 +85,9 @@ export function reportSheetHtml(model, team) {
       .join("");
     const t = model.totals;
     table = `<table class="sheet-table">
-      <thead><tr><th class="l">ผู้เล่น</th><th>คะแนน</th><th class="l">หมายเหตุ</th><th>นาที</th><th>เหลือง</th><th>แดง</th><th>ประตู</th><th>Assist</th><th>ตำแหน่ง</th><th>สถานะ</th></tr></thead>
+      <thead><tr><th>#</th><th class="l">ผู้เล่น</th><th>คะแนน</th><th class="l">หมายเหตุ</th><th>นาที</th><th>เหลือง</th><th>แดง</th><th>ประตู</th><th>Assist</th><th>ตำแหน่ง</th><th>สถานะ</th></tr></thead>
       <tbody>${body}</tbody>
-      <tfoot><tr><td class="l">รวม (เฉพาะคนที่ลงสนาม)</td><td>${t.avgRating !== null ? `เฉลี่ย ${t.avgRating} ${escapeHtml(starsText(t.avgRating))}` : "-"}</td><td></td><td>${t.minutesKnown ? t.minutes : "-"}</td><td>${t.yellow}</td><td>${t.red}</td><td>${t.goals}</td><td>${t.assists}</td><td></td><td></td></tr></tfoot>
+      <tfoot><tr><td></td><td class="l">รวม (เฉพาะคนที่ลงสนาม)</td><td>${t.avgRating !== null ? `เฉลี่ย ${t.avgRating} ${escapeHtml(starsText(t.avgRating))}` : "-"}</td><td></td><td>${t.minutesKnown ? t.minutes : "-"}</td><td>${t.yellow}</td><td>${t.red}</td><td>${t.goals}</td><td>${t.assists}</td><td></td><td></td></tr></tfoot>
     </table>`;
   } else {
     table = `<p class="sheet-note">รายงานนี้บันทึกก่อนมีระบบ Match Day จึงไม่มีรายละเอียดรายคน${model.lineupNames.length > 0 ? ` — ตัวจริง: ${escapeHtml(model.lineupNames.join(", "))}` : ""}</p>`;

@@ -87,10 +87,11 @@ export function formationError(format, formation) {
 }
 
 // ---------- แถวนักกีฬา ----------
-// row = { id, nickname, fullName, ageGroup, guest, defaultPosition, status, position, goals, assists, yellow, red, note, outMinute, replacedBy, rating }
+// row = { id, number, nickname, fullName, ageGroup, guest, defaultPosition, status, position, goals, assists, yellow, red, note, outMinute, replacedBy, rating }
 export function newRow(player, ownAgeGroup) {
   return {
     id: player.id,
+    number: typeof player.number === "number" ? player.number : null,
     nickname: player.nickname ?? player.fullName ?? "-",
     fullName: player.fullName ?? "",
     ageGroup: player.ageGroup ?? ownAgeGroup,
@@ -293,6 +294,7 @@ export function buildMatchDayPayload(form, ageGroup) {
     const did = played.has(r.id);
     return {
       id: r.id,
+      number: r.number ?? null,
       name: r.nickname,
       fullName: r.fullName || null,
       ageGroup: r.ageGroup,
@@ -346,6 +348,7 @@ export function buildMatchDayPayload(form, ageGroup) {
 export function formFromReport(report) {
   const rows = (report.players || []).map((p) => ({
     id: p.id,
+    number: typeof p.number === "number" ? p.number : null,
     nickname: p.name ?? "-",
     fullName: p.fullName ?? "",
     ageGroup: p.ageGroup ?? report.ageGroup,

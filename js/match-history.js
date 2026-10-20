@@ -81,6 +81,7 @@ export function buildReportModel(report) {
       if (p.replacesId) notes.push(`เข้าแทน ${nameById.get(p.replacesId) ?? "-"} นาที ${p.subInMinute ?? "-"}`);
       return {
         id: p.id,
+        number: typeof p.number === "number" ? p.number : null,
         name: p.name ?? "-",
         ageGroup: p.ageGroup ?? null,
         guest: !!p.guest,
