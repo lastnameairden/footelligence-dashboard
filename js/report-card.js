@@ -25,11 +25,13 @@ import {
   SCORE_CATEGORY_COLORS,
   escapeHtml,
   teamDateRangeQuery,
-  safeHttpUrl
+  safeHttpUrl,
+  todayBangkok
 } from "./ui-utils.js";
 import { CRITERIA, SECT, categoryRawScore, isEvaluationComplete, scoreToGrade } from "./masc-data.js";
 import { icon } from "./icons.js";
 import { staffCan } from "./staff-perms.js";
+import { periodAllowed } from "./athlete-windows.js";
 import { FITNESS_SUMMARY_PRESETS, buildFitnessSeries } from "./fitness-profile.js";
 import { parentFitnessSectionsHtml } from "./fitness-view.js";
 
@@ -1055,6 +1057,15 @@ onAuthStateChanged(auth, async (user) => {
     if (isCoach && myGroups.length > 0 && !myGroups.includes(ageGroup)) {
       showAccessGate("สมุดพกเปิดได้เฉพาะรุ่นอายุที่คุณดูแล กรุณาเลือกรุ่นจากเมนู Evaluation → Athlete Results");
       return;
+    }
+    // โค้ชเปิดได้เฉพาะช่วงที่ผู้ดูแลเปิดไว้ (athleteResultsWindows) และต้องตรงกับช่วงเดือนที่เปิด — แอดมิน/ทีมหลังบ้านไม่ถูกจำกัด
+    if (isCoach) {
+      const windowsSnap = await getDocs(collection(db, "athleteResultsWindows"));
+      const windows = windowsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      if (!periodAllowed(windows, team, todayBangkok(), start, end)) {
+        showAccessGate("สมุดพกช่วงนี้ยังไม่เปิดให้โค้ชดู ผู้ดูแลระบบจะเปิดให้ดูเป็นช่วงๆ — ดูช่วงที่เปิดได้ที่เมนู Evaluation → Athlete Results");
+        return;
+      }
     }
 
     if (!team || !start || !end) {

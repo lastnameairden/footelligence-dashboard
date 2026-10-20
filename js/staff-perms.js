@@ -71,7 +71,8 @@ export const ADMIN_FEATURE_REQUIREMENTS = {
   "report-card": "view",
   "masc-rounds": "admin",
   meetings: "meetings",
-  "fitness-rounds": "admin"
+  "fitness-rounds": "admin",
+  "athlete-windows": "admin"
 };
 
 // แอดมินหลัก (perms = null) เข้าได้ทุกอย่าง / ทีมหลังบ้านเข้าได้เฉพาะที่มีสิทธิ์ครบ / feature ที่ไม่รู้จักถือว่าแอดมินเท่านั้น (ปลอดภัยไว้ก่อน)

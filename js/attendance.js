@@ -66,6 +66,7 @@ import {
 } from "./ui-utils.js";
 import { openAdminMeetings, renderCoachMeetingCard, renderCoachMeetingTasks, loadCoachMeetingNotifications, loadCoachMeetingOverview } from "./coach-meetings-ui.js";
 import { openAdminFitnessRounds } from "./fitness-rounds-ui.js";
+import { openAdminAthleteWindows } from "./athlete-windows-ui.js";
 import { openFitnessEntry } from "./fitness-entry-ui.js";
 import { parseParentHeights } from "./fitness-calc.js";
 import { applyTeamTheme } from "./team-theme.js";
@@ -327,6 +328,7 @@ const adminReportCardStatus = document.getElementById("admin-report-card-status"
 const adminMascRoundsSection = document.getElementById("admin-masc-rounds-section");
 const adminMeetingsSection = document.getElementById("admin-meetings-section");
 const adminFitnessRoundsSection = document.getElementById("admin-fitness-rounds-section");
+const adminAthleteWindowsSection = document.getElementById("admin-athlete-windows-section");
 const fitnessEntrySection = document.getElementById("fitness-entry-section");
 const adminMascRoundPeriodSelect = document.getElementById("admin-masc-round-period-select");
 const adminMascRoundStartInput = document.getElementById("admin-masc-round-start-input");
@@ -683,6 +685,7 @@ function hideAllScreens() {
   adminMascRoundsSection.classList.add("hidden");
   adminMeetingsSection.classList.add("hidden");
   adminFitnessRoundsSection.classList.add("hidden");
+  adminAthleteWindowsSection.classList.add("hidden");
   fitnessEntrySection.classList.add("hidden");
   adminPlayerAuditSection.classList.add("hidden");
   addPlayerSection.classList.add("hidden");
@@ -999,6 +1002,7 @@ function renderDrawerItemsInner() {
         ["masc-rounds", "dna", "กำหนดรอบการประเมิน MASC", openAdminMascRoundsSection],
         ["meetings", "calendar", "นัดประชุมโค้ชรายสัปดาห์", openAdminMeetingsSection],
         ["fitness-rounds", "trending-up", "รอบทดสอบสมรรถภาพ", openAdminFitnessRoundsSection],
+        ["athlete-windows", "book", "เปิดสมุดพกให้โค้ช", openAdminAthleteWindowsSection],
         ["development", "trending-up", "พัฒนาการนักกีฬา", () => (window.location.href = "./development.html")]
       ];
       for (const [feature, iconName, label, handler] of adminItems) {
@@ -1616,7 +1620,7 @@ function openAthleteResultsSection() {
   showAthleteResults();
 }
 
-initPhysical({ team: () => myTeam, ageGroups: () => myAgeGroups });
+initPhysical({ team: () => myTeam, ageGroups: () => myAgeGroups, canBypass: () => currentIsAdmin });
 for (const btn of document.querySelectorAll("[data-eval-nav]")) btn.addEventListener("click", () => COACH_SCREEN_OPENERS[btn.dataset.evalNav]?.());
 for (const btn of document.querySelectorAll("[data-eval-back]")) btn.addEventListener("click", openEvaluationLanding);
 for (const btn of document.querySelectorAll("[data-physical-back]")) btn.addEventListener("click", openPhysicalTestLanding);
@@ -1631,6 +1635,12 @@ function openFitnessEntrySection() {
     ageGroups: myAgeGroups,
     isAdmin: currentIsAdmin
   });
+}
+
+function openAdminAthleteWindowsSection() {
+  hideAllScreens();
+  adminAthleteWindowsSection.classList.remove("hidden");
+  openAdminAthleteWindows({ teams: TEAMS });
 }
 
 function openAdminFitnessRoundsSection() {
@@ -4137,7 +4147,8 @@ const ROUTE_SCREENS = [
   { el: adminReportCardSection, key: "report-card", kind: "admin" },
   { el: adminMascRoundsSection, key: "masc-rounds", kind: "admin" },
   { el: adminMeetingsSection, key: "meetings", kind: "admin" },
-  { el: adminFitnessRoundsSection, key: "fitness-rounds", kind: "admin" }
+  { el: adminFitnessRoundsSection, key: "fitness-rounds", kind: "admin" },
+  { el: adminAthleteWindowsSection, key: "athlete-windows", kind: "admin" }
 ];
 let routeSyncEnabled = false;
 
@@ -4379,7 +4390,8 @@ onAuthStateChanged(auth, async (user) => {
         "report-card": openAdminReportCardSection,
         "masc-rounds": openAdminMascRoundsSection,
         meetings: openAdminMeetingsSection,
-        "fitness-rounds": openAdminFitnessRoundsSection
+        "fitness-rounds": openAdminFitnessRoundsSection,
+        "athlete-windows": openAdminAthleteWindowsSection
       };
       const route = parseRouteHash(window.location.hash);
       if (route.admin === "team" && adminCan("team") && (await restoreAdminTeamContext(route))) {

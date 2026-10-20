@@ -10,9 +10,10 @@ import { ageGroupsOf } from "./player-gallery.js";
 import { monthsBack } from "./plan-report-data.js";
 import { addMonthsToMonth, thaiMonthLabel } from "./coach-meetings.js";
 import { printSheet } from "./print-sheet.js";
+import { coachAccessModel, dateLabel, daysLeft, periodAllowed, windowLabel } from "./athlete-windows.js";
 
 const el = (id) => document.getElementById(id);
-let api = null; // { team(), ageGroups() } — ageGroups() ว่าง = ดูแลทั้งทีม (ใช้รุ่นที่มีนักกีฬา)
+let api = null; // { team(), ageGroups(), canBypass() = แอดมินที่สวมบทบาทโค้ช } — ageGroups() ว่าง = ดูแลทั้งทีม (ใช้รุ่นที่มีนักกีฬา)
 let rounds = [];
 let pool = [];
 
@@ -91,34 +92,79 @@ export async function showTestingForm() {
 }
 
 // ---------- Athlete Results ----------
+// โค้ชเปิดได้เฉพาะช่วงที่ผู้ดูแลเปิดไว้ (athleteResultsWindows — ดู athlete-windows.js) ส่วนแอดมินที่สวมบทบาทโค้ชเลือกช่วงเดือนเองได้
 const monthOptions = () => monthsBack(thisMonthBangkok(), 12).map((m) => ({ value: m, label: thaiMonthLabel(m) }));
+let windows = [];
+
+function showBanner(html, cls) {
+  el("athlete-results-banner").innerHTML = html ? `<div class="card card-pad ${cls}">${html}</div>` : "";
+}
 
 export async function showAthleteResults() {
-  const ageSelect = el("athlete-results-age");
+  const status = el("athlete-results-status");
+  status.textContent = "";
+  const bypass = api.canBypass();
+  showBanner("", "");
+  el("athlete-results-controls").classList.add("hidden");
+  try {
+    const snap = await getDocs(collection(db, "athleteResultsWindows"));
+    windows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  } catch (err) {
+    console.error(err);
+    windows = [];
+    if (!bypass) return showBanner(`โหลดช่วงเปิดสมุดพกไม่สำเร็จ: ${escapeHtml(err.message)}`, "text-red-600");
+  }
+  const today = todayBangkok();
+  const access = coachAccessModel(windows, api.team(), today);
+  if (!bypass && access.kind === "closed") {
+    const next = access.next ? `ช่วงถัดไป: สมุดพก ${escapeHtml(windowLabel(access.next))} เปิดให้ดู ${escapeHtml(dateLabel(access.next.openDate))}` : "ตอนนี้ยังไม่มีช่วงที่กำหนดไว้";
+    return showBanner(`<p class="font-semibold">สมุดพกยังไม่เปิดให้ดู</p><p class="text-sm text-slate-500 mt-1">ผู้ดูแลระบบจะเปิดให้ดูเป็นช่วงๆ · ${next}</p>`, "text-center");
+  }
+
   const groups = await groupsToShow().catch(() => api.ageGroups());
   const mine = api.ageGroups();
   // โค้ชที่ดูแลหลายรุ่นต้องเลือกรุ่นเสมอ ส่วนโหมดดูแลทั้งทีมเลือก "ทุกรุ่น" ได้
   const options = [...(mine.length === 0 ? [{ value: "__ALL__", label: "ทุกรุ่น" }] : []), ...groups.map((g) => ({ value: g, label: g }))];
+  const ageSelect = el("athlete-results-age");
   fillSelect(ageSelect, options, ageSelect.value);
-  const thisMonth = thisMonthBangkok();
-  fillSelect(el("athlete-results-start"), monthOptions(), el("athlete-results-start").value || addMonthsToMonth(thisMonth, -2));
-  fillSelect(el("athlete-results-end"), monthOptions(), el("athlete-results-end").value || thisMonth);
-  el("athlete-results-status").textContent = "";
+
+  const periodSelect = el("athlete-results-period");
+  el("athlete-results-period-wrap").classList.toggle("hidden", bypass);
+  el("athlete-results-free-wrap").classList.toggle("hidden", !bypass);
+  if (bypass) {
+    const thisMonth = thisMonthBangkok();
+    fillSelect(el("athlete-results-start"), monthOptions(), el("athlete-results-start").value || addMonthsToMonth(thisMonth, -2));
+    fillSelect(el("athlete-results-end"), monthOptions(), el("athlete-results-end").value || thisMonth);
+    showBanner("แอดมินเปิดดูสมุดพกได้ทุกช่วง (โค้ชเปิดได้เฉพาะช่วงที่กำหนดในเมนู เปิดสมุดพกให้โค้ช)", "text-slate-500 text-sm");
+  } else {
+    fillSelect(periodSelect, access.windows.map((w) => ({ value: `${w.startMonth}|${w.endMonth}`, label: windowLabel(w) })), periodSelect.value);
+    const first = access.windows[0];
+    const left = daysLeft(first, today);
+    showBanner(
+      `เปิดให้ดูสมุดพกช่วง ${escapeHtml(windowLabel(first))} · ถึง ${escapeHtml(dateLabel(first.closeDate))} (${left === 0 ? "วันสุดท้าย" : `เหลือ ${left} วัน`})`,
+      "text-emerald-700 text-sm font-medium"
+    );
+  }
+  el("athlete-results-controls").classList.remove("hidden");
 }
 
 function openAthleteResults() {
   const status = el("athlete-results-status");
   const team = api.team();
   const ageGroup = el("athlete-results-age").value;
-  const start = el("athlete-results-start").value;
-  const end = el("athlete-results-end").value;
+  const bypass = api.canBypass();
+  const [pStart, pEnd] = el("athlete-results-period").value.split("|");
+  const start = bypass ? el("athlete-results-start").value : pStart;
+  const end = bypass ? el("athlete-results-end").value : pEnd;
   status.className = "text-sm text-red-600 w-full";
   if (!team) return void (status.textContent = "ยังไม่ทราบทีมที่รับผิดชอบ");
   if (!ageGroup) return void (status.textContent = "เลือกรุ่นอายุก่อน");
+  if (!start || !end) return void (status.textContent = "เลือกช่วงสมุดพกก่อน");
   if (start > end) return void (status.textContent = "เดือนเริ่มต้นต้องอยู่ก่อนหรือเท่ากับเดือนสิ้นสุด");
+  // กันกรณีช่วงปิดไประหว่างเปิดหน้านี้ค้างไว้ (หน้าสมุดพกตรวจซ้ำอีกชั้น)
+  if (!bypass && !periodAllowed(windows, team, todayBangkok(), start, end)) return void (status.textContent = "ช่วงนี้ปิดแล้ว รีเฟรชหน้าเพื่อดูช่วงที่เปิดอยู่");
   window.location.href = `./report-card.html#team=${encodeURIComponent(team)}&ageGroup=${encodeURIComponent(ageGroup)}&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
 }
-
 export function initPhysical(c) {
   api = c;
   el("physical-instruction-age").addEventListener("change", renderInstruction);

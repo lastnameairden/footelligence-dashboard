@@ -98,7 +98,7 @@ test("rules: staff can register as pending but registration never carries permis
   assert.match(create, /hasPerm\('coaches'\)[\s\S]*resource\.data\.role in \['coach', 'executive'\][\s\S]*request\.resource\.data\.role in \['coach', 'executive'\]/);
   assert.match(create, /hasAny\(\['permissions', 'email'\]\)/);
   // ทีมหลังบ้านไม่แตะรอบ/นัด/ข้อความของแอดมิน
-  for (const name of ["mascRounds", "fitnessRounds", "adminNotificationReads"]) {
+  for (const name of ["mascRounds", "fitnessRounds", "athleteResultsWindows", "adminNotificationReads"]) {
     const block = rules.slice(rules.indexOf(`match /${name}/`));
     const end = block.indexOf("\n    }");
     assert.ok(!/canManageAll|hasPerm/.test(block.slice(0, end)), `${name} must stay admin-only for writes`);

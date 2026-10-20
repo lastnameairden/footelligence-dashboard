@@ -713,6 +713,64 @@
         </table>
       </div>
     </section>
+    <!-- เปิดสมุดพกให้โค้ช (Athlete Results ของโค้ชเปิดได้เฉพาะช่วงที่ผู้ดูแลระบบกำหนดที่นี่) -->
+    <section id="admin-athlete-windows-section" class="hidden space-y-6">
+      <button data-admin-back class="btn btn-ghost px-0">← กลับหน้า Dashboard</button>
+      <div class="page-heading">
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M4 5a2 2 0 0 1 2-2h12v18H6a2 2 0 0 1-2-2V5Z"/><path d="M8 7h6M8 11h6"/></svg></div>
+        <div>
+          <h2>เปิดสมุดพกให้โค้ช</h2>
+          <p>โค้ชเปิดดู Athlete Results (สมุดพกนักกีฬา) ได้เฉพาะช่วงวันที่ที่กำหนดที่นี่ ผู้ดูแลระบบและทีมหลังบ้านเปิดได้ตลอด</p>
+        </div>
+      </div>
+
+      <div class="card card-pad space-y-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="field-label">ทีม</label>
+            <select id="athlete-window-team" class="field-input"></select>
+          </div>
+          <div></div>
+          <div>
+            <label class="field-label">สมุดพกตั้งแต่เดือน</label>
+            <select id="athlete-window-start" class="field-input"></select>
+          </div>
+          <div>
+            <label class="field-label">ถึงเดือน</label>
+            <select id="athlete-window-end" class="field-input"></select>
+          </div>
+          <div>
+            <label class="field-label">โค้ชเปิดดูได้ตั้งแต่วันที่</label>
+            <input id="athlete-window-open" type="date" class="field-input" />
+          </div>
+          <div>
+            <label class="field-label">ถึงวันที่ (รวมวันนี้)</label>
+            <input id="athlete-window-close" type="date" class="field-input" />
+          </div>
+        </div>
+        <div class="flex items-center gap-4">
+          <button type="button" id="athlete-window-submit" class="btn btn-primary">เปิดสมุดพกให้โค้ช</button>
+          <p id="athlete-window-status" class="text-sm text-slate-500"></p>
+        </div>
+      </div>
+
+      <div class="card table-wrap">
+        <table class="pro-table">
+          <thead>
+            <tr>
+              <th>ทีม</th>
+              <th>สมุดพกช่วง</th>
+              <th>โค้ชเปิดดูได้</th>
+              <th>สถานะ</th>
+              <th>ดำเนินการ</th>
+            </tr>
+          </thead>
+          <tbody id="athlete-window-list-body">
+            <tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
     <!-- จัดการข้อมูลทีม -->
     <section id="admin-manage-team-section" class="hidden space-y-6">
       <button data-admin-back class="btn btn-ghost px-0">← กลับหน้า Dashboard</button>
@@ -1000,15 +1058,18 @@
           <p>สมุดพกนักกีฬาของรุ่นที่ดูแล (ดูและพิมพ์ได้ คำเห็นโค้ชและสรุปจากโค้ชฟิตเนสผู้ดูแลระบบเป็นผู้กรอก)</p>
         </div>
       </div>
-      <div class="card card-pad flex flex-wrap items-end gap-3">
+      <div id="athlete-results-banner"></div>
+      <div id="athlete-results-controls" class="card card-pad flex flex-wrap items-end gap-3">
         <div><label class="field-label">รุ่นอายุ</label><select id="athlete-results-age" class="field-input" style="width:auto"></select></div>
-        <div><label class="field-label">ตั้งแต่เดือน</label><select id="athlete-results-start" class="field-input" style="width:auto"></select></div>
-        <div><label class="field-label">ถึงเดือน</label><select id="athlete-results-end" class="field-input" style="width:auto"></select></div>
+        <div id="athlete-results-period-wrap"><label class="field-label">สมุดพกช่วง</label><select id="athlete-results-period" class="field-input" style="width:auto"></select></div>
+        <div id="athlete-results-free-wrap" class="hidden flex flex-wrap items-end gap-3">
+          <div><label class="field-label">ตั้งแต่เดือน</label><select id="athlete-results-start" class="field-input" style="width:auto"></select></div>
+          <div><label class="field-label">ถึงเดือน</label><select id="athlete-results-end" class="field-input" style="width:auto"></select></div>
+        </div>
         <button id="athlete-results-open-btn" type="button" class="btn btn-primary">เปิดสมุดพก</button>
         <p id="athlete-results-status" class="text-sm text-slate-500 w-full"></p>
       </div>
-      <p class="text-sm text-slate-500">สมุดพกหน้า 2 "ร่างกายและการเคลื่อนไหว" แสดงการเติบโต ผลทดสอบสมรรถภาพ MASC-M และสรุปจากโค้ชฟิตเนส เมื่อนักกีฬามีผลทดสอบแล้ว</p>
-    </section>
+      <p class="text-sm text-slate-500">สมุดพกหน้า 2 "ร่างกายและการเคลื่อนไหว" แสดงการเติบโต ผลทดสอบสมรรถภาพ MASC-M และสรุปจากโค้ชฟิตเนส เมื่อนักกีฬามีผลทดสอบแล้ว</p>    </section>
 
     <!-- Training Plan (เมนู 5): หน้าเลือก 7 ตัวเลือก — Upload / Plan Data / Report / Report Data + 3 ตัวที่ยังไม่เปิดใช้งาน -->
     <section id="training-plan-menu-section" class="hidden space-y-6">

@@ -49,6 +49,8 @@ const PAGE_OF_SCRIPT = {
   "js/coach-meetings-ui.js": "attendance.html",
   "js/match-data-ui.js": "attendance.html",
   "js/fitness-rounds-ui.js": "attendance.html",
+  "js/athlete-windows-ui.js": "attendance.html",
+  "js/physical-ui.js": "attendance.html",
   "js/fitness-entry-ui.js": "attendance.html"
 };
 test("every getElementById id used by a page script exists in that page's HTML", () => {
