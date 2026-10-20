@@ -738,6 +738,33 @@
       </div>
     </section>
     <!-- เปิดสมุดพกให้โค้ช (Athlete Results ของโค้ชเปิดได้เฉพาะช่วงที่ผู้ดูแลระบบกำหนดที่นี่) -->
+    <!-- แอดมินหลัก: ประกาศถึงทีมหลังบ้าน — ขึ้นที่ Home ของหน้าทีมสำหรับทีมหลังบ้าน -->
+    <section id="admin-staff-announcements-section" class="hidden space-y-6">
+      <button data-admin-back class="btn btn-ghost px-0">← กลับหน้า Dashboard</button>
+      <div class="page-heading">
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M6 9a6 6 0 0 1 12 0c0 6 2 7 2 7H4s2-1 2-7Z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg></div>
+        <div>
+          <h2>ประกาศถึงทีมหลังบ้าน</h2>
+          <p>ทีมหลังบ้านเห็นประกาศที่ Home ของหน้าทีม (ผู้ที่ได้รับสิทธิ์ดู Dashboard)</p>
+        </div>
+      </div>
+      <div class="card card-pad space-y-4">
+        <div>
+          <label class="field-label" for="announce-title">หัวข้อ</label>
+          <input id="announce-title" type="text" maxlength="80" class="field-input" />
+        </div>
+        <div>
+          <label class="field-label" for="announce-message">รายละเอียด</label>
+          <textarea id="announce-message" rows="4" maxlength="1000" class="field-input"></textarea>
+        </div>
+        <div class="flex items-center gap-3 flex-wrap">
+          <button id="announce-submit" type="button" class="btn btn-primary">ประกาศ</button>
+          <p id="announce-status" class="text-sm text-slate-500"></p>
+        </div>
+      </div>
+      <div id="announce-list" class="space-y-3"></div>
+    </section>
+
     <section id="admin-athlete-windows-section" class="hidden space-y-6">
       <button data-admin-back class="btn btn-ghost px-0">← กลับหน้า Dashboard</button>
       <div class="page-heading">

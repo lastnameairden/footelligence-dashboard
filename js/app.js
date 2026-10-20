@@ -1778,6 +1778,7 @@ function renderDrawerItems() {
     navDrawerItems.appendChild(drawerItem(icon("calendar"), "นัดประชุมโค้ชรายสัปดาห์", "./attendance.html#admin=meetings"));
     navDrawerItems.appendChild(drawerItem(icon("trending-up"), "รอบทดสอบสมรรถภาพ", "./attendance.html#admin=fitness-rounds"));
     navDrawerItems.appendChild(drawerItem(icon("trending-up"), "พัฒนาการนักกีฬา", "./development.html"));
+    navDrawerItems.appendChild(drawerItem(icon("bell"), "ประกาศถึงทีมหลังบ้าน", "./attendance.html#admin=staff-announcements"));
     // "กลับภาพรวมทุกทีม" มีประโยชน์เฉพาะตอนกำลังดูทีมใดทีมหนึ่งอยู่ (มี ?team= เจาะจงทีมจริงในนี้) — ถ้าอยู่ที่
     // ภาพรวมทุกทีมอยู่แล้ว (หน้าแรกสุด ไม่มี ?team= หรือมีแต่ไม่ตรงชื่อทีมไหนเลย) กดแล้วจะแค่โหลดหน้าเดิมซ้ำ
     // ไม่มีประโยชน์ จึงไม่ต้องมีปุ่มนี้ให้เห็นเลย (เหมือน dashboardBackLink ในหน้าที่ซ่อนกรณีเดียวกัน)

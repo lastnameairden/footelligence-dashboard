@@ -243,6 +243,16 @@ service cloud.firestore {
 
     // ช่วงที่ผู้ดูแลระบบเปิดให้โค้ชดู Athlete Results (สมุดพก): { team: "ALL" | ชื่อทีม, startMonth, endMonth, openDate, closeDate, status }
     // ทุกคนที่ล็อกอินอ่านได้ (หน้าโค้ชและหน้าสมุดพกใช้ตรวจว่าเปิดอยู่ไหม) — สร้าง/แก้/ลบได้เฉพาะผู้ดูแลระบบหลัก (ทีมหลังบ้านแตะไม่ได้)
+    // ประกาศจากผู้ดูแลระบบถึงทีมหลังบ้าน (Home ของหน้าทีม) — แอดมินหลักเขียน/ลบ, ทีมหลังบ้านที่อนุมัติแล้วอ่านได้
+    match /staffAnnouncements/{id} {
+      allow read: if isAdmin() || isStaff();
+      allow create: if isAdmin()
+                    && request.resource.data.keys().hasOnly(['title', 'message', 'createdBy', 'createdAt'])
+                    && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 80
+                    && request.resource.data.message is string && request.resource.data.message.size() > 0 && request.resource.data.message.size() <= 1000;
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
     match /athleteResultsWindows/{id} {
       allow read: if isSignedIn();
       allow create, update, delete: if isAdmin();

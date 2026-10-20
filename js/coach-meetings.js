@@ -270,6 +270,25 @@ export function recapStatus(meeting, coachId, recap, todayStr) {
   return { state: daysLeft < 0 ? "overdue" : "pending", deadline, daysLeft };
 }
 
+// สรุปงานหลังประชุมของทั้งทีม (Home ของทีมหลังบ้าน): waiting = ถึงวันประชุมแล้วแต่ยังไม่ส่ง (รวมเลยกำหนด), overdue = เลยกำหนดแล้ว,
+// done = ส่งแล้ว — คนลา/ขาดและนัดที่ยังไม่ถึงวันไม่นับ (ไม่ต้องส่ง) · recaps = Map ของ `${meetingId}_${coachId}` → เอกสารงานที่ส่งแล้ว
+export function teamRecapSummary(meetings, recaps, todayStr) {
+  const out = { waiting: 0, overdue: 0, done: 0, waitingCoaches: [] };
+  for (const m of meetings || []) {
+    const names = m.coachNames || [];
+    (m.coachIds || []).forEach((id, i) => {
+      const { state } = recapStatus(m, id, recaps.get(recapDocId(m.id, id)) || null, todayStr);
+      if (state === "submitted" || state === "late") out.done += 1;
+      else if (state === "pending" || state === "overdue") {
+        out.waiting += 1;
+        if (state === "overdue") out.overdue += 1;
+        out.waitingCoaches.push(names[i] ?? id);
+      }
+    });
+  }
+  return out;
+}
+
 // ข้อความ+โทนสีของสถานะ (tone = success / warning / danger / neutral)
 export function recapStatusView(status) {
   switch (status.state) {

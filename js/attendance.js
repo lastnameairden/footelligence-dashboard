@@ -67,6 +67,7 @@ import {
 import { openAdminMeetings, renderCoachMeetingCard, renderCoachMeetingTasks, renderCoachNextMeeting, renderCoachMeetingHistory, loadCoachMeetingNotifications, loadCoachMeetingOverview } from "./coach-meetings-ui.js";
 import { openAdminFitnessRounds } from "./fitness-rounds-ui.js";
 import { openAdminAthleteWindows } from "./athlete-windows-ui.js";
+import { openAdminAnnouncements } from "./admin-announcements-ui.js";
 import { openFitnessEntry } from "./fitness-entry-ui.js";
 import { parseParentHeights } from "./fitness-calc.js";
 import { applyTeamTheme } from "./team-theme.js";
@@ -77,6 +78,7 @@ import { addMonthsToMonth, thaiMonthLabel } from "./coach-meetings.js";
 import { filterPlans, filterReportsByMonths, groupByMonth, monthOptionsOf, monthsBack, planAgeGroupsOf, planDataHtml, reportHistoryHtml } from "./plan-report-data.js";
 import { COACH_MENU, childMatchesScreen, menuItem, menuKeyForScreen } from "./coach-menu.js";
 import { STAFF_UNFILTERED_SCREENS, staffMenuFor } from "./staff-menu.js";
+import { initStaffHome, showStaffHome } from "./staff-home-ui.js";
 import { ageGroupsForFilter, matchesAgeFilter, validFilter } from "./age-filter.js";
 import { initPhysical, showAthleteResults, showInstruction, showTestingForm } from "./physical-ui.js";
 import { initProfile, showProfile } from "./coach-profile-ui.js";
@@ -326,6 +328,7 @@ const adminMascRoundsSection = document.getElementById("admin-masc-rounds-sectio
 const adminMeetingsSection = document.getElementById("admin-meetings-section");
 const adminFitnessRoundsSection = document.getElementById("admin-fitness-rounds-section");
 const adminAthleteWindowsSection = document.getElementById("admin-athlete-windows-section");
+const adminStaffAnnouncementsSection = document.getElementById("admin-staff-announcements-section");
 const fitnessEntrySection = document.getElementById("fitness-entry-section");
 const adminMascRoundPeriodSelect = document.getElementById("admin-masc-round-period-select");
 const adminMascRoundStartInput = document.getElementById("admin-masc-round-start-input");
@@ -682,6 +685,7 @@ function hideAllScreens() {
   adminMeetingsSection.classList.add("hidden");
   adminFitnessRoundsSection.classList.add("hidden");
   adminAthleteWindowsSection.classList.add("hidden");
+  adminStaffAnnouncementsSection.classList.add("hidden");
   fitnessEntrySection.classList.add("hidden");
   adminPlayerAuditSection.classList.add("hidden");
   addPlayerSection.classList.add("hidden");
@@ -1117,6 +1121,7 @@ function renderDrawerItemsInner() {
         ["meetings", "calendar", "นัดประชุมโค้ชรายสัปดาห์", openAdminMeetingsSection],
         ["fitness-rounds", "trending-up", "รอบทดสอบสมรรถภาพ", openAdminFitnessRoundsSection],
         ["athlete-windows", "book", "เปิดสมุดพกให้โค้ช", openAdminAthleteWindowsSection],
+        ["staff-announcements", "bell", "ประกาศถึงทีมหลังบ้าน", openAdminStaffAnnouncementsSection],
         ["development", "trending-up", "พัฒนาการนักกีฬา", () => (window.location.href = "./development.html")]
       ];
       for (const [feature, iconName, label, handler] of adminItems) {
@@ -1767,6 +1772,12 @@ function openFitnessEntrySection() {
     ageGroups: myAgeGroups,
     isAdmin: currentIsAdmin
   });
+}
+
+function openAdminStaffAnnouncementsSection() {
+  hideAllScreens();
+  adminStaffAnnouncementsSection.classList.remove("hidden");
+  openAdminAnnouncements({ authorName: () => adminOwnName });
 }
 
 function openAdminAthleteWindowsSection() {
@@ -3721,11 +3732,12 @@ staffFilterInner.addEventListener("click", (e) => {
   if (btn) setStaffAgeFilter(btn.dataset.age);
 });
 
-// Home ของหน้าทีม — ประกาศจากผู้ดูแลระบบและงาน Meeting ที่รอตรวจ (เนื้อหาเติมในขั้นถัดไป)
+// Home ของหน้าทีม — ประกาศจากผู้ดูแลระบบ + (สิทธิ์ meetings) งาน Meeting ที่รอตรวจ (staff-home-ui.js)
+initStaffHome(staffHomeBody, () => openCoachMenuItem("meeting"));
 function openStaffHome() {
   hideAllScreens();
   staffHomeSection.classList.remove("hidden");
-  staffHomeBody.innerHTML = '<div class="card card-pad text-sm text-slate-500">ยังไม่มีประกาศจากผู้ดูแลระบบ</div>';
+  showStaffHome(staffHomeBody, { team: myTeam, uid: auth.currentUser.uid, canMeetings: staffCan(currentStaffPerms, "meetings") });
 }
 
 // Coach Data — โค้ชของทีม (ใช้ตารางสรุปการทำงานโค้ชเดือนนี้ชุดเดียวกับหน้าผู้บริหาร) กรองตามรุ่นอายุที่โค้ชรับผิดชอบ
@@ -4392,7 +4404,8 @@ const ROUTE_SCREENS = [
   { el: adminMascRoundsSection, key: "masc-rounds", kind: "admin" },
   { el: adminMeetingsSection, key: "meetings", kind: "admin" },
   { el: adminFitnessRoundsSection, key: "fitness-rounds", kind: "admin" },
-  { el: adminAthleteWindowsSection, key: "athlete-windows", kind: "admin" }
+  { el: adminAthleteWindowsSection, key: "athlete-windows", kind: "admin" },
+  { el: adminStaffAnnouncementsSection, key: "staff-announcements", kind: "admin" }
 ];
 let routeSyncEnabled = false;
 
@@ -4673,7 +4686,8 @@ onAuthStateChanged(auth, async (user) => {
         "masc-rounds": openAdminMascRoundsSection,
         meetings: openAdminMeetingsSection,
         "fitness-rounds": openAdminFitnessRoundsSection,
-        "athlete-windows": openAdminAthleteWindowsSection
+        "athlete-windows": openAdminAthleteWindowsSection,
+        "staff-announcements": openAdminStaffAnnouncementsSection
       };
       const route = parseRouteHash(window.location.hash);
       const mayEnterTeam = adminCan("team") || (route.as === "staff" && isStaffRole && staffCan(currentStaffPerms, "view"));
