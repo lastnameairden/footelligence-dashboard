@@ -229,7 +229,8 @@ service cloud.firestore {
     // เอกสารแยกตามช่วงเวลา (playerId+startMonth+endMonth) เพื่อไม่ให้คำเห็นรอบเก่าถูกทับตอนสร้างรอบใหม่
     match /playerReportCards/{id} {
       // ทีมหลังบ้านที่มีสิทธิ์ดู อ่านสมุดพกได้ (อ่านอย่างเดียว) — เขียนคำเห็นโค้ช/สรุปจากโค้ชฟิตเนสได้เฉพาะผู้ดูแลระบบหลัก
-      allow read: if canViewAll();
+      // โค้ช/ผู้บริหารทีมอ่านสมุดพกของทีมตัวเองได้ (Evaluation → Athlete Results ของโค้ช) — query ต้องมี where team == ทีมตัวเอง
+      allow read: if canViewAll() || (canViewTeam() && ownsTeam());
       allow write: if isAdmin();
     }
 

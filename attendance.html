@@ -42,6 +42,7 @@
     <!-- เมนูหลักของโค้ช 9 รายการ แบบแถบแนวนอน (แสดงเฉพาะหน้าจอกว้าง) + แถบเมนูย่อยของเมนูที่มีหน้าย่อย — สร้างโดย attendance.js -->
     <nav id="coach-tabbar" class="coach-tabbar" aria-label="เมนูหลักของโค้ช"><div id="coach-tabbar-inner" class="coach-tabbar-inner"></div></nav>
     <div id="coach-subtabs" class="coach-subtabs"><div id="coach-subtabs-inner" class="coach-subtabs-inner"></div></div>
+    <div id="coach-subtabs2" class="coach-subtabs coach-subtabs-2"><div id="coach-subtabs2-inner" class="coach-subtabs-inner"></div></div>
   </header>
 
   <!-- เมนูนำทางแบบเลื่อนออกจากด้านซ้าย (เปิดด้วยปุ่ม ☰) -->
@@ -922,6 +923,93 @@
       </div>
     </section>
 
+    <!-- Evaluation (เมนู 7): หน้าเลือก 3 ส่วน → Footelligence Test (MASC) / Physical Test / Athlete Results -->
+    <section id="evaluation-menu-section" class="hidden space-y-6">
+      <div class="page-heading">
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg></div>
+        <div>
+          <h2>Evaluation</h2>
+          <p>การประเมินนักกีฬา ผลทดสอบสมรรถภาพ และสมุดพก</p>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <button type="button" data-eval-nav="masc" class="card card-pad match-data-card"><span class="match-data-card-title">Footelligence Test</span><span class="match-data-card-text">ประเมินนักกีฬาตามเกณฑ์ MASC (Motricity · Availability · Smart · Commitment)</span></button>
+        <button type="button" data-eval-nav="physical-test" class="card card-pad match-data-card"><span class="match-data-card-title">Physical Test</span><span class="match-data-card-text">ทดสอบสมรรถภาพทางกาย: วิธีทดสอบ แบบฟอร์มพิมพ์ และลงข้อมูลหลังทดสอบ</span></button>
+        <button type="button" data-eval-nav="athlete-results" class="card card-pad match-data-card"><span class="match-data-card-title">Athlete Results</span><span class="match-data-card-text">สมุดพกนักกีฬา รวมการเติบโตและผลทดสอบสมรรถภาพ</span></button>
+      </div>
+    </section>
+
+    <section id="physical-test-menu-section" class="hidden space-y-6">
+      <button data-eval-back type="button" class="btn btn-ghost px-0">← กลับ Evaluation</button>
+      <div class="page-heading">
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="m3 17 6-6 4 4 8-9"/><path d="M15 6h6v6"/></svg></div>
+        <div>
+          <h2>Physical Test</h2>
+          <p>การทดสอบสมรรถภาพทางกายของรุ่นที่ดูแล</p>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <button type="button" data-eval-nav="physical-instruction" class="card card-pad match-data-card"><span class="match-data-card-title">Instruction</span><span class="match-data-card-text">ชื่อการทดสอบ วิธีทดสอบ อุปกรณ์ รูป และวิดีโอ</span></button>
+        <button type="button" data-eval-nav="physical-form" class="card card-pad match-data-card"><span class="match-data-card-title">Testing Form</span><span class="match-data-card-text">แบบฟอร์มพิมพ์ A4 ไว้จดผลขณะทดสอบ</span></button>
+        <button type="button" data-eval-nav="fitness" class="card card-pad match-data-card"><span class="match-data-card-title">Data Entry</span><span class="match-data-card-text">ลงข้อมูลผลทดสอบหลังทดสอบเสร็จ</span></button>
+      </div>
+    </section>
+
+    <section id="physical-instruction-section" class="hidden space-y-4">
+      <button data-physical-back type="button" class="btn btn-ghost px-0">← กลับ Physical Test</button>
+      <div class="page-heading">
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M7 3h7l4 4v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M14 3v4h4"/><path d="M8.5 12.5h7M8.5 16h7"/></svg></div>
+        <div>
+          <h2>Instruction</h2>
+          <p>วิธีทดสอบสมรรถภาพแต่ละรายการ</p>
+        </div>
+      </div>
+      <div class="card card-pad flex flex-wrap items-center gap-3">
+        <div class="flex items-center gap-2"><label class="field-label mb-0">แสดงรายการของรุ่น</label><select id="physical-instruction-age" class="field-input" style="width:auto"></select></div>
+        <p class="text-sm text-slate-500">เนื้อหาเป็นฉบับร่างตามวิธีมาตรฐาน รูปและวิดีโอจะเพิ่มภายหลัง</p>
+      </div>
+      <div id="physical-instruction-body" class="space-y-4"></div>
+    </section>
+
+    <section id="physical-form-section" class="hidden space-y-4 print-host">
+      <div class="no-print space-y-4">
+        <button data-physical-back type="button" class="btn btn-ghost px-0">← กลับ Physical Test</button>
+        <div class="card card-pad flex flex-wrap items-end gap-3">
+          <div>
+            <label class="field-label">รุ่นอายุ</label>
+            <select id="physical-form-age" class="field-input" style="width:auto"></select>
+          </div>
+          <div>
+            <label class="field-label">รอบทดสอบ</label>
+            <select id="physical-form-round" class="field-input" style="width:auto"></select>
+          </div>
+          <button id="physical-form-print-btn" type="button" class="btn btn-primary">พิมพ์ / บันทึกเป็น PDF</button>
+          <p class="text-sm text-slate-500 w-full">คอลัมน์ตามรายการทดสอบของรอบและรุ่นที่เลือก มีแถวว่างท้ายตารางสำหรับนักกีฬารุ่นอื่น จดเสร็จแล้วนำผลไปลงที่ Data Entry</p>
+        </div>
+        <p id="physical-form-status" class="text-sm text-slate-500"></p>
+      </div>
+      <div id="physical-form-sheet" class="match-sheet-wrap"></div>
+    </section>
+
+    <section id="athlete-results-section" class="hidden space-y-4">
+      <button data-eval-back type="button" class="btn btn-ghost px-0">← กลับ Evaluation</button>
+      <div class="page-heading">
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M4 5a2 2 0 0 1 2-2h12v18H6a2 2 0 0 1-2-2V5Z"/><path d="M8 7h6M8 11h6"/></svg></div>
+        <div>
+          <h2>Athlete Results</h2>
+          <p>สมุดพกนักกีฬาของรุ่นที่ดูแล (ดูและพิมพ์ได้ คำเห็นโค้ชและสรุปจากโค้ชฟิตเนสผู้ดูแลระบบเป็นผู้กรอก)</p>
+        </div>
+      </div>
+      <div class="card card-pad flex flex-wrap items-end gap-3">
+        <div><label class="field-label">รุ่นอายุ</label><select id="athlete-results-age" class="field-input" style="width:auto"></select></div>
+        <div><label class="field-label">ตั้งแต่เดือน</label><select id="athlete-results-start" class="field-input" style="width:auto"></select></div>
+        <div><label class="field-label">ถึงเดือน</label><select id="athlete-results-end" class="field-input" style="width:auto"></select></div>
+        <button id="athlete-results-open-btn" type="button" class="btn btn-primary">เปิดสมุดพก</button>
+        <p id="athlete-results-status" class="text-sm text-slate-500 w-full"></p>
+      </div>
+      <p class="text-sm text-slate-500">สมุดพกหน้า 2 "ร่างกายและการเคลื่อนไหว" แสดงการเติบโต ผลทดสอบสมรรถภาพ MASC-M และสรุปจากโค้ชฟิตเนส เมื่อนักกีฬามีผลทดสอบแล้ว</p>
+    </section>
+
     <!-- Training Plan (เมนู 5): หน้าเลือก 7 ตัวเลือก — Upload / Plan Data / Report / Report Data + 3 ตัวที่ยังไม่เปิดใช้งาน -->
     <section id="training-plan-menu-section" class="hidden space-y-6">
       <div class="page-heading">
@@ -1281,12 +1369,12 @@
 
     <!-- กรอกผลทดสอบสมรรถภาพ (ตารางนักกีฬาของรุ่น × รายการทดสอบ เฉพาะรอบที่เปิดอยู่) -->
     <section id="fitness-entry-section" class="hidden space-y-4">
-      <button data-back class="btn btn-ghost px-0">← กลับหน้า Daily</button>
+      <button data-physical-back type="button" class="btn btn-ghost px-0">← กลับ Physical Test</button>
 
       <div class="page-heading">
         <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="m3 17 6-6 4 4 8-9"/><path d="M15 6h6v6"/></svg></div>
         <div>
-          <h2>ผลทดสอบสมรรถภาพ</h2>
+          <h2>Data Entry · ผลทดสอบสมรรถภาพ</h2>
           <p>กรอกผลของรอบที่เปิดอยู่ บันทึกอัตโนมัติเมื่อออกจากช่อง · ช่องว่าง = ไม่ได้ทดสอบรอบนี้</p>
         </div>
       </div>

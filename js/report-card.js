@@ -1032,9 +1032,11 @@ onAuthStateChanged(auth, async (user) => {
     const coachDoc = await getDoc(doc(db, "coaches", user.uid));
     const data = coachDoc.exists() ? coachDoc.data() : null;
 
-    const allowed = data && data.status === "approved" && (data.role === "admin" || (data.role === "staff" && staffCan(data.permissions, "view")));
+    // โค้ชเปิดสมุดพกของทีม/รุ่นที่ตัวเองดูแลได้ (Evaluation → Athlete Results) แบบดูอย่างเดียว — คำเห็นโค้ชและสรุปจากโค้ชฟิตเนสแก้ได้เฉพาะผู้ดูแลระบบ
+    const isCoach = !!data && data.status === "approved" && data.role === "coach" && !!data.team;
+    const allowed = isCoach || (data && data.status === "approved" && (data.role === "admin" || (data.role === "staff" && staffCan(data.permissions, "view"))));
     if (!allowed) {
-      showAccessGate("หน้านี้ใช้ได้เฉพาะบัญชีผู้ดูแลระบบหรือทีมหลังบ้านที่ได้รับสิทธิ์ดูรายงานเท่านั้น");
+      showAccessGate("หน้านี้ใช้ได้เฉพาะโค้ช ผู้ดูแลระบบ หรือทีมหลังบ้านที่ได้รับสิทธิ์ดูรายงานเท่านั้น");
       return;
     }
     currentAdminName = data.name || user.email;
@@ -1044,10 +1046,16 @@ onAuthStateChanged(auth, async (user) => {
     // (serve, clean-url) จะ redirect "report-card.html" ไปเป็น "report-card" และตัด query string ทิ้งระหว่างทาง
     // แต่ไม่ตัด hash — ใช้ได้ทั้งในเครื่องและบน Vercel เหมือนกัน
     const params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-    const team = params.get("team");
+    // โค้ชจริง: ใช้ทีมของตัวเองเสมอ (ไม่เชื่อทีมใน URL) และเปิดได้เฉพาะรุ่นที่ดูแล
+    const team = isCoach ? data.team : params.get("team");
     const ageGroup = params.get("ageGroup") || "__ALL__";
     const start = params.get("start");
     const end = params.get("end");
+    const myGroups = isCoach && Array.isArray(data.ageGroups) ? data.ageGroups : [];
+    if (isCoach && myGroups.length > 0 && !myGroups.includes(ageGroup)) {
+      showAccessGate("สมุดพกเปิดได้เฉพาะรุ่นอายุที่คุณดูแล กรุณาเลือกรุ่นจากเมนู Evaluation → Athlete Results");
+      return;
+    }
 
     if (!team || !start || !end) {
       showAccessGate("ไม่พบเงื่อนไขที่ต้องการสร้างสมุดพก กรุณาเลือกทีม/ช่วงเวลาจากหน้าเช็คชื่ออีกครั้ง");

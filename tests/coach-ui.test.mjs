@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { TEAM_THEMES, applyTeamTheme, contrastWithWhite, teamThemeVars } from "../js/team-theme.js";
 import fs from "node:fs";
-import { COACH_MENU, childMatchesScreen, menuItem, menuKeyForScreen } from "../js/coach-menu.js";
+import { COACH_MENU, activeChildFor, childMatchesScreen, menuItem, menuKeyForScreen } from "../js/coach-menu.js";
 import { COACH_SCREEN_KEYS } from "../js/screen-route.js";
 import { ageGroupsOf, birthYearLabel, birthdayLabel, filterAndSortPlayers, playerDisplayName } from "../js/player-gallery.js";
 
@@ -72,6 +72,22 @@ test("Training Plan menu: landing + 4 live options + 3 disabled 'coming soon' op
   for (const s of ["training-plan", "plan", "plan-data", "report", "report-data"]) assert.equal(menuKeyForScreen(s), "training-plan", s);
   assert.equal(childMatchesScreen(tp.children[2], "report"), true);
   assert.equal(childMatchesScreen(tp.children[4], "report"), false);
+});
+
+test("Evaluation menu: Footelligence Test (MASC), Physical Test with 3 sub-options, Athlete Results", () => {
+  const ev = menuItem("evaluation");
+  assert.equal(ev.screen, "evaluation");
+  assert.deepEqual(ev.children.map((c) => c.label), ["Footelligence Test", "Physical Test", "Athlete Results"]);
+  assert.equal(ev.children[0].external, "masc");
+  const physical = ev.children[1];
+  assert.deepEqual(physical.children.map((c) => [c.label, c.screen]), [["Instruction", "physical-instruction"], ["Testing Form", "physical-form"], ["Data Entry", "fitness"]]);
+  for (const s of ["evaluation", "physical-test", "physical-instruction", "physical-form", "fitness", "athlete-results"]) assert.equal(menuKeyForScreen(s), "evaluation", s);
+  for (const g of physical.children) assert.ok(physical.screens.includes(g.screen), g.screen);
+  assert.equal(activeChildFor(ev, "physical-form")?.label, "Physical Test");
+  assert.equal(activeChildFor(ev, "fitness")?.label, "Physical Test", "old fitness entry page now lives under Physical Test");
+  assert.equal(activeChildFor(ev, "athlete-results"), null, "no second row for leaf sub-menus");
+  assert.equal(activeChildFor(menuItem("meeting"), "meeting-tasks"), null);
+  assert.equal(activeChildFor(null, "fitness"), null);
 });
 
 test("birthYearLabel / birthdayLabel show Gregorian / Buddhist years", () => {

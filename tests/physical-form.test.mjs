@@ -1,0 +1,94 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { FITNESS_TESTS, testsForRound } from "../js/fitness-calc.js";
+import { PHYSICAL_TEST_CONTENT, instructionCardHtml, instructionsHtml, safeImageSrc } from "../js/physical-test-content.js";
+import { TESTING_ROW_MM, defaultBlankRows, defaultRoundId, pickNote, roundOptions, testingFormHtml, testingRowHeightMm } from "../js/physical-form.js";
+
+const rounds = [
+  { id: "r1", roundType: "baseline", openDate: "2026-05-17", closeDate: "2026-05-30", makeupUntil: "2026-06-13", mode: "full" },
+  { id: "r2", roundType: "monitoring", openDate: "2026-08-09", closeDate: "2026-08-22", makeupUntil: "2026-09-05", mode: "selective" },
+  { id: "r3", roundType: "reeval", openDate: "2026-11-08", closeDate: "2026-11-21", makeupUntil: "2026-12-05", mode: "full" }
+];
+
+test("every fitness test has instruction content with equipment, steps and an empty media slot", () => {
+  for (const t of FITNESS_TESTS) {
+    const c = PHYSICAL_TEST_CONTENT[t.code];
+    assert.ok(c, t.code);
+    assert.ok(c.name && c.equipment.length > 0 && c.steps.length > 0, t.code);
+  }
+  assert.deepEqual(Object.keys(PHYSICAL_TEST_CONTENT).sort(), FITNESS_TESTS.map((t) => t.code).sort());
+});
+
+test("instruction card: age range, trial rule, placeholders when there is no image or video, and real media when given", () => {
+  const broad = FITNESS_TESTS.find((t) => t.code === "broad_jump");
+  const html = instructionCardHtml(broad);
+  assert.match(html, /U10–U18/);
+  assert.match(html, /3 ครั้ง · ใช้ค่าสูงสุด/);
+  assert.match(html, /รูปการทดสอบ · รอเพิ่ม/);
+  assert.match(html, /วิดีโอ · รอเพิ่ม/);
+  const withMedia = instructionCardHtml(broad, { ...PHYSICAL_TEST_CONTENT.broad_jump, imageUrl: "assets/physical/bj.jpg", videoUrl: "https://youtu.be/abc?x=1&y=2" });
+  assert.match(withMedia, /<img src="assets\/physical\/bj\.jpg"/);
+  assert.match(withMedia, /href="https:\/\/youtu\.be\/abc\?x=1&amp;y=2"/);
+  assert.ok(!withMedia.includes("รอเพิ่ม"));
+});
+
+test("safeImageSrc accepts https and assets/ paths only; the instruction page filters by age", () => {
+  assert.equal(safeImageSrc("javascript:alert(1)"), "");
+  assert.equal(safeImageSrc("assets/../secret.png"), "");
+  assert.equal(safeImageSrc("assets/physical/a.png"), "assets/physical/a.png");
+  assert.equal(safeImageSrc("https://x.com/a.png"), "https://x.com/a.png");
+  assert.equal((instructionsHtml().match(/instruction-card/g) || []).length, FITNESS_TESTS.length);
+  const u11 = instructionsHtml(11);
+  assert.ok(u11.includes('data-test="broad_jump"') && !u11.includes('data-test="cmj"') && !u11.includes('data-test="rsa_6x30"'));
+  assert.match(instructionsHtml(30), /ไม่มีรายการทดสอบ/);
+});
+
+test("defaultRoundId prefers the open round, then the latest, then none; options end with the no-round choice", () => {
+  assert.equal(defaultRoundId(rounds, "2026-08-10"), "r2");
+  assert.equal(defaultRoundId(rounds, "2026-10-01"), "r3", "latest by open date when nothing is open");
+  assert.equal(defaultRoundId([], "2026-10-01"), "");
+  const options = roundOptions(rounds, "2026-08-10");
+  assert.deepEqual(options.map((o) => o.id), ["r3", "r2", "r1", ""]);
+  assert.match(options[1].label, /กำลังเปิด/);
+  assert.match(options[0].label, /ยังไม่เปิด/);
+  assert.match(options[2].label, /ปิดแล้ว/);
+});
+
+test("row height shrinks with more rows but stays within the printable limits", () => {
+  assert.equal(testingRowHeightMm(10), TESTING_ROW_MM.max);
+  assert.equal(testingRowHeightMm(40), TESTING_ROW_MM.min);
+  assert.ok(testingRowHeightMm(20) < testingRowHeightMm(15));
+  assert.equal(defaultBlankRows(30), 2);
+  assert.equal(defaultBlankRows(14), 3);
+});
+
+const players = [
+  { number: 7, nickname: "เจเจ" },
+  { number: 3, nickname: "<b>x</b>" }
+];
+
+test("testing form: columns follow the round tests, trial sub-columns match the trial counts, text is escaped", () => {
+  const tests = testsForRound(rounds[0], "U16");
+  const html = testingFormHtml({ team: "THAWEE SC", ageGroup: "U16", roundText: "Baseline พ.ค. 2026", players, tests });
+  assert.match(html, /PHYSICAL TEST FORM/);
+  assert.match(html, /THAWEE SC · U16 · Baseline พ.ค. 2026/);
+  for (const t of tests) assert.ok(html.includes(t.label.replace("×", "×")), t.label);
+  const trialTotal = tests.reduce((n, t) => n + t.trials, 0);
+  const firstBody = html.split("<tbody>")[1].split("</tr>")[0];
+  assert.equal((firstBody.match(/<td/g) || []).length, 2 + trialTotal + 1);
+  const subHeaders = html.split("</tr><tr>")[1].split("</tr>")[0];
+  assert.equal((subHeaders.match(/<th>/g) || []).length, tests.filter((t) => t.trials > 1).reduce((n, t) => n + t.trials, 0));
+  assert.ok(!html.includes("<b>x</b>"));
+  assert.match(html, /พื้นผิว ☐ หญ้าเทียม/);
+  assert.match(html, /รองเท้า ☐ รองเท้าสตั๊ด/);
+  assert.match(html, /--row-h:\d+(\.\d)?mm/);
+  assert.equal((html.match(/sheet-blank/g) || []).length, 3);
+});
+
+test("pickNote lists max/min tests and RSA only when present", () => {
+  const u16 = testsForRound(rounds[0], "U16");
+  assert.match(pickNote(u16), /Broad Jump สูงสุด/);
+  assert.match(pickNote(u16), /Sprint 10 ม\. ต่ำสุด/);
+  assert.match(pickNote(u16), /RSA/);
+  assert.equal(pickNote(FITNESS_TESTS.filter((t) => t.pick === "single")), "");
+});

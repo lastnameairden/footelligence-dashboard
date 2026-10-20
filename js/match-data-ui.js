@@ -6,27 +6,12 @@ import { escapeHtml, todayBangkok } from "./ui-utils.js";
 import { buildReportModel, filterReports, groupByAgeGroup, hasDetail, seasonLabel, seasonOptions } from "./match-history.js";
 import { historyHtml, recordingFormHtml, reportSheetHtml } from "./match-sheets.js";
 import { ageGroupsOf } from "./player-gallery.js";
+import { printSheet } from "./print-sheet.js";
 
 const el = (id) => document.getElementById(id);
 let api = null; // { team(), ageGroups(), open(screen) = เปิดพร้อมโหลดข้อมูล, show(screen) = แค่สลับหน้าจอ, editMatchDay(date, ageGroup), ensureSession(date) }
 let reports = []; // matchReports ของทีม (โหลดตอนเปิดประวัติ)
 let currentReport = null;
-
-// ---------- พิมพ์ ----------
-// พิมพ์เฉพาะ .print-sheet: ใส่ class ให้ body ชั่วคราว (CSS @media print ซ่อนส่วนอื่น) + ตั้งขนาดกระดาษผ่าน <style> ชั่วคราว แล้วคืนค่าเมื่อพิมพ์เสร็จ
-function printSheet(pageCss) {
-  const style = document.createElement("style");
-  style.textContent = `@page { ${pageCss} }`;
-  document.head.appendChild(style);
-  document.body.classList.add("printing-sheet");
-  const cleanup = () => {
-    document.body.classList.remove("printing-sheet");
-    style.remove();
-    window.removeEventListener("afterprint", cleanup);
-  };
-  window.addEventListener("afterprint", cleanup);
-  window.print();
-}
 
 // ---------- Match Recording Form ----------
 async function loadPool() {

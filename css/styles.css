@@ -657,3 +657,11 @@ table.pro-table td.emphasis { font-weight: 600; color: var(--text-1); }
 .match-data-card-off:hover, .match-data-card-off:focus-visible { transform: none; }
 .coach-subtab-off { border-style: dashed; opacity: 0.6; cursor: not-allowed; }
 .report-row-new td { background: var(--accent-tint, #fef3c7); }
+/* Evaluation: แถบเมนูย่อยชั้นที่ 2 (Physical Test) + หน้า Instruction + Testing Form */
+.coach-subtabs-2 .coach-subtabs-inner { padding-top: 0.3rem; padding-bottom: 0.4rem; padding-left: 2.25rem; background: var(--surface-2); }
+.drawer-subitem2 { padding-left: 4.4rem; font-size: 0.8rem; }
+.instruction-grid { display: grid; grid-template-columns: 1fr; gap: 0.9rem; }
+.instruction-img { width: 100%; max-height: 14rem; object-fit: contain; border-radius: 0.5rem; background: var(--surface-2); }
+.instruction-img-empty { display: flex; align-items: center; justify-content: center; min-height: 7rem; border: 1px dashed var(--border); color: var(--text-3); font-size: 0.8125rem; }
+@media (min-width: 640px) { .instruction-grid { grid-template-columns: 14rem 1fr; } }
+@media screen { .sheet-testing-table { min-width: 1100px; } }

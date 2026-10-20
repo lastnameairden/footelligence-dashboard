@@ -45,11 +45,22 @@ export const COACH_MENU = [
     label: "Evaluation",
     hint: "การประเมิน",
     icon: "target",
-    screen: "fitness",
-    screens: ["fitness"],
+    screen: "evaluation",
+    screens: ["evaluation", "physical-test", "physical-instruction", "physical-form", "fitness", "athlete-results"],
+    // children ซ้อนได้ 1 ชั้น: Physical Test มีเมนูย่อยของตัวเอง (แสดงเป็นแถบแถวที่สอง)
     children: [
-      { label: "ผลทดสอบสมรรถภาพ", screen: "fitness" },
-      { label: "การประเมิน MASC", external: "masc" }
+      { label: "Footelligence Test", external: "masc" },
+      {
+        label: "Physical Test",
+        screen: "physical-test",
+        screens: ["physical-test", "physical-instruction", "physical-form", "fitness"],
+        children: [
+          { label: "Instruction", screen: "physical-instruction" },
+          { label: "Testing Form", screen: "physical-form" },
+          { label: "Data Entry", screen: "fitness" }
+        ]
+      },
+      { label: "Athlete Results", screen: "athlete-results" }
     ]
   },
   { key: "injury-sick", label: "Injury/Sick", hint: "บาดเจ็บ / เจ็บป่วย", icon: "heart-pulse", screen: "injury", screens: ["injury"] },
@@ -59,6 +70,11 @@ export const COACH_MENU = [
 // เมนูย่อยนี้เปิดอยู่ไหม (เมนูย่อยบางตัวครอบคลุมหลายหน้าจอ เช่น ประวัติการแข่งขัน + รายงานผล)
 export function childMatchesScreen(child, screen) {
   return !!screen && (child.screens || [child.screen]).includes(screen);
+}
+
+// เมนูย่อยชั้นแรกที่หน้าจอนี้อยู่ภายใต้ (ใช้เลือกแถบเมนูย่อยชั้นที่ 2 ที่จะแสดง) — ไม่มี = null
+export function activeChildFor(menu, screen) {
+  return (menu?.children || []).find((c) => c.children && childMatchesScreen(c, screen)) ?? null;
 }
 
 // เมนูที่หน้าจอนี้อยู่ภายใต้ (ไม่มี = null)
