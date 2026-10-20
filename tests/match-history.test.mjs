@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildReportModel, filterReports, formatLabel, groupByAgeGroup, hasDetail, seasonLabel, seasonOptions, seasonStartYear } from "../js/match-history.js";
-import { dateLabel, historyHtml, recordingFormHtml, reportSheetHtml, starsText } from "../js/match-sheets.js";
+import { FORM_COL_WIDTHS, FORM_ROW_MM, FORM_TABLE_BUDGET_MM, dateLabel, defaultBlankRows, formRowHeightMm, historyHtml, recordingFormHtml, reportSheetHtml, starsText } from "../js/match-sheets.js";
 
 const detailReport = {
   id: "md1",
@@ -122,4 +122,29 @@ test("recordingFormHtml lists every player of the age group plus blank rows and 
   assert.equal((html.match(/class="sheet-blank"/g) || []).length, 4);
   assert.match(html, /ความยาวการแข่งขัน/);
   assert.match(html, /☆☆☆☆/, "4 blank stars");
+});
+
+test("the recording form is sized to fit one A4 landscape page: rows shrink with the roster but never overflow the budget", () => {
+  assert.equal(formRowHeightMm(14), FORM_ROW_MM.max, "few players: comfortable rows");
+  for (const n of [16, 20, 24, 26, 28]) {
+    const h = formRowHeightMm(n);
+    assert.ok(h >= FORM_ROW_MM.min && h <= FORM_ROW_MM.max);
+    assert.ok(h * n <= FORM_TABLE_BUDGET_MM + 1e-6 || h === FORM_ROW_MM.min, `${n} rows of ${h}mm must fit the ${FORM_TABLE_BUDGET_MM}mm budget`);
+  }
+  assert.ok(formRowHeightMm(26) < formRowHeightMm(18), "more players, thinner rows");
+  assert.equal(defaultBlankRows(18), 4);
+  assert.equal(defaultBlankRows(24), 2, "fewer blank rows for a big squad");
+  assert.equal(Math.round(FORM_COL_WIDTHS.reduce((a, b) => a + b, 0)), 100);
+  assert.equal(FORM_COL_WIDTHS.length, 14);
+});
+
+test("recordingFormHtml carries the row height, a column per field and no page-spilling extras", () => {
+  const players = Array.from({ length: 20 }, (_, i) => ({ number: i + 1, nickname: `P${i + 1}`, fullName: "x", ageGroup: "U16" }));
+  const html = recordingFormHtml({ team: "THAWEE SC", ageGroup: "U16", players });
+  assert.match(html, new RegExp(`--row-h:${formRowHeightMm(24)}mm`), "20 players + 4 blank rows");
+  assert.equal((html.match(/<col /g) || []).length, 14);
+  assert.equal((html.match(/<th[ >]/g) || []).length, 14);
+  assert.equal((html.match(/class="sheet-blank"/g) || []).length, 4);
+  const big = recordingFormHtml({ team: "THAWEE SC", ageGroup: "U16", players: Array.from({ length: 26 }, (_, i) => ({ number: i, nickname: "x", ageGroup: "U16" })) });
+  assert.equal((big.match(/class="sheet-blank"/g) || []).length, 2);
 });

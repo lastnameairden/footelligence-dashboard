@@ -620,6 +620,9 @@ table.pro-table td.emphasis { font-weight: 600; color: var(--text-1); }
 .sheet-note { color: #555; margin: 0.4rem 0; font-size: 0.75rem; }
 .sheet-report-lines p { margin: 0.2rem 0; }
 .sheet-fields > div { margin: 0.2rem 0; line-height: 2; }
+.sheet-row { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 0 0.45rem; }
+.sheet-row .grow { flex: 1 1 6rem; min-width: 4rem; }
+.sheet-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1.5rem; }
 .sheet-line { display: inline-block; border-bottom: 1px solid #555; height: 1em; vertical-align: bottom; }
 .sheet-form-table td { height: 1.5rem; }
 .sheet-blank td { height: 1.7rem; }
@@ -634,4 +637,17 @@ table.pro-table td.emphasis { font-weight: 600; color: var(--text-1); }
   body.printing-sheet .sheet-table tr { page-break-inside: avoid; }
   body.printing-sheet .sheet-table thead { display: table-header-group; }
   body.printing-sheet { background: #fff !important; }
+}
+/* Match Recording Form: บังคับให้พอดี A4 แนวนอนหน้าเดียว (ขนาดกระดาษตั้งตอนพิมพ์ใน match-data-ui.js: A4 landscape, margin 7mm → พื้นที่ 283 × 196 มม.)
+   ความสูงแถวตารางมาจากตัวแปร --row-h ที่คำนวณตามจำนวนนักกีฬา (formRowHeightMm) */
+@media print {
+  body.printing-sheet .sheet-form { height: 194mm; overflow: hidden; font-size: 7.4pt; line-height: 1.3; page-break-after: avoid; page-break-inside: avoid; }
+  body.printing-sheet .sheet-form .sheet-head { padding-bottom: 0.8mm; border-bottom-width: 1.5px; flex-wrap: nowrap; }
+  body.printing-sheet .sheet-form .sheet-logo { width: 8.5mm; height: 8.5mm; }
+  body.printing-sheet .sheet-form h4 { margin: 1.4mm 0 0.6mm; font-size: 8.2pt; }
+  body.printing-sheet .sheet-form .sheet-fields > div { margin: 0; line-height: 1.75; }
+  body.printing-sheet .sheet-form .sheet-table { font-size: 6.6pt; table-layout: fixed; }
+  body.printing-sheet .sheet-form .sheet-table th { font-size: 6pt; padding: 0.2mm 0.4mm; line-height: 1.15; }
+  body.printing-sheet .sheet-form .sheet-table td { height: var(--row-h); padding: 0 0.5mm; line-height: 1; }
+  body.printing-sheet .sheet-form .sheet-note { margin: 0.6mm 0; font-size: 6pt; }
 }

@@ -117,39 +117,56 @@ export function reportSheetHtml(model, team) {
 const BOX = "☐";
 const STARS_BLANK = "☆".repeat(MATCH_RATING_MAX);
 
-export function recordingFormHtml({ team, ageGroup, players, blankRows = 4 }) {
+// ฟอร์มต้องอยู่ในกระดาษ A4 แนวนอน "หน้าเดียว" — ความสูงที่เหลือให้ตารางนักกีฬา (มม.) หลังหักหัวฟอร์ม ส่วนที่ 1/3 และบรรทัดอื่น (ดู @media print ใน styles.css)
+export const FORM_TABLE_BUDGET_MM = 112; // เผื่อ ~15 มม. จากที่ประเมินไว้ ให้หัวตารางขึ้นหลายบรรทัดหรือข้อความยาวก็ยังไม่ล้นหน้า
+// สัดส่วนความกว้างคอลัมน์ (รวม 100): # · ชื่อเล่น · ชื่อจริง · รุ่น · สถานะ · ตำแหน่ง · ประตู · Assist · เหลือง · แดง · ออกนาที · ถูกแทนโดย · หมายเหตุ · คะแนน
+export const FORM_COL_WIDTHS = [3, 8, 13, 4, 11, 6, 4.5, 4.5, 4, 4, 6, 9, 12, 11];
+export const FORM_ROW_MM = { min: 3.9, max: 6.5 };
+
+// ความสูงต่อแถวของตาราง (มม.) ให้จำนวนแถวทั้งหมด (นักกีฬา + แถวว่าง) พอดีกับ FORM_TABLE_BUDGET_MM — คนน้อยแถวสูง/คนมากแถวบางลงแต่ยังอยู่หน้าเดียว
+export function formRowHeightMm(rowCount) {
+  const h = FORM_TABLE_BUDGET_MM / Math.max(rowCount, 1);
+  return Math.floor(Math.min(FORM_ROW_MM.max, Math.max(FORM_ROW_MM.min, h)) * 10) / 10; // ปัดลงเสมอ ไม่ให้เกินงบความสูง
+}
+
+// แถวว่างท้ายตารางสำหรับนักกีฬารุ่นอื่น: 4 แถว ลดเหลือ 2 เมื่อรุ่นมีนักกีฬามาก เพื่อไม่ให้แถวบางเกินไป
+export const defaultBlankRows = (playerCount) => (playerCount >= 24 ? 2 : 4);
+
+export function recordingFormHtml({ team, ageGroup, players, blankRows = defaultBlankRows(players.length) }) {
+  const cells = (n) => "<td></td>".repeat(n);
   const rows = players
     .map(
       (p) => `<tr>
         <td>${p.number ?? ""}</td><td class="l">${escapeHtml(p.nickname ?? "-")}</td><td class="l">${escapeHtml(p.fullName ?? "")}</td><td>${escapeHtml(p.ageGroup ?? ageGroup)}</td>
-        <td class="nw">${BOX}ต ${BOX}ส ${BOX}ม</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="nw">${STARS_BLANK}</td></tr>`
+        <td class="nw">${BOX}ต ${BOX}ส ${BOX}ม</td>${cells(8)}<td class="nw">${STARS_BLANK}</td></tr>`
     )
     .join("");
-  const blank = Array.from({ length: blankRows }, () => `<tr class="sheet-blank"><td></td><td class="l"></td><td class="l"></td><td></td><td class="nw">${BOX}ต ${BOX}ส ${BOX}ม</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="nw">${STARS_BLANK}</td></tr>`).join("");
-  const line = (w = 110) => `<span class="sheet-line" style="min-width:${w}px"></span>`;
-  return `<div class="sheet sheet-form print-sheet">
-    <div class="sheet-head"><div class="sheet-brand">${teamLogoImg(team, "sheet-logo")}<div><b>MATCH RECORDING FORM</b><br><span>${escapeHtml(team)} · ${escapeHtml(ageGroup)}</span></div></div>
-      <div class="sheet-vs">วันที่ ${line(100)} เวลา ${line(55)} สถานที่ ${line(120)}</div></div>
+  const blank = Array.from({ length: blankRows }, () => `<tr class="sheet-blank"><td></td><td class="l"></td><td class="l"></td><td></td><td class="nw">${BOX}ต ${BOX}ส ${BOX}ม</td>${cells(8)}<td class="nw">${STARS_BLANK}</td></tr>`).join("");
+  const rowH = formRowHeightMm(players.length + blankRows);
+  const line = (cls = "") => `<span class="sheet-line grow ${cls}"></span>`;
+  const fixed = (w) => `<span class="sheet-line" style="width:${w}mm"></span>`;
+  return `<div class="sheet sheet-form print-sheet" style="--row-h:${rowH}mm">
+    <div class="sheet-head"><div class="sheet-brand">${teamLogoImg(team, "sheet-logo")}<div><b>MATCH RECORDING FORM</b> <span>${escapeHtml(team)} · ${escapeHtml(ageGroup)}</span></div></div>
+      <div class="sheet-vs sheet-row">วันที่ ${fixed(26)} เวลา ${fixed(14)} สถานที่ ${fixed(40)}</div></div>
     <h4>ส่วนที่ 1 · ข้อมูล Match</h4>
     <div class="sheet-fields">
-      <div>ประเภทการแข่งขัน ${BOX} 7v7 ${BOX} 9v9 ${BOX} 11v11 ${BOX} อื่นๆ ${line(70)} &nbsp; ความยาวการแข่งขัน ${line(40)} นาที</div>
-      <div>ประเภทรายการ ${BOX} ลีก ${BOX} ทัวร์นาเมนต์ ${BOX} อุ่นเครื่อง &nbsp; ชื่อรายการ ${line(220)}</div>
-      <div>คู่แข่ง ${line(260)}</div>
+      <div class="sheet-row"><span>ประเภทการแข่งขัน ${BOX} 7v7 ${BOX} 9v9 ${BOX} 11v11 ${BOX} อื่นๆ</span>${fixed(22)}<span>ความยาวการแข่งขัน</span>${fixed(12)}<span>นาที &nbsp; ประเภทรายการ ${BOX} ลีก ${BOX} ทัวร์นาเมนต์ ${BOX} อุ่นเครื่อง</span></div>
+      <div class="sheet-row"><span>ชื่อรายการ</span>${line()}<span>คู่แข่ง</span>${line()}</div>
     </div>
     <h4>ส่วนที่ 2 · ข้อมูล Game</h4>
-    <div class="sheet-fields"><div>ผลการแข่งขัน ${BOX} ชนะ ${BOX} เสมอ ${BOX} แพ้ &nbsp; ประตู ทีมเรา ${line(40)} คู่แข่ง ${line(40)} &nbsp; แผนการเล่น ${line(80)}</div></div>
+    <div class="sheet-fields"><div class="sheet-row"><span>ผลการแข่งขัน ${BOX} ชนะ ${BOX} เสมอ ${BOX} แพ้ &nbsp; ประตู ทีมเรา</span>${fixed(12)}<span>คู่แข่ง</span>${fixed(12)}<span>&nbsp; แผนการเล่น</span>${fixed(24)}</div></div>
     <table class="sheet-table sheet-form-table">
-      <thead><tr><th>#</th><th class="l">ชื่อเล่น</th><th class="l">ชื่อจริง</th><th>รุ่น</th><th>ต=ตัวจริง ส=สำรอง ม=ไม่มีรายชื่อ</th><th>ตำแหน่ง</th><th>ประตู</th><th>Assist</th><th>ใบเหลือง</th><th>ใบแดง</th><th>ออกนาที</th><th>ถูกแทนโดย</th><th>หมายเหตุ</th><th>คะแนน (วงกลม ครั้งละครึ่งดาว)</th></tr></thead>
+      <colgroup>${FORM_COL_WIDTHS.map((w) => `<col style="width:${w}%">`).join("")}</colgroup>
+      <thead><tr><th>#</th><th class="l">ชื่อเล่น</th><th class="l">ชื่อจริง</th><th>รุ่น</th><th>ต=ตัวจริง ส=สำรอง ม=ไม่มี</th><th>ตำแหน่ง</th><th>ประตู</th><th>Assist</th><th>เหลือง</th><th>แดง</th><th>ออกนาที</th><th>ถูกแทนโดย</th><th>หมายเหตุ</th><th>คะแนน (ครึ่งดาว)</th></tr></thead>
       <tbody>${rows}${blank}</tbody>
     </table>
-    <p class="sheet-note">ตำแหน่ง: ${ALL_POSITIONS.join(" ")} · นาทีเปลี่ยนตัวเขียนรูปแบบ 00:00 · แถวว่างท้ายตารางสำหรับนักกีฬาจากรุ่นอื่น (เขียนรุ่นอายุในช่อง "รุ่น")</p>
+    <p class="sheet-note">ตำแหน่ง: ${ALL_POSITIONS.join(" ")} · นาทีเปลี่ยนตัวเขียน 00:00 · แถวว่างท้ายตารางสำหรับนักกีฬาจากรุ่นอื่น (เขียนรุ่นในช่อง "รุ่น")</p>
     <h4>ส่วนที่ 3 · Match Report</h4>
-    <div class="sheet-fields">
-      <div>รูปแบบการเล่นเกมรุกของคู่แข่ง ${line(520)}</div>
-      <div>รูปแบบการเล่นเกมรับของคู่แข่ง ${line(520)}</div>
-      <div>ลิงก์ดูการแข่งขันย้อนหลัง (ถ้ามี) ${line(300)} </div>
-      <div>ความคิดเห็นเพิ่มเติม (ถ้ามี) ${line(430)}</div>
+    <div class="sheet-fields sheet-cols">
+      <div class="sheet-row"><span>เกมรุกของคู่แข่ง</span>${line()}</div>
+      <div class="sheet-row"><span>ลิงก์ดูย้อนหลัง (ถ้ามี)</span>${line()}</div>
+      <div class="sheet-row"><span>เกมรับของคู่แข่ง</span>${line()}</div>
+      <div class="sheet-row"><span>ความคิดเห็นเพิ่มเติม (ถ้ามี)</span>${line()}</div>
     </div>
   </div>`;
 }
-
