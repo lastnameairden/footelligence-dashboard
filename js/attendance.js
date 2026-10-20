@@ -166,6 +166,7 @@ const meetingTasksSection = document.getElementById("meeting-tasks-section");
 const meetingTasksBody = document.getElementById("meeting-tasks-body");
 const dayTypeSegmented = document.getElementById("day-type-segmented");
 const matchDayPanel = document.getElementById("match-day-panel");
+const scoreLegend = document.getElementById("score-legend");
 const instructionSection = document.getElementById("instruction-section");
 const playerGallerySection = document.getElementById("player-gallery-section");
 const playerGalleryCount = document.getElementById("player-gallery-count");
@@ -5016,6 +5017,7 @@ function setMatchDayVisible(on) {
   matchDayPanel.classList.toggle("hidden", !on);
   loadSessionBtn.classList.toggle("hidden", on);
   viewSessionBtn.classList.toggle("hidden", on);
+  scoreLegend.classList.toggle("hidden", on); // เกณฑ์ 1-4 เป็นของตารางเช็คชื่อซ้อม ไม่เกี่ยวกับ Match Day
   if (on) {
     rosterWrap.classList.add("hidden");
     noTrainingBanner.classList.add("hidden");

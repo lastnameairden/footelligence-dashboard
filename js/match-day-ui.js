@@ -248,8 +248,8 @@ function render() {
       <div class="card card-pad space-y-4">
         <h3 class="section-title">ส่วนที่ 3 · Match Report</h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div><label class="field-label">รูปแบบการเล่นเกมรุกของคู่แข่ง <span class="text-red-600">*บังคับ</span></label><textarea rows="3" class="field-input" data-f="oppAttack">${escapeHtml(f.oppAttack)}</textarea></div>
-          <div><label class="field-label">รูปแบบการเล่นเกมรับของคู่แข่ง <span class="text-red-600">*บังคับ</span></label><textarea rows="3" class="field-input" data-f="oppDefense">${escapeHtml(f.oppDefense)}</textarea></div>
+          <div><label class="field-label">รูปแบบการเล่นเกมรุกของคู่แข่ง</label><textarea rows="3" class="field-input" data-f="oppAttack">${escapeHtml(f.oppAttack)}</textarea></div>
+          <div><label class="field-label">รูปแบบการเล่นเกมรับของคู่แข่ง</label><textarea rows="3" class="field-input" data-f="oppDefense">${escapeHtml(f.oppDefense)}</textarea></div>
           ${textField("ลิงก์สำหรับดูการแข่งขันย้อนหลัง (ถ้ามี)", "videoUrl", f.videoUrl, { placeholder: "https://..." })}
           <div><label class="field-label">ความคิดเห็นเพิ่มเติม (ถ้ามี)</label><textarea rows="3" class="field-input" data-f="notes">${escapeHtml(f.notes)}</textarea></div>
         </div>
