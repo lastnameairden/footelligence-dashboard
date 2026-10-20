@@ -7,7 +7,7 @@ import { buildResults, resultsHtml } from "./injury-results.js";
 import { ageNumberOf } from "./fitness-calc.js";
 
 const el = (id) => document.getElementById(id);
-let api = null; // { team(), ageGroups(), edit(report) = เปิด Recording ในโหมดแก้ไข }
+let api = null; // { team(), ageGroups(), edit(report) = เปิด Recording ในโหมดแก้ไข, remove(report) = ลบรายการแล้วโหลดผลใหม่ }
 let reports = [];
 let mode = "term";
 let key = null;
@@ -68,8 +68,11 @@ export function initResults(c) {
   });
   el("injury-results-age").addEventListener("change", render);
   el("injury-results-body").addEventListener("click", (e) => {
-    const btn = e.target.closest("[data-injury-edit]");
-    const report = btn && reports.find((r) => r.id === btn.dataset.injuryEdit);
-    if (report) api.edit(report);
+    const editBtn = e.target.closest("[data-injury-edit]");
+    const deleteBtn = e.target.closest("[data-injury-delete]");
+    const report = reports.find((r) => r.id === (editBtn?.dataset.injuryEdit ?? deleteBtn?.dataset.injuryDelete));
+    if (!report) return;
+    if (editBtn) api.edit(report);
+    else api.remove(report); // ลบ (มีกล่องยืนยันก่อน) แล้วโหลดผลใหม่
   });
 }

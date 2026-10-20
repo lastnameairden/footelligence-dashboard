@@ -145,7 +145,6 @@ const injuryReportForm = document.getElementById("injury-report-form");
 const injuryReportStatus = document.getElementById("injury-report-status");
 const injuryReportSubmitBtn = document.getElementById("injury-report-submit-btn");
 const cancelEditInjuryBtn = document.getElementById("cancel-edit-injury-btn");
-const injuryReportListBody = document.getElementById("injury-report-list-body");
 const injuryAgeGroupSelect = document.getElementById("injury-age-group");
 const injuryPlayerSearchInput = document.getElementById("injury-player-search");
 const injuryPlayerDropdown = document.getElementById("injury-player-dropdown");
@@ -6649,16 +6648,6 @@ function loadInjuryFormExtras(inj) {
   renderInjuryProgress();
 }
 
-// รายละเอียดสั้นๆ ใต้อาการในตารางรายการ (ตำแหน่ง ประเภท กลไก บาดเจ็บซ้ำ จำนวนวันที่หยุด ความคืบหน้า)
-function injuryDetailHtml(inj) {
-  const { tags, daysText } = injuryDetailLabels(inj, todayBangkok());
-  const parts = [...tags, daysText];
-  const noteCount = (inj.progressNotes || []).length;
-  if (noteCount > 0) parts.push(`ความคืบหน้า ${noteCount} รายการ`);
-  const shown = parts.filter(Boolean);
-  return shown.length > 0 ? `<div class="text-xs text-slate-500 mt-1">${shown.map(escapeHtml).join(" · ")}</div>` : "";
-}
-
 // ความคืบหน้าการรักษา (แสดงเฉพาะตอนเปิดแก้ไขรายงานที่บันทึกแล้ว)
 function renderInjuryProgress() {
   const record = editingInjuryId ? injuryReportsCache.find((r) => r.id === editingInjuryId) : null;
@@ -6774,51 +6763,14 @@ injuryAgeGroupSelect.addEventListener("change", () => {
   refreshInjuryRecurrence();
 });
 
+// โหลดรายงานบาดเจ็บของทีมเข้า cache (ใช้ตรวจบาดเจ็บซ้ำและบันทึกความคืบหน้า) — หน้า Recording ไม่แสดงรายชื่อแล้ว ดู/แก้ไข/ลบรายการที่ Results
 async function renderInjuryReportList() {
-  injuryReportListBody.innerHTML =
-    '<tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>';
   const snap = await getDocs(query(collection(db, "injuryReports"), where("team", "==", myTeam)));
   const reports = [];
   snap.forEach((d) => reports.push({ id: d.id, ...d.data() }));
   reports.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
   injuryReportsCache = reports;
-
-  if (reports.length === 0) {
-    injuryReportListBody.innerHTML =
-      '<tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">ยังไม่มีรายการบาดเจ็บ</td></tr>';
-    return;
-  }
-
-  injuryReportListBody.innerHTML = "";
-  for (const inj of reports) {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td class="emphasis">${escapeHtml(inj.date ?? "-")}</td>
-      <td>${escapeHtml(inj.playerName ?? "-")}</td>
-      <td>${escapeHtml(inj.ageGroup ?? "-")}</td>
-      <td>${escapeHtml(inj.description ?? "-")}${injuryDetailHtml(inj)}</td>
-      <td>${injurySeverityBadge(inj.severity)}</td>
-      <td>${injuryStatusBadge(inj.status)}</td>
-      <td>${escapeHtml(inj.expectedReturn ?? "-")}</td>
-    `;
-    const actionTd = document.createElement("td");
-    actionTd.className = "space-x-2";
-    const editBtn = document.createElement("button");
-    editBtn.textContent = "แก้ไข";
-    editBtn.className = "btn btn-secondary btn-sm";
-    editBtn.addEventListener("click", () => startEditInjury(inj));
-    const deleteBtn = document.createElement("button");
-    deleteBtn.textContent = "ลบ";
-    deleteBtn.className = "btn btn-danger-soft btn-sm";
-    deleteBtn.addEventListener("click", () => deleteInjuryReport(inj));
-    actionTd.appendChild(editBtn);
-    actionTd.appendChild(deleteBtn);
-    tr.appendChild(actionTd);
-    injuryReportListBody.appendChild(tr);
-  }
-  applyDataLabels(injuryReportListBody);
 }
-
 function startEditInjury(inj) {
   editingInjuryId = inj.id;
   injuryAgeGroupSelect.value = inj.ageGroup ?? "";
@@ -6845,6 +6797,10 @@ initResults({
   edit: (report) => {
     openInjuryReportSection();
     startEditInjury(report);
+  },
+  remove: async (report) => {
+    await deleteInjuryReport(report);
+    await showResults();
   }
 });
 

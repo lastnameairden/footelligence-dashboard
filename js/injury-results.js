@@ -146,7 +146,7 @@ function detailTableHtml(model) {
         <td>${injurySeverityBadge(r.severity)}</td>
         <td>${injuryStatusBadge(r.status)}</td>
         <td title="${escapeHtml(daysText)}">${days}</td>
-        <td><button type="button" class="btn btn-secondary btn-sm" data-injury-edit="${escapeHtml(r.id)}">แก้ไข</button></td>
+        <td class="whitespace-nowrap"><button type="button" class="btn btn-secondary btn-sm" data-injury-edit="${escapeHtml(r.id)}">แก้ไข</button> <button type="button" class="btn btn-danger-soft btn-sm" data-injury-delete="${escapeHtml(r.id)}">ลบ</button></td>
       </tr>`;
     })
     .join("");

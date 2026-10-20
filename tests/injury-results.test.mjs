@@ -60,6 +60,7 @@ test("resultsHtml: summary cards, charts, tables, edit buttons, escaped text", (
   assert.match(html, /ตามรุ่นอายุ/);
   assert.match(html, /เลยกำหนด 10 วัน/);
   assert.match(html, /data-injury-edit="b"/);
+  assert.match(html, /data-injury-delete="b"/);
   assert.match(html, /เจเจ<\/span> <span class="text-slate-400">U17<\/span> · 2 ครั้ง \(ซ้ำ 1\)/);
   assert.ok(!html.includes("<img src=x") && !html.includes("<script>"));
   assert.ok((html.match(/<svg/g) || []).length >= 6, "bars and stacked bars are SVG");
