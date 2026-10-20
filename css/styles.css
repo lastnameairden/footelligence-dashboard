@@ -693,3 +693,7 @@ details[open] > .injury-history-group-summary::before, details[open] > .injury-h
 .injury-history-player .table-wrap { padding: 0 1rem 0.75rem; }
 .injury-history-latest { flex: 1 1 12rem; }
 .injury-history-list { background: var(--surface); }
+/* Training Report: ภาพย่อรูปแนบในตารางประวัติ */
+.report-photo-list { display: flex; flex-wrap: wrap; gap: 0.3rem; min-width: 3rem; }
+.report-photo-thumb { width: 2.75rem; height: 2.75rem; object-fit: cover; border-radius: 0.4rem; border: 1px solid var(--border); background: var(--surface-2); display: block; }
+.report-photo-thumb:hover { border-color: var(--accent); }

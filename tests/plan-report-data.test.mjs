@@ -10,6 +10,7 @@ import {
   planAgeGroupsOf,
   planDataHtml,
   reportAttendLabel,
+  photoThumbsHtml,
   reportHistoryHtml,
   reportPeriodLabel,
   shortDate,
@@ -110,4 +111,23 @@ test("reportHistoryHtml: compact (under the form) and full (Training Report Data
   assert.match(full, /20 ต\.ค\. 18:12/);
   assert.match(full, /13\.7512, 100\.5013/);
   assert.match(reportHistoryHtml([], {}), /ยังไม่มีรายงาน/);
+});
+
+test("photoThumbsHtml: one thumbnail link per https photo, anything else is dropped, no photos = dash", () => {
+  const html = photoThumbsHtml([{ url: "https://x/a.jpg?t=1&u=2" }, { url: "javascript:alert(1)" }, { url: "https://x/b.jpg" }, null, {}]);
+  assert.equal((html.match(/<img /g) || []).length, 2);
+  assert.match(html, /href="https:\/\/x\/a\.jpg\?t=1&amp;u=2" target="_blank" rel="noopener noreferrer"/);
+  assert.ok(!html.includes("javascript:"));
+  assert.equal(photoThumbsHtml([]), "-");
+  assert.equal(photoThumbsHtml(undefined), "-");
+  assert.equal(photoThumbsHtml([{ url: "http://insecure/a.jpg" }]), "-");
+});
+
+test("report history tables show the photo thumbnails instead of a count", () => {
+  const groups = groupByMonth([{ id: "r", date: "2026-10-20", coachName: "โค้ช", attended: true, photos: [{ url: "https://x/a.jpg" }] }]);
+  for (const mode of ["compact", "full"]) {
+    const html = reportHistoryHtml(groups, { mode });
+    assert.match(html, /class="report-photo-thumb"/, mode);
+    assert.match(html, /src="https:\/\/x\/a\.jpg"/, mode);
+  }
 });

@@ -122,6 +122,14 @@ export function filterReportsByMonths(reports, months = []) {
   return reports.filter((r) => set.size === 0 || set.has(monthOf(r.date)));
 }
 
+// รูปแนบของรายงาน (photos = [{ url, path }]) เป็นภาพย่อกดเปิดรูปเต็มในแท็บใหม่ — รับเฉพาะลิงก์ https (safeHttpUrl) ไม่มีรูป = "-"
+export function photoThumbsHtml(photos) {
+  const urls = (photos || []).map((p) => safeHttpUrl(p?.url)).filter(Boolean);
+  if (urls.length === 0) return "-";
+  return `<div class="report-photo-list">${urls
+    .map((u, i) => `<a href="${u}" target="_blank" rel="noopener noreferrer" title="เปิดรูปที่ ${i + 1}"><img src="${u}" alt="รูปรายงานการฝึกซ้อม ${i + 1}" loading="lazy" class="report-photo-thumb" /></a>`)
+    .join("")}</div>`;
+}
 // mode "compact" = ใต้ฟอร์ม Training Report · "full" = หน้า Training Report Data (เพิ่มโค้ช พิกัด วัน/เวลาที่ส่ง)
 export function reportHistoryHtml(groups, { mode = "compact", highlightDate = null } = {}) {
   if (groups.length === 0) return '<div class="card card-pad text-center text-slate-500">ยังไม่มีรายงานการฝึกซ้อมในช่วงที่เลือก</div>';
@@ -137,7 +145,7 @@ export function reportHistoryHtml(groups, { mode = "compact", highlightDate = nu
           const tag = r.attended === true ? "badge badge-success" : "badge badge-neutral";
           const attend = `<span class="${tag}">${escapeHtml(reportAttendLabel(r))}</span>`;
           const open = `<button type="button" class="btn btn-secondary btn-sm" data-report-open="${escapeHtml(r.date)}">เปิด / แก้ไข</button>`;
-          const photos = (r.photos || []).length || "-";
+          const photos = photoThumbsHtml(r.photos);
           const mark = highlightDate && r.date === highlightDate ? ' class="report-row-new"' : "";
           return full
             ? `<tr${mark}><td class="emphasis">${escapeHtml(shortDate(r.date))}</td><td>${escapeHtml(r.coachName ?? "-")}</td><td>${attend}</td><td>${escapeHtml(reportPeriodLabel(r))}</td><td>${escapeHtml(r.notes ?? "-")}</td><td>${locationHtml(r.location)}</td><td>${photos}</td><td>${escapeHtml(submittedLabel(r))}</td><td>${open}</td></tr>`
