@@ -70,6 +70,8 @@ import { openFitnessEntry } from "./fitness-entry-ui.js";
 import { parseParentHeights } from "./fitness-calc.js";
 import { applyTeamTheme } from "./team-theme.js";
 import { initMatchDay, openMatchDay } from "./match-day-ui.js";
+import { buildAttendanceGrid, gridHtml, legendHtml } from "./attendance-grid.js";
+import { addMonthsToMonth, thaiMonthLabel } from "./coach-meetings.js";
 import { COACH_MENU, menuItem, menuKeyForScreen } from "./coach-menu.js";
 import { ageGroupsOf, birthYearLabel, birthdayLabel, filterAndSortPlayers, playerDisplayName } from "./player-gallery.js";
 import { STAFF_PERMISSIONS, canAccessAdminFeature, normalizePermissions, permissionsSummary, staffCan, staffLandingFeature } from "./staff-perms.js";
@@ -164,6 +166,15 @@ const trainingPlanLateCountEl = document.getElementById("training-plan-late-coun
 const dailySection = document.getElementById("daily-section");
 const meetingTasksSection = document.getElementById("meeting-tasks-section");
 const meetingTasksBody = document.getElementById("meeting-tasks-body");
+const attendanceGridSection = document.getElementById("attendance-grid-section");
+const attendanceGridCoachLabel = document.getElementById("attendance-grid-coach-label");
+const attendanceGridPrevBtn = document.getElementById("attendance-grid-prev-btn");
+const attendanceGridNextBtn = document.getElementById("attendance-grid-next-btn");
+const attendanceGridMonthLabel = document.getElementById("attendance-grid-month-label");
+const attendanceGridAgeSelect = document.getElementById("attendance-grid-age-select");
+const attendanceGridStatus = document.getElementById("attendance-grid-status");
+const attendanceGridLegend = document.getElementById("attendance-grid-legend");
+const attendanceGridWrap = document.getElementById("attendance-grid-wrap");
 const dayTypeSegmented = document.getElementById("day-type-segmented");
 const matchDayPanel = document.getElementById("match-day-panel");
 const scoreLegend = document.getElementById("score-legend");
@@ -659,6 +670,7 @@ function hideAllScreens() {
   dailySection.classList.add("hidden");
   meetingTasksSection.classList.add("hidden");
   instructionSection.classList.add("hidden");
+  attendanceGridSection.classList.add("hidden");
   playerGallerySection.classList.add("hidden");
   playerDetailSection.classList.add("hidden");
 }
@@ -983,6 +995,7 @@ function renderDrawerItemsInner() {
 // ---------- เมนูหลักของโค้ช 9 รายการ (รายการและการจับคู่หน้าจออยู่ที่ coach-menu.js) ----------
 const COACH_SCREEN_OPENERS = {
   instruction: () => openInstructionSection(),
+  "attendance-grid": () => openAttendanceGrid(),
   players: () => openPlayerGallery(),
   checkin: () => openCheckinSection(),
   daily: () => showDaily(),
@@ -1088,6 +1101,85 @@ coachSubtabsInner.addEventListener("click", (e) => {
   if (!btn) return;
   if (btn.dataset.subExternal === "masc") openMascPage();
   else COACH_SCREEN_OPENERS[btn.dataset.subScreen]?.();
+});
+
+// ---------- Attendance (เมนู 4): ตารางเช็คชื่อรายเดือนของรุ่นอายุที่โค้ชดูแล — ตรรกะ/สีอยู่ที่ attendance-grid.js ----------
+let attendanceGridMonth = "";
+let attendanceGridData = null; // { attendanceRecords, sessions, matchReports, coaches } ของเดือนที่โหลดล่าสุด
+
+function renderAttendanceGridView() {
+  const groups = ageGroupsOf(players);
+  if (groups.length === 0) {
+    attendanceGridAgeSelect.innerHTML = "";
+    attendanceGridWrap.innerHTML = '<p class="px-4 py-6 text-center text-slate-400 text-sm">ยังไม่มีนักกีฬาในความดูแล</p>';
+    attendanceGridCoachLabel.textContent = "สรุปการเข้าซ้อมรายเดือน";
+    return;
+  }
+  const keep = groups.includes(attendanceGridAgeSelect.value) ? attendanceGridAgeSelect.value : groups[0];
+  attendanceGridAgeSelect.innerHTML = groups.map((g) => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join("");
+  attendanceGridAgeSelect.value = keep;
+  const coaches = (attendanceGridData.coaches || []).filter((c) => (c.ageGroups || []).includes(keep));
+  attendanceGridCoachLabel.textContent =
+    coaches.length > 0 ? `โค้ชผู้รับผิดชอบ: ${coaches.map((c) => `${c.name ?? "-"} (${coachPositionLabel(c.coachPosition)})`).join(", ")}` : "สรุปการเข้าซ้อมรายเดือน";
+  const rosterOfGroup = filterAndSortPlayers(players, { ageGroup: keep, sort: "number" });
+  const grid = buildAttendanceGrid({
+    month: attendanceGridMonth,
+    ageGroup: keep,
+    players: rosterOfGroup,
+    attendanceRecords: attendanceGridData.attendanceRecords,
+    sessions: attendanceGridData.sessions,
+    matchReports: attendanceGridData.matchReports,
+    weekdays: TEAM_TRAINING_WEEKDAYS[myTeam],
+    today: todayBangkok()
+  });
+  attendanceGridWrap.innerHTML = gridHtml(grid);
+}
+
+async function loadAttendanceGrid() {
+  attendanceGridMonthLabel.textContent = thaiMonthLabel(attendanceGridMonth);
+  attendanceGridStatus.textContent = "กำลังโหลด...";
+  attendanceGridWrap.innerHTML = '<p class="px-4 py-6 text-center text-slate-400 text-sm">กำลังโหลด...</p>';
+  try {
+    const { start, end } = monthDateRange(attendanceGridMonth);
+    const [attSnap, sessionSnap, matchSnap, coachSnap] = await Promise.all([
+      getDocs(teamDateRangeQuery("attendance", myTeam, start, end)),
+      getDocs(teamDateRangeQuery("sessions", myTeam, start, end)),
+      getDocs(teamDateRangeQuery("matchReports", myTeam, start, end)),
+      getDocs(query(collection(db, "coaches"), where("team", "==", myTeam), where("role", "==", "coach")))
+    ]);
+    attendanceGridData = {
+      attendanceRecords: attSnap.docs.map((d) => d.data()),
+      sessions: sessionSnap.docs.map((d) => d.data()),
+      matchReports: matchSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
+      coaches: coachSnap.docs.map((d) => d.data())
+    };
+    attendanceGridStatus.textContent = "";
+    renderAttendanceGridView();
+  } catch (err) {
+    console.error(err);
+    attendanceGridStatus.textContent = "";
+    attendanceGridWrap.innerHTML = `<p class="px-4 py-6 text-center text-red-600 text-sm">โหลดข้อมูลไม่สำเร็จ: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+function openAttendanceGrid() {
+  hideAllScreens();
+  attendanceGridSection.classList.remove("hidden");
+  attendanceGridLegend.innerHTML = legendHtml();
+  if (!attendanceGridMonth) attendanceGridMonth = thisMonthBangkok();
+  loadAttendanceGrid();
+}
+
+attendanceGridPrevBtn.addEventListener("click", () => {
+  attendanceGridMonth = addMonthsToMonth(attendanceGridMonth, -1);
+  loadAttendanceGrid();
+});
+attendanceGridNextBtn.addEventListener("click", () => {
+  attendanceGridMonth = addMonthsToMonth(attendanceGridMonth, 1);
+  loadAttendanceGrid();
+});
+attendanceGridAgeSelect.addEventListener("change", () => {
+  if (attendanceGridData) renderAttendanceGridView();
 });
 
 function openInstructionSection() {
@@ -3879,6 +3971,7 @@ const ROUTE_SCREENS = [
   { el: playerDetailSection, key: "player-detail", kind: "coach" },
   { el: addPlayerSection, key: "player-form", kind: "coach" },
   { el: instructionSection, key: "instruction", kind: "coach" },
+  { el: attendanceGridSection, key: "attendance-grid", kind: "coach" },
   { el: fitnessEntrySection, key: "fitness", kind: "coach" },
   { el: executiveSection, key: "executive", kind: "executive" },
   { el: executivePlayersSection, key: "executive-players", kind: "executive" },
@@ -3990,6 +4083,9 @@ function openCoachScreen(screen, date) {
       break;
     case "instruction":
       openInstructionSection();
+      break;
+    case "attendance-grid":
+      openAttendanceGrid();
       break;
     case "fitness":
       openFitnessEntrySection();

@@ -1,13 +1,13 @@
 // เมนูหลัก 9 รายการของโค้ช (ตรรกะล้วนๆ ไม่พึ่ง DOM/Firebase เพื่อเทสต์ใน Node ได้) — ใช้ทั้งเมนู ☰ ด้านข้าง (มือถือ) และแถบเมนูแนวนอน (คอมพิวเตอร์)
 // screen = รหัสหน้าจอตาม COACH_SCREEN_KEYS ใน screen-route.js; screens = ทุกหน้าที่นับว่าอยู่ภายใต้เมนูนี้ (ใช้ไฮไลต์เมนูที่เปิดอยู่)
 // children = เมนูย่อย (แสดงเป็นแถบเล็กใต้แถบเมนูหลักเมื่ออยู่ในเมนูนั้น) — external = หน้าอื่นนอก attendance.html
-// หน้าเดิมที่ยังไม่ได้กำหนดที่อยู่ถาวร (รอผู้ใช้แจ้ง) ผูกไว้ชั่วคราว: Attendance → Daily, Evaluation → ผลทดสอบสมรรถภาพ + MASC, Training Plan → แผน + รายงานการฝึกซ้อม
+// หน้าเดิมที่ยังไม่ได้กำหนดที่อยู่ถาวร (รอผู้ใช้แจ้ง) ผูกไว้ชั่วคราว: Daily (หน้าแรกหลังล็อกอิน) ไฮไลต์ใต้ Attendance, Evaluation → ผลทดสอบสมรรถภาพ + MASC, Training Plan → แผน + รายงานการฝึกซ้อม
 
 export const COACH_MENU = [
   { key: "instruction", label: "Instruction", hint: "คำชี้แจง", icon: "file-text", screen: "instruction", screens: ["instruction"] },
   { key: "player-data", label: "Player Data", hint: "ข้อมูลนักกีฬา", icon: "users", screen: "players", screens: ["players", "player-detail", "player-form"] },
   { key: "attendance-check", label: "Attendance Check", hint: "เช็คชื่อ", icon: "check-circle", screen: "checkin", screens: ["checkin"] },
-  { key: "attendance", label: "Attendance", hint: "สรุปการเข้าซ้อม", icon: "calendar", screen: "daily", screens: ["daily"] },
+  { key: "attendance", label: "Attendance", hint: "สรุปการเข้าซ้อม", icon: "calendar", screen: "attendance-grid", screens: ["attendance-grid", "daily"] },
   {
     key: "training-plan",
     label: "Training Plan",
