@@ -133,7 +133,21 @@ export function matchDetailHtml(b) {
 export const TREND_STEP = 0.3; // เปลี่ยนเกินนี้ (ในสเกล 1-4) ถึงนับว่าดีขึ้น/ลดลง
 
 // records = attendance ของนักกีฬาคนนี้ { date, status, scores } — ช่วงปัจจุบัน = days วันล่าสุดนับถึง todayStr เทียบกับ days วันก่อนหน้า
+// ถ้า days วันล่าสุดไม่มีคะแนนเลย (เช่น พักฤดูกาล/ช่วงหยุด) จะเลื่อนหน้าต่างไปสิ้นสุดที่วันล่าสุดที่นักกีฬามีคะแนน
+// แล้วใส่ shifted: true ให้หน้าจอบอกชัดว่าเป็นช่วงที่เลื่อนมา — ไม่งั้นนักกีฬาที่มีคะแนนแต่เก่ากว่า 30 วันจะดูเหมือนไม่มีข้อมูล
 export function dailyScoreSeries(records, todayStr, days = 30) {
+  const base = dailyWindow(records, todayStr, days);
+  if (base.points.length > 0) return { ...base, shifted: false };
+  const latest = records
+    .filter((r) => r.date <= todayStr && computeAvgScore(r.scores) !== null)
+    .map((r) => r.date)
+    .sort()
+    .pop();
+  if (!latest) return { ...base, shifted: false };
+  return { ...dailyWindow(records, latest, days), shifted: true };
+}
+
+function dailyWindow(records, todayStr, days) {
   const curStart = addDaysToDate(todayStr, -(days - 1));
   const prevStart = addDaysToDate(curStart, -days);
   const cur = records.filter((r) => r.date >= curStart && r.date <= todayStr);
@@ -160,7 +174,8 @@ const arrow = (delta) => (delta === null ? '<span class="text-slate-300">–</sp
 
 export function dailyScoreHtml(s) {
   const total = s.counts.A + s.counts.P + s.counts.I + s.counts.R;
-  const counts = `<p class="text-xs text-slate-500">${s.days} วันล่าสุด: มาซ้อม <b>${s.counts.A}</b> · ลา <b>${s.counts.P}</b> · บาดเจ็บ <b>${s.counts.I}</b> · พักฟื้น <b>${s.counts.R}</b> (รวม ${total} วันที่เช็คชื่อ)</p>`;
+  const windowLabel = s.shifted ? `${s.days} วันถึง ${dayMonth(s.todayStr)}` : `${s.days} วันล่าสุด`;
+  const counts = `<p class="text-xs text-slate-500">${windowLabel}: มาซ้อม <b>${s.counts.A}</b> · ลา <b>${s.counts.P}</b> · บาดเจ็บ <b>${s.counts.I}</b> · พักฟื้น <b>${s.counts.R}</b> (รวม ${total} วันที่เช็คชื่อ)</p>`;
   if (s.points.length === 0) return `<p class="text-sm text-slate-400">ยังไม่มีคะแนนฝึกซ้อมรายวันใน ${s.days} วันล่าสุด</p>${counts}`;
   const W = 640;
   const H = 150;
@@ -179,7 +194,8 @@ export function dailyScoreHtml(s) {
       <span class="w-9 text-right font-medium">${fmt1(c.current)}</span><span class="w-20 text-right text-xs">${arrow(c.delta)}</span></div>`)
     .join("");
   const overall = `<p class="text-sm">คะแนนเฉลี่ย <b>${fmt1(s.overall)}</b> / 4 ${s.previousOverall !== null && s.overall !== null ? `<span class="text-xs">${arrow(s.overall - s.previousOverall)} เทียบ ${s.days} วันก่อนหน้า</span>` : ""}</p>`;
-  return `${overall}${chart}<div class="mt-2">${rows}</div>${counts}`;
+  const shifted = s.shifted ? `<p class="text-xs" style="color:#b45309">ไม่มีคะแนนใน ${s.days} วันล่าสุด — แสดงช่วง ${s.days} วันที่สิ้นสุดวันที่ ${escapeHtml(dayMonth(s.todayStr))} ซึ่งเป็นวันล่าสุดที่มีคะแนน</p>` : "";
+  return `${overall}${shifted}${chart}<div class="mt-2">${rows}</div>${counts}`;
 }
 
 // ---------- MASC รายรอบ ----------

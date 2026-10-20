@@ -120,6 +120,21 @@ test("dailyScoreSeries: 30-day window, per-day averages, category means vs the p
   assert.match(dailyScoreHtml(dailyScoreSeries([], today, 30)), /ยังไม่มีคะแนนฝึกซ้อมรายวัน/);
 });
 
+test("dailyScoreSeries: no scores in the last 30 days shifts the window to the latest scored day instead of showing nothing", () => {
+  const today = "2026-10-20";
+  const records = [att("2026-08-10", "A", sc(3, 3, 3, 3)), att("2026-08-05", "A", sc(2, 2, 2, 2)), att("2026-10-01", "P")];
+  const s = dailyScoreSeries(records, today, 30);
+  assert.equal(s.shifted, true);
+  assert.equal(s.todayStr, "2026-08-10");
+  assert.deepEqual(s.points.map((p) => p.date), ["2026-08-05", "2026-08-10"]);
+  assert.match(dailyScoreHtml(s), /<polyline/);
+  assert.match(dailyScoreHtml(s), /ไม่มีคะแนนใน 30 วันล่าสุด/);
+  // มีคะแนนในช่วงล่าสุดอยู่แล้ว = ไม่เลื่อน
+  assert.equal(dailyScoreSeries([att("2026-10-19", "A", sc(4, 4, 4, 4))], today, 30).shifted, false);
+  // ไม่มีคะแนนเลย = ไม่เลื่อน (ยังขึ้นข้อความ "ยังไม่มีคะแนน")
+  assert.equal(dailyScoreSeries([att("2026-10-01", "P")], today, 30).shifted, false);
+});
+
 const ev = (label, M, A, S, C, time, extra = {}) => ({
   assessmentPeriod: label,
   updatedAt: { toDate: () => new Date(time) },
