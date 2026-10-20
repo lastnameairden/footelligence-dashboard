@@ -1083,9 +1083,8 @@ function renderDrawerItemsInner() {
   if (myTeam) {
     navDrawerItems.appendChild(drawerSectionLabel(`ทีม: ${teamLogoImg(myTeam)}${myTeam}`));
     appendCoachMenuToDrawer();
-    navDrawerItems.appendChild(drawerDivider());
-    navDrawerItems.appendChild(drawerItem(icon("bar-chart"), "Dashboard", goToDashboard));
     return;
+
   }
 
   // ผู้บริหารทีม (ดูข้อมูลอย่างเดียว ไม่มีเครื่องมือจัดการทีม) หรือกรณีอื่นที่ยังไม่ทราบทีม
@@ -1213,7 +1212,6 @@ function renderCoachNav() {
     const cls = menu.key === active ? "coach-tab active" : "coach-tab";
     return `<button type="button" class="${cls}" data-menu="${menu.key}" title="${escapeHtml(menu.hint)}">${icon(menu.icon)} ${menu.label}${menuBadgeHtml(menu.key)}</button>`;
   });
-  if (!currentIsAdmin) tabs.push(`<button type="button" class="coach-tab" data-menu="dashboard" style="margin-left:auto">${icon("bar-chart")} Dashboard</button>`);
   coachTabbarInner.innerHTML = tabs.join("");
 
   const subtabHtml = (child) => {
@@ -1235,8 +1233,8 @@ function renderCoachNav() {
 coachTabbarInner.addEventListener("click", (e) => {
   const btn = e.target.closest("[data-menu]");
   if (!btn) return;
-  if (btn.dataset.menu === "dashboard") goToDashboard();
-  else openCoachMenuItem(btn.dataset.menu);
+  openCoachMenuItem(btn.dataset.menu);
+
 });
 
 for (const row of [coachSubtabsInner, coachSubtabs2Inner]) {
