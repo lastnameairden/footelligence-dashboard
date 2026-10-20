@@ -77,6 +77,7 @@ import { addMonthsToMonth, thaiMonthLabel } from "./coach-meetings.js";
 import { filterPlans, filterReportsByMonths, groupByMonth, monthOptionsOf, monthsBack, planAgeGroupsOf, planDataHtml, reportHistoryHtml } from "./plan-report-data.js";
 import { COACH_MENU, activeChildFor, childMatchesScreen, menuItem, menuKeyForScreen } from "./coach-menu.js";
 import { initPhysical, showAthleteResults, showInstruction, showTestingForm } from "./physical-ui.js";
+import { initProfile, showProfile } from "./coach-profile-ui.js";
 import { ageGroupsOf, birthYearLabel, birthdayLabel, filterAndSortPlayers, playerDisplayName } from "./player-gallery.js";
 import { STAFF_PERMISSIONS, canAccessAdminFeature, normalizePermissions, permissionsSummary, staffCan, staffLandingFeature } from "./staff-perms.js";
 import { isEvaluationComplete } from "./masc-data.js";
@@ -220,6 +221,7 @@ const physicalTestMenuSection = document.getElementById("physical-test-menu-sect
 const physicalInstructionSection = document.getElementById("physical-instruction-section");
 const physicalFormSection = document.getElementById("physical-form-section");
 const athleteResultsSection = document.getElementById("athlete-results-section");
+const profileSection = document.getElementById("profile-section");
 const dailyDateInput = document.getElementById("daily-date-input");
 const dailyLoadBtn = document.getElementById("daily-load-btn");
 const dailyStatus = document.getElementById("daily-status");
@@ -710,6 +712,7 @@ function hideAllScreens() {
   physicalInstructionSection.classList.add("hidden");
   physicalFormSection.classList.add("hidden");
   athleteResultsSection.classList.add("hidden");
+  profileSection.classList.add("hidden");
   playerGallerySection.classList.add("hidden");
   playerDetailSection.classList.add("hidden");
 }
@@ -1056,6 +1059,7 @@ const COACH_SCREEN_OPENERS = {
   "physical-instruction": () => openPhysicalInstruction(),
   "physical-form": () => openPhysicalForm(),
   "athlete-results": () => openAthleteResultsSection(),
+  profile: () => openProfileSection(),
   masc: () => openMascPage(),
   "meeting-tasks": () => openMeetingTasksSection()
 };
@@ -1125,6 +1129,8 @@ function appendCoachMenuToDrawer() {
 function renderCoachNav() {
   const visible = coachNavVisible();
   coachTabbar.classList.toggle("is-on", visible);
+  // การ์ดชื่อโค้ช (coach-bar) ไม่แสดงในหน้าของเมนูโค้ช — ข้อมูลอยู่ที่เมนู Profile (ยังอยู่ใน DOM เพราะลิ้นชักดึงชื่อ/ป้ายบทบาทจากที่นี่)
+  coachBar.classList.toggle("coach-bar-off", visible);
   if (!visible) {
     coachTabbarInner.innerHTML = "";
     coachSubtabsInner.innerHTML = "";
@@ -1614,6 +1620,25 @@ function openPhysicalForm() {
   physicalFormSection.classList.remove("hidden");
   showTestingForm();
 }
+// ---------- Profile (เมนู 10) ----------
+// เอกสารโค้ชที่หน้า Profile แสดง: โค้ชจริง = เอกสารของตัวเอง, แอดมินสวมบทบาท = โค้ชที่เลือก (โหมดจัดการทีมแบบกว้างไม่ระบุตัว = null)
+let currentCoachRecord = null;
+
+async function profileTaskCount() {
+  const coachId = meetingCoachId();
+  if (!myTeam || !coachId) return null;
+  const { tasks } = await loadCoachMeetingOverview(myTeam, coachId, myCoachPosition);
+  return tasks.filter((t) => t.status.state === "pending" || t.status.state === "overdue").length;
+}
+
+function openProfileSection() {
+  hideAllScreens();
+  profileSection.classList.remove("hidden");
+  showProfile();
+}
+
+initProfile({ record: () => currentCoachRecord, team: () => myTeam, taskCount: profileTaskCount });
+
 function openAthleteResultsSection() {
   hideAllScreens();
   athleteResultsSection.classList.remove("hidden");
@@ -3491,6 +3516,7 @@ async function enterTeamManagementMode(team, returnSection, coachRecordOverride,
   myAgeGroups = coachRecordOverride ? coachRecord?.ageGroups || [] : [];
   myCoachPosition = coachRecordOverride ? coachRecord?.coachPosition || null : null;
   myCoachName = coachRecord?.name || auth.currentUser?.email;
+  currentCoachRecord = coachRecordOverride ? coachRecord : null;
   // แสดงชื่อ/อีเมล/สถานะ/รุ่นอายุของโค้ชตัวจริง (ถ้าหาเจอ) แทนข้อมูลของผู้ดูแลระบบเอง เพื่อให้หน้าจอเหมือนที่โค้ช
   // จริงเห็นทุกประการเวลาสวมบทบาทเข้ามาทดสอบ/ตรวจสอบระบบ — สลับกลับตอนออกจากโหมดนี้ที่ exitTeamManagementToAdminPanel()
   coachNameEl.textContent = coachRecord?.name || team;
@@ -4133,6 +4159,7 @@ const ROUTE_SCREENS = [
   { el: physicalInstructionSection, key: "physical-instruction", kind: "coach" },
   { el: physicalFormSection, key: "physical-form", kind: "coach" },
   { el: athleteResultsSection, key: "athlete-results", kind: "coach" },
+  { el: profileSection, key: "profile", kind: "coach" },
   { el: executiveSection, key: "executive", kind: "executive" },
   { el: executivePlayersSection, key: "executive-players", kind: "executive" },
   { el: adminCoachesSection, key: "coaches", kind: "admin" },
@@ -4282,6 +4309,9 @@ function openCoachScreen(screen, date) {
       break;
     case "athlete-results":
       openAthleteResultsSection();
+      break;
+    case "profile":
+      openProfileSection();
       break;
     case "meeting-tasks":
       openMeetingTasksSection();
@@ -4442,6 +4472,7 @@ onAuthStateChanged(auth, async (user) => {
     myAgeGroups = data.ageGroups || [];
     myCoachPosition = data.coachPosition || null;
     renderCoachProfile(user, data, myTeam);
+    currentCoachRecord = { id: user.uid, ...data };
     coachAgeGroupsWrap.classList.remove("hidden");
     coachAgeGroupsEl.textContent = myAgeGroups.length ? myAgeGroups.join(", ") : "-";
     adminReturnSection = null;

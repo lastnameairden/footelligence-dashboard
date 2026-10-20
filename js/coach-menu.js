@@ -1,4 +1,4 @@
-// เมนูหลัก 9 รายการของโค้ช (ตรรกะล้วนๆ ไม่พึ่ง DOM/Firebase เพื่อเทสต์ใน Node ได้) — ใช้ทั้งเมนู ☰ ด้านข้าง (มือถือ) และแถบเมนูแนวนอน (คอมพิวเตอร์)
+// เมนูหลัก 10 รายการของโค้ช (ตรรกะล้วนๆ ไม่พึ่ง DOM/Firebase เพื่อเทสต์ใน Node ได้) — ใช้ทั้งเมนู ☰ ด้านข้าง (มือถือ) และแถบเมนูแนวนอน (คอมพิวเตอร์)
 // screen = รหัสหน้าจอตาม COACH_SCREEN_KEYS ใน screen-route.js; screens = ทุกหน้าที่นับว่าอยู่ภายใต้เมนูนี้ (ใช้ไฮไลต์เมนูที่เปิดอยู่)
 // disabled (ในเมนูย่อย) = ยังไม่เปิดใช้งาน แสดงจางๆ กดไม่ได้
 // children = เมนูย่อย (แสดงเป็นแถบเล็กใต้แถบเมนูหลักเมื่ออยู่ในเมนูนั้น) — external = หน้าอื่นนอก attendance.html
@@ -64,7 +64,8 @@ export const COACH_MENU = [
     ]
   },
   { key: "injury-sick", label: "Injury/Sick", hint: "บาดเจ็บ / เจ็บป่วย", icon: "heart-pulse", screen: "injury", screens: ["injury"] },
-  { key: "meeting", label: "Meeting", hint: "นัดประชุม + งานหลังประชุม", icon: "book", screen: "meeting-tasks", screens: ["meeting-tasks"] }
+  { key: "meeting", label: "Meeting", hint: "นัดประชุม + งานหลังประชุม", icon: "book", screen: "meeting-tasks", screens: ["meeting-tasks"] },
+  { key: "profile", label: "Profile", hint: "โปรไฟล์ของฉัน", icon: "user", screen: "profile", screens: ["profile"] }
 ];
 
 // เมนูย่อยนี้เปิดอยู่ไหม (เมนูย่อยบางตัวครอบคลุมหลายหน้าจอ เช่น ประวัติการแข่งขัน + รายงานผล)

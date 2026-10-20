@@ -665,3 +665,19 @@ table.pro-table td.emphasis { font-weight: 600; color: var(--text-1); }
 .instruction-img-empty { display: flex; align-items: center; justify-content: center; min-height: 7rem; border: 1px dashed var(--border); color: var(--text-3); font-size: 0.8125rem; }
 @media (min-width: 640px) { .instruction-grid { grid-template-columns: 14rem 1fr; } }
 @media screen { .sheet-testing-table { min-width: 1100px; } }
+/* Profile ของโค้ช + ซ่อนการ์ดชื่อโค้ชในหน้าเมนูโค้ช */
+.coach-bar-off { display: none !important; }
+.profile-head { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.profile-avatar { width: 3.25rem; height: 3.25rem; border-radius: 9999px; background: var(--accent); color: var(--accent-ink); display: flex; align-items: center; justify-content: center; font-size: 1.25rem; font-weight: 600; flex-shrink: 0; }
+.profile-head-main { flex: 1 1 12rem; min-width: 0; }
+.profile-name { font-size: 1.05rem; font-weight: 600; }
+.profile-head-side { font-size: 0.8125rem; color: var(--text-2); text-align: right; }
+.profile-kv > div { display: flex; justify-content: space-between; gap: 1rem; padding: 0.35rem 0; border-top: 1px solid var(--border); font-size: 0.875rem; }
+.profile-kv > div:first-child { border-top: 0; }
+.profile-kv dt { color: var(--text-2); }
+.profile-kv dd { text-align: right; font-weight: 500; }
+.profile-stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 0.75rem; }
+.profile-stat { background: var(--surface-2); border-radius: 0.6rem; padding: 0.7rem 0.85rem; }
+.profile-stat-label { font-size: 0.75rem; color: var(--text-2); }
+.profile-stat-value { font-size: 1.5rem; font-weight: 600; line-height: 1.3; }
+.profile-stat-sub { font-size: 0.75rem; font-weight: 400; color: var(--text-2); }

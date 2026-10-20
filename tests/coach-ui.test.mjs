@@ -42,12 +42,12 @@ test("applyTeamTheme sets then clears the CSS variables and the data attribute",
   assert.equal(attrs.size, 0);
 });
 
-test("coach menu: exactly the nine requested items, in order, English labels", () => {
+test("coach menu: exactly the ten requested items, in order, English labels", () => {
   assert.deepEqual(
     COACH_MENU.map((m) => m.label),
-    ["Instruction", "Player Data", "Attendance Check", "Attendance", "Training Plan", "Match Data", "Evaluation", "Injury/Sick", "Meeting"]
+    ["Instruction", "Player Data", "Attendance Check", "Attendance", "Training Plan", "Match Data", "Evaluation", "Injury/Sick", "Meeting", "Profile"]
   );
-  assert.equal(new Set(COACH_MENU.map((m) => m.key)).size, 9);
+  assert.equal(new Set(COACH_MENU.map((m) => m.key)).size, 10);
 });
 
 test("coach menu only points at screens that exist, and every coach screen belongs to one menu", () => {
@@ -61,6 +61,7 @@ test("coach menu only points at screens that exist, and every coach screen belon
   assert.equal(menuKeyForScreen("player-detail"), "player-data");
   assert.equal(menuKeyForScreen("nope"), null);
   assert.equal(menuItem("meeting").screen, "meeting-tasks");
+  assert.equal(menuKeyForScreen("profile"), "profile");
 });
 
 test("Training Plan menu: landing + 4 live options + 3 disabled 'coming soon' options; old plan/report links stay under it", () => {

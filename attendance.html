@@ -981,6 +981,26 @@
       </div>
     </section>
 
+    <!-- Profile (เมนู 10): ข้อมูลโค้ชอย่างละเอียด อ่านอย่างเดียว -->
+    <section id="profile-section" class="hidden space-y-6">
+      <div class="page-heading">
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c0-4.1 3.4-7 7.5-7s7.5 2.9 7.5 7"/></svg></div>
+        <div>
+          <h2>Profile</h2>
+          <p>ข้อมูลบัญชี ความรับผิดชอบ และผลการทำงานของคุณ</p>
+        </div>
+      </div>
+      <div id="profile-info" class="space-y-4"></div>
+      <div id="profile-stats-wrap" class="card card-pad space-y-3">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <h3 class="section-title">ผลการทำงานของฉัน</h3>
+          <div class="flex items-center gap-2"><label class="field-label mb-0">เดือน</label><select id="profile-month-select" class="field-input" style="width:auto"></select></div>
+        </div>
+        <div id="profile-stats"></div>
+        <p class="text-xs text-slate-400">เกณฑ์ = จำนวนวันฝึกซ้อมปกติของทีมในเดือนนั้น · ตรงเวลา = ส่งก่อน 23:59 น. ของวันนั้น (แผนฝึกก่อน 14:00 น.)</p>
+      </div>
+    </section>
+
     <!-- Evaluation (เมนู 7): หน้าเลือก 3 ส่วน → Footelligence Test (MASC) / Physical Test / Athlete Results -->
     <section id="evaluation-menu-section" class="hidden space-y-6">
       <div class="page-heading">
