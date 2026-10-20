@@ -11,6 +11,7 @@ import { db, auth } from "./firebase-init.js";
 import { icon } from "./icons.js";
 import { injuryStatsHtml, injuryTrendHtml } from "./injury-stats-view.js";
 import { canAccessAdminFeature, normalizePermissions, staffCan } from "./staff-perms.js";
+import { applyTeamTheme } from "./team-theme.js";
 import { buildInjuryStats } from "./injury-form.js";
 import {
   PERIOD_MODES,
@@ -1887,6 +1888,8 @@ onAuthStateChanged(auth, async (user) => {
     } else {
       dashboardBackLink.classList.add("hidden");
       dashboardContent.classList.remove("hidden");
+      // โค้ชเห็นโทนสีของทีมตัวเองทั้งระบบ (ผู้บริหารทีมและผู้ดูแลระบบใช้ธีมเริ่มต้น)
+      if (data.role === "coach") applyTeamTheme(data.team);
       loadDashboard(data.team);
     }
   } catch (err) {

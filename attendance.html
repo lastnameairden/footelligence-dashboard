@@ -39,6 +39,9 @@
         </div>
       </div>
     </div>
+    <!-- เมนูหลักของโค้ช 9 รายการ แบบแถบแนวนอน (แสดงเฉพาะหน้าจอกว้าง) + แถบเมนูย่อยของเมนูที่มีหน้าย่อย — สร้างโดย attendance.js -->
+    <nav id="coach-tabbar" class="coach-tabbar" aria-label="เมนูหลักของโค้ช"><div id="coach-tabbar-inner" class="coach-tabbar-inner"></div></nav>
+    <div id="coach-subtabs" class="coach-subtabs"><div id="coach-subtabs-inner" class="coach-subtabs-inner"></div></div>
   </header>
 
   <!-- เมนูนำทางแบบเลื่อนออกจากด้านซ้าย (เปิดด้วยปุ่ม ☰) -->
@@ -919,9 +922,49 @@
       </div>
     </section>
 
-    <!-- หน้าจอเพิ่มนักกีฬา -->
+    <!-- Instruction: ยังไม่เปิดใช้ — รอพัฒนาเมื่อเมนูอื่นและระบบสมบูรณ์แล้ว -->
+    <section id="instruction-section" class="hidden space-y-6">
+      <div class="page-heading">
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg></div>
+        <div>
+          <h2>Instruction</h2>
+          <p>คำชี้แจงการใช้งาน</p>
+        </div>
+      </div>
+      <div class="card card-pad text-center text-slate-500">เมนูนี้กำลังพัฒนา เร็วๆ นี้</div>
+    </section>
+
+    <!-- Player Data: แกลเลอรีนักกีฬา (เฉพาะรุ่นอายุที่โค้ชรับผิดชอบ) -->
+    <section id="player-gallery-section" class="hidden space-y-5">
+      <div class="page-heading">
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M16 5.5a3 3 0 0 1 0 5.8M18 14.5c2 .7 3.5 2.4 3.5 5.5"/></svg></div>
+        <div class="flex-1">
+          <h2>Player Data</h2>
+          <p id="player-gallery-count">ข้อมูลนักกีฬา</p>
+        </div>
+        <button id="player-gallery-add-btn" type="button" class="btn btn-primary">+ เพิ่มนักกีฬา</button>
+      </div>
+      <div class="flex items-center gap-2 flex-wrap">
+        <div id="player-gallery-chips" class="flex gap-2 flex-wrap"></div>
+        <input id="player-gallery-search" type="search" class="field-input" style="max-width:16rem" placeholder="ค้นหาชื่อเล่น/ชื่อจริง" />
+        <select id="player-gallery-sort" class="field-input" style="width:auto">
+          <option value="number">เรียงตามเบอร์</option>
+          <option value="name">เรียงตามชื่อเล่น</option>
+        </select>
+      </div>
+      <p id="player-gallery-status" class="text-sm text-slate-500"></p>
+      <div id="player-gallery-grid" class="player-gallery-grid"></div>
+    </section>
+
+    <!-- Player Data: รายละเอียดนักกีฬารายคน (แก้ไข/ลบ) -->
+    <section id="player-detail-section" class="hidden space-y-5">
+      <button id="player-detail-back-btn" type="button" class="btn btn-ghost px-0">← กลับแกลเลอรีนักกีฬา</button>
+      <div id="player-detail-body" class="card card-pad"></div>
+    </section>
+
+    <!-- ฟอร์มเพิ่ม/แก้ไขนักกีฬา (เปิดจากปุ่ม "เพิ่มนักกีฬา" ในแกลเลอรี หรือ "แก้ไขข้อมูล" ในหน้ารายละเอียด) -->
     <section id="add-player-section" class="hidden space-y-6">
-      <button data-back class="btn btn-ghost px-0">← กลับหน้า Daily</button>
+      <button id="player-form-back-btn" type="button" class="btn btn-ghost px-0">← กลับแกลเลอรีนักกีฬา</button>
       <div class="card card-pad">
         <h2 class="section-title mb-4"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M18 8v4M16 10h4"/></svg></span> เพิ่มข้อมูลนักกีฬา</h2>
         <form id="add-player-form" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1021,28 +1064,6 @@
             <p id="add-player-status" class="text-sm text-slate-500"></p>
           </div>
         </form>
-      </div>
-
-      <div>
-        <h2 class="section-title mb-3"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c0-4.1 3.4-7 7.5-7s7.5 2.9 7.5 7"/></svg></span> รายชื่อนักกีฬาในทีม</h2>
-        <div class="card table-wrap">
-          <table class="pro-table">
-            <thead>
-              <tr>
-                <th>เบอร์</th>
-                <th>ชื่อเล่น</th>
-                <th>ชื่อ-นามสกุล</th>
-                <th>วันเกิด</th>
-                <th>รุ่นอายุ</th>
-                <th>ตำแหน่ง</th>
-                <th>ดำเนินการ</th>
-              </tr>
-            </thead>
-            <tbody id="player-list-body">
-              <tr><td colspan="7" class="px-4 py-6 text-center text-slate-400">ยังไม่มีนักกีฬาในทีมนี้</td></tr>
-            </tbody>
-          </table>
-        </div>
       </div>
     </section>
 

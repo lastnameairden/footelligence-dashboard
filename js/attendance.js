@@ -68,6 +68,9 @@ import { openAdminMeetings, renderCoachMeetingCard, renderCoachMeetingTasks, loa
 import { openAdminFitnessRounds } from "./fitness-rounds-ui.js";
 import { openFitnessEntry } from "./fitness-entry-ui.js";
 import { parseParentHeights } from "./fitness-calc.js";
+import { applyTeamTheme } from "./team-theme.js";
+import { COACH_MENU, menuItem, menuKeyForScreen } from "./coach-menu.js";
+import { ageGroupsOf, birthYearLabel, birthdayLabel, filterAndSortPlayers, playerDisplayName } from "./player-gallery.js";
 import { STAFF_PERMISSIONS, canAccessAdminFeature, normalizePermissions, permissionsSummary, staffCan, staffLandingFeature } from "./staff-perms.js";
 import { isEvaluationComplete } from "./masc-data.js";
 import { applyAttendanceChange, firestoreFieldsForChange, createSaveQueue, rosterLockState } from "./attendance-save.js";
@@ -160,6 +163,23 @@ const trainingPlanLateCountEl = document.getElementById("training-plan-late-coun
 const dailySection = document.getElementById("daily-section");
 const meetingTasksSection = document.getElementById("meeting-tasks-section");
 const meetingTasksBody = document.getElementById("meeting-tasks-body");
+const instructionSection = document.getElementById("instruction-section");
+const playerGallerySection = document.getElementById("player-gallery-section");
+const playerGalleryCount = document.getElementById("player-gallery-count");
+const playerGalleryAddBtn = document.getElementById("player-gallery-add-btn");
+const playerGalleryChips = document.getElementById("player-gallery-chips");
+const playerGallerySearch = document.getElementById("player-gallery-search");
+const playerGallerySort = document.getElementById("player-gallery-sort");
+const playerGalleryStatus = document.getElementById("player-gallery-status");
+const playerGalleryGrid = document.getElementById("player-gallery-grid");
+const playerDetailSection = document.getElementById("player-detail-section");
+const playerDetailBackBtn = document.getElementById("player-detail-back-btn");
+const playerDetailBody = document.getElementById("player-detail-body");
+const playerFormBackBtn = document.getElementById("player-form-back-btn");
+const coachTabbar = document.getElementById("coach-tabbar");
+const coachTabbarInner = document.getElementById("coach-tabbar-inner");
+const coachSubtabs = document.getElementById("coach-subtabs");
+const coachSubtabsInner = document.getElementById("coach-subtabs-inner");
 const dailyDateInput = document.getElementById("daily-date-input");
 const dailyLoadBtn = document.getElementById("daily-load-btn");
 const dailyStatus = document.getElementById("daily-status");
@@ -317,7 +337,7 @@ const addPlayerSubmitBtn = document.getElementById("add-player-submit-btn");
 const cancelEditPlayerBtn = document.getElementById("cancel-edit-player-btn");
 const playerPhotoInput = document.getElementById("player-photo-input");
 const playerPhotoStatus = document.getElementById("player-photo-status");
-const playerListBody = document.getElementById("player-list-body");
+
 const coachDirectoryGroups = document.getElementById("coach-directory-groups");
 const editCoachOverlay = document.getElementById("edit-coach-overlay");
 const editCoachCloseBtn = document.getElementById("edit-coach-close-btn");
@@ -634,6 +654,9 @@ function hideAllScreens() {
   trainingPlanSection.classList.add("hidden");
   dailySection.classList.add("hidden");
   meetingTasksSection.classList.add("hidden");
+  instructionSection.classList.add("hidden");
+  playerGallerySection.classList.add("hidden");
+  playerDetailSection.classList.add("hidden");
 }
 
 // ---------- งานหลังประชุม (เมนูของโค้ช) ----------
@@ -646,6 +669,7 @@ async function refreshMeetingTaskCount() {
   try {
     const { tasks } = await loadCoachMeetingOverview(myTeam, coachId, myCoachPosition);
     meetingTaskCount = tasks.filter((t) => t.status.state === "pending" || t.status.state === "overdue").length;
+    renderCoachNav();
   } catch (err) {
     console.error(err);
   }
@@ -879,7 +903,15 @@ function exitTeamManagementToAdminPanel() {
 }
 
 // เนื้อหาเมนูปรับตามบทบาทและบริบทปัจจุบัน (โค้ช / ผู้บริหารทีม / ผู้ดูแลระบบ, กำลังจัดการทีมอยู่หรือไม่)
+// เมนูหลักของโค้ชถูกวาง 2 ที่: แถบแนวนอนใต้หัวหน้า (คอมพิวเตอร์) และรายการใน ☰ (มือถือ) — ธีมสีทีม/แถบเมนูอัปเดตทุกครั้งที่เมนูถูกวาดใหม่
+// (เข้าสู่ระบบ สวมบทบาท/ออกจากบทบาท) และทุกครั้งที่หน้าจอเปลี่ยน (ดู routeObserver ด้านล่าง)
 function renderDrawerItems() {
+  renderDrawerItemsInner();
+  applyTeamTheme(coachNavVisible() ? myTeam : null);
+  renderCoachNav();
+}
+
+function renderDrawerItemsInner() {
   // ซิงก์ป้ายบทบาทจากแถบข้อมูลโค้ช (coach-bar) เข้ามาในลิ้นชักด้วย เพราะกำหนดค่าหลังจุดที่เรียก
   // renderCoachProfile() เสมอ (renderDrawerItems ถูกเรียกทีหลังในทุกกรณี จึงอ่านค่าล่าสุดได้ตรงกัน)
   navDrawerRoleBadgeEl.innerHTML = coachRoleBadgeEl.outerHTML;
@@ -896,25 +928,7 @@ function renderDrawerItems() {
       navDrawerItems.appendChild(drawerItem(icon("shield"), "กลับแผงควบคุมผู้ดูแลระบบ", exitTeamManagementToAdminPanel));
     } else if (myTeam) {
       navDrawerItems.appendChild(drawerSectionLabel(`จัดการทีม: ${teamLogoImg(myTeam)}${myTeam}`));
-      navDrawerItems.appendChild(drawerItem(icon("calendar"), "Daily", showDaily));
-      navDrawerItems.appendChild(drawerItem(icon("user"), "เพิ่ม/แก้ไขนักกีฬา", openAddPlayerSection));
-      navDrawerItems.appendChild(drawerItem(icon("check-circle"), "เช็คชื่อ + ให้คะแนน", openCheckinSection));
-      navDrawerItems.appendChild(drawerItem(icon("file-text"), "รายงานการฝึกซ้อม", openReportSection));
-      navDrawerItems.appendChild(drawerItem(icon("football"), "รายงานผลการแข่งขัน", openMatchReportSection));
-      navDrawerItems.appendChild(drawerItem(icon("heart-pulse"), "รายงานอาการบาดเจ็บ", openInjuryReportSection));
-      navDrawerItems.appendChild(drawerItem(icon("clipboard-list"), "แผนการฝึกซ้อมรายวัน", openTrainingPlanSection));
-      navDrawerItems.appendChild(drawerItem(icon("trending-up"), "ผลทดสอบสมรรถภาพ", openFitnessEntrySection));
-      if (!isStaffSession()) navDrawerItems.appendChild(
-        drawerItem(icon("dna"), "การประเมิน MASC", () => {
-          // แนบ ageGroups/coachPosition ไปด้วยถ้ากำลังสวมบทบาทเป็นโค้ชคนใดคนหนึ่งอยู่ (myAgeGroups มีค่า) เพื่อให้
-          // masc.html กรองรายชื่อนักกีฬาให้ตรงกับที่โค้ชคนนั้นเห็นจริง เหมือนกับทุกเมนูอื่นในโหมดนี้ — ถ้าเป็นการ
-          // จัดการทีมแบบกว้าง (ไม่เจาะจงโค้ช) myAgeGroups จะว่างอยู่แล้ว จึงไม่แนบพารามิเตอร์เพิ่ม เห็นทุกรุ่นเหมือนเดิม
-          const params = new URLSearchParams({ team: myTeam });
-          if (myAgeGroups.length > 0) params.set("ageGroups", myAgeGroups.join(","));
-          if (myCoachPosition) params.set("coachPosition", myCoachPosition);
-          window.location.href = `./masc.html#${params.toString()}`;
-        })
-      );
+      appendCoachMenuToDrawer();
       navDrawerItems.appendChild(drawerDivider());
       navDrawerItems.appendChild(drawerItem(icon("shield"), "กลับแผงควบคุมผู้ดูแลระบบ", exitTeamManagementToAdminPanel));
     } else {
@@ -946,17 +960,7 @@ function renderDrawerItems() {
 
   if (myTeam) {
     navDrawerItems.appendChild(drawerSectionLabel(`ทีม: ${teamLogoImg(myTeam)}${myTeam}`));
-    navDrawerItems.appendChild(drawerItem(icon("calendar"), "Daily", showDaily));
-    const taskBadge = meetingTaskCount > 0 ? ` <span class="badge badge-warning">${meetingTaskCount}</span>` : "";
-    navDrawerItems.appendChild(drawerItem(icon("book"), `งานหลังประชุม${taskBadge}`, openMeetingTasksSection));
-    navDrawerItems.appendChild(drawerItem(icon("user"), "เพิ่ม/แก้ไขนักกีฬา", openAddPlayerSection));
-    navDrawerItems.appendChild(drawerItem(icon("check-circle"), "เช็คชื่อ + ให้คะแนน", openCheckinSection));
-    navDrawerItems.appendChild(drawerItem(icon("file-text"), "รายงานการฝึกซ้อม", openReportSection));
-    navDrawerItems.appendChild(drawerItem(icon("football"), "รายงานผลการแข่งขัน", openMatchReportSection));
-    navDrawerItems.appendChild(drawerItem(icon("heart-pulse"), "รายงานอาการบาดเจ็บ", openInjuryReportSection));
-    navDrawerItems.appendChild(drawerItem(icon("clipboard-list"), "แผนการฝึกซ้อมรายวัน", openTrainingPlanSection));
-      navDrawerItems.appendChild(drawerItem(icon("trending-up"), "ผลทดสอบสมรรถภาพ", openFitnessEntrySection));
-    navDrawerItems.appendChild(drawerItem(icon("dna"), "การประเมิน MASC", () => (window.location.href = "./masc.html")));
+    appendCoachMenuToDrawer();
     navDrawerItems.appendChild(drawerDivider());
     navDrawerItems.appendChild(drawerItem(icon("bar-chart"), "Dashboard", goToDashboard));
     return;
@@ -970,6 +974,121 @@ function renderDrawerItems() {
     );
   }
   navDrawerItems.appendChild(drawerItem(icon("bar-chart"), "Dashboard", goToDashboard));
+}
+
+// ---------- เมนูหลักของโค้ช 9 รายการ (รายการและการจับคู่หน้าจออยู่ที่ coach-menu.js) ----------
+const COACH_SCREEN_OPENERS = {
+  instruction: () => openInstructionSection(),
+  players: () => openPlayerGallery(),
+  checkin: () => openCheckinSection(),
+  daily: () => showDaily(),
+  plan: () => openTrainingPlanSection(),
+  report: () => openReportSection(),
+  match: () => openMatchReportSection(),
+  injury: () => openInjuryReportSection(),
+  fitness: () => openFitnessEntrySection(),
+  "meeting-tasks": () => openMeetingTasksSection()
+};
+
+// หน้าประเมิน MASC เป็นหน้าแยก (masc.html) — ผู้ดูแลระบบที่สวมบทบาทโค้ชแนบรุ่นอายุ/ตำแหน่งของโค้ชคนนั้นไปด้วย เพื่อให้เห็นรายชื่อตรงกับที่โค้ชเห็นจริง
+function openMascPage() {
+  if (!currentIsAdmin) {
+    window.location.href = "./masc.html";
+    return;
+  }
+  const params = new URLSearchParams({ team: myTeam });
+  if (myAgeGroups.length > 0) params.set("ageGroups", myAgeGroups.join(","));
+  if (myCoachPosition) params.set("coachPosition", myCoachPosition);
+  window.location.href = `./masc.html#${params.toString()}`;
+}
+
+// เมนูของโค้ชใช้ตอนมีทีมที่ดูแลอยู่ (โค้ชจริง หรือผู้ดูแลระบบ/ทีมหลังบ้านที่สวมบทบาทโค้ช) — โหมดผู้บริหารทีมไม่ใช้
+function coachNavVisible() {
+  return !!myTeam && !(currentIsAdmin && adminViewingAs === "executive");
+}
+
+function currentScreenKey() {
+  return ROUTE_SCREENS.find((s) => !s.el.classList.contains("hidden"))?.key ?? null;
+}
+
+// เมนูย่อยของเมนูหนึ่ง (ทีมหลังบ้านไม่เห็น MASC เหมือนเดิม)
+function coachChildren(menu) {
+  return (menu.children || []).filter((c) => !(c.external === "masc" && isStaffSession()));
+}
+
+function openCoachMenuItem(key) {
+  const menu = menuItem(key);
+  if (menu) COACH_SCREEN_OPENERS[menu.screen]?.();
+}
+
+function menuBadgeHtml(key) {
+  return key === "meeting" && meetingTaskCount > 0 ? ` <span class="badge badge-warning">${meetingTaskCount}</span>` : "";
+}
+
+function appendCoachMenuToDrawer() {
+  const wrap = document.createElement("div");
+  wrap.className = "coach-drawer-menu";
+  const active = menuKeyForScreen(currentScreenKey());
+  const screen = currentScreenKey();
+  for (const menu of COACH_MENU) {
+    const btn = drawerItem(icon(menu.icon), `${menu.label}<span class="drawer-hint">${menu.hint}</span>${menuBadgeHtml(menu.key)}`, () => openCoachMenuItem(menu.key));
+    if (menu.key === active) btn.classList.add("active");
+    wrap.appendChild(btn);
+    for (const child of coachChildren(menu)) {
+      const sub = drawerItem("", child.label, child.external ? openMascPage : COACH_SCREEN_OPENERS[child.screen]);
+      sub.classList.add("drawer-subitem");
+      if (child.screen && child.screen === screen) sub.classList.add("active");
+      wrap.appendChild(sub);
+    }
+  }
+  navDrawerItems.appendChild(wrap);
+}
+
+function renderCoachNav() {
+  const visible = coachNavVisible();
+  coachTabbar.classList.toggle("is-on", visible);
+  if (!visible) {
+    coachTabbarInner.innerHTML = "";
+    coachSubtabsInner.innerHTML = "";
+    coachSubtabs.classList.remove("is-on");
+    return;
+  }
+  const screen = currentScreenKey();
+  const active = menuKeyForScreen(screen);
+  const tabs = COACH_MENU.map((menu) => {
+    const cls = menu.key === active ? "coach-tab active" : "coach-tab";
+    return `<button type="button" class="${cls}" data-menu="${menu.key}" title="${escapeHtml(menu.hint)}">${icon(menu.icon)} ${menu.label}${menuBadgeHtml(menu.key)}</button>`;
+  });
+  if (!currentIsAdmin) tabs.push(`<button type="button" class="coach-tab" data-menu="dashboard" style="margin-left:auto">${icon("bar-chart")} Dashboard</button>`);
+  coachTabbarInner.innerHTML = tabs.join("");
+
+  const children = active ? coachChildren(menuItem(active)) : [];
+  coachSubtabsInner.innerHTML = children
+    .map((child) => {
+      const cls = child.screen && child.screen === screen ? "coach-subtab active" : "coach-subtab";
+      return `<button type="button" class="${cls}" data-sub-screen="${child.screen ?? ""}" data-sub-external="${child.external ?? ""}">${escapeHtml(child.label)}</button>`;
+    })
+    .join("");
+  coachSubtabs.classList.toggle("is-on", children.length > 0);
+}
+
+coachTabbarInner.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-menu]");
+  if (!btn) return;
+  if (btn.dataset.menu === "dashboard") goToDashboard();
+  else openCoachMenuItem(btn.dataset.menu);
+});
+
+coachSubtabsInner.addEventListener("click", (e) => {
+  const btn = e.target.closest("button");
+  if (!btn) return;
+  if (btn.dataset.subExternal === "masc") openMascPage();
+  else COACH_SCREEN_OPENERS[btn.dataset.subScreen]?.();
+});
+
+function openInstructionSection() {
+  hideAllScreens();
+  instructionSection.classList.remove("hidden");
 }
 
 function populateTeamSelect(selectEl, placeholder) {
@@ -1628,11 +1747,9 @@ function applyAgeGroupLock() {
   }
 }
 
+// "หน้านักกีฬา" = แกลเลอรีของเมนู Player Data (ฟอร์มเพิ่ม/แก้ไขเปิดจากปุ่มในแกลเลอรี/หน้ารายละเอียด — ดู openPlayerForm)
 function openAddPlayerSection() {
-  hideAllScreens();
-  addPlayerSection.classList.remove("hidden");
-  applyAgeGroupLock();
-  renderPlayerList();
+  openPlayerGallery();
 }
 
 function openCheckinSection() {
@@ -3744,7 +3861,10 @@ const ROUTE_SCREENS = [
   { el: matchReportSection, key: "match", kind: "coach" },
   { el: injuryReportSection, key: "injury", kind: "coach" },
   { el: trainingPlanSection, key: "plan", kind: "coach" },
-  { el: addPlayerSection, key: "players", kind: "coach" },
+  { el: playerGallerySection, key: "players", kind: "coach" },
+  { el: playerDetailSection, key: "player-detail", kind: "coach" },
+  { el: addPlayerSection, key: "player-form", kind: "coach" },
+  { el: instructionSection, key: "instruction", kind: "coach" },
   { el: fitnessEntrySection, key: "fitness", kind: "coach" },
   { el: executiveSection, key: "executive", kind: "executive" },
   { el: executivePlayersSection, key: "executive-players", kind: "executive" },
@@ -3808,7 +3928,10 @@ function enableRouteSync() {
 }
 
 {
-  const routeObserver = new MutationObserver(() => syncRouteToUrl());
+  const routeObserver = new MutationObserver(() => {
+    syncRouteToUrl();
+    renderCoachNav();
+  });
   for (const s of ROUTE_SCREENS) routeObserver.observe(s.el, { attributes: true, attributeFilter: ["class"] });
   for (const input of [dailyDateInput, dateInput, reportDateInput, trainingPlanDateInput]) {
     input.addEventListener("change", syncRouteToUrl);
@@ -3845,7 +3968,14 @@ function openCoachScreen(screen, date) {
       openInjuryReportSection();
       break;
     case "players":
-      openAddPlayerSection();
+    case "player-detail": // รหัสนักกีฬาไม่ได้เก็บใน URL — รีเฟรชแล้วกลับมาที่แกลเลอรี
+      openPlayerGallery();
+      break;
+    case "player-form":
+      openPlayerForm();
+      break;
+    case "instruction":
+      openInstructionSection();
       break;
     case "fitness":
       openFitnessEntrySection();
@@ -4051,46 +4181,145 @@ async function loadPlayers() {
   players.sort((a, b) => (a.number ?? 0) - (b.number ?? 0));
 }
 
-// ---------- รายชื่อนักกีฬาในทีม + แก้ไข/ลบ ----------
-function renderPlayerList() {
-  playerListBody.innerHTML = "";
-  if (players.length === 0) {
-    playerListBody.innerHTML =
-      '<tr><td colspan="7" class="px-4 py-6 text-center text-slate-400">ยังไม่มีนักกีฬาในทีมนี้</td></tr>';
-    return;
-  }
-  for (const p of players) {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${escapeHtml(p.number ?? "-")}</td>
-      <td class="emphasis">${escapeHtml(p.nickname ?? "-")}</td>
-      <td>${escapeHtml(p.fullName ?? "-")}</td>
-      <td>${escapeHtml(p.birthday ?? "-")}</td>
-      <td>${escapeHtml(p.ageGroup ?? "-")}</td>
-      <td>${escapeHtml(p.position ?? "-")}</td>
-    `;
-    const actionTd = document.createElement("td");
-    actionTd.className = "space-x-2";
+// ---------- Player Data (เมนู 2): แกลเลอรี → รายละเอียดรายคน → เพิ่ม/แก้ไข/ลบ ----------
+// โค้ชเห็นเฉพาะนักกีฬาที่ loadPlayers() กรองให้แล้ว (รุ่นอายุ + ตำแหน่งตามที่รับผิดชอบ)
+let galleryAgeGroup = "all";
+let detailPlayerId = null;
 
-    const editBtn = document.createElement("button");
-    editBtn.textContent = "แก้ไข";
-    editBtn.className = "btn btn-secondary btn-sm";
-    editBtn.addEventListener("click", () => startEditPlayer(p));
-
-    const deleteBtn = document.createElement("button");
-    deleteBtn.textContent = "ลบ";
-    deleteBtn.className = "btn btn-danger-soft btn-sm";
-    deleteBtn.addEventListener("click", () => deletePlayer(p));
-
-    actionTd.appendChild(editBtn);
-    actionTd.appendChild(deleteBtn);
-    tr.appendChild(actionTd);
-    playerListBody.appendChild(tr);
-  }
-  applyDataLabels(playerListBody);
+function playerPhotoHtml(p) {
+  const src = safeHttpUrl(p.photoUrl);
+  return src ? `<img src="${src}" alt="" loading="lazy" />` : icon("user");
 }
 
+function openPlayerGallery(message = "") {
+  hideAllScreens();
+  playerGallerySection.classList.remove("hidden");
+  playerGalleryStatus.textContent = message;
+  renderPlayerGallery();
+}
+
+function playerCardHtml(p) {
+  return `<button type="button" class="player-card" data-player-id="${escapeHtml(p.id)}">
+    <span class="player-card-photo">${playerPhotoHtml(p)}</span>
+    <span class="player-card-body">
+      <span class="player-card-name">${escapeHtml(playerDisplayName(p))}${p.number != null ? ` <span class="badge badge-neutral">#${escapeHtml(p.number)}</span>` : ""}</span>
+      <span class="player-card-label">FULL NAME (ชื่อจริง)</span>
+      <span class="player-card-value">${escapeHtml(p.fullName ?? "-")}</span>
+      <span class="player-card-label">AGE GROUP (รุ่นอายุ)</span>
+      <span class="badge badge-neutral">${escapeHtml(p.ageGroup ?? "-")}</span>
+      <span class="player-card-label">YEAR OF BIRTH (ปีเกิด)</span>
+      <span class="badge badge-success">${escapeHtml(birthYearLabel(p.birthday))}</span>
+    </span>
+  </button>`;
+}
+
+function renderPlayerGallery() {
+  const groups = ageGroupsOf(players);
+  if (galleryAgeGroup !== "all" && !groups.includes(galleryAgeGroup)) galleryAgeGroup = "all";
+  // ปุ่มสลับรุ่นอายุ แสดงเมื่อโค้ชดูแลหลายรุ่น (รุ่นเดียวไม่ต้องมีตัวเลือก)
+  playerGalleryChips.innerHTML =
+    groups.length > 1
+      ? ["all", ...groups]
+          .map((g) => {
+            const cls = g === galleryAgeGroup ? "chip-toggle active" : "chip-toggle";
+            return `<button type="button" class="${cls}" data-gallery-group="${escapeHtml(g)}">${g === "all" ? "ทุกรุ่น" : escapeHtml(g)}</button>`;
+          })
+          .join("")
+      : "";
+  const list = filterAndSortPlayers(players, { ageGroup: galleryAgeGroup, query: playerGallerySearch.value, sort: playerGallerySort.value });
+  playerGalleryCount.textContent = `${groups.length > 0 ? `${groups.join(" · ")} · ` : ""}${list.length} คน`;
+  playerGalleryGrid.innerHTML =
+    list.length > 0
+      ? list.map(playerCardHtml).join("")
+      : `<div class="card card-pad text-center text-slate-500" style="grid-column:1/-1">${players.length === 0 ? "ยังไม่มีนักกีฬาในความดูแล — กด \"+ เพิ่มนักกีฬา\" เพื่อเริ่มต้น" : "ไม่พบนักกีฬาตามเงื่อนไขที่เลือก"}</div>`;
+}
+
+playerGalleryChips.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-gallery-group]");
+  if (!btn) return;
+  galleryAgeGroup = btn.dataset.galleryGroup;
+  renderPlayerGallery();
+});
+playerGallerySearch.addEventListener("input", renderPlayerGallery);
+playerGallerySort.addEventListener("change", renderPlayerGallery);
+playerGalleryGrid.addEventListener("click", (e) => {
+  const card = e.target.closest("[data-player-id]");
+  if (card) openPlayerDetail(card.dataset.playerId);
+});
+playerGalleryAddBtn.addEventListener("click", () => openPlayerForm());
+
+function playerDetailRows(p) {
+  const heights = p.parentHeights;
+  const parents =
+    heights && (heights.father || heights.mother)
+      ? `${heights.father ?? "-"} / ${heights.mother ?? "-"} ซม.${heights.source ? ` (${heights.source})` : ""}`
+      : "-";
+  return [
+    ["ชื่อ-นามสกุล", p.fullName ?? "-"],
+    ["รุ่นอายุ", p.ageGroup ?? "-"],
+    ["วันเกิด / ปีเกิด", birthdayLabel(p.birthday)],
+    ["ตำแหน่ง", p.position ?? "-"],
+    ["เพศ", p.sex ?? "-"],
+    ["ส่วนสูงพ่อ / แม่", parents]
+  ]
+    .map(([label, value]) => `<div class="player-detail-row"><dt>${label}</dt><dd>${escapeHtml(value)}</dd></div>`)
+    .join("");
+}
+
+function openPlayerDetail(id) {
+  const p = players.find((x) => x.id === id);
+  if (!p) {
+    openPlayerGallery();
+    return;
+  }
+  detailPlayerId = id;
+  hideAllScreens();
+  playerDetailSection.classList.remove("hidden");
+  playerDetailBody.innerHTML = `<div class="flex gap-5 flex-wrap">
+    <div class="player-detail-photo">${playerPhotoHtml(p)}</div>
+    <div class="flex-1 min-w-[240px]">
+      <h2 class="text-xl font-bold">${escapeHtml(playerDisplayName(p))}${p.number != null ? ` <span class="badge badge-neutral">เบอร์ ${escapeHtml(p.number)}</span>` : ""}</h2>
+      <dl class="mt-2">${playerDetailRows(p)}</dl>
+      <div class="flex gap-2 flex-wrap mt-4">
+        <button type="button" class="btn btn-secondary" data-detail-action="edit">${icon("edit")} แก้ไขข้อมูล</button>
+        <button type="button" class="btn btn-danger-soft" data-detail-action="delete">${icon("trash")} ลบนักกีฬา</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+playerDetailBody.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-detail-action]");
+  const p = players.find((x) => x.id === detailPlayerId);
+  if (!btn || !p) return;
+  if (btn.dataset.detailAction === "edit") startEditPlayer(p);
+  else deletePlayer(p);
+});
+playerDetailBackBtn.addEventListener("click", () => openPlayerGallery());
+
+// ฟอร์มเพิ่ม/แก้ไข — ปุ่มกลับพาไปหน้ารายละเอียดถ้ากำลังแก้ไขอยู่ ไม่งั้นกลับแกลเลอรี
+function openPlayerFormScreen() {
+  hideAllScreens();
+  addPlayerSection.classList.remove("hidden");
+  applyAgeGroupLock();
+}
+
+function openPlayerForm() {
+  stopEditPlayer();
+  addPlayerStatus.textContent = "";
+  openPlayerFormScreen();
+}
+
+function leavePlayerForm() {
+  const editedId = editingPlayerId;
+  stopEditPlayer();
+  addPlayerStatus.textContent = "";
+  if (editedId) openPlayerDetail(editedId);
+  else openPlayerGallery();
+}
+playerFormBackBtn.addEventListener("click", leavePlayerForm);
 function startEditPlayer(p) {
+  openPlayerFormScreen();
   editingPlayerId = p.id;
   document.getElementById("player-number").value = p.number ?? "";
   document.getElementById("player-nickname").value = p.nickname ?? "";
@@ -4127,31 +4356,25 @@ function stopEditPlayer() {
   cancelEditPlayerBtn.classList.add("hidden");
 }
 
-cancelEditPlayerBtn.addEventListener("click", () => {
-  stopEditPlayer();
-  addPlayerStatus.textContent = "";
-});
+cancelEditPlayerBtn.addEventListener("click", leavePlayerForm);
 
 async function deletePlayer(p) {
-  const ok = confirm(`ยืนยันลบนักกีฬา "${p.nickname ?? p.fullName}"? การลบนี้ไม่สามารถย้อนกลับได้`);
+  const ok = confirm(`ยืนยันลบนักกีฬา "${p.nickname ?? p.fullName}" ออกจากระบบ?\nข้อมูลเช็คชื่อและผลประเมินเดิมที่อ้างถึงนักกีฬาคนนี้จะไม่ถูกลบ และการลบนี้ไม่สามารถย้อนกลับได้`);
   if (!ok) return;
   try {
     await deleteDoc(doc(db, "players", p.id));
     // ลบรูปนักกีฬาใน Storage ทิ้งด้วยแบบ best-effort กันไฟล์ค้าง (ไม่บล็อกการลบเอกสารหลักถ้าลบรูปไม่สำเร็จ)
     await deleteStorageFileBestEffort(p.photoPath);
     if (editingPlayerId === p.id) stopEditPlayer();
-    addPlayerStatus.textContent = `ลบ "${p.nickname ?? p.fullName}" แล้ว`;
-    addPlayerStatus.className = "text-sm text-slate-500";
     await loadPlayers();
-    renderPlayerList();
+    openPlayerGallery(`ลบ "${p.nickname ?? p.fullName}" แล้ว`);
     if (currentSessionId && currentSessionData && !currentSessionData.noTraining) {
       const existingMap = await loadExistingAttendance(currentSessionId);
       renderRoster(existingMap);
     }
   } catch (err) {
     console.error(err);
-    addPlayerStatus.textContent = "ลบไม่สำเร็จ: " + err.message;
-    addPlayerStatus.className = "text-sm text-red-600";
+    openPlayerGallery("ลบไม่สำเร็จ: " + err.message);
   }
 }
 
@@ -4255,6 +4478,7 @@ addPlayerForm.addEventListener("submit", async (e) => {
     addPlayerStatus.textContent = "กำลังบันทึก...";
     addPlayerStatus.className = "text-sm text-slate-500";
 
+    const editedId = editingPlayerId;
     if (editingPlayerId) {
       await updateDoc(doc(db, "players", editingPlayerId), payload);
       addPlayerStatus.innerHTML = `บันทึกการแก้ไข "${escapeHtml(nickname)}" สำเร็จ ${icon("check")}${escapeHtml(birthdayCorrectedNote)}`;
@@ -4278,11 +4502,12 @@ addPlayerForm.addEventListener("submit", async (e) => {
     }
 
     await loadPlayers();
-    renderPlayerList();
+    renderPlayerGallery();
     if (currentSessionId && currentSessionData && !currentSessionData.noTraining) {
       const existingMap = await loadExistingAttendance(currentSessionId);
       renderRoster(existingMap);
     }
+    if (editedId) openPlayerDetail(editedId);
   } catch (err) {
     console.error(err);
     addPlayerStatus.textContent = "บันทึกไม่สำเร็จ: " + err.message;

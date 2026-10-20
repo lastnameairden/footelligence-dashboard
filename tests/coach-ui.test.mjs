@@ -1,0 +1,99 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { TEAM_THEMES, applyTeamTheme, contrastWithWhite, teamThemeVars } from "../js/team-theme.js";
+import { COACH_MENU, menuItem, menuKeyForScreen } from "../js/coach-menu.js";
+import { COACH_SCREEN_KEYS } from "../js/screen-route.js";
+import { ageGroupsOf, birthYearLabel, birthdayLabel, filterAndSortPlayers, playerDisplayName } from "../js/player-gallery.js";
+
+test("team themes: white text is readable (>= 4.5:1) on every header and accent color", () => {
+  for (const [team, t] of Object.entries(TEAM_THEMES)) {
+    for (const key of ["header", "accent", "accentHover"]) {
+      assert.ok(contrastWithWhite(t[key]) >= 4.5, `${team} ${key} ${t[key]} contrast ${contrastWithWhite(t[key]).toFixed(2)}`);
+    }
+  }
+});
+
+test("teamThemeVars covers the three teams and nothing else; accent tint is a 10% wash of the accent", () => {
+  assert.deepEqual(Object.keys(TEAM_THEMES).sort(), ["KHAMPHEE FOOTBALL", "THAMMASATHIT", "THAWEE SC"]);
+  assert.equal(teamThemeVars("NOPE"), null);
+  assert.equal(teamThemeVars(null), null);
+  const v = teamThemeVars("THAWEE SC");
+  assert.equal(v["--accent"], "#b01e38");
+  assert.equal(v["--accent-tint"], "rgba(176, 30, 56, 0.1)");
+  assert.equal(v["--header-ink"], "#FFFFFF");
+});
+
+test("applyTeamTheme sets then clears the CSS variables and the data attribute", () => {
+  const store = new Map();
+  const attrs = new Map();
+  const root = {
+    style: { setProperty: (k, v) => store.set(k, v), removeProperty: (k) => store.delete(k) },
+    setAttribute: (k, v) => attrs.set(k, v),
+    removeAttribute: (k) => attrs.delete(k)
+  };
+  applyTeamTheme("KHAMPHEE FOOTBALL", root);
+  assert.equal(store.get("--header-bg"), "#0b2a5b");
+  assert.equal(attrs.get("data-team-theme"), "KHAMPHEE FOOTBALL");
+  applyTeamTheme("THAMMASATHIT", root);
+  assert.equal(store.get("--accent"), "#c2410c", "switching teams replaces the previous theme");
+  applyTeamTheme(null, root);
+  assert.equal(store.size, 0);
+  assert.equal(attrs.size, 0);
+});
+
+test("coach menu: exactly the nine requested items, in order, English labels", () => {
+  assert.deepEqual(
+    COACH_MENU.map((m) => m.label),
+    ["Instruction", "Player Data", "Attendance Check", "Attendance", "Training Plan", "Match Data", "Evaluation", "Injury/Sick", "Meeting"]
+  );
+  assert.equal(new Set(COACH_MENU.map((m) => m.key)).size, 9);
+});
+
+test("coach menu only points at screens that exist, and every coach screen belongs to one menu", () => {
+  for (const m of COACH_MENU) {
+    assert.ok(COACH_SCREEN_KEYS.includes(m.screen), `${m.key} → ${m.screen}`);
+    assert.ok(m.screens.includes(m.screen));
+    for (const c of m.children || []) if (c.screen) assert.ok(m.screens.includes(c.screen), `${m.key} child ${c.screen}`);
+  }
+  for (const screen of COACH_SCREEN_KEYS) assert.notEqual(menuKeyForScreen(screen), null, `screen ${screen} has no menu`);
+  assert.equal(menuKeyForScreen("report"), "training-plan");
+  assert.equal(menuKeyForScreen("player-detail"), "player-data");
+  assert.equal(menuKeyForScreen("nope"), null);
+  assert.equal(menuItem("meeting").screen, "meeting-tasks");
+});
+
+test("birthYearLabel / birthdayLabel show Gregorian / Buddhist years", () => {
+  assert.equal(birthYearLabel("2009-03-12"), "2009 / 2552");
+  assert.equal(birthYearLabel(""), "-");
+  assert.equal(birthYearLabel(null), "-");
+  assert.equal(birthYearLabel("12/03/2009"), "-");
+  assert.equal(birthdayLabel("2009-03-12"), "12 มี.ค. 2009 / 2552");
+  assert.equal(birthdayLabel("2009-13-12"), "-");
+});
+
+const roster = [
+  { id: "a", nickname: "เจเจ", fullName: "ภพธรรม พรคต", ageGroup: "U16", number: 7 },
+  { id: "b", nickname: "เทอรี่", fullName: "เจตนิพัทธ์ คำสม", ageGroup: "U16", number: 3 },
+  { id: "c", nickname: "นัท", fullName: "นันทพัทธ์ ออมสิน", ageGroup: "U13", number: null },
+  { id: "d", nickname: "Alex", fullName: "Alex Smith", ageGroup: "U13", number: 1 }
+];
+
+test("ageGroupsOf: only groups present, youngest first", () => {
+  assert.deepEqual(ageGroupsOf(roster), ["U13", "U16"]);
+  assert.deepEqual(ageGroupsOf([]), []);
+});
+
+test("filterAndSortPlayers: by age group, by name search, sorted by number (no number last) or by name", () => {
+  assert.deepEqual(filterAndSortPlayers(roster, { ageGroup: "U16" }).map((p) => p.id), ["b", "a"]);
+  assert.deepEqual(filterAndSortPlayers(roster, {}).map((p) => p.id), ["d", "b", "a", "c"]);
+  assert.deepEqual(filterAndSortPlayers(roster, { query: "  smith " }).map((p) => p.id), ["d"]);
+  assert.deepEqual(filterAndSortPlayers(roster, { query: "เจ" }).map((p) => p.id).sort(), ["a", "b"]);
+  assert.deepEqual(filterAndSortPlayers(roster, { sort: "name", ageGroup: "U13" }).map((p) => p.id), ["c", "d"]);
+  assert.deepEqual(filterAndSortPlayers(roster, { ageGroup: "all", query: "zzz" }), []);
+});
+
+test("playerDisplayName prefers the nickname", () => {
+  assert.equal(playerDisplayName({ nickname: "เจเจ", fullName: "x" }), "เจเจ");
+  assert.equal(playerDisplayName({ fullName: "x" }), "x");
+  assert.equal(playerDisplayName({}), "-");
+});
