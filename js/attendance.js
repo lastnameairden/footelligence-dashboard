@@ -93,16 +93,6 @@ import {
   planInjuryAutoFill
 } from "./injury-attendance.js";
 import {
-  MAX_LINEUP_SIZE,
-  buildLineupFields,
-  guestAgeGroupOptions,
-  guestCandidates,
-  isGoalkeeper,
-  lineupFromReport,
-  ownGroupCandidates,
-  summarizeLineup
-} from "./match-lineup.js";
-import {
   BODY_REGIONS,
   CONTEXTS,
   MECHANISMS,
@@ -135,13 +125,7 @@ const coachBar = document.getElementById("coach-bar");
 const addPlayerSection = document.getElementById("add-player-section");
 const checkinSection = document.getElementById("checkin-section");
 const reportSection = document.getElementById("report-section");
-const matchReportSection = document.getElementById("match-report-section");
 const injuryReportSection = document.getElementById("injury-report-section");
-const matchReportForm = document.getElementById("match-report-form");
-const matchReportStatus = document.getElementById("match-report-status");
-const matchReportSubmitBtn = document.getElementById("match-report-submit-btn");
-const cancelEditMatchBtn = document.getElementById("cancel-edit-match-btn");
-const matchReportListBody = document.getElementById("match-report-list-body");
 const injuryReportForm = document.getElementById("injury-report-form");
 const injuryReportStatus = document.getElementById("injury-report-status");
 const injuryReportSubmitBtn = document.getElementById("injury-report-submit-btn");
@@ -367,7 +351,6 @@ const drawerLogoutBtn = document.getElementById("drawer-logout-btn");
 const dateInput = document.getElementById("session-date");
 const loadSessionBtn = document.getElementById("load-session-btn");
 const viewSessionBtn = document.getElementById("view-session-btn");
-const markNoTrainingBtn = document.getElementById("mark-no-training-btn");
 const noTrainingBanner = document.getElementById("no-training-banner");
 const undoNoTrainingBtn = document.getElementById("undo-no-training-btn");
 const rosterWrap = document.getElementById("roster-wrap");
@@ -694,7 +677,6 @@ function hideAllScreens() {
   addPlayerSection.classList.add("hidden");
   checkinSection.classList.add("hidden");
   reportSection.classList.add("hidden");
-  matchReportSection.classList.add("hidden");
   injuryReportSection.classList.add("hidden");
   trainingPlanSection.classList.add("hidden");
   trainingPlanMenuSection.classList.add("hidden");
@@ -2131,15 +2113,6 @@ function openReportSection() {
     reportDateInput.value = todayBangkok();
   }
   loadReportHistory();
-}
-
-function openMatchReportSection() {
-  hideAllScreens();
-  matchReportSection.classList.remove("hidden");
-  stopEditMatch();
-  renderMatchReportList();
-  // โหลดนักกีฬาทุกรุ่น/ทุกตำแหน่งของทีมไว้ให้เลือก 11 ตัวจริง (รวม GK และผู้เล่นรุ่นอื่นที่ดึงขึ้นมา)
-  loadMatchPlayerPool().then(renderMatchGuestControls);
 }
 
 // ---------- Injury/Sick (เมนู 8): หน้าเลือก → Recording (ฟอร์มเดิม) / Results (สรุปผลและกราฟ) ----------
@@ -4239,7 +4212,6 @@ const ROUTE_SCREENS = [
   { el: meetingHistorySection, key: "meeting-history", kind: "coach" },
   { el: checkinSection, key: "checkin", kind: "coach" },
   { el: reportSection, key: "report", kind: "coach" },
-  { el: matchReportSection, key: "match", kind: "coach" },
   { el: injuryReportSection, key: "injury", kind: "coach" },
   { el: trainingPlanSection, key: "plan", kind: "coach" },
   { el: trainingPlanMenuSection, key: "training-plan", kind: "coach" },
@@ -5501,7 +5473,7 @@ async function chooseDayType(type) {
   }
   setMatchDayVisible(false);
   syncDayTypeUi(type);
-  if (type === "no_training") markNoTrainingBtn.click();
+  if (type === "no_training") await markNoTraining();
   else if (currentSessionData?.noTraining) undoNoTrainingBtn.click();
   else {
     try {
@@ -5630,7 +5602,8 @@ viewSessionBtn.addEventListener("click", async () => {
   }
 });
 
-markNoTrainingBtn.addEventListener("click", async () => {
+// ทำเครื่องหมายวันที่เลือกว่า "ไม่มีฝึกซ้อม" (เรียกจากตัวเลือกประเภทวันในหน้าเช็คชื่อ)
+async function markNoTraining() {
   const dateStr = dateInput.value;
   if (!dateStr) {
     setAttendanceStatus("กรุณาเลือกวันที่ก่อน", true);
@@ -5657,7 +5630,7 @@ markNoTrainingBtn.addEventListener("click", async () => {
     console.error(err);
     setAttendanceStatus("บันทึกไม่สำเร็จ: " + err.message, true);
   }
-});
+}
 
 undoNoTrainingBtn.addEventListener("click", async () => {
   if (!currentSessionId) return;
@@ -6178,431 +6151,10 @@ reportForm.addEventListener("submit", async (e) => {
   }
 });
 
-// ---------- รายงานผลการแข่งขัน ----------
-const MATCH_RESULT_OPTIONS = ["ชนะ", "แพ้", "เสมอ"];
-
-let editingMatchId = null;
-let matchResult = null;
-let matchLineupSelectedIds = new Set();
-
-const matchCompetitionTypeSelect = document.getElementById("match-competition-type");
-const matchAgeGroupSelect = document.getElementById("match-age-group");
-const matchResultSegmentedWrap = document.getElementById("match-result-segmented");
-const matchFormationInput = document.getElementById("match-formation");
-const matchLineupSearchInput = document.getElementById("match-lineup-search");
-const matchLineupDropdown = document.getElementById("match-lineup-dropdown");
-const matchLineupChips = document.getElementById("match-lineup-chips");
-const matchLineupCountEl = document.getElementById("match-lineup-count");
-const matchLineupSummaryEl = document.getElementById("match-lineup-summary");
-const matchLineupGkNoteEl = document.getElementById("match-lineup-gk-note");
-const matchGuestSegmentedWrap = document.getElementById("match-guest-segmented");
-const matchGuestPanel = document.getElementById("match-guest-panel");
-const matchGuestAgeGroupSelect = document.getElementById("match-guest-age-group");
-const matchGuestSearchInput = document.getElementById("match-guest-search");
-const matchGuestDropdown = document.getElementById("match-guest-dropdown");
-
-function renderMatchResultSegmented() {
-  matchResultSegmentedWrap.innerHTML = "";
-  matchResultSegmentedWrap.appendChild(
-    createSegmentedGroup(MATCH_RESULT_OPTIONS, matchResult, (result) => {
-      matchResult = result;
-      renderMatchResultSegmented();
-    })
-  );
-}
-
-// ---------- 11 ผู้เล่นตัวจริง (ตรรกะล้วนอยู่ที่ match-lineup.js) ----------
-// รายชื่อให้เลือกมาจาก "นักกีฬาทุกรุ่น/ทุกตำแหน่งของทีม" (matchPlayerPool) ไม่ใช่ players ที่ถูกกรองตามตำแหน่ง/รุ่นของโค้ช เพราะ
-// Head/Assistant Coach ไม่เห็น GK ใน players เลย แต่ 11 ตัวจริงต้องมีผู้รักษาประตูของรุ่นนั้น และต้องดึงผู้เล่นรุ่นอื่นขึ้นมาเล่นได้
-let matchPlayerPool = [];
-let matchLineupRecords = new Map(); // id -> ข้อมูลนักกีฬาที่เลือกไว้ (เก็บไว้เองเพราะอาจไม่อยู่ใน pool เช่น ถูกลบออกจากทีมแล้ว)
-let matchGuestMode = false; // มีผู้เล่นจากรุ่นอื่นขึ้นมาเล่นไหม
-
-async function loadMatchPlayerPool() {
-  try {
-    const snap = await getDocs(query(collection(db, "players"), where("team", "==", myTeam)));
-    matchPlayerPool = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  } catch (err) {
-    console.error(err);
-    matchPlayerPool = [];
-  }
-}
-
-// โหลด pool ไม่ได้ก็ยังใช้ฟอร์มได้ (ถอยไปใช้ players เหมือนเดิม — ไม่มี GK/รุ่นอื่นให้เลือกเท่านั้น)
-const lineupPool = () => (matchPlayerPool.length > 0 ? matchPlayerPool : players);
-
-function matchSelectedPlayers() {
-  return [...matchLineupSelectedIds].map((id) => matchLineupRecords.get(id)).filter(Boolean);
-}
-
+// ชื่อเรียกนักกีฬา (ใช้ร่วมกันหลายหน้า เช่น รายงานบาดเจ็บ)
 function playerLabel(p) {
   return p.nickname ?? p.fullName ?? "-";
 }
-
-function updateMatchLineupCount() {
-  const sum = summarizeLineup(matchSelectedPlayers(), matchAgeGroupSelect.value);
-  matchLineupCountEl.textContent = `(${matchLineupSelectedIds.size}/${MAX_LINEUP_SIZE} คน)`;
-  if (sum.guestCount > 0) {
-    matchLineupSummaryEl.textContent = `ผู้เล่นจากรุ่นอื่นขึ้นมาเล่น ${sum.guestCount} คน (${sum.guestsByGroup.map((g) => `${g.ageGroup}: ${g.count} คน`).join(" · ")})`;
-  } else {
-    matchLineupSummaryEl.textContent = matchGuestMode ? "ยังไม่ได้เลือกผู้เล่นจากรุ่นอื่น" : "";
-  }
-  if (sum.total === 0) {
-    matchLineupGkNoteEl.textContent = "";
-  } else if (sum.hasGoalkeeper) {
-    matchLineupGkNoteEl.textContent = `ผู้รักษาประตู: ${sum.goalkeepers.join(", ")}`;
-    matchLineupGkNoteEl.className = "text-sm text-emerald-700 mt-1";
-  } else {
-    matchLineupGkNoteEl.textContent = "ยังไม่มีผู้รักษาประตูใน 11 ตัวจริง";
-    matchLineupGkNoteEl.className = "text-sm text-amber-700 mt-1";
-  }
-}
-
-function renderMatchLineupChips() {
-  matchLineupChips.innerHTML = "";
-  const matchGroup = matchAgeGroupSelect.value;
-  for (const p of matchSelectedPlayers()) {
-    const guest = p.ageGroup && p.ageGroup !== matchGroup;
-    const chip = document.createElement("span");
-    chip.className =
-      "inline-flex items-center gap-2 text-sm font-medium rounded-full pl-3 pr-2 py-1 " +
-      (guest ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-700");
-    chip.textContent = `${playerLabel(p)}${isGoalkeeper(p) ? " (GK)" : ""}${guest ? ` · ${p.ageGroup}` : ""}`;
-    const removeBtn = document.createElement("button");
-    removeBtn.type = "button";
-    removeBtn.innerHTML = icon("close");
-    removeBtn.className = "text-slate-400 hover:text-red-600 leading-none";
-    removeBtn.addEventListener("click", () => {
-      matchLineupSelectedIds.delete(p.id);
-      renderMatchLineupChips();
-      renderLineupDropdowns();
-    });
-    chip.appendChild(removeBtn);
-    matchLineupChips.appendChild(chip);
-  }
-  updateMatchLineupCount();
-}
-
-function addPlayerToLineup(p) {
-  if (matchLineupSelectedIds.size >= MAX_LINEUP_SIZE) return;
-  matchLineupSelectedIds.add(p.id);
-  matchLineupRecords.set(p.id, p);
-  matchLineupSearchInput.value = "";
-  matchGuestSearchInput.value = "";
-  renderMatchLineupChips();
-  renderLineupDropdowns();
-}
-
-// dropdown ค้นหาผู้เล่น (ใช้ร่วมกันทั้งช่องรุ่นที่แข่งและช่องผู้เล่นจากรุ่นอื่น) — candidates = รายชื่อที่ยังเลือกได้ก่อนกรองด้วยคำค้น
-function renderLineupDropdown(dropdownEl, searchText, candidates, emptyText) {
-  if (matchLineupSelectedIds.size >= MAX_LINEUP_SIZE) {
-    dropdownEl.innerHTML = '<p class="text-sm text-slate-400 px-3 py-2">เลือกครบ 11 คนแล้ว</p>';
-    dropdownEl.classList.remove("hidden");
-    return;
-  }
-  const keyword = searchText.trim().toLowerCase();
-  const available = candidates.filter((p) => !matchLineupSelectedIds.has(p.id));
-  const shown = available.filter(
-    (p) => !keyword || playerLabel(p).toLowerCase().includes(keyword) || (p.fullName ?? "").toLowerCase().includes(keyword)
-  );
-  if (shown.length === 0) {
-    dropdownEl.innerHTML = `<p class="text-sm text-slate-400 px-3 py-2">${candidates.length === 0 ? emptyText : "ไม่พบนักกีฬาที่ค้นหา"}</p>`;
-    dropdownEl.classList.remove("hidden");
-    return;
-  }
-  dropdownEl.innerHTML = "";
-  for (const p of shown) {
-    const item = document.createElement("button");
-    item.type = "button";
-    item.textContent = `${playerLabel(p)}${p.fullName ? ` (${p.fullName})` : ""}${isGoalkeeper(p) ? " · GK" : ""}`;
-    item.className = "block w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-100";
-    // ใช้ mousedown แทน click เพื่อให้ทำงานก่อน blur ของช่องค้นหา ไม่งั้น dropdown จะถูกซ่อนก่อนคลิกติด
-    item.addEventListener("mousedown", (e) => {
-      e.preventDefault();
-      addPlayerToLineup(p);
-    });
-    dropdownEl.appendChild(item);
-  }
-  dropdownEl.classList.remove("hidden");
-}
-
-function renderMatchLineupDropdown(searchText) {
-  const ageGroup = matchAgeGroupSelect.value;
-  if (!ageGroup) {
-    matchLineupDropdown.innerHTML = '<p class="text-sm text-slate-400 px-3 py-2">กรุณาเลือกรุ่นอายุที่แข่งขันก่อน</p>';
-    matchLineupDropdown.classList.remove("hidden");
-    return;
-  }
-  renderLineupDropdown(matchLineupDropdown, searchText, ownGroupCandidates(lineupPool(), ageGroup), "ไม่มีนักกีฬารุ่นอายุนี้ในทีม");
-}
-
-function renderMatchGuestDropdown(searchText) {
-  const source = matchGuestAgeGroupSelect.value;
-  if (!source) {
-    matchGuestDropdown.innerHTML = '<p class="text-sm text-slate-400 px-3 py-2">เลือกรุ่นอายุที่ดึงขึ้นมาก่อน</p>';
-    matchGuestDropdown.classList.remove("hidden");
-    return;
-  }
-  renderLineupDropdown(matchGuestDropdown, searchText, guestCandidates(lineupPool(), source), "ไม่มีนักกีฬารุ่นนี้ในทีม");
-}
-
-function renderLineupDropdowns() {
-  if (!matchLineupDropdown.classList.contains("hidden")) renderMatchLineupDropdown(matchLineupSearchInput.value);
-  if (!matchGuestDropdown.classList.contains("hidden")) renderMatchGuestDropdown(matchGuestSearchInput.value);
-}
-
-// ปุ่ม "มีผู้เล่นจากรุ่นอื่นขึ้นมาเล่นไหม? ไม่มี/มี" + ช่องเลือกรุ่น/ค้นหาผู้เล่น (แสดงเฉพาะเมื่อเลือก "มี")
-function renderMatchGuestControls() {
-  matchGuestSegmentedWrap.innerHTML = "";
-  matchGuestSegmentedWrap.appendChild(
-    createSegmentedGroup(["ไม่มี", "มี"], matchGuestMode ? "มี" : "ไม่มี", (choice) => {
-      if (choice === "มี") {
-        if (!matchAgeGroupSelect.value) {
-          matchReportStatus.textContent = "กรุณาเลือกรุ่นอายุที่แข่งขันก่อน";
-          matchReportStatus.className = "text-sm text-red-600";
-          return;
-        }
-        matchGuestMode = true;
-      } else {
-        const matchGroup = matchAgeGroupSelect.value;
-        const guests = matchSelectedPlayers().filter((p) => p.ageGroup && p.ageGroup !== matchGroup);
-        if (guests.length > 0 && !confirm(`เอาผู้เล่นจากรุ่นอื่น ${guests.length} คนออกจากตัวจริง?`)) return;
-        guests.forEach((p) => matchLineupSelectedIds.delete(p.id));
-        matchGuestMode = false;
-      }
-      renderMatchGuestControls();
-      renderMatchLineupChips();
-    })
-  );
-  matchGuestPanel.classList.toggle("hidden", !matchGuestMode);
-  const keep = matchGuestAgeGroupSelect.value;
-  const options = guestAgeGroupOptions(lineupPool(), matchAgeGroupSelect.value);
-  matchGuestAgeGroupSelect.innerHTML =
-    '<option value="">-- เลือกรุ่นอายุ --</option>' +
-    options.map((o) => `<option value="${escapeHtml(o.ageGroup)}">${escapeHtml(o.ageGroup)} (${o.count} คน)</option>`).join("");
-  if (options.some((o) => o.ageGroup === keep)) matchGuestAgeGroupSelect.value = keep;
-  matchGuestSearchInput.disabled = options.length === 0;
-  matchGuestSearchInput.placeholder = options.length === 0 ? "ไม่มีนักกีฬารุ่นอื่นในทีม" : "พิมพ์ชื่อเพื่อค้นหาและเลือกผู้เล่นจากรุ่นนั้น...";
-}
-
-function resetMatchLineup() {
-  matchLineupSelectedIds = new Set();
-  matchLineupRecords = new Map();
-  matchGuestMode = false;
-  matchLineupSearchInput.value = "";
-  matchGuestSearchInput.value = "";
-  matchLineupDropdown.classList.add("hidden");
-  matchGuestDropdown.classList.add("hidden");
-  renderMatchGuestControls();
-  renderMatchLineupChips();
-}
-
-matchLineupSearchInput.addEventListener("input", () => {
-  renderMatchLineupDropdown(matchLineupSearchInput.value);
-});
-matchLineupSearchInput.addEventListener("focus", () => {
-  renderMatchLineupDropdown(matchLineupSearchInput.value);
-});
-matchLineupSearchInput.addEventListener("blur", () => {
-  matchLineupDropdown.classList.add("hidden");
-});
-matchGuestSearchInput.addEventListener("input", () => {
-  renderMatchGuestDropdown(matchGuestSearchInput.value);
-});
-matchGuestSearchInput.addEventListener("focus", () => {
-  renderMatchGuestDropdown(matchGuestSearchInput.value);
-});
-matchGuestSearchInput.addEventListener("blur", () => {
-  matchGuestDropdown.classList.add("hidden");
-});
-matchGuestAgeGroupSelect.addEventListener("change", () => {
-  matchGuestSearchInput.value = "";
-  matchGuestDropdown.classList.add("hidden");
-});
-matchAgeGroupSelect.addEventListener("change", () => {
-  // เปลี่ยนรุ่นอายุแล้ว รายชื่อผู้เล่นตัวจริงที่เคยเลือกไว้อาจไม่ใช่รุ่นเดียวกันอีกต่อไป จึงล้างค่าเดิม (รวมผู้เล่นที่ดึงมาจากรุ่นอื่น)
-  resetMatchLineup();
-});
-renderMatchGuestControls();
-async function renderMatchReportList() {
-  matchReportListBody.innerHTML =
-    '<tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>';
-  const snap = await getDocs(query(collection(db, "matchReports"), where("team", "==", myTeam)));
-  const reports = [];
-  snap.forEach((d) => reports.push({ id: d.id, ...d.data() }));
-  reports.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
-
-  if (reports.length === 0) {
-    matchReportListBody.innerHTML =
-      '<tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">ยังไม่มีรายการแข่งขัน</td></tr>';
-    return;
-  }
-
-  matchReportListBody.innerHTML = "";
-  for (const m of reports) {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td class="emphasis">${escapeHtml(m.date ?? "-")}</td>
-      <td>${escapeHtml(m.opponent ?? "-")}</td>
-      <td>${escapeHtml(m.competitionType ?? "-")}</td>
-      <td>${escapeHtml(m.ageGroup ?? "-")}</td>
-      <td>${matchResultBadge(m.result)}</td>
-      <td class="emphasis">${m.scoreUs} - ${m.scoreThem}</td>
-      <td>${escapeHtml(m.competition ?? "-")}</td>
-    `;
-    const actionTd = document.createElement("td");
-    actionTd.className = "space-x-2";
-    const editBtn = document.createElement("button");
-    editBtn.textContent = "แก้ไข";
-    editBtn.className = "btn btn-secondary btn-sm";
-    editBtn.addEventListener("click", () => startEditMatch(m));
-    const deleteBtn = document.createElement("button");
-    deleteBtn.textContent = "ลบ";
-    deleteBtn.className = "btn btn-danger-soft btn-sm";
-    deleteBtn.addEventListener("click", () => deleteMatchReport(m));
-    actionTd.appendChild(editBtn);
-    actionTd.appendChild(deleteBtn);
-    tr.appendChild(actionTd);
-    matchReportListBody.appendChild(tr);
-  }
-  applyDataLabels(matchReportListBody);
-}
-
-function startEditMatch(m) {
-  editingMatchId = m.id;
-  document.getElementById("match-date").value = m.date ?? "";
-  document.getElementById("match-opponent").value = m.opponent ?? "";
-  matchCompetitionTypeSelect.value = m.competitionType ?? "ทัวร์นาเมนต์";
-  document.getElementById("match-competition").value = m.competition ?? "";
-  matchAgeGroupSelect.value = m.ageGroup ?? "";
-  document.getElementById("match-score-us").value = m.scoreUs ?? "";
-  document.getElementById("match-score-them").value = m.scoreThem ?? "";
-  matchFormationInput.value = m.formation ?? "";
-  document.getElementById("match-notes").value = m.notes ?? "";
-  matchResult = m.result ?? null;
-  renderMatchResultSegmented();
-  matchLineupRecords = new Map(lineupFromReport(m, lineupPool()).map((p) => [p.id, p]));
-  matchLineupSelectedIds = new Set(matchLineupRecords.keys());
-  matchGuestMode = matchSelectedPlayers().some((p) => p.ageGroup && p.ageGroup !== m.ageGroup);
-  renderMatchGuestControls();
-  renderMatchLineupChips();
-  matchReportSubmitBtn.textContent = "บันทึกการแก้ไข";
-  cancelEditMatchBtn.classList.remove("hidden");
-  matchReportStatus.textContent = `กำลังแก้ไขผลการแข่งขันวันที่ ${m.date}`;
-  matchReportStatus.className = "text-sm text-slate-500";
-  matchReportForm.scrollIntoView({ behavior: "smooth", block: "start" });
-}
-
-function stopEditMatch() {
-  editingMatchId = null;
-  matchReportForm.reset();
-  matchResult = null;
-  renderMatchResultSegmented();
-  resetMatchLineup();
-  matchReportSubmitBtn.textContent = "บันทึกผลการแข่งขัน";
-  cancelEditMatchBtn.classList.add("hidden");
-}
-
-cancelEditMatchBtn.addEventListener("click", () => {
-  stopEditMatch();
-  matchReportStatus.textContent = "";
-});
-
-async function deleteMatchReport(m) {
-  const ok = confirm(`ยืนยันลบผลการแข่งขันวันที่ ${m.date} กับ ${m.opponent}? การลบนี้ไม่สามารถย้อนกลับได้`);
-  if (!ok) return;
-  try {
-    await deleteDoc(doc(db, "matchReports", m.id));
-    if (editingMatchId === m.id) stopEditMatch();
-    matchReportStatus.textContent = "ลบรายการแล้ว";
-    matchReportStatus.className = "text-sm text-slate-500";
-    await renderMatchReportList();
-  } catch (err) {
-    console.error(err);
-    matchReportStatus.textContent = "ลบไม่สำเร็จ: " + err.message;
-    matchReportStatus.className = "text-sm text-red-600";
-  }
-}
-
-matchReportForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  if (!myTeam) {
-    matchReportStatus.textContent = "ยังไม่ทราบทีมที่รับผิดชอบ";
-    matchReportStatus.className = "text-sm text-red-600";
-    return;
-  }
-  if (!matchResult) {
-    matchReportStatus.textContent = "กรุณาเลือกผลการแข่งขัน (ชนะ/แพ้/เสมอ)";
-    matchReportStatus.className = "text-sm text-red-600";
-    return;
-  }
-  if (!matchAgeGroupSelect.value) {
-    matchReportStatus.textContent = "กรุณาเลือกรุ่นอายุที่แข่งขัน";
-    matchReportStatus.className = "text-sm text-red-600";
-    return;
-  }
-
-  const date = document.getElementById("match-date").value;
-  const opponent = document.getElementById("match-opponent").value.trim();
-  const competitionType = matchCompetitionTypeSelect.value;
-  const competition = document.getElementById("match-competition").value.trim();
-  const ageGroup = matchAgeGroupSelect.value;
-  const scoreUs = Number(document.getElementById("match-score-us").value);
-  const scoreThem = Number(document.getElementById("match-score-them").value);
-  const formation = matchFormationInput.value.trim();
-  const notes = document.getElementById("match-notes").value.trim();
-
-  const lineupPlayers = matchSelectedPlayers();
-  // 11 ตัวจริงควรมีผู้รักษาประตู — ไม่บังคับ (กรณีไม่มี GK ในทีมจริงๆ) แต่ถามยืนยันก่อนบันทึกเพื่อกันลืม
-  if (lineupPlayers.length > 0 && !lineupPlayers.some(isGoalkeeper)) {
-    if (!confirm("ใน 11 ตัวจริงยังไม่มีผู้รักษาประตู — ยืนยันบันทึกโดยไม่มี GK?")) return;
-  }
-  const lineupFields = buildLineupFields(lineupPlayers, ageGroup);
-
-  const payload = {
-    team: myTeam,
-    date,
-    opponent,
-    competitionType,
-    competition: competition || null,
-    ageGroup,
-    result: matchResult,
-    scoreUs,
-    scoreThem,
-    formation: formation || null,
-    ...lineupFields,
-    notes: notes || null,
-    coachId: auth.currentUser.uid,
-    coachName: myCoachName || auth.currentUser.email,
-    updatedAt: serverTimestamp()
-  };
-
-  try {
-    matchReportStatus.textContent = "กำลังบันทึก...";
-    matchReportStatus.className = "text-sm text-slate-500";
-
-    if (editingMatchId) {
-      await updateDoc(doc(db, "matchReports", editingMatchId), payload);
-      matchReportStatus.innerHTML = `บันทึกการแก้ไขสำเร็จ ${icon("check")}`;
-      matchReportStatus.className = "text-sm text-emerald-600";
-      stopEditMatch();
-    } else {
-      await addDoc(collection(db, "matchReports"), { ...payload, createdAt: serverTimestamp() });
-      matchReportForm.reset();
-      matchResult = null;
-      renderMatchResultSegmented();
-      resetMatchLineup();
-      matchReportStatus.innerHTML = `บันทึกผลการแข่งขันสำเร็จ ${icon("check")}`;
-      matchReportStatus.className = "text-sm text-emerald-600";
-    }
-    await renderMatchReportList();
-  } catch (err) {
-    console.error(err);
-    matchReportStatus.textContent = "บันทึกไม่สำเร็จ: " + err.message;
-    matchReportStatus.className = "text-sm text-red-600";
-  }
-});
-
 // ---------- รายงานอาการบาดเจ็บ ----------
 let editingInjuryId = null;
 let injurySelectedPlayerId = null;
@@ -7638,7 +7190,14 @@ trainingPlanForm.addEventListener("submit", async (e) => {
   }
 });
 
-// ---------- Home: ข้อความช่วยเหลือของรายงานการฝึกซ้อม ----------
+// กรอง "รายงานการฝึกซ้อม" (trainingReports) ให้เหลือเฉพาะของโค้ชคนนี้ — รายงานไม่มีฟิลด์ ageGroup ให้กรอง (ทีมหนึ่งมีหลายโค้ชคนละรุ่น
+// จึงเห็นรายงานของโค้ชคนอื่นปนกันได้) myAgeGroups.length > 0 = รู้ตัวโค้ชแน่ชัดแล้ว (โค้ชจริงล็อกอินเอง หรือผู้ดูแลระบบสวมบทบาทเจาะจงคนใดคนหนึ่ง)
+// โหมด "จัดการทีมนี้" แบบกว้าง (myAgeGroups ว่าง) ยังเห็นรายงานของทุกโค้ชในทีมเหมือนเดิม
+function filterByMyCoachName(reports) {
+  return myAgeGroups.length > 0 ? reports.filter((r) => r.coachName === myCoachName) : reports;
+}
+
+// ---------- รายงานการฝึกซ้อม: ข้อความช่วงเวลา ----------
 function formatReportPeriodForDaily(r) {
   if (!r.periodType) return "-";
   const labels = { morning: "ซ้อมเช้า", evening: "ซ้อมเย็น" };
