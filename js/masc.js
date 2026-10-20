@@ -15,6 +15,9 @@ import { db, auth } from "./firebase-init.js";
 import { AGES, POS, SECT, SB, CRITERIA, SCORE_VALUES, categoryRawScore, isEvaluationComplete, scoreToGrade } from "./masc-data.js";
 import { getCoachPlayerIds, escapeHtml, todayBangkok } from "./ui-utils.js";
 import { icon } from "./icons.js";
+// อยู่ใน iframe ของเมนูโค้ช: ซ่อนหัว/ท้ายหน้าและปุ่มย้อนกลับของหน้านี้ (ดู html.embedded ใน styles.css)
+if (window.self !== window.top) document.documentElement.classList.add("embedded");
+
 
 const statusEl = document.getElementById("status-message");
 const accessGate = document.getElementById("access-gate");

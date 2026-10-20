@@ -1,7 +1,7 @@
 // เมนูหลัก 11 รายการของโค้ช (ตรรกะล้วนๆ ไม่พึ่ง DOM/Firebase เพื่อเทสต์ใน Node ได้) — ใช้ทั้งเมนู ☰ ด้านข้าง (มือถือ) และแถบเมนูแนวนอน (คอมพิวเตอร์)
 // screen = รหัสหน้าจอตาม COACH_SCREEN_KEYS ใน screen-route.js; screens = ทุกหน้าที่นับว่าอยู่ภายใต้เมนูนี้ (ใช้ไฮไลต์เมนูที่เปิดอยู่)
 // disabled (ในเมนูย่อย) = ยังไม่เปิดใช้งาน แสดงจางๆ กดไม่ได้
-// children = เมนูย่อย (แสดงเป็นแถบเล็กใต้แถบเมนูหลักเมื่ออยู่ในเมนูนั้น) — external = หน้าอื่นนอก attendance.html
+// children = เมนูย่อย (แสดงเป็นแถบเล็กใต้แถบเมนูหลักเมื่ออยู่ในเมนูนั้น) — external = หน้าอื่นนอก attendance.html (ตอนนี้ไม่มีเมนูใดใช้: Footelligence Test และสมุดพกฝังอยู่ในกรอบเมนูแล้ว)
 // Home = หน้าแรกหลังล็อกอิน (screen "daily" คงรหัสเดิมไว้ให้ลิงก์เก่า/กระดิ่งใช้ต่อได้)
 
 export const COACH_MENU = [
@@ -47,10 +47,10 @@ export const COACH_MENU = [
     hint: "การประเมิน",
     icon: "target",
     screen: "evaluation",
-    screens: ["evaluation", "physical-test", "physical-instruction", "physical-form", "fitness", "athlete-results"],
+    screens: ["evaluation", "footelligence-test", "physical-test", "physical-instruction", "physical-form", "fitness", "athlete-results"],
     // children ซ้อนได้ 1 ชั้น: Physical Test มีเมนูย่อยของตัวเอง (แสดงเป็นแถบแถวที่สอง)
     children: [
-      { label: "Footelligence Test", external: "masc" },
+      { label: "Footelligence Test", screen: "footelligence-test" },
       {
         label: "Physical Test",
         screen: "physical-test",

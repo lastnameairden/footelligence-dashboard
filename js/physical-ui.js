@@ -13,7 +13,7 @@ import { printSheet } from "./print-sheet.js";
 import { coachAccessModel, dateLabel, daysLeft, periodAllowed, windowLabel } from "./athlete-windows.js";
 
 const el = (id) => document.getElementById(id);
-let api = null; // { team(), ageGroups(), canBypass() = แอดมินที่สวมบทบาทโค้ช } — ageGroups() ว่าง = ดูแลทั้งทีม (ใช้รุ่นที่มีนักกีฬา)
+let api = null; // { team(), ageGroups(), canBypass() = แอดมินที่สวมบทบาทโค้ช, openReportCard({team,ageGroup,start,end}), closeReportCard() } — ageGroups() ว่าง = ดูแลทั้งทีม (ใช้รุ่นที่มีนักกีฬา)
 let rounds = [];
 let pool = [];
 
@@ -103,6 +103,7 @@ function showBanner(html, cls) {
 export async function showAthleteResults() {
   const status = el("athlete-results-status");
   status.textContent = "";
+  api.closeReportCard(); // ไม่ค้างสมุดพกของรอบก่อนไว้ — กด "เปิดสมุดพก" ใหม่ทุกครั้ง (และไม่เห็นต่อหลังพ้นช่วงเปิด)
   const bypass = api.canBypass();
   showBanner("", "");
   el("athlete-results-controls").classList.add("hidden");
@@ -163,7 +164,8 @@ function openAthleteResults() {
   if (start > end) return void (status.textContent = "เดือนเริ่มต้นต้องอยู่ก่อนหรือเท่ากับเดือนสิ้นสุด");
   // กันกรณีช่วงปิดไประหว่างเปิดหน้านี้ค้างไว้ (หน้าสมุดพกตรวจซ้ำอีกชั้น)
   if (!bypass && !periodAllowed(windows, team, todayBangkok(), start, end)) return void (status.textContent = "ช่วงนี้ปิดแล้ว รีเฟรชหน้าเพื่อดูช่วงที่เปิดอยู่");
-  window.location.href = `./report-card.html#team=${encodeURIComponent(team)}&ageGroup=${encodeURIComponent(ageGroup)}&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+  status.textContent = "";
+  api.openReportCard({ team, ageGroup, start, end });
 }
 export function initPhysical(c) {
   api = c;

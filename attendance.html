@@ -1048,12 +1048,16 @@
         </div>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <button type="button" data-eval-nav="masc" class="card card-pad match-data-card"><span class="match-data-card-title">Footelligence Test</span><span class="match-data-card-text">ประเมินนักกีฬาตามเกณฑ์ MASC (Motricity · Availability · Smart · Commitment)</span></button>
+        <button type="button" data-eval-nav="footelligence-test" class="card card-pad match-data-card"><span class="match-data-card-title">Footelligence Test</span><span class="match-data-card-text">ประเมินนักกีฬาตามเกณฑ์ MASC (Motricity · Availability · Smart · Commitment)</span></button>
         <button type="button" data-eval-nav="physical-test" class="card card-pad match-data-card"><span class="match-data-card-title">Physical Test</span><span class="match-data-card-text">ทดสอบสมรรถภาพทางกาย: วิธีทดสอบ แบบฟอร์มพิมพ์ และลงข้อมูลหลังทดสอบ</span></button>
         <button type="button" data-eval-nav="athlete-results" class="card card-pad match-data-card"><span class="match-data-card-title">Athlete Results</span><span class="match-data-card-text">สมุดพกนักกีฬา รวมการเติบโตและผลทดสอบสมรรถภาพ</span></button>
       </div>
     </section>
 
+    <!-- Footelligence Test (MASC): ฝังหน้าประเมินเดิม (masc.html) ไว้ในกรอบเมนู — ไม่พาออกไปหน้าแยก -->
+    <section id="footelligence-test-section" class="hidden">
+      <iframe id="footelligence-test-frame" class="embed-frame" title="Footelligence Test" src="about:blank"></iframe>
+    </section>
     <section id="physical-test-menu-section" class="hidden space-y-6">
       <button data-eval-back type="button" class="btn btn-ghost px-0">← กลับ Evaluation</button>
       <div class="page-heading">
@@ -1126,7 +1130,8 @@
         <button id="athlete-results-open-btn" type="button" class="btn btn-primary">เปิดสมุดพก</button>
         <p id="athlete-results-status" class="text-sm text-slate-500 w-full"></p>
       </div>
-      <p class="text-sm text-slate-500">สมุดพกหน้า 2 "ร่างกายและการเคลื่อนไหว" แสดงการเติบโต ผลทดสอบสมรรถภาพ MASC-M และสรุปจากโค้ชฟิตเนส เมื่อนักกีฬามีผลทดสอบแล้ว</p>    </section>
+      <!-- สมุดพกของช่วงที่เลือกแสดงในหน้านี้เลย (ฝัง report-card.html) -->
+      <iframe id="athlete-results-frame" class="embed-frame hidden" title="สมุดพกนักกีฬา" src="about:blank"></iframe>      <p class="text-sm text-slate-500">สมุดพกหน้า 2 "ร่างกายและการเคลื่อนไหว" แสดงการเติบโต ผลทดสอบสมรรถภาพ MASC-M และสรุปจากโค้ชฟิตเนส เมื่อนักกีฬามีผลทดสอบแล้ว</p>    </section>
 
     <!-- Training Plan (เมนู 5): หน้าเลือก 7 ตัวเลือก — Upload / Plan Data / Report / Report Data + 3 ตัวที่ยังไม่เปิดใช้งาน -->
     <section id="training-plan-menu-section" class="hidden space-y-6">

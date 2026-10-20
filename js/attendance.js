@@ -78,6 +78,7 @@ import { filterPlans, filterReportsByMonths, groupByMonth, monthOptionsOf, month
 import { COACH_MENU, activeChildFor, childMatchesScreen, menuItem, menuKeyForScreen } from "./coach-menu.js";
 import { initPhysical, showAthleteResults, showInstruction, showTestingForm } from "./physical-ui.js";
 import { initProfile, showProfile } from "./coach-profile-ui.js";
+import { clearEmbedded, showEmbedded } from "./embed-frame.js";
 import { athleteResultsNotification, fitnessRoundNotification, unreadNotesNotification } from "./coach-notifications.js";
 import { initResults, showResults } from "./injury-results-ui.js";
 import { ageGroupsOf, birthYearLabel, birthdayLabel, filterAndSortPlayers, playerDisplayName } from "./player-gallery.js";
@@ -212,6 +213,9 @@ const physicalInstructionSection = document.getElementById("physical-instruction
 const physicalFormSection = document.getElementById("physical-form-section");
 const athleteResultsSection = document.getElementById("athlete-results-section");
 const profileSection = document.getElementById("profile-section");
+const footelligenceTestSection = document.getElementById("footelligence-test-section");
+const footelligenceTestFrame = document.getElementById("footelligence-test-frame");
+const athleteResultsFrame = document.getElementById("athlete-results-frame");
 const injuryMenuSection = document.getElementById("injury-menu-section");
 const injuryResultsSection = document.getElementById("injury-results-section");
 const dailyReminderBanner = document.getElementById("daily-reminder-banner");
@@ -698,6 +702,7 @@ function hideAllScreens() {
   physicalFormSection.classList.add("hidden");
   athleteResultsSection.classList.add("hidden");
   profileSection.classList.add("hidden");
+  footelligenceTestSection.classList.add("hidden");
   injuryMenuSection.classList.add("hidden");
   injuryResultsSection.classList.add("hidden");
   playerGallerySection.classList.add("hidden");
@@ -1131,25 +1136,26 @@ const COACH_SCREEN_OPENERS = {
   profile: () => openProfileSection(),
   "injury-menu": () => openInjuryMenu(),
   "injury-results": () => openInjuryResults(),
-  masc: () => openMascPage(),
+  "footelligence-test": () => openFootelligenceTest(),
   "meeting-menu": () => openMeetingMenu(),
   "meeting-next": () => openMeetingNext(),
   "meeting-tasks": () => openMeetingTasksSection(),
   "meeting-history": () => openMeetingHistory()
 };
 
-// หน้าประเมิน MASC เป็นหน้าแยก (masc.html) — ผู้ดูแลระบบที่สวมบทบาทโค้ชแนบรุ่นอายุ/ตำแหน่งของโค้ชคนนั้นไปด้วย เพื่อให้เห็นรายชื่อตรงกับที่โค้ชเห็นจริง
-function openMascPage() {
-  if (!currentIsAdmin) {
-    window.location.href = "./masc.html";
-    return;
-  }
-  const params = new URLSearchParams({ team: myTeam });
-  if (myAgeGroups.length > 0) params.set("ageGroups", myAgeGroups.join(","));
-  if (myCoachPosition) params.set("coachPosition", myCoachPosition);
-  window.location.href = `./masc.html#${params.toString()}`;
+// Footelligence Test (MASC) แสดงในกรอบเมนูเลย (ฝัง masc.html) — ผู้ดูแลระบบที่สวมบทบาทโค้ชแนบรุ่นอายุ/ตำแหน่งของโค้ชคนนั้นไปด้วย เพื่อให้เห็นรายชื่อตรงกับที่โค้ชเห็นจริง
+function openFootelligenceTest() {
+  hideAllScreens();
+  footelligenceTestSection.classList.remove("hidden");
+  const params = currentIsAdmin ? { team: myTeam, ageGroups: myAgeGroups.join(","), coachPosition: myCoachPosition } : {};
+  showEmbedded(footelligenceTestFrame, "masc.html", params);
 }
 
+// สมุดพก (Athlete Results) ของช่วงที่เลือก แสดงใต้ตัวเลือกในหน้า Athlete Results (ฝัง report-card.html โหลดใหม่ทุกครั้งที่กดเปิด)
+function openReportCardFrame({ team, ageGroup, start, end }) {
+  showEmbedded(athleteResultsFrame, "report-card.html", { team, ageGroup, start, end }, { reload: true });
+  athleteResultsFrame.scrollIntoView({ behavior: "smooth", block: "start" });
+}
 // เมนูของโค้ชใช้ตอนมีทีมที่ดูแลอยู่ (โค้ชจริง หรือผู้ดูแลระบบ/ทีมหลังบ้านที่สวมบทบาทโค้ช) — โหมดผู้บริหารทีมไม่ใช้
 function coachNavVisible() {
   return !!myTeam && !(currentIsAdmin && adminViewingAs === "executive");
@@ -1161,7 +1167,7 @@ function currentScreenKey() {
 
 // เมนูย่อยของเมนูหนึ่ง (ทีมหลังบ้านไม่เห็น MASC เหมือนเดิม)
 function coachChildren(menu) {
-  return (menu.children || []).filter((c) => !(c.external === "masc" && isStaffSession()));
+  return (menu.children || []).filter((c) => !(c.screen === "footelligence-test" && isStaffSession()));
 }
 
 function openCoachMenuItem(key) {
@@ -1183,7 +1189,7 @@ function appendCoachMenuToDrawer() {
     if (menu.key === active) btn.classList.add("active");
     wrap.appendChild(btn);
     for (const child of coachChildren(menu)) {
-      const sub = drawerItem("", child.disabled ? `${child.label} <span class="badge badge-warning">เร็วๆ นี้</span>` : child.label, child.disabled ? () => {} : child.external ? openMascPage : COACH_SCREEN_OPENERS[child.screen]);
+      const sub = drawerItem("", child.disabled ? `${child.label} <span class="badge badge-warning">เร็วๆ นี้</span>` : child.label, child.disabled ? () => {} : COACH_SCREEN_OPENERS[child.screen]);
       sub.classList.add("drawer-subitem");
       if (child.disabled) sub.classList.add("coach-subtab-off");
       if (childMatchesScreen(child, screen)) sub.classList.add("active");
@@ -1224,7 +1230,7 @@ function renderCoachNav() {
   const subtabHtml = (child) => {
     if (child.disabled) return `<button type="button" class="coach-subtab coach-subtab-off" data-sub-off title="เร็วๆ นี้">${escapeHtml(child.label)}</button>`;
     const cls = childMatchesScreen(child, screen) ? "coach-subtab active" : "coach-subtab";
-    return `<button type="button" class="${cls}" data-sub-screen="${child.screen ?? ""}" data-sub-external="${child.external ?? ""}">${escapeHtml(child.label)}</button>`;
+    return `<button type="button" class="${cls}" data-sub-screen="${child.screen ?? ""}">${escapeHtml(child.label)}</button>`;
   };
   const menu = active ? menuItem(active) : null;
   const children = menu ? coachChildren(menu) : [];
@@ -1248,8 +1254,7 @@ for (const row of [coachSubtabsInner, coachSubtabs2Inner]) {
   row.addEventListener("click", (e) => {
     const btn = e.target.closest("button");
     if (!btn || btn.hasAttribute("data-sub-off")) return;
-    if (btn.dataset.subExternal === "masc") openMascPage();
-    else COACH_SCREEN_OPENERS[btn.dataset.subScreen]?.();
+    COACH_SCREEN_OPENERS[btn.dataset.subScreen]?.();
   });
 }
 
@@ -1718,7 +1723,13 @@ function openAthleteResultsSection() {
   showAthleteResults();
 }
 
-initPhysical({ team: () => myTeam, ageGroups: () => myAgeGroups, canBypass: () => currentIsAdmin });
+initPhysical({
+  team: () => myTeam,
+  ageGroups: () => myAgeGroups,
+  canBypass: () => currentIsAdmin,
+  openReportCard: openReportCardFrame,
+  closeReportCard: () => clearEmbedded(athleteResultsFrame)
+});
 for (const btn of document.querySelectorAll("[data-eval-nav]")) btn.addEventListener("click", () => COACH_SCREEN_OPENERS[btn.dataset.evalNav]?.());
 for (const btn of document.querySelectorAll("[data-eval-back]")) btn.addEventListener("click", openEvaluationLanding);
 for (const btn of document.querySelectorAll("[data-physical-back]")) btn.addEventListener("click", openPhysicalTestLanding);
@@ -4231,6 +4242,7 @@ const ROUTE_SCREENS = [
   { el: physicalFormSection, key: "physical-form", kind: "coach" },
   { el: athleteResultsSection, key: "athlete-results", kind: "coach" },
   { el: profileSection, key: "profile", kind: "coach" },
+  { el: footelligenceTestSection, key: "footelligence-test", kind: "coach" },
   { el: injuryMenuSection, key: "injury-menu", kind: "coach" },
   { el: injuryResultsSection, key: "injury-results", kind: "coach" },
   { el: executiveSection, key: "executive", kind: "executive" },
@@ -4385,6 +4397,9 @@ function openCoachScreen(screen, date) {
       break;
     case "profile":
       openProfileSection();
+      break;
+    case "footelligence-test":
+      openFootelligenceTest();
       break;
     case "injury-menu":
       openInjuryMenu();

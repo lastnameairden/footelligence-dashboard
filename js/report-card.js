@@ -32,6 +32,9 @@ import { CRITERIA, SECT, categoryRawScore, isEvaluationComplete, scoreToGrade } 
 import { icon } from "./icons.js";
 import { staffCan } from "./staff-perms.js";
 import { periodAllowed } from "./athlete-windows.js";
+// อยู่ใน iframe ของเมนูโค้ช: ซ่อนหัว/ท้ายหน้าและปุ่มย้อนกลับของหน้านี้ (ดู html.embedded ใน styles.css)
+if (window.self !== window.top) document.documentElement.classList.add("embedded");
+
 import { FITNESS_SUMMARY_PRESETS, buildFitnessSeries } from "./fitness-profile.js";
 import { parentFitnessSectionsHtml } from "./fitness-view.js";
 

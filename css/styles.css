@@ -697,3 +697,8 @@ details[open] > .injury-history-group-summary::before, details[open] > .injury-h
 .report-photo-list { display: flex; flex-wrap: wrap; gap: 0.3rem; min-width: 3rem; }
 .report-photo-thumb { width: 2.75rem; height: 2.75rem; object-fit: cover; border-radius: 0.4rem; border: 1px solid var(--border); background: var(--surface-2); display: block; }
 .report-photo-thumb:hover { border-color: var(--accent); }
+/* หน้าที่ถูกฝังในกรอบเมนูโค้ช (masc.html / report-card.html ใน iframe): ซ่อนหัว/ท้าย/ปุ่มย้อนกลับของตัวเอง */
+html.embedded .app-header, html.embedded .app-footer, html.embedded [data-embed-hide] { display: none !important; }
+html.embedded body { background: transparent; min-height: 0; }
+html.embedded main { padding-top: 0.25rem; padding-bottom: 1rem; }
+.embed-frame { width: 100%; border: 0; display: block; background: transparent; min-height: 30rem; }

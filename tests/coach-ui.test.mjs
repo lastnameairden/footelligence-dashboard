@@ -81,10 +81,11 @@ test("Evaluation menu: Footelligence Test (MASC), Physical Test with 3 sub-optio
   const ev = menuItem("evaluation");
   assert.equal(ev.screen, "evaluation");
   assert.deepEqual(ev.children.map((c) => c.label), ["Footelligence Test", "Physical Test", "Athlete Results"]);
-  assert.equal(ev.children[0].external, "masc");
+  assert.equal(ev.children[0].screen, "footelligence-test", "MASC is shown inside the menu frame, not as an external page");
+  assert.equal(ev.children[0].external, undefined);
   const physical = ev.children[1];
   assert.deepEqual(physical.children.map((c) => [c.label, c.screen]), [["Instruction", "physical-instruction"], ["Testing Form", "physical-form"], ["Data Entry", "fitness"]]);
-  for (const s of ["evaluation", "physical-test", "physical-instruction", "physical-form", "fitness", "athlete-results"]) assert.equal(menuKeyForScreen(s), "evaluation", s);
+  for (const s of ["evaluation", "footelligence-test", "physical-test", "physical-instruction", "physical-form", "fitness", "athlete-results"]) assert.equal(menuKeyForScreen(s), "evaluation", s);
   for (const g of physical.children) assert.ok(physical.screens.includes(g.screen), g.screen);
   assert.equal(activeChildFor(ev, "physical-form")?.label, "Physical Test");
   assert.equal(activeChildFor(ev, "fitness")?.label, "Physical Test", "old fitness entry page now lives under Physical Test");

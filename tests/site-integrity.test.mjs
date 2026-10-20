@@ -92,8 +92,8 @@ test("vercel.json CSP keeps scripts locked down", () => {
   const csp = headers["Content-Security-Policy"];
   const scriptSrc = csp.match(/script-src([^;]*)/)[1];
   assert.ok(!/unsafe-inline|unsafe-eval/.test(scriptSrc), "script-src must not allow inline/eval");
-  assert.ok(/frame-ancestors 'none'/.test(csp));
-  assert.equal(headers["X-Frame-Options"], "DENY");
+  assert.ok(/frame-ancestors 'self'/.test(csp), "only our own pages may frame the site (Footelligence Test and the report card are embedded in the coach menu)");
+  assert.equal(headers["X-Frame-Options"], "SAMEORIGIN");
   assert.equal(headers["X-Content-Type-Options"], "nosniff");
 });
 
