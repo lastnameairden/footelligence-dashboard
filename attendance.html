@@ -1956,7 +1956,6 @@
       </div>
     </section>
 
-    <!-- หน้าจอสรุปประจำวัน (Daily) -->
     <!-- งานหลังประชุมของโค้ช: กรอก "ความรู้ที่ได้วันนี้" + "นำไปใช้ในสนามอย่างไร" ของการประชุมแต่ละครั้ง ส่งก่อน 2 วันสุดท้ายของเดือน -->
     <!-- Meeting (เมนู 9): หน้าเลือก Next Meeting / Post-Meeting Tasks / History -->
     <section id="meeting-menu-section" class="hidden space-y-6">
@@ -2013,109 +2012,28 @@
       <div id="meeting-tasks-body" class="space-y-3"></div>
     </section>
 
+    <!-- Home (เมนู 1): หน้าแรกหลังล็อกอิน — สิ่งที่ยังไม่ได้ทำวันนี้ + นัดประชุม/งานหลังประชุม + ข้อความจากผู้ดูแลระบบ (แทนหน้าสรุปประจำวัน Daily เดิม) -->
     <section id="daily-section" class="hidden space-y-6">
       <div class="page-heading">
-        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></div>
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M4 11.5 12 5l8 6.5"/><path d="M6 10.5V20h12v-9.5"/><path d="M10 20v-5h4v5"/></svg></div>
         <div>
-          <h2>สรุปประจำวัน</h2>
-          <p>ดูข้อมูลทั้งหมดที่กรอกไว้ในวันที่เลือก ครบในหน้าเดียว</p>
+          <h2>Home</h2>
+          <p id="home-date-line">สิ่งที่ต้องทำวันนี้ นัดประชุม และข้อความจากผู้ดูแลระบบ</p>
         </div>
       </div>
 
-      <div class="card card-pad flex flex-wrap items-end gap-4">
-        <div>
-          <label class="field-label">เลือกวันที่</label>
-          <input id="daily-date-input" type="date" class="field-input" />
-        </div>
-        <button id="daily-load-btn" class="btn btn-primary">โหลดข้อมูล</button>
-        <p id="daily-status" class="text-sm text-slate-500 w-full"></p>
-      </div>
-
-      <div id="daily-date-heading" class="hidden text-lg font-bold text-slate-900"></div>
-
-      <!-- เตือนงานประจำวันที่ยังไม่ได้ทำ (เช็คชื่อ/ส่งรายงานการฝึกซ้อมของ "วันนี้" — ไม่ผูกกับวันที่ที่เลือกดูด้านบน)
-      เพื่อลดปัญหาโค้ชลืมทำ/ส่งสาย โดยไม่ต้องรอผู้ดูแลระบบตามทีหลัง -->
+      <!-- เตือนงานประจำวันที่ยังไม่ได้ทำของ "วันนี้" (เช็คชื่อ/ส่งแผน/ส่งรายงานการฝึกซ้อม) เพื่อลดปัญหาโค้ชลืมทำ/ส่งสาย -->
       <div id="daily-reminder-banner" class="hidden card card-warning card-pad space-y-2"></div>
+      <p id="home-all-done" class="hidden card card-pad text-sm text-emerald-700 font-medium">วันนี้ทำครบแล้ว ไม่มีงานค้าง</p>
 
-      <!-- นัดประชุมโค้ชครั้งถัดไปของโค้ชคนนี้ (ซ่อนไว้จนกว่าจะมีนัด) -->
+      <!-- นัดประชุมโค้ชครั้งถัดไป + งานหลังประชุมของโค้ชคนนี้ (ซ้อนไว้จนกว่าจะมีนัด/งาน) -->
       <div id="daily-meeting-card" class="hidden"></div>
 
-      <!-- ข้อความที่ผู้ดูแลระบบส่งถึงทีมนี้โดยตรง (เดิมมีให้แค่บัญชีผู้บริหารทีมเห็น — เพิ่มให้โค้ชจริงเห็นด้วย
-      เพราะเป็นผู้รับผิดชอบตัวจริงที่ควรรู้เรื่องนี้) -->
+      <!-- ข้อความที่ผู้ดูแลระบบส่งถึงทีมนี้โดยตรง -->
       <div id="daily-executive-notes-section">
         <h2 class="section-title mb-3"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg></span> ข้อความจากผู้ดูแลระบบ</h2>
         <div id="daily-executive-notes-list" class="space-y-3">
           <p class="text-sm text-slate-400">กำลังโหลด...</p>
-        </div>
-      </div>
-
-      <div>
-        <h2 class="section-title mb-3"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.3 2.3L16 10"/></svg></span> เช็คชื่อการฝึกซ้อม</h2>
-        <div class="card table-wrap">
-          <table class="pro-table">
-            <thead>
-              <tr>
-                <th>ผู้เล่น</th>
-                <th>สถานะ</th>
-                <th>คะแนนเฉลี่ย</th>
-              </tr>
-            </thead>
-            <tbody id="daily-attendance-body">
-              <tr><td colspan="3" class="px-4 py-6 text-center text-slate-400">เลือกวันที่แล้วกด "โหลดข้อมูล"</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <div id="daily-attendance-pagination" class="hidden flex items-center justify-between gap-3 mt-3 text-sm"></div>
-      </div>
-
-      <div>
-        <h2 class="section-title mb-3"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M7 3h7l4 4v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M14 3v4h4"/><path d="M8.5 12.5h7M8.5 16h7"/></svg></span> รายงานการฝึกซ้อม</h2>
-        <div id="daily-training-report-card" class="card card-pad text-sm text-slate-400">เลือกวันที่แล้วกด "โหลดข้อมูล"</div>
-      </div>
-
-      <div>
-        <h2 class="section-title mb-3"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/><path d="M9 11h6M9 15h6M9 19h3"/></svg></span> แผนการฝึกซ้อมรายวัน</h2>
-        <div id="daily-training-plan-card" class="card card-pad text-sm text-slate-400">เลือกวันที่แล้วกด "โหลดข้อมูล"</div>
-      </div>
-
-      <div>
-        <h2 class="section-title mb-3"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M8 4h8v4a4 4 0 0 1-8 0V4Z"/><path d="M8 5H5a1 1 0 0 0-1 1c0 2 1.5 3.5 3.5 3.8"/><path d="M16 5h3a1 1 0 0 1 1 1c0 2-1.5 3.5-3.5 3.8"/><path d="M12 12v3"/><path d="M8 20h8"/><path d="M9 17h6l1 3H8l1-3Z"/></svg></span> รายงานผลการแข่งขัน</h2>
-        <div class="card table-wrap">
-          <table class="pro-table">
-            <thead>
-              <tr>
-                <th>คู่แข่ง</th>
-                <th>ประเภท</th>
-                <th>รุ่นอายุ</th>
-                <th>ผลการแข่งขัน</th>
-                <th>สกอร์</th>
-                <th>รายการแข่งขัน</th>
-              </tr>
-            </thead>
-            <tbody id="daily-match-body">
-              <tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">เลือกวันที่แล้วกด "โหลดข้อมูล"</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div>
-        <h2 class="section-title mb-3"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M20 8.5c0 4-4 6.5-8 9.5-4-3-8-5.5-8-9.5A4.5 4.5 0 0 1 8.5 4c1.4 0 2.7.7 3.5 1.8C12.8 4.7 14.1 4 15.5 4A4.5 4.5 0 0 1 20 8.5Z"/><path d="M4.5 10H8l1.5-3L12 12l1.5-4 1 2h4.5"/></svg></span> รายงานอาการบาดเจ็บ</h2>
-        <div class="card table-wrap">
-          <table class="pro-table">
-            <thead>
-              <tr>
-                <th>นักกีฬา</th>
-                <th>รุ่นอายุ</th>
-                <th>อาการ</th>
-                <th>ความรุนแรง</th>
-                <th>สถานะ</th>
-              </tr>
-            </thead>
-            <tbody id="daily-injury-body">
-              <tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">เลือกวันที่แล้วกด "โหลดข้อมูล"</td></tr>
-            </tbody>
-          </table>
         </div>
       </div>
     </section>

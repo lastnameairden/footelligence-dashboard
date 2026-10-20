@@ -230,19 +230,11 @@ const athleteResultsSection = document.getElementById("athlete-results-section")
 const profileSection = document.getElementById("profile-section");
 const injuryMenuSection = document.getElementById("injury-menu-section");
 const injuryResultsSection = document.getElementById("injury-results-section");
-const dailyDateInput = document.getElementById("daily-date-input");
-const dailyLoadBtn = document.getElementById("daily-load-btn");
-const dailyStatus = document.getElementById("daily-status");
-const dailyDateHeading = document.getElementById("daily-date-heading");
 const dailyReminderBanner = document.getElementById("daily-reminder-banner");
+const homeDateLine = document.getElementById("home-date-line");
+const homeAllDone = document.getElementById("home-all-done");
 const dailyMeetingCard = document.getElementById("daily-meeting-card");
 const dailyExecutiveNotesList = document.getElementById("daily-executive-notes-list");
-const dailyAttendanceBody = document.getElementById("daily-attendance-body");
-const dailyAttendancePagination = document.getElementById("daily-attendance-pagination");
-const dailyTrainingReportCard = document.getElementById("daily-training-report-card");
-const dailyTrainingPlanCard = document.getElementById("daily-training-plan-card");
-const dailyMatchBody = document.getElementById("daily-match-body");
-const dailyInjuryBody = document.getElementById("daily-injury-body");
 const reportDateInput = document.getElementById("report-date");
 const reportLoadBtn = document.getElementById("report-load-btn");
 const reportLoadStatus = document.getElementById("report-load-status");
@@ -809,11 +801,9 @@ async function openMeetingTasksSection() {
 function showDaily() {
   hideAllScreens();
   dailySection.classList.remove("hidden");
-  if (!dailyDateInput.value) {
-    dailyDateInput.value = todayBangkok();
-  }
-  loadDailyData(dailyDateInput.value);
+  homeDateLine.textContent = formatThaiDate(todayBangkok());
   checkTodayReminders();
+
   renderCoachMeetingCard(dailyMeetingCard, myTeam, meetingCoachId(), {
     position: myCoachPosition,
     onChange: () => {
@@ -824,28 +814,47 @@ function showDaily() {
   loadExecutiveNotes(myTeam, dailyExecutiveNotesList);
 }
 
-// เตือนงานประจำวันที่ยังไม่ได้ทำของ "วันนี้" จริงๆ (ไม่ผูกกับวันที่ที่เลือกดูในการ์ดด้านบนของหน้านี้) — เรียก
-// ครั้งเดียวตอนเปิดหน้า Daily (หน้าแรกของโค้ช) เพื่อกันลืมเช็คชื่อ/ส่งรายงาน โดยไม่ต้องรอผู้ดูแลระบบส่งข้อความ
-// เตือนย้อนหลัง ตรวจแค่ "เริ่มทำหรือยัง" ไม่ตรวจความครบถ้วน (มีระบบแจ้งเตือนของผู้ดูแลระบบดูแลส่วนนั้นอยู่แล้ว)
+function formatThaiDate(dateStr) {
+  return new Date(`${dateStr}T00:00:00`).toLocaleDateString("th-TH", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+}
+
+// เตือนงานประจำวันที่ยังไม่ได้ทำของ "วันนี้" (หน้า Home — หน้าแรกของโค้ช) เพื่อกันลืมเช็คชื่อ/ส่งแผน/ส่งรายงาน โดยไม่ต้องรอผู้ดูแลระบบ
+// ส่งข้อความเตือนย้อนหลัง ตรวจแค่ "เริ่มทำหรือยัง" ไม่ตรวจความครบถ้วน (มีระบบแจ้งเตือนของผู้ดูแลระบบดูแลส่วนนั้นอยู่แล้ว)
+// เตือนแผนฝึกเฉพาะวันฝึกซ้อมปกติของทีมที่ไม่ได้ถูกทำเครื่องหมาย "ไม่มีซ้อม" และยังไม่มีแผนของรุ่นที่ดูแลในวันนี้
 async function checkTodayReminders() {
   if (!myTeam) return;
   const todayStr = todayBangkok();
   dailyReminderBanner.classList.add("hidden");
   dailyReminderBanner.innerHTML = "";
+  homeAllDone.classList.add("hidden");
   try {
-    const [session, reportSnap] = await Promise.all([
+    const [session, reportSnap, planSnap] = await Promise.all([
       findSession(todayStr),
-      getDocs(query(collection(db, "trainingReports"), where("team", "==", myTeam), where("date", "==", todayStr)))
+      getDocs(query(collection(db, "trainingReports"), where("team", "==", myTeam), where("date", "==", todayStr))),
+      getDocs(query(collection(db, "trainingPlans"), where("team", "==", myTeam), where("date", "==", todayStr)))
     ]);
 
     const reminders = [];
     if (!session) {
       reminders.push({ text: "ยังไม่ได้เช็คชื่อการฝึกซ้อมวันนี้", action: openCheckinSection });
     }
+    const [y, m, d] = todayStr.split("-").map(Number);
+    const weekday = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+    const trainsToday = (TEAM_TRAINING_WEEKDAYS[myTeam] || []).includes(weekday);
+    const hasMyPlan = planSnap.docs.some((p) => {
+      const groups = p.data().ageGroups || [];
+      return myAgeGroups.length === 0 || groups.some((g) => myAgeGroups.includes(g));
+    });
+    if (trainsToday && !session?.noTraining && !hasMyPlan) {
+      reminders.push({ text: "ยังไม่ได้ส่งแผนการฝึกซ้อมวันนี้", action: openTrainingPlanSection });
+    }
     if (reportSnap.empty) {
       reminders.push({ text: "ยังไม่ได้ส่งรายงานการฝึกซ้อมวันนี้", action: openReportSection });
     }
-    if (reminders.length === 0) return;
+    if (reminders.length === 0) {
+      homeAllDone.classList.remove("hidden");
+      return;
+    }
 
     dailyReminderBanner.innerHTML = `<p class="text-sm font-semibold text-amber-800 mb-1">${icon("bell")} สิ่งที่ยังไม่ได้ทำวันนี้</p>`;
     for (const r of reminders) {
@@ -866,7 +875,6 @@ async function checkTodayReminders() {
     // ไม่ต้องแสดง error ให้กวนใจ เพราะเป็นแค่ตัวเตือนเสริม ไม่ใช่ข้อมูลหลักของหน้านี้
   }
 }
-
 // ---------- เมนูนำทางแบบเลื่อน (Hamburger Drawer) ----------
 function openDrawer() {
   renderDrawerItems();
@@ -2130,20 +2138,12 @@ function openInjuryReportSection() {
   renderInjuryReportList();
 }
 
-dailyLoadBtn.addEventListener("click", () => {
-  if (!dailyDateInput.value) {
-    dailyStatus.textContent = "กรุณาเลือกวันที่ก่อน";
-    dailyStatus.className = "text-sm text-red-600 w-full";
-    return;
-  }
-  loadDailyData(dailyDateInput.value);
-});
 
 for (const btn of backButtons) {
   btn.addEventListener("click", () => {
     if (editingPlayerId) stopEditPlayer();
     // ปุ่มนี้อยู่ในหน้าเพิ่มนักกีฬา/เช็คชื่อ/รายงาน/แข่งขัน/บาดเจ็บ ซึ่งหลังลบเมนูการ์ดออกแล้ว
-    // หน้า Daily คือหน้าแม่หนึ่งเดียวของทั้งหมดนี้ จึงย้อนกลับไปหน้า Daily ทีละสเต็ปเสมอ
+    // หน้า Home คือหน้าแม่หนึ่งเดียวของทั้งหมดนี้ จึงย้อนกลับไปหน้า Home เสมอ
     showDaily();
   });
 }
@@ -4258,7 +4258,7 @@ const ROUTE_SCREENS = [
 let routeSyncEnabled = false;
 
 function routeDateForScreen(key) {
-  const input = { daily: dailyDateInput, checkin: dateInput, report: reportDateInput, plan: trainingPlanDateInput }[key];
+  const input = { checkin: dateInput, report: reportDateInput, plan: trainingPlanDateInput }[key];
   return input && isValidRouteDate(input.value) ? input.value : undefined;
 }
 
@@ -4306,7 +4306,7 @@ function enableRouteSync() {
     renderCoachNav();
   });
   for (const s of ROUTE_SCREENS) routeObserver.observe(s.el, { attributes: true, attributeFilter: ["class"] });
-  for (const input of [dailyDateInput, dateInput, reportDateInput, trainingPlanDateInput]) {
+  for (const input of [dateInput, reportDateInput, trainingPlanDateInput]) {
     input.addEventListener("change", syncRouteToUrl);
   }
 }
@@ -4410,7 +4410,6 @@ function openCoachScreen(screen, date) {
       openMeetingTasksSection();
       break;
     default:
-      if (d) dailyDateInput.value = d;
       showDaily();
   }
 }
@@ -7614,252 +7613,11 @@ trainingPlanForm.addEventListener("submit", async (e) => {
   }
 });
 
-// ---------- สรุปประจำวัน (Daily) ----------
-function formatThaiDate(dateStr) {
-  const d = new Date(`${dateStr}T00:00:00`);
-  return d.toLocaleDateString("th-TH", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
-}
-
+// ---------- Home: ข้อความช่วยเหลือของรายงานการฝึกซ้อม ----------
 function formatReportPeriodForDaily(r) {
   if (!r.periodType) return "-";
   const labels = { morning: "ซ้อมเช้า", evening: "ซ้อมเย็น" };
   const label = r.periodType === "other" ? r.periodOtherText || "อื่นๆ" : labels[r.periodType] || r.periodType;
   const timeRange = r.periodStartTime && r.periodEndTime ? `${r.periodStartTime} - ${r.periodEndTime} น.` : "";
   return timeRange ? `${label} (${timeRange})` : label;
-}
-
-const DAILY_ATTENDANCE_PAGE_SIZE = 10;
-let dailyAttendanceRows = [];
-let dailyAttendancePage = 1;
-
-function renderDailyAttendancePage() {
-  const totalPages = Math.max(1, Math.ceil(dailyAttendanceRows.length / DAILY_ATTENDANCE_PAGE_SIZE));
-  dailyAttendancePage = Math.min(Math.max(dailyAttendancePage, 1), totalPages);
-  const start = (dailyAttendancePage - 1) * DAILY_ATTENDANCE_PAGE_SIZE;
-  const pageRows = dailyAttendanceRows.slice(start, start + DAILY_ATTENDANCE_PAGE_SIZE);
-
-  dailyAttendanceBody.innerHTML = pageRows
-    .map(
-      (r) => `
-        <tr>
-          <td class="emphasis">${escapeHtml(r.name)}</td>
-          <td>${escapeHtml(r.status)}</td>
-          <td>${r.avgText}</td>
-        </tr>`
-    )
-    .join("");
-  applyDataLabels(dailyAttendanceBody);
-
-  // แสดงปุ่มเปลี่ยนหน้าเฉพาะตอนมีมากกว่า 1 หน้า (ไม่รกจอถ้ามีนักกีฬาน้อยกว่า/เท่ากับ 10 คน)
-  if (totalPages <= 1) {
-    dailyAttendancePagination.classList.add("hidden");
-    return;
-  }
-  dailyAttendancePagination.classList.remove("hidden");
-  dailyAttendancePagination.innerHTML = "";
-  const prevBtn = document.createElement("button");
-  prevBtn.type = "button";
-  prevBtn.className = "btn btn-secondary btn-sm";
-  prevBtn.textContent = "‹ ก่อนหน้า";
-  prevBtn.disabled = dailyAttendancePage <= 1;
-  prevBtn.addEventListener("click", () => {
-    dailyAttendancePage -= 1;
-    renderDailyAttendancePage();
-  });
-  const pageLabel = document.createElement("span");
-  pageLabel.className = "text-slate-500";
-  pageLabel.textContent = `หน้า ${dailyAttendancePage} จาก ${totalPages} (ทั้งหมด ${dailyAttendanceRows.length} คน)`;
-  const nextBtn = document.createElement("button");
-  nextBtn.type = "button";
-  nextBtn.className = "btn btn-secondary btn-sm";
-  nextBtn.textContent = "ถัดไป ›";
-  nextBtn.disabled = dailyAttendancePage >= totalPages;
-  nextBtn.addEventListener("click", () => {
-    dailyAttendancePage += 1;
-    renderDailyAttendancePage();
-  });
-  dailyAttendancePagination.appendChild(prevBtn);
-  dailyAttendancePagination.appendChild(pageLabel);
-  dailyAttendancePagination.appendChild(nextBtn);
-}
-
-// แสดงเฉพาะนักกีฬาที่อยู่ในขอบเขตของโค้ชคนนี้จริง (players ตัวแปรกลางถูกกรองตามรุ่นอายุ+ตำแหน่งไว้แล้วจาก
-// loadPlayers) — บันทึกเช็คชื่อผูกกับ "ทีม" ทั้งก้อนต่อวัน จึงมีนักกีฬารุ่น/ตำแหน่งอื่นปนมาด้วย ต้องกรองออกไป
-// ไม่ใช่แค่หาไม่เจอแล้วโชว์ "-" (แบบเดิมที่แก้ไปก่อนหน้า) เพื่อให้โค้ชแต่ละคนเห็นเฉพาะรุ่น/นักกีฬาของตัวเองเท่านั้น
-function renderDailyAttendance(snap) {
-  const myPlayerIds = new Set(players.map((p) => p.id));
-  const records = [];
-  snap.forEach((d) => {
-    const data = d.data();
-    if (myPlayerIds.has(data.playerId)) records.push(data);
-  });
-  dailyAttendancePage = 1;
-  if (records.length === 0) {
-    dailyAttendanceRows = [];
-    dailyAttendancePagination.classList.add("hidden");
-    dailyAttendanceBody.innerHTML =
-      '<tr><td colspan="3" class="px-4 py-6 text-center text-slate-400">ยังไม่มีการเช็คชื่อในวันนี้</td></tr>';
-    return;
-  }
-  const playerMap = new Map(players.map((p) => [p.id, p]));
-  dailyAttendanceRows = records.map((r) => {
-    const p = playerMap.get(r.playerId);
-    const avg = computeAvgScore(r.scores);
-    return {
-      name: p ? p.nickname ?? p.fullName ?? "-" : "-",
-      status: r.status ?? "-",
-      avgText: avg !== null ? avg.toFixed(2) : "-"
-    };
-  });
-  renderDailyAttendancePage();
-}
-
-function renderDailyTrainingReport(snap) {
-  // รายงานการฝึกซ้อมส่งแยกต่างหากทีละโค้ช (ไม่มีฟิลด์ ageGroup ให้กรองเหมือนแผนการฝึกซ้อม) ต้องกรองเอาเฉพาะ
-  // รายงานของโค้ชคนนี้เอง ไม่ใช่หยิบรายงานแรกที่เจอ (อาจเป็นของโค้ชรุ่นอื่นในทีมเดียวกัน)
-  const allReports = [];
-  snap.forEach((d) => allReports.push(d.data()));
-  const reports = filterByMyCoachName(allReports);
-  if (reports.length === 0) {
-    dailyTrainingReportCard.innerHTML = '<p class="text-sm text-slate-400">ยังไม่มีรายงานการฝึกซ้อมในวันนี้</p>';
-    return;
-  }
-  const r = reports[0];
-  const attendedText =
-    r.attended === true
-      ? '<span class="badge badge-success">มีการซ้อม</span>'
-      : r.attended === false
-        ? '<span class="badge badge-warning">ไม่มีการซ้อม</span>'
-        : "-";
-  dailyTrainingReportCard.innerHTML = `
-    <div class="space-y-2">
-      <p><span class="text-slate-400">สถานะ:</span> ${attendedText}</p>
-      <p><span class="text-slate-400">ช่วงเวลา:</span> ${formatReportPeriodForDaily(r)}</p>
-      <p><span class="text-slate-400">หมายเหตุ:</span> ${escapeHtml(r.notes ?? "-")}</p>
-    </div>
-  `;
-}
-
-function renderDailyTrainingPlan(snap) {
-  // แผนการฝึกซ้อมส่งแยกต่างหากทีละโค้ช (มี ageGroups ของตัวเอง) ทีมหนึ่งจึงมีได้หลายแผนต่อวัน (คนละโค้ช
-  // คนละรุ่นอายุ) ต้องกรองเอาเฉพาะแผนของรุ่นอายุที่โค้ชคนนี้ดูแลจริง ไม่ใช่หยิบแผนแรกที่เจอแบบสุ่ม
-  const plans = [];
-  snap.forEach((d) => plans.push(d.data()));
-  const myPlans =
-    myAgeGroups.length > 0 ? plans.filter((pl) => (pl.ageGroups || []).some((ag) => myAgeGroups.includes(ag))) : plans;
-  if (myPlans.length === 0) {
-    dailyTrainingPlanCard.innerHTML = '<p class="text-sm text-slate-400">ยังไม่มีการส่งแผนการฝึกซ้อมในวันนี้</p>';
-    return;
-  }
-  const p = myPlans[0];
-  dailyTrainingPlanCard.innerHTML = `
-    <div class="space-y-2">
-      <p><span class="text-slate-400">รุ่นอายุ:</span> ${(p.ageGroups || []).join(", ") || "-"}</p>
-      <p><span class="text-slate-400">กรุ้ปผู้เล่น:</span> ${escapeHtml(p.playerGroup ?? "-")}</p>
-      <p><span class="text-slate-400">ประเภทการฝึก:</span> ${escapeHtml(p.trainingType ?? "-")}</p>
-      <p><span class="text-slate-400">Phase:</span> ${escapeHtml(p.phase ?? "-")}</p>
-      <p><span class="text-slate-400">หัวข้อหลัก (Main part):</span> ${escapeHtml(p.mainPart ?? "-")}</p>
-      <p><span class="text-slate-400">Physical:</span> ${(p.physicalFocus || []).join(", ") || "-"}</p>
-      <p><span class="text-slate-400">สถานะการส่ง:</span> ${trainingPlanSubmissionStatus(p)}</p>
-    </div>
-  `;
-}
-
-// กรองเฉพาะรุ่นอายุที่โค้ชคนนี้ดูแลจริง (myAgeGroups ว่างเปล่า = โหมดจัดการทีมแบบกว้าง ไม่เจาะจงคน จึงเห็น
-// ทุกรุ่นเหมือนเดิม) ใช้ร่วมกันทั้งผลการแข่งขันและอาการบาดเจ็บ เพราะทั้งสองผูกกับรุ่นอายุโดยตรงอยู่แล้ว
-function filterByMyAgeGroups(reports) {
-  return myAgeGroups.length > 0 ? reports.filter((r) => myAgeGroups.includes(r.ageGroup)) : reports;
-}
-
-// เหมือน filterByMyAgeGroups ด้านบนแต่กรองด้วยชื่อโค้ชแทน — ใช้กับ "รายงานการฝึกซ้อม" (trainingReports) ซึ่งไม่มี
-// ฟิลด์ ageGroup ให้กรอง (เดิมออกแบบเป็นรายงานเดียวต่อทีมต่อวัน แต่ทีมหนึ่งมีหลายโค้ชคนละรุ่นอายุ ทำให้เห็น
-// รายงานของโค้ชคนอื่นปนกันอยู่) myAgeGroups.length > 0 เป็นสัญญาณเดียวกับที่ใช้ทั่วทั้งระบบว่า "รู้ตัวโค้ชคนนี้
-// แน่ชัดแล้ว" (โค้ชจริงล็อกอินเอง หรือผู้ดูแลระบบสวมบทบาทเจาะจงคนใดคนหนึ่ง) — โหมด "จัดการทีมนี้" แบบกว้าง
-// (myAgeGroups ว่างเปล่า) ยังเห็นรายงานของทุกโค้ชในทีมเหมือนเดิม เพราะยังไม่รู้ว่าจะจำกัดขอบเขตแค่ไหน
-function filterByMyCoachName(reports) {
-  return myAgeGroups.length > 0 ? reports.filter((r) => r.coachName === myCoachName) : reports;
-}
-
-function renderDailyMatchReports(snap) {
-  const allReports = [];
-  snap.forEach((d) => allReports.push(d.data()));
-  const reports = filterByMyAgeGroups(allReports);
-  if (reports.length === 0) {
-    dailyMatchBody.innerHTML =
-      '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">ไม่มีการแข่งขันในวันนี้</td></tr>';
-    return;
-  }
-  dailyMatchBody.innerHTML = reports
-    .map(
-      (m) => `
-      <tr>
-        <td class="emphasis">${escapeHtml(m.opponent ?? "-")}</td>
-        <td>${escapeHtml(m.competitionType ?? "-")}</td>
-        <td>${escapeHtml(m.ageGroup ?? "-")}</td>
-        <td>${matchResultBadge(m.result)}</td>
-        <td class="emphasis">${m.scoreUs} - ${m.scoreThem}</td>
-        <td>${escapeHtml(m.competition ?? "-")}</td>
-      </tr>`
-    )
-    .join("");
-  applyDataLabels(dailyMatchBody);
-}
-
-function renderDailyInjuryReports(snap) {
-  const allReports = [];
-  snap.forEach((d) => allReports.push(d.data()));
-  const reports = filterByMyAgeGroups(allReports);
-  if (reports.length === 0) {
-    dailyInjuryBody.innerHTML =
-      '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">ไม่มีรายงานอาการบาดเจ็บในวันนี้</td></tr>';
-    return;
-  }
-  dailyInjuryBody.innerHTML = reports
-    .map(
-      (inj) => `
-      <tr>
-        <td class="emphasis">${escapeHtml(inj.playerName ?? "-")}</td>
-        <td>${escapeHtml(inj.ageGroup ?? "-")}</td>
-        <td>${escapeHtml(inj.description ?? "-")}</td>
-        <td>${injurySeverityBadge(inj.severity)}</td>
-        <td>${injuryStatusBadge(inj.status)}</td>
-      </tr>`
-    )
-    .join("");
-  applyDataLabels(dailyInjuryBody);
-}
-
-async function loadDailyData(dateStr) {
-  if (!myTeam) {
-    dailyStatus.textContent = "ยังไม่ทราบทีมที่รับผิดชอบ";
-    dailyStatus.className = "text-sm text-red-600 w-full";
-    return;
-  }
-  dailyStatus.textContent = "กำลังโหลดข้อมูล...";
-  dailyStatus.className = "text-sm text-slate-500 w-full";
-  dailyDateHeading.innerHTML = `${icon("calendar")} ${escapeHtml(formatThaiDate(dateStr))}`;
-  dailyDateHeading.classList.remove("hidden");
-
-  try {
-    const [attendanceSnap, trainingSnap, trainingPlanSnap, matchSnap, injurySnap] = await Promise.all([
-      getDocs(query(collection(db, "attendance"), where("team", "==", myTeam), where("date", "==", dateStr))),
-      getDocs(query(collection(db, "trainingReports"), where("team", "==", myTeam), where("date", "==", dateStr))),
-      getDocs(query(collection(db, "trainingPlans"), where("team", "==", myTeam), where("date", "==", dateStr))),
-      getDocs(query(collection(db, "matchReports"), where("team", "==", myTeam), where("date", "==", dateStr))),
-      getDocs(query(collection(db, "injuryReports"), where("team", "==", myTeam), where("date", "==", dateStr)))
-    ]);
-
-    renderDailyAttendance(attendanceSnap);
-    renderDailyTrainingReport(trainingSnap);
-    renderDailyTrainingPlan(trainingPlanSnap);
-    renderDailyMatchReports(matchSnap);
-    renderDailyInjuryReports(injurySnap);
-
-    dailyStatus.innerHTML = `โหลดข้อมูลสำเร็จ ${icon("check")}`;
-    dailyStatus.className = "text-sm text-emerald-600 w-full";
-  } catch (err) {
-    console.error(err);
-    dailyStatus.textContent = "โหลดข้อมูลไม่สำเร็จ: " + err.message;
-    dailyStatus.className = "text-sm text-red-600 w-full";
-  }
 }
