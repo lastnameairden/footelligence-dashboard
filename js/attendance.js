@@ -64,7 +64,7 @@ import {
   TEAM_TRAINING_WEEKDAYS,
   isRecordOfCoach
 } from "./ui-utils.js";
-import { openAdminMeetings, renderCoachMeetingCard, renderCoachMeetingTasks, loadCoachMeetingNotifications, loadCoachMeetingOverview } from "./coach-meetings-ui.js";
+import { openAdminMeetings, renderCoachMeetingCard, renderCoachMeetingTasks, renderCoachNextMeeting, renderCoachMeetingHistory, loadCoachMeetingNotifications, loadCoachMeetingOverview } from "./coach-meetings-ui.js";
 import { openAdminFitnessRounds } from "./fitness-rounds-ui.js";
 import { openAdminAthleteWindows } from "./athlete-windows-ui.js";
 import { openFitnessEntry } from "./fitness-entry-ui.js";
@@ -181,6 +181,12 @@ const trainingPlanLateCountEl = document.getElementById("training-plan-late-coun
 const dailySection = document.getElementById("daily-section");
 const meetingTasksSection = document.getElementById("meeting-tasks-section");
 const meetingTasksBody = document.getElementById("meeting-tasks-body");
+const meetingMenuSection = document.getElementById("meeting-menu-section");
+const meetingNextSection = document.getElementById("meeting-next-section");
+const meetingNextBody = document.getElementById("meeting-next-body");
+const meetingHistorySection = document.getElementById("meeting-history-section");
+const meetingHistoryBody = document.getElementById("meeting-history-body");
+const meetingHistoryMonth = document.getElementById("meeting-history-month");
 const matchDataSection = document.getElementById("match-data-section");
 const matchFormSection = document.getElementById("match-form-section");
 const matchHistorySection = document.getElementById("match-history-section");
@@ -703,6 +709,9 @@ function hideAllScreens() {
   reportDataSection.classList.add("hidden");
   dailySection.classList.add("hidden");
   meetingTasksSection.classList.add("hidden");
+  meetingMenuSection.classList.add("hidden");
+  meetingNextSection.classList.add("hidden");
+  meetingHistorySection.classList.add("hidden");
   instructionSection.classList.add("hidden");
   attendanceGridSection.classList.add("hidden");
   matchDataSection.classList.add("hidden");
@@ -736,6 +745,48 @@ async function refreshMeetingTaskCount() {
     console.error(err);
   }
 }
+
+// ---------- Meeting (เมนู 9): หน้าเลือก → Next Meeting / Post-Meeting Tasks / History ----------
+function meetingPageOpts() {
+  return { position: myCoachPosition, onChange: () => { refreshNotifications(); refreshMeetingTaskCount(); } };
+}
+function openMeetingMenu() {
+  hideAllScreens();
+  meetingMenuSection.classList.remove("hidden");
+}
+async function openMeetingNext() {
+  hideAllScreens();
+  meetingNextSection.classList.remove("hidden");
+  const coachId = meetingCoachId();
+  if (!myTeam || !coachId) {
+    meetingNextBody.innerHTML = '<div class="card card-pad text-sm text-slate-500">ยังไม่ทราบโค้ช — โหมดจัดการทีมแบบกว้างไม่ได้ระบุโค้ชคนใดคนหนึ่ง</div>';
+    return;
+  }
+  await renderCoachNextMeeting(meetingNextBody, myTeam, coachId, meetingPageOpts());
+}
+function renderMeetingHistory() {
+  const coachId = meetingCoachId();
+  if (!myTeam || !coachId) {
+    meetingHistoryBody.innerHTML = '<div class="card card-pad text-sm text-slate-500">ยังไม่ทราบโค้ช — โหมดจัดการทีมแบบกว้างไม่ได้ระบุโค้ชคนใดคนหนึ่ง</div>';
+    return Promise.resolve();
+  }
+  return renderCoachMeetingHistory(meetingHistoryBody, myTeam, coachId, meetingHistoryMonth.value, meetingPageOpts());
+}
+async function openMeetingHistory() {
+  hideAllScreens();
+  meetingHistorySection.classList.remove("hidden");
+  if (!meetingHistoryMonth.options.length) {
+    const thisMonth = thisMonthBangkok();
+    // เดือนหน้า (นัดที่ผู้ดูแลสร้างล่วงหน้า) + เดือนนี้ย้อนหลัง 12 เดือน
+    const months = [addMonthsToMonth(thisMonth, 1), ...Array.from({ length: 13 }, (_, i) => addMonthsToMonth(thisMonth, -i))];
+    meetingHistoryMonth.innerHTML = months.map((m) => `<option value="${m}">${escapeHtml(thaiMonthLabel(m))}</option>`).join("");
+    meetingHistoryMonth.value = thisMonth;
+  }
+  await renderMeetingHistory();
+}
+meetingHistoryMonth.addEventListener("change", renderMeetingHistory);
+for (const btn of document.querySelectorAll("[data-meeting-nav]")) btn.addEventListener("click", () => COACH_SCREEN_OPENERS[btn.dataset.meetingNav]?.());
+for (const btn of document.querySelectorAll("[data-meeting-back]")) btn.addEventListener("click", openMeetingMenu);
 
 async function openMeetingTasksSection() {
   hideAllScreens();
@@ -1067,7 +1118,10 @@ const COACH_SCREEN_OPENERS = {
   "injury-menu": () => openInjuryMenu(),
   "injury-results": () => openInjuryResults(),
   masc: () => openMascPage(),
-  "meeting-tasks": () => openMeetingTasksSection()
+  "meeting-menu": () => openMeetingMenu(),
+  "meeting-next": () => openMeetingNext(),
+  "meeting-tasks": () => openMeetingTasksSection(),
+  "meeting-history": () => openMeetingHistory()
 };
 
 // หน้าประเมิน MASC เป็นหน้าแยก (masc.html) — ผู้ดูแลระบบที่สวมบทบาทโค้ชแนบรุ่นอายุ/ตำแหน่งของโค้ชคนนั้นไปด้วย เพื่อให้เห็นรายชื่อตรงกับที่โค้ชเห็นจริง
@@ -4155,6 +4209,9 @@ function renderCoachProfile(user, data, teamText) {
 const ROUTE_SCREENS = [
   { el: dailySection, key: "daily", kind: "coach" },
   { el: meetingTasksSection, key: "meeting-tasks", kind: "coach" },
+  { el: meetingMenuSection, key: "meeting-menu", kind: "coach" },
+  { el: meetingNextSection, key: "meeting-next", kind: "coach" },
+  { el: meetingHistorySection, key: "meeting-history", kind: "coach" },
   { el: checkinSection, key: "checkin", kind: "coach" },
   { el: reportSection, key: "report", kind: "coach" },
   { el: matchReportSection, key: "match", kind: "coach" },
@@ -4339,6 +4396,15 @@ function openCoachScreen(screen, date) {
       break;
     case "injury-results":
       openInjuryResults();
+      break;
+    case "meeting-menu":
+      openMeetingMenu();
+      break;
+    case "meeting-next":
+      openMeetingNext();
+      break;
+    case "meeting-history":
+      openMeetingHistory();
       break;
     case "meeting-tasks":
       openMeetingTasksSection();

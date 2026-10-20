@@ -40,6 +40,7 @@ import {
   validateRecapInput,
   addDaysToDate,
   addMonthsToMonth,
+  attendanceView,
   buildTeamMeetingDocs,
   coachTrackOf,
   daysUntil,
@@ -48,6 +49,7 @@ import {
   isValidMeetingLink,
   meetingDate,
   meetingFilePath,
+  meetingHistoryRows,
   meetingWeekdayOf,
   nextMeetingForCoach,
   sectionHasPlan,
@@ -842,16 +844,79 @@ export async function renderCoachMeetingTasks(el, team, coachId, opts = {}) {
   try {
     invalidateCoachMeetingCache();
     const track = coachTrackOf(opts.position);
-    const { next, tasks } = await fetchCoachMeetingData(team, coachId, track);
-    // นัดครั้งถัดไป (วาระ+ไฟล์ที่ทีมงานแนบไว้) อยู่บนสุด ตามด้วยงานหลังประชุมของแต่ละนัด (แต่ละงานแสดงวาระ+ไฟล์ของนัดนั้นด้วย)
+    const { tasks } = await fetchCoachMeetingData(team, coachId, track);
+    // งานหลังประชุมของแต่ละนัด (แต่ละงานแสดงวาระ+ไฟล์ของนัดนั้นด้วย) — นัดครั้งถัดไปอยู่หน้า Next Meeting แยกต่างหาก
     el.innerHTML =
-      (next ? nextMeetingCardHtml(next, track) : "") +
       (tasks.length > 0
         ? tasks.map((t) => recapTaskCardHtml(t, coachId, opts.canSubmit !== false, track)).join("")
         : '<div class="card card-pad text-sm text-slate-500">ยังไม่มีงานหลังประชุมที่ต้องส่ง — งานจะขึ้นที่นี่หลังวันประชุมของคุณ</div>');
   } catch (err) {
     console.error(err);
     el.innerHTML = `<div class="card card-pad text-sm text-red-600">โหลดงานหลังประชุมไม่สำเร็จ: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+// หน้า Meeting → Next Meeting: นัดครั้งถัดไป (วัน/เวลา ลิงก์ วาระ+ไฟล์ของส่วนกลางและสายตัวเอง) + รายชื่อผู้เข้าร่วมนัดนั้น
+export async function renderCoachNextMeeting(el, team, coachId, opts = {}) {
+  el.innerHTML = '<p class="text-sm text-slate-400">กำลังโหลด...</p>';
+  try {
+    invalidateCoachMeetingCache();
+    const track = coachTrackOf(opts.position);
+    const { next } = await fetchCoachMeetingData(team, coachId, track);
+    if (!next) {
+      el.innerHTML = '<div class="card card-pad text-sm text-slate-500">ยังไม่มีนัดประชุมครั้งถัดไป — ผู้ดูแลระบบจะกำหนดตารางประชุมรายเดือน</div>';
+      return;
+    }
+    const names = (next.coachNames || []).filter(Boolean);
+    const participants = names.length > 0
+      ? `<div class="card card-pad"><p class="text-sm font-semibold text-slate-900 mb-1">ผู้เข้าร่วมสัปดาห์นี้ (${names.length} คน)</p><p class="text-sm text-slate-700">${names.map(escapeHtml).join(" · ")}</p></div>`
+      : "";
+    el.innerHTML = nextMeetingCardHtml(next, track) + participants;
+  } catch (err) {
+    console.error(err);
+    el.innerHTML = `<div class="card card-pad text-sm text-red-600">โหลดนัดประชุมไม่สำเร็จ: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+// หน้า Meeting → History: ประวัติการประชุมของโค้ชในเดือน month — การเข้าร่วม สถานะงานหลังประชุม และกางดูวาระ+ไฟล์/คำตอบที่ส่งไว้
+export async function renderCoachMeetingHistory(el, team, coachId, month, opts = {}) {
+  el.innerHTML = '<p class="text-sm text-slate-400">กำลังโหลด...</p>';
+  try {
+    const track = coachTrackOf(opts.position);
+    const today = todayBangkok();
+    const [meetingSnap, recapSnap] = await Promise.all([
+      getDocs(teamDateRangeQuery("coachMeetings", team, `${month}-01`, `${month}-31`)),
+      getDocs(query(collection(db, "coachMeetingRecaps"), where("team", "==", team), where("coachId", "==", coachId)))
+    ]);
+    const list = meetingSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const recapsByMeeting = new Map();
+    recapSnap.forEach((d) => recapsByMeeting.set(d.data().meetingId, d.data()));
+    const rows = meetingHistoryRows(list, coachId, recapsByMeeting, today);
+    if (rows.length === 0) {
+      el.innerHTML = '<div class="card card-pad text-center text-sm text-slate-500">ไม่มีการประชุมของคุณในเดือนนี้</div>';
+      return;
+    }
+    el.innerHTML = rows
+      .map((row) => {
+        const m = row.meeting;
+        const att = attendanceView(row, today);
+        const rec = recapStatusView(row.status);
+        const agenda = agendaBlocksHtml(m, track);
+        const answers = row.recap
+          ? COACH_RECAP_FIELDS.map((f, i) => `<div class="mt-2"><p class="text-xs font-semibold text-slate-600">${i + 1}. ${f.label}</p><p class="text-sm text-slate-800" ${preLine}>${escapeHtml(row.recap[f.key] || "-")}</p></div>`).join("")
+          : "";
+        const body = `${agenda ? `<div class="mt-3 rounded-lg bg-slate-50 p-3"><p class="text-sm font-semibold text-slate-900">วาระและเอกสารจากทีมงาน</p>${agenda}</div>` : ""}${
+          row.recap ? `<div class="mt-3"><p class="text-sm font-semibold text-slate-900">งานหลังประชุมที่ส่งไว้</p>${answers}</div>` : ""
+        }`;
+        const summary = `<span class="font-semibold text-slate-900">${escapeHtml(thaiMeetingDateLabel(m.date))}</span><span class="${RECAP_TONE_BADGE[att.tone]}">${escapeHtml(att.text)}</span>${row.status.state === "upcoming" ? "" : `<span class="${RECAP_TONE_BADGE[rec.tone]}">${escapeHtml(rec.text)}</span>`}`;
+        return body
+          ? `<details class="card card-pad"><summary class="cursor-pointer flex items-center gap-2 flex-wrap">${summary}</summary>${body}</details>`
+          : `<div class="card card-pad"><div class="flex items-center gap-2 flex-wrap">${summary}</div><p class="text-xs text-slate-400 mt-2">ไม่มีวาระหรือไฟล์ที่บันทึกไว้ของนัดนี้</p></div>`;
+      })
+      .join("");
+  } catch (err) {
+    console.error(err);
+    el.innerHTML = `<div class="card card-pad text-sm text-red-600">โหลดประวัติการประชุมไม่สำเร็จ: ${escapeHtml(err.message)}</div>`;
   }
 }
 

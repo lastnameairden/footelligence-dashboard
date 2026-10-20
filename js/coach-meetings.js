@@ -309,3 +309,22 @@ export function recapTasksForCoach(meetings, coachId, recapsByMeeting, todayStr)
     .filter((t) => t.status.state !== "upcoming" && t.status.state !== "excused")
     .sort((a, b) => b.meeting.date.localeCompare(a.meeting.date));
 }
+
+// ประวัติการประชุมของโค้ชคนหนึ่ง (หน้า Meeting → History): ทุกนัดที่โค้ชอยู่ในรายชื่อ เรียงจากล่าสุดก่อน
+// attendance = เข้าร่วม/ลา/ขาดที่แอดมินบันทึก (ยังไม่บันทึก = null) · status = สถานะงานหลังประชุม (ดู recapStatus) · recap = งานที่ส่งแล้ว
+export function meetingHistoryRows(meetings, coachId, recapsByMeeting, todayStr) {
+  return meetings
+    .filter((m) => (m.coachIds || []).includes(coachId))
+    .map((m) => {
+      const raw = (m.attendance || {})[coachId];
+      const recap = recapsByMeeting.get(m.id) || null;
+      return { meeting: m, attendance: MEETING_ATTENDANCE_STATUSES.includes(raw) ? raw : null, recap, status: recapStatus(m, coachId, recap, todayStr) };
+    })
+    .sort((a, b) => b.meeting.date.localeCompare(a.meeting.date));
+}
+
+// ข้อความ+โทนของการเข้าร่วม (นัดที่ยังไม่ถึงวัน = ยังไม่ถึงวันประชุม · ผ่านแล้วแต่แอดมินยังไม่บันทึก = ยังไม่บันทึกผล)
+export function attendanceView(row, todayStr) {
+  if (row.attendance) return { text: MEETING_ATTENDANCE_LABELS[row.attendance], tone: row.attendance === "attended" ? "success" : row.attendance === "leave" ? "neutral" : "danger" };
+  return todayStr < row.meeting.date ? { text: "ยังไม่ถึงวันประชุม", tone: "neutral" } : { text: "ยังไม่บันทึกผล", tone: "neutral" };
+}

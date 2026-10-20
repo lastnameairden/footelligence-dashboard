@@ -75,7 +75,19 @@ export const COACH_MENU = [
       { label: "Results", screen: "injury-results" }
     ]
   },
-  { key: "meeting", label: "Meeting", hint: "นัดประชุม + งานหลังประชุม", icon: "book", screen: "meeting-tasks", screens: ["meeting-tasks"] },
+  {
+    key: "meeting",
+    label: "Meeting",
+    hint: "นัดประชุม + งานหลังประชุม",
+    icon: "book",
+    screen: "meeting-menu",
+    screens: ["meeting-menu", "meeting-next", "meeting-tasks", "meeting-history"],
+    children: [
+      { label: "Next Meeting", screen: "meeting-next" },
+      { label: "Post-Meeting Tasks", screen: "meeting-tasks" },
+      { label: "History", screen: "meeting-history" }
+    ]
+  },
   { key: "profile", label: "Profile", hint: "โปรไฟล์ของฉัน", icon: "user", screen: "profile", screens: ["profile"] }
 ];
 

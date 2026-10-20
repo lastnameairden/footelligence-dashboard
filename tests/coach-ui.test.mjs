@@ -60,7 +60,7 @@ test("coach menu only points at screens that exist, and every coach screen belon
   assert.equal(menuKeyForScreen("report"), "training-plan");
   assert.equal(menuKeyForScreen("player-detail"), "player-data");
   assert.equal(menuKeyForScreen("nope"), null);
-  assert.equal(menuItem("meeting").screen, "meeting-tasks");
+  assert.equal(menuItem("meeting").screen, "meeting-menu");
   assert.equal(menuKeyForScreen("profile"), "profile");
 });
 
@@ -96,6 +96,12 @@ test("Injury/Sick menu: landing, Recording (old injury page) and Results; the ol
   assert.equal(m.screen, "injury-menu");
   assert.deepEqual(m.children.map((c) => [c.label, c.screen]), [["Recording", "injury"], ["Results", "injury-results"]]);
   for (const s of ["injury-menu", "injury", "injury-results"]) assert.equal(menuKeyForScreen(s), "injury-sick", s);
+});
+
+test("Meeting menu: landing, Next Meeting, Post-Meeting Tasks (old meeting-tasks screen) and History", () => {
+  const m = menuItem("meeting");
+  assert.deepEqual(m.children.map((c) => [c.label, c.screen]), [["Next Meeting", "meeting-next"], ["Post-Meeting Tasks", "meeting-tasks"], ["History", "meeting-history"]]);
+  for (const s of ["meeting-menu", "meeting-next", "meeting-tasks", "meeting-history"]) assert.equal(menuKeyForScreen(s), "meeting", s);
 });
 
 test("birthYearLabel / birthdayLabel show Gregorian / Buddhist years", () => {
