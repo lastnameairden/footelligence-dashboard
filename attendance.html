@@ -1074,8 +1074,8 @@
       <div class="page-heading">
         <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.3 2.3L16 10"/></svg></div>
         <div>
-          <h2>เช็คชื่อการฝึกซ้อม</h2>
-          <p>เลือกวันที่ฝึกซ้อม แล้วบันทึกสถานะและให้คะแนนผู้เล่นแต่ละคน</p>
+          <h2>Attendance Check</h2>
+          <p>เลือกวันที่และชนิดวัน — วันซ้อมปกติบันทึกสถานะและให้คะแนนผู้เล่นแต่ละคน · Match Day กรอกข้อมูลการแข่งขัน</p>
         </div>
       </div>
 
@@ -1086,9 +1086,16 @@
         </div>
         <button id="load-session-btn" class="btn btn-primary">โหลด / สร้างวันซ้อมนี้</button>
         <button id="view-session-btn" class="btn btn-secondary"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg> เรียกดู (ไม่สร้างวันซ้อมใหม่)</button>
-        <button id="mark-no-training-btn" class="btn btn-warning-soft">วันนี้ไม่มีฝึกซ้อม</button>
+        <button id="mark-no-training-btn" class="hidden btn btn-warning-soft">วันนี้ไม่มีฝึกซ้อม</button>
+        <div class="w-full sm:w-auto">
+          <label class="field-label">ชนิดวัน</label>
+          <div id="day-type-segmented"></div>
+        </div>
         <p id="attendance-status" class="text-sm text-slate-500 w-full">เลือกวันที่แล้วกดปุ่ม เพื่อเริ่มเช็คชื่อ</p>
       </div>
+
+      <!-- Match Day: ฟอร์มข้อมูล Match / Game / Match Report (สร้างโดย match-day-ui.js) แทนตารางเช็คชื่อเมื่อเลือกชนิดวัน Match Day -->
+      <div id="match-day-panel" class="hidden"></div>
 
       <!-- แสดงเมื่อวันที่เลือกถูกทำเครื่องหมายว่าไม่มีฝึกซ้อม -->
       <div id="no-training-banner" class="hidden card card-warning card-pad flex items-center justify-between">

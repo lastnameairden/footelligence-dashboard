@@ -69,6 +69,7 @@ import { openAdminFitnessRounds } from "./fitness-rounds-ui.js";
 import { openFitnessEntry } from "./fitness-entry-ui.js";
 import { parseParentHeights } from "./fitness-calc.js";
 import { applyTeamTheme } from "./team-theme.js";
+import { initMatchDay, openMatchDay } from "./match-day-ui.js";
 import { COACH_MENU, menuItem, menuKeyForScreen } from "./coach-menu.js";
 import { ageGroupsOf, birthYearLabel, birthdayLabel, filterAndSortPlayers, playerDisplayName } from "./player-gallery.js";
 import { STAFF_PERMISSIONS, canAccessAdminFeature, normalizePermissions, permissionsSummary, staffCan, staffLandingFeature } from "./staff-perms.js";
@@ -163,6 +164,8 @@ const trainingPlanLateCountEl = document.getElementById("training-plan-late-coun
 const dailySection = document.getElementById("daily-section");
 const meetingTasksSection = document.getElementById("meeting-tasks-section");
 const meetingTasksBody = document.getElementById("meeting-tasks-body");
+const dayTypeSegmented = document.getElementById("day-type-segmented");
+const matchDayPanel = document.getElementById("match-day-panel");
 const instructionSection = document.getElementById("instruction-section");
 const playerGallerySection = document.getElementById("player-gallery-section");
 const playerGalleryCount = document.getElementById("player-gallery-count");
@@ -1755,6 +1758,7 @@ function openAddPlayerSection() {
 function openCheckinSection() {
   hideAllScreens();
   checkinSection.classList.remove("hidden");
+  resetDayType();
   showRosterView();
 }
 
@@ -3010,7 +3014,7 @@ const PROGRESS_LABELS = {
   complete: "ประเมินครบแล้ว",
   partial: "ประเมินบางส่วน",
   not_started: "ยังไม่เริ่มประเมิน",
-  no_training: "ไม่มีฝึกซ้อม"
+  no_training: "ไม่มีฝึกซ้อม / Match Day"
 };
 
 // วาดตารางความคืบหน้าของแถวที่ส่งมา (ใช้ซ้ำได้ทั้งตอนโหลดครั้งแรกและตอนสลับปุ่มเลือกทีม)
@@ -3032,7 +3036,7 @@ function renderProgressTable(rows) {
         <td class="emphasis">${escapeHtml(r.coach.name ?? "-")}</td>
         <td>${escapeHtml(r.coach.team)}</td>
         <td>${r.totalPlayers}</td>
-        <td class="text-slate-400" colspan="2">ไม่มีฝึกซ้อม</td>
+        <td class="text-slate-400" colspan="2">${r.matchDay ? "Match Day" : "ไม่มีฝึกซ้อม"}</td>
         <td>-</td>
       `;
     } else {
@@ -3082,7 +3086,7 @@ async function loadDailyProgress(dateStr) {
       // (ทีมหนึ่งมีหลายรุ่นอายุ/หลายโค้ชดูแลคนละรุ่น — sessions/attendance ยังผูกกับ "ทีม" ทั้งก้อนต่อวัน)
       const players = playersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
       const myPlayerIds = getCoachPlayerIds(c, players);
-      const totalPlayers = myPlayerIds.size;
+      let totalPlayers = myPlayerIds.size;
 
       if (sessionSnap.empty) {
         return { coach: c, totalPlayers, evaluated: 0, noTraining: false, completedAt: null };
@@ -3091,6 +3095,15 @@ async function loadDailyProgress(dateStr) {
       const sessionData = sessionDoc.data();
       if (sessionData.noTraining) {
         return { coach: c, totalPlayers, evaluated: 0, noTraining: true, completedAt: null };
+      }
+      // รุ่นอายุที่มี Match Day ในวันนั้นไม่นับเป็นวันเช็คชื่อซ้อม — ถ้านักกีฬาทุกคนของโค้ชอยู่ในรุ่นเหล่านั้นถือเป็น Match Day ทั้งแถว
+      const matchDayGroups = new Set(sessionData.matchDayAgeGroups || []);
+      if (matchDayGroups.size > 0) {
+        for (const p of players) if (matchDayGroups.has(p.ageGroup)) myPlayerIds.delete(p.id);
+        if (totalPlayers > 0 && myPlayerIds.size === 0) {
+          return { coach: c, totalPlayers, evaluated: 0, noTraining: true, matchDay: true, completedAt: null };
+        }
+        totalPlayers = myPlayerIds.size;
       }
       const attendanceSnap = await getDocs(
         query(collection(db, "attendance"), where("sessionId", "==", sessionDoc.id))
@@ -4971,12 +4984,107 @@ function commitAttendanceChange(playerId, change) {
 function saveScoreCategory(playerId, categoryKey, value) {
   commitAttendanceChange(playerId, { category: categoryKey, value });
 }
+// ---------- ชนิดวันของหน้าเช็คชื่อ: วันซ้อมปกติ / วันไม่มีซ้อม / Match Day ----------
+// วันไม่มีซ้อมใช้ตรรกะเดิมของปุ่ม "วันนี้ไม่มีฝึกซ้อม" (ซ่อนปุ่มเดิมไว้ ให้ตัวเลือกนี้เรียกแทน) Match Day = ฟอร์มใน match-day-ui.js แทนตารางเช็คชื่อ
+const DAY_TYPES = [
+  ["normal", "วันซ้อมปกติ"],
+  ["no_training", "วันไม่มีซ้อม"],
+  ["match", "Match Day"]
+];
+let dayType = "normal";
+initMatchDay(matchDayPanel);
+
+function renderDayTypeSegmented() {
+  dayTypeSegmented.innerHTML = "";
+  const active = DAY_TYPES.find(([key]) => key === dayType)[1];
+  dayTypeSegmented.appendChild(
+    createSegmentedGroup(
+      DAY_TYPES.map(([, label]) => label),
+      active,
+      (label) => chooseDayType(DAY_TYPES.find(([, l]) => l === label)[0])
+    )
+  );
+}
+
+// แค่ปรับสถานะ/ปุ่มบนจอให้ตรง ไม่ทำงานอื่น (ใช้ตอนระบบเปลี่ยนมุมมองเอง เช่น โหลดวันที่ถูกบันทึกว่าไม่มีซ้อม)
+function syncDayTypeUi(type) {
+  dayType = type;
+  renderDayTypeSegmented();
+}
+
+function setMatchDayVisible(on) {
+  matchDayPanel.classList.toggle("hidden", !on);
+  loadSessionBtn.classList.toggle("hidden", on);
+  viewSessionBtn.classList.toggle("hidden", on);
+  if (on) {
+    rosterWrap.classList.add("hidden");
+    noTrainingBanner.classList.add("hidden");
+    rosterLockedBanner.classList.add("hidden");
+    rosterCompleteBanner.classList.add("hidden");
+    setAttendanceStatus("");
+  }
+}
+
+function resetDayType() {
+  setMatchDayVisible(false);
+  syncDayTypeUi("normal");
+}
+
+function startMatchDay() {
+  return openMatchDay({
+    team: myTeam,
+    date: dateInput.value,
+    ageGroups: myAgeGroups,
+    coachId: auth.currentUser.uid,
+    coachName: myCoachName || auth.currentUser.email,
+    ensureSession: findOrCreateSession
+  });
+}
+
+async function chooseDayType(type) {
+  if (type === dayType) return;
+  const dateStr = dateInput.value;
+  if (!dateStr) {
+    setAttendanceStatus("กรุณาเลือกวันที่ก่อน", true);
+    return;
+  }
+  if (!myTeam) {
+    setAttendanceStatus("ยังไม่ทราบทีมที่รับผิดชอบ", true);
+    return;
+  }
+  if (type === "match") {
+    syncDayTypeUi("match");
+    setMatchDayVisible(true);
+    await startMatchDay();
+    return;
+  }
+  setMatchDayVisible(false);
+  syncDayTypeUi(type);
+  if (type === "no_training") markNoTrainingBtn.click();
+  else if (currentSessionData?.noTraining) undoNoTrainingBtn.click();
+  else {
+    try {
+      await viewSessionForDate(dateStr);
+    } catch (err) {
+      console.error(err);
+      setAttendanceStatus("เรียกดูไม่สำเร็จ: " + err.message, true);
+    }
+  }
+}
+
+// เปลี่ยนวันที่ระหว่างอยู่ใน Match Day = โหลดฟอร์มของวันใหม่ (รุ่นเดิม)
+dateInput.addEventListener("change", () => {
+  if (dayType === "match" && dateInput.value && myTeam) startMatchDay();
+});
+
 function showRosterView() {
   noTrainingBanner.classList.add("hidden");
   rosterWrap.classList.remove("hidden");
+  if (dayType === "no_training") syncDayTypeUi("normal");
 }
 
 function showNoTrainingView() {
+  syncDayTypeUi("no_training");
   noTrainingBanner.classList.remove("hidden");
   rosterLockedBanner.classList.add("hidden");
   rosterCompleteBanner.classList.add("hidden");

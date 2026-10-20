@@ -855,7 +855,7 @@ const AGE_PROGRESS_LABELS = {
   complete: "ประเมินครบแล้ว",
   partial: "ประเมินบางส่วน",
   not_started: "ยังไม่เริ่มประเมิน",
-  no_training: "ไม่มีฝึกซ้อม"
+  no_training: "ไม่มีฝึกซ้อม / Match Day"
 };
 const UNASSIGNED_AGE_GROUP = "ไม่ระบุรุ่นอายุ";
 
@@ -882,10 +882,12 @@ async function loadAgeGroupProgress(team, dateStr) {
   );
 
   let noTraining = false;
+  let matchDayGroups = new Set(); // รุ่นอายุที่มี Match Day ในวันนั้น — ไม่นับเป็นวันเช็คชื่อซ้อมของรุ่นนั้น
   let attendanceRecords = [];
   if (!sessionSnap.empty) {
     const sessionDoc = sessionSnap.docs[0];
     noTraining = !!sessionDoc.data().noTraining;
+    matchDayGroups = new Set(sessionDoc.data().matchDayAgeGroups || []);
     if (!noTraining) {
       const attSnap = await getDocs(
         query(
@@ -902,6 +904,10 @@ async function loadAgeGroupProgress(team, dateStr) {
   for (const [ageGroup, groupPlayers] of ageGroups) {
     if (noTraining) {
       rows.push({ ageGroup, totalPlayers: groupPlayers.length, evaluated: 0, noTraining: true, completedAt: null });
+      continue;
+    }
+    if (matchDayGroups.has(ageGroup)) {
+      rows.push({ ageGroup, totalPlayers: groupPlayers.length, evaluated: 0, noTraining: true, matchDay: true, completedAt: null });
       continue;
     }
     const evaluatedRecords = attendanceRecords.filter(
@@ -929,7 +935,7 @@ async function loadAgeGroupProgress(team, dateStr) {
           <tr>
             <td class="emphasis">${escapeHtml(r.ageGroup)}</td>
             <td>${r.totalPlayers}</td>
-            <td class="text-slate-400" colspan="2">ไม่มีฝึกซ้อม</td>
+            <td class="text-slate-400" colspan="2">${r.matchDay ? "Match Day" : "ไม่มีฝึกซ้อม"}</td>
             <td>-</td>
           </tr>`;
       }
