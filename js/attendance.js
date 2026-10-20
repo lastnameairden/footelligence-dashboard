@@ -78,6 +78,7 @@ import { filterPlans, filterReportsByMonths, groupByMonth, monthOptionsOf, month
 import { COACH_MENU, childMatchesScreen, menuItem, menuKeyForScreen } from "./coach-menu.js";
 import { initPhysical, showAthleteResults, showInstruction, showTestingForm } from "./physical-ui.js";
 import { initProfile, showProfile } from "./coach-profile-ui.js";
+import { initPlayerDetailProgress, showPlayerProgress } from "./player-detail-ui.js";
 import { clearEmbedded, showEmbedded } from "./embed-frame.js";
 import { athleteResultsNotification, fitnessRoundNotification, unreadNotesNotification } from "./coach-notifications.js";
 import { initResults, showResults } from "./injury-results-ui.js";
@@ -4691,7 +4692,9 @@ function openPlayerDetail(id) {
       </div>
     </div>
   </div>`;
+  showPlayerProgress(p, myTeam); // Match Report + IDP / Progression ใต้โปรไฟล์
 }
+initPlayerDetailProgress();
 
 playerDetailBody.addEventListener("click", (e) => {
   const btn = e.target.closest("[data-detail-action]");

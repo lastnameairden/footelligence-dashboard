@@ -53,6 +53,7 @@ const PAGE_OF_SCRIPT = {
   "js/physical-ui.js": "attendance.html",
   "js/coach-profile-ui.js": "attendance.html",
   "js/injury-results-ui.js": "attendance.html",
+  "js/player-detail-ui.js": "attendance.html",
   "js/fitness-entry-ui.js": "attendance.html"
 };
 test("every getElementById id used by a page script exists in that page's HTML", () => {
