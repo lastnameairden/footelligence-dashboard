@@ -73,6 +73,7 @@ import { initMatchDay, openMatchDay } from "./match-day-ui.js";
 import { buildAttendanceGrid, gridHtml, legendHtml } from "./attendance-grid.js";
 import { initMatchData, showMatchForm, showMatchHistory } from "./match-data-ui.js";
 import { addMonthsToMonth, thaiMonthLabel } from "./coach-meetings.js";
+import { filterPlans, filterReportsByMonths, groupByMonth, monthOptionsOf, monthsBack, planAgeGroupsOf, planDataHtml, reportHistoryHtml } from "./plan-report-data.js";
 import { COACH_MENU, childMatchesScreen, menuItem, menuKeyForScreen } from "./coach-menu.js";
 import { ageGroupsOf, birthYearLabel, birthdayLabel, filterAndSortPlayers, playerDisplayName } from "./player-gallery.js";
 import { STAFF_PERMISSIONS, canAccessAdminFeature, normalizePermissions, permissionsSummary, staffCan, staffLandingFeature } from "./staff-perms.js";
@@ -149,7 +150,17 @@ const trainingPlanForm = document.getElementById("training-plan-form");
 const trainingPlanStatus = document.getElementById("training-plan-status");
 const trainingPlanSubmitBtn = document.getElementById("training-plan-submit-btn");
 const cancelEditTrainingPlanBtn = document.getElementById("cancel-edit-training-plan-btn");
-const trainingPlanListBody = document.getElementById("training-plan-list-body");
+const trainingPlanMenuSection = document.getElementById("training-plan-menu-section");
+const planDataSection = document.getElementById("plan-data-section");
+const planDataMonthSelect = document.getElementById("plan-data-month-select");
+const planDataAgeSelect = document.getElementById("plan-data-age-select");
+const planDataStatus = document.getElementById("plan-data-status");
+const planDataBody = document.getElementById("plan-data-body");
+const reportDataSection = document.getElementById("report-data-section");
+const reportDataMonthSelect = document.getElementById("report-data-month-select");
+const reportDataStatus = document.getElementById("report-data-status");
+const reportDataBody = document.getElementById("report-data-body");
+const reportHistoryBody = document.getElementById("report-history-body");
 const trainingPlanDateInput = document.getElementById("training-plan-date");
 const trainingPlanPlayerGroupSegmentedWrap = document.getElementById("training-plan-player-group-segmented");
 const trainingPlanAgeGroupToggleWrap = document.getElementById("training-plan-age-group-toggle");
@@ -672,6 +683,9 @@ function hideAllScreens() {
   matchReportSection.classList.add("hidden");
   injuryReportSection.classList.add("hidden");
   trainingPlanSection.classList.add("hidden");
+  trainingPlanMenuSection.classList.add("hidden");
+  planDataSection.classList.add("hidden");
+  reportDataSection.classList.add("hidden");
   dailySection.classList.add("hidden");
   meetingTasksSection.classList.add("hidden");
   instructionSection.classList.add("hidden");
@@ -1008,8 +1022,11 @@ const COACH_SCREEN_OPENERS = {
   players: () => openPlayerGallery(),
   checkin: () => openCheckinSection(),
   daily: () => showDaily(),
+  "training-plan": () => openTrainingPlanLanding(),
   plan: () => openTrainingPlanSection(),
+  "plan-data": () => openPlanData(),
   report: () => openReportSection(),
+  "report-data": () => openReportData(),
   match: () => openMatchDataLanding(), // ฟอร์มรายงานผลเดิมถูกแทนที่ด้วย Match Data แล้ว
   "match-data": () => openMatchDataLanding(),
   "match-form": () => openMatchForm(),
@@ -1065,8 +1082,9 @@ function appendCoachMenuToDrawer() {
     if (menu.key === active) btn.classList.add("active");
     wrap.appendChild(btn);
     for (const child of coachChildren(menu)) {
-      const sub = drawerItem("", child.label, child.external ? openMascPage : COACH_SCREEN_OPENERS[child.screen]);
+      const sub = drawerItem("", child.disabled ? `${child.label} <span class="badge badge-warning">เร็วๆ นี้</span>` : child.label, child.disabled ? () => {} : child.external ? openMascPage : COACH_SCREEN_OPENERS[child.screen]);
       sub.classList.add("drawer-subitem");
+      if (child.disabled) sub.classList.add("coach-subtab-off");
       if (childMatchesScreen(child, screen)) sub.classList.add("active");
       wrap.appendChild(sub);
     }
@@ -1095,6 +1113,7 @@ function renderCoachNav() {
   const children = active ? coachChildren(menuItem(active)) : [];
   coachSubtabsInner.innerHTML = children
     .map((child) => {
+      if (child.disabled) return `<button type="button" class="coach-subtab coach-subtab-off" data-sub-off title="เร็วๆ นี้">${escapeHtml(child.label)}</button>`;
       const cls = childMatchesScreen(child, screen) ? "coach-subtab active" : "coach-subtab";
       return `<button type="button" class="${cls}" data-sub-screen="${child.screen ?? ""}" data-sub-external="${child.external ?? ""}">${escapeHtml(child.label)}</button>`;
     })
@@ -1111,7 +1130,7 @@ coachTabbarInner.addEventListener("click", (e) => {
 
 coachSubtabsInner.addEventListener("click", (e) => {
   const btn = e.target.closest("button");
-  if (!btn) return;
+  if (!btn || btn.hasAttribute("data-sub-off")) return;
   if (btn.dataset.subExternal === "masc") openMascPage();
   else COACH_SCREEN_OPENERS[btn.dataset.subScreen]?.();
 });
@@ -1919,6 +1938,7 @@ function openReportSection() {
   if (!reportDateInput.value) {
     reportDateInput.value = todayBangkok();
   }
+  loadReportHistory();
 }
 
 function openMatchReportSection() {
@@ -4020,6 +4040,9 @@ const ROUTE_SCREENS = [
   { el: matchReportSection, key: "match", kind: "coach" },
   { el: injuryReportSection, key: "injury", kind: "coach" },
   { el: trainingPlanSection, key: "plan", kind: "coach" },
+  { el: trainingPlanMenuSection, key: "training-plan", kind: "coach" },
+  { el: planDataSection, key: "plan-data", kind: "coach" },
+  { el: reportDataSection, key: "report-data", kind: "coach" },
   { el: playerGallerySection, key: "players", kind: "coach" },
   { el: playerDetailSection, key: "player-detail", kind: "coach" },
   { el: addPlayerSection, key: "player-form", kind: "coach" },
@@ -4124,6 +4147,15 @@ function openCoachScreen(screen, date) {
     case "plan":
       openTrainingPlanSection();
       if (d) trainingPlanDateInput.value = d;
+      break;
+    case "training-plan":
+      openTrainingPlanLanding();
+      break;
+    case "plan-data":
+      openPlanData();
+      break;
+    case "report-data":
+      openReportData();
       break;
     case "match":
     case "match-data":
@@ -5891,6 +5923,7 @@ reportForm.addEventListener("submit", async (e) => {
     reportSummary.classList.remove("hidden");
     reportLoadStatus.innerHTML = `ส่งรายงานสำหรับวันที่ ${escapeHtml(dateStr)} เรียบร้อย ${icon("check")} (ซิงก์กับหน้าเช็คชื่อรายวันอัตโนมัติ)`;
     reportLoadStatus.className = "text-sm text-emerald-600 w-full";
+    loadReportHistory(dateStr);
   } catch (err) {
     console.error(err);
     reportStatus.textContent = "ส่งรายงานไม่สำเร็จ: " + err.message;
@@ -7094,10 +7127,14 @@ async function deleteTrainingPlan(plan) {
     trainingPlanStatus.textContent = "ลบแผนการฝึกซ้อมแล้ว";
     trainingPlanStatus.className = "text-sm text-slate-500";
     await renderTrainingPlanList();
+    planDataStatus.textContent = "ลบแผนการฝึกซ้อมแล้ว";
+    planDataStatus.className = "text-sm text-slate-500";
   } catch (err) {
     console.error(err);
     trainingPlanStatus.textContent = "ลบไม่สำเร็จ: " + err.message;
     trainingPlanStatus.className = "text-sm text-red-600";
+    planDataStatus.textContent = "ลบไม่สำเร็จ: " + err.message;
+    planDataStatus.className = "text-sm text-red-600";
   }
 }
 
@@ -7106,7 +7143,7 @@ async function deleteTrainingPlan(plan) {
 function trainingPlanSubmissionStatus(plan) {
   if (!plan.updatedAt || !plan.date) return "-";
   return isTrainingPlanLate(plan)
-    ? '<span class="badge badge-warning">${icon("clock")} เลท</span>'
+    ? `<span class="badge badge-warning">${icon("clock")} เลท</span>`
     : `<span class="badge badge-success">${icon("check-circle")} ตรงเวลา</span>`;
 }
 
@@ -7116,12 +7153,22 @@ function countLateTrainingPlansThisMonth(plans) {
   return plans.filter((p) => (p.date || "").startsWith(thisMonth) && isTrainingPlanLate(p)).length;
 }
 
+// โหลดแผนของทีม (กรองตามรุ่นที่ดูแล) เก็บไว้ใน trainingPlansCache แล้ววาดตารางที่หน้า Training Plan Data + อัปเดตแจ้งเตือนส่งสาย
+let trainingPlansCache = [];
+
 async function renderTrainingPlanList() {
-  trainingPlanListBody.innerHTML =
-    '<tr><td colspan="9" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>';
-  const snap = await getDocs(query(collection(db, "trainingPlans"), where("team", "==", myTeam)));
-  const allPlans = [];
-  snap.forEach((d) => allPlans.push({ id: d.id, ...d.data() }));
+  planDataStatus.textContent = "กำลังโหลด...";
+  planDataStatus.className = "text-sm text-slate-500";
+  let allPlans = [];
+  try {
+    const snap = await getDocs(query(collection(db, "trainingPlans"), where("team", "==", myTeam)));
+    snap.forEach((d) => allPlans.push({ id: d.id, ...d.data() }));
+  } catch (err) {
+    console.error(err);
+    planDataStatus.textContent = "โหลดแผนไม่สำเร็จ: " + err.message;
+    planDataStatus.className = "text-sm text-red-600";
+    return;
+  }
 
   // แสดงเฉพาะแผนของรุ่นอายุที่ตัวเองรับผิดชอบ (ถ้ารู้ตัวโค้ชแน่ชัด — myAgeGroups ไม่ว่าง เช่นโค้ชจริงล็อกอินเอง
   // หรือผู้ดูแลระบบสวมบทบาทเป็นโค้ชคนใดคนหนึ่งเจาะจง) ไม่ปนกับแผนของโค้ชรุ่นอื่นในทีมเดียวกัน — trainingPlans
@@ -7131,49 +7178,129 @@ async function renderTrainingPlanList() {
     ? allPlans.filter((p) => (p.ageGroups || []).some((ag) => myAgeGroups.includes(ag)))
     : allPlans;
   plans.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  trainingPlansCache = plans;
 
   const lateCountThisMonth = countLateTrainingPlansThisMonth(plans);
   trainingPlanLateWarning.classList.toggle("hidden", lateCountThisMonth <= TRAINING_PLAN_LATE_WARNING_THRESHOLD);
   trainingPlanLateCountEl.textContent = lateCountThisMonth;
 
-  if (plans.length === 0) {
-    trainingPlanListBody.innerHTML =
-      '<tr><td colspan="9" class="px-4 py-6 text-center text-slate-400">ยังไม่มีแผนการฝึกซ้อม</td></tr>';
-    return;
-  }
+  planDataStatus.textContent = "";
+  renderPlanData();
+}
 
-  trainingPlanListBody.innerHTML = "";
-  for (const plan of plans) {
-    const tr = document.createElement("tr");
-    const fileCell = plan.fileUrl
-      ? `<a href="${plan.fileUrl}" target="_blank" rel="noopener" class="text-blue-600 hover:underline">${icon("paperclip")} เปิดไฟล์</a>`
-      : "-";
-    tr.innerHTML = `
-      <td class="emphasis">${escapeHtml(plan.date ?? "-")}</td>
-      <td>${(plan.ageGroups || []).join(", ") || "-"}</td>
-      <td>${escapeHtml(plan.trainingType ?? "-")}</td>
-      <td>${escapeHtml(plan.phase ?? "-")}</td>
-      <td>${escapeHtml(plan.mainPart ?? "-")}</td>
-      <td>${(plan.physicalFocus || []).join(", ") || "-"}</td>
-      <td>${trainingPlanSubmissionStatus(plan)}</td>
-      <td>${fileCell}</td>
-    `;
-    const actionTd = document.createElement("td");
-    actionTd.className = "space-x-2";
-    const editBtn = document.createElement("button");
-    editBtn.textContent = "แก้ไข";
-    editBtn.className = "btn btn-secondary btn-sm";
-    editBtn.addEventListener("click", () => startEditTrainingPlan(plan));
-    const deleteBtn = document.createElement("button");
-    deleteBtn.textContent = "ลบ";
-    deleteBtn.className = "btn btn-danger-soft btn-sm";
-    deleteBtn.addEventListener("click", () => deleteTrainingPlan(plan));
-    actionTd.appendChild(editBtn);
-    actionTd.appendChild(deleteBtn);
-    tr.appendChild(actionTd);
-    trainingPlanListBody.appendChild(tr);
+// ตาราง Training Plan Data: กรองตามเดือน/รุ่นอายุที่เลือก (ข้อมูลอยู่ใน trainingPlansCache ไม่ต้องโหลดใหม่)
+function renderPlanData() {
+  const thisMonth = thisMonthBangkok();
+  const months = monthOptionsOf(trainingPlansCache, thisMonth);
+  const month = months.includes(planDataMonthSelect.value) ? planDataMonthSelect.value : thisMonth;
+  planDataMonthSelect.innerHTML = months.map((m) => `<option value="${m}">${escapeHtml(thaiMonthLabel(m))}</option>`).join("");
+  planDataMonthSelect.value = month;
+
+  const ages = planAgeGroupsOf(trainingPlansCache);
+  const ageGroup = ages.includes(planDataAgeSelect.value) ? planDataAgeSelect.value : "";
+  planDataAgeSelect.innerHTML = '<option value="">ทุกรุ่น</option>' + ages.map((a) => `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join("");
+  planDataAgeSelect.value = ageGroup;
+
+  const groups = groupByMonth(filterPlans(trainingPlansCache, { month, ageGroup }));
+  planDataBody.innerHTML = planDataHtml(groups, { statusHtml: trainingPlanSubmissionStatus });
+  applyDataLabels(planDataBody.querySelector("tbody"));
+}
+
+planDataMonthSelect.addEventListener("change", renderPlanData);
+planDataAgeSelect.addEventListener("change", renderPlanData);
+planDataBody.addEventListener("click", (e) => {
+  const edit = e.target.closest("[data-plan-edit]");
+  const del = e.target.closest("[data-plan-delete]");
+  if (edit) {
+    const plan = trainingPlansCache.find((p) => p.id === edit.dataset.planEdit);
+    if (!plan) return;
+    openTrainingPlanSection(); // ไปหน้า Upload ในโหมดแก้ไข (ฟอร์มเดิม)
+    startEditTrainingPlan(plan);
+  } else if (del) {
+    const plan = trainingPlansCache.find((p) => p.id === del.dataset.planDelete);
+    if (plan) deleteTrainingPlan(plan);
   }
-  applyDataLabels(trainingPlanListBody);
+});
+
+function openTrainingPlanLanding() {
+  hideAllScreens();
+  trainingPlanMenuSection.classList.remove("hidden");
+}
+
+function openPlanData() {
+  hideAllScreens();
+  planDataSection.classList.remove("hidden");
+  planDataMonthSelect.value = "";
+  planDataAgeSelect.value = "";
+  renderTrainingPlanList();
+}
+
+// เมนูที่ยังไม่เปิดใช้งานกดไม่ได้ (แสดงเป็น "เร็วๆ นี้" ที่ป้ายอยู่แล้ว)
+for (const btn of document.querySelectorAll("[data-plan-nav]")) btn.addEventListener("click", () => COACH_SCREEN_OPENERS[btn.dataset.planNav]?.());
+for (const btn of document.querySelectorAll("[data-training-plan-back]")) btn.addEventListener("click", openTrainingPlanLanding);
+
+// ---------- ประวัติรายงานการฝึกซ้อม (Training Report ใต้ฟอร์ม + Training Report Data) ----------
+// รายงานของโค้ชคนนี้ในช่วงเดือนที่ระบุ (เดือนแรก→เดือนสุดท้าย) — ใช้ฟิลเตอร์ฝั่งโค้ชเหมือนหน้ารายงานเดิม (filterByMyCoachName)
+async function fetchMyReportsInMonths(months) {
+  const sorted = [...months].sort();
+  const snap = await getDocs(teamDateRangeQuery("trainingReports", myTeam, `${sorted[0]}-01`, `${sorted[sorted.length - 1]}-31`));
+  const all = [];
+  snap.forEach((d) => all.push({ id: d.id, ...d.data() }));
+  return filterReportsByMonths(filterByMyCoachName(all), months);
+}
+
+// highlightDate = วันที่ของรายงานที่เพิ่งส่ง (ไฮไลต์แถวนั้น)
+async function loadReportHistory(highlightDate = null) {
+  if (!myTeam) return;
+  const thisMonth = thisMonthBangkok();
+  reportHistoryBody.innerHTML = '<p class="text-sm text-slate-500">กำลังโหลด...</p>';
+  try {
+    const reports = await fetchMyReportsInMonths([addMonthsToMonth(thisMonth, -1), thisMonth]);
+    reportHistoryBody.innerHTML = reportHistoryHtml(groupByMonth(reports), { highlightDate });
+    applyDataLabels(reportHistoryBody.querySelector("tbody"));
+  } catch (err) {
+    console.error(err);
+    reportHistoryBody.innerHTML = `<p class="text-sm text-red-600">โหลดประวัติรายงานไม่สำเร็จ: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+async function renderReportData() {
+  const month = reportDataMonthSelect.value || thisMonthBangkok();
+  reportDataStatus.textContent = "กำลังโหลด...";
+  reportDataStatus.className = "text-sm text-slate-500";
+  try {
+    const reports = await fetchMyReportsInMonths([month]);
+    reportDataBody.innerHTML = reportHistoryHtml(groupByMonth(reports), { mode: "full" });
+    applyDataLabels(reportDataBody.querySelector("tbody"));
+    reportDataStatus.textContent = "";
+  } catch (err) {
+    console.error(err);
+    reportDataStatus.textContent = "โหลดไม่สำเร็จ: " + err.message;
+    reportDataStatus.className = "text-sm text-red-600";
+  }
+}
+
+function openReportData() {
+  hideAllScreens();
+  reportDataSection.classList.remove("hidden");
+  const thisMonth = thisMonthBangkok();
+  reportDataMonthSelect.innerHTML = monthsBack(thisMonth, 12).map((m) => `<option value="${m}">${escapeHtml(thaiMonthLabel(m))}</option>`).join("");
+  reportDataMonthSelect.value = thisMonth;
+  renderReportData();
+}
+reportDataMonthSelect.addEventListener("change", renderReportData);
+
+// กด "เปิด / แก้ไข" ที่แถวรายงาน → ไปหน้า Training Report ของวันนั้นแล้วโหลดรายงาน
+function openReportOfDate(date) {
+  openReportSection();
+  reportDateInput.value = date;
+  reportLoadBtn.click();
+}
+for (const body of [reportHistoryBody, reportDataBody]) {
+  body.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-report-open]");
+    if (btn) openReportOfDate(btn.dataset.reportOpen);
+  });
 }
 
 function openTrainingPlanSection() {

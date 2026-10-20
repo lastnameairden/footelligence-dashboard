@@ -922,6 +922,62 @@
       </div>
     </section>
 
+    <!-- Training Plan (เมนู 5): หน้าเลือก 7 ตัวเลือก — Upload / Plan Data / Report / Report Data + 3 ตัวที่ยังไม่เปิดใช้งาน -->
+    <section id="training-plan-menu-section" class="hidden space-y-6">
+      <div class="page-heading">
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/><path d="M9 11h6M9 15h6M9 19h3"/></svg></div>
+        <div>
+          <h2>Training Plan</h2>
+          <p>แผนการฝึกซ้อมและรายงานการฝึกซ้อมของรุ่นที่ดูแล</p>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <button type="button" data-plan-nav="plan" class="card card-pad match-data-card"><span class="match-data-card-title">Upload Training Plan</span><span class="match-data-card-text">ส่งแผนการฝึกซ้อมรายวัน พร้อมไฟล์แผน (ต้องส่งภายใน 14:00 น.)</span></button>
+        <button type="button" data-plan-nav="plan-data" class="card card-pad match-data-card"><span class="match-data-card-title">Training Plan Data</span><span class="match-data-card-text">ประวัติการอัปโหลดแผนการฝึกซ้อม แก้ไข/ลบได้</span></button>
+        <button type="button" data-plan-nav="report" class="card card-pad match-data-card"><span class="match-data-card-title">Training Report</span><span class="match-data-card-text">ส่งรายงานการฝึกซ้อมรายวัน พร้อมประวัติรายงานเดือนนี้และเดือนก่อนหน้า</span></button>
+        <button type="button" data-plan-nav="report-data" class="card card-pad match-data-card"><span class="match-data-card-title">Training Report Data</span><span class="match-data-card-text">ประวัติรายงานการฝึกซ้อมย้อนหลังรายเดือน</span></button>
+        <button type="button" data-plan-off class="card card-pad match-data-card match-data-card-off"><span class="match-data-card-title">FootelligencePad <span class="badge badge-warning">เร็วๆ นี้</span></span><span class="match-data-card-text">หน้าต่างสำหรับเขียนแผนการฝึกซ้อม</span></button>
+        <button type="button" data-plan-off class="card card-pad match-data-card match-data-card-off"><span class="match-data-card-title">Footelligence Logbook <span class="badge badge-warning">เร็วๆ นี้</span></span><span class="match-data-card-text">สมุดบันทึกการฝึกซ้อม</span></button>
+        <button type="button" data-plan-off class="card card-pad match-data-card match-data-card-off"><span class="match-data-card-title">Export <span class="badge badge-warning">เร็วๆ นี้</span></span><span class="match-data-card-text">ส่งออกข้อมูลแผนและรายงาน</span></button>
+      </div>
+      <p id="training-plan-menu-status" class="text-sm text-slate-500"></p>
+    </section>
+
+    <!-- Training Plan Data: ประวัติการอัปโหลดแผน (คอลัมน์ตามฟอร์ม Upload) จัดกลุ่มตามเดือน -->
+    <section id="plan-data-section" class="hidden space-y-4">
+      <button data-training-plan-back type="button" class="btn btn-ghost px-0">← กลับ Training Plan</button>
+      <div class="page-heading">
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg></div>
+        <div>
+          <h2>Training Plan Data</h2>
+          <p>ประวัติแผนการฝึกซ้อมที่อัปโหลดไว้ (รุ่นอายุที่ดูแล)</p>
+        </div>
+      </div>
+      <div class="card card-pad flex flex-wrap items-center gap-3">
+        <div class="flex items-center gap-2"><label class="field-label mb-0">เดือน</label><select id="plan-data-month-select" class="field-input" style="width:auto"></select></div>
+        <div class="flex items-center gap-2"><label class="field-label mb-0">รุ่นอายุ</label><select id="plan-data-age-select" class="field-input" style="width:auto"></select></div>
+        <p id="plan-data-status" class="text-sm text-slate-500"></p>
+      </div>
+      <div id="plan-data-body"></div>
+    </section>
+
+    <!-- Training Report Data: ประวัติรายงานการฝึกซ้อมย้อนหลังรายเดือน -->
+    <section id="report-data-section" class="hidden space-y-4">
+      <button data-training-plan-back type="button" class="btn btn-ghost px-0">← กลับ Training Plan</button>
+      <div class="page-heading">
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M7 3h7l4 4v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M14 3v4h4"/><path d="M8.5 12.5h7M8.5 16h7"/></svg></div>
+        <div>
+          <h2>Training Report Data</h2>
+          <p>ประวัติรายงานการฝึกซ้อมของคุณ เลือกเดือนย้อนหลังได้</p>
+        </div>
+      </div>
+      <div class="card card-pad flex flex-wrap items-center gap-3">
+        <div class="flex items-center gap-2"><label class="field-label mb-0">เดือน</label><select id="report-data-month-select" class="field-input" style="width:auto"></select></div>
+        <p id="report-data-status" class="text-sm text-slate-500"></p>
+      </div>
+      <div id="report-data-body"></div>
+    </section>
+
     <!-- Match Data (เมนู 6): หน้าเลือกส่วนย่อย → Match Recording Form / ประวัติการแข่งขัน → รายงานผล Match Day -->
     <section id="match-data-section" class="hidden space-y-6">
       <div class="page-heading">
@@ -1280,12 +1336,12 @@
     </section>
     <!-- หน้าจอรายงานการฝึกซ้อม (รูปถ่าย + รายชื่อนักกีฬาที่ไม่ได้เข้าซ้อม + พิกัด GPS) -->
     <section id="report-section" class="hidden space-y-6">
-      <button data-back class="btn btn-ghost px-0">← กลับหน้า Daily</button>
+      <button data-training-plan-back type="button" class="btn btn-ghost px-0">← กลับ Training Plan</button>
 
       <div class="page-heading">
         <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M7 3h7l4 4v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M14 3v4h4"/><path d="M8.5 12.5h7M8.5 16h7"/></svg></div>
         <div>
-          <h2>รายงานการฝึกซ้อม</h2>
+          <h2>Training Report</h2>
           <p>ระบุรายชื่อนักกีฬาที่ไม่ได้เข้าซ้อมในวันนี้</p>
         </div>
       </div>
@@ -1337,6 +1393,12 @@
           <p id="report-status" class="text-sm text-slate-500"></p>
         </div>
       </form>
+
+      <!-- ประวัติรายงานของเดือนนี้และเดือนก่อนหน้า (เห็นเสมอ รายงานที่เพิ่งส่งถูกไฮไลต์) -->
+      <div class="space-y-3">
+        <h3 class="section-title">ประวัติรายงาน · เดือนนี้และเดือนก่อนหน้า</h3>
+        <div id="report-history-body"></div>
+      </div>
     </section>
 
     <!-- หน้าจอรายงานผลการแข่งขัน -->
@@ -1633,12 +1695,12 @@
 
     <!-- หน้าจอส่งแผนการฝึกซ้อมรายวัน -->
     <section id="training-plan-section" class="hidden space-y-6">
-      <button data-back class="btn btn-ghost px-0">← กลับหน้า Daily</button>
+      <button data-training-plan-back type="button" class="btn btn-ghost px-0">← กลับ Training Plan</button>
 
       <div class="page-heading">
         <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/><path d="M9 11h6M9 15h6M9 19h3"/></svg></div>
         <div>
-          <h2>แผนการฝึกซ้อมรายวัน</h2>
+          <h2>Upload Training Plan</h2>
           <p>ส่งแผนการฝึกซ้อมของวันนั้นๆ พร้อมหัวข้อหลัก จุดเน้นด้านฟิสิคอล และไฟล์แผน (รูป/PDF) ที่ต้องแนบทุกครั้ง (ต้องส่งภายใน 14:00 น. ของวันนั้น)</p>
         </div>
       </div>
@@ -1708,30 +1770,6 @@
             <p id="training-plan-status" class="text-sm text-slate-500"></p>
           </div>
         </form>
-      </div>
-
-      <div>
-        <h2 class="section-title mb-3"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/><path d="M9 11h6M9 15h6M9 19h3"/></svg></span> ประวัติแผนการฝึกซ้อม</h2>
-        <div class="card table-wrap">
-          <table class="pro-table">
-            <thead>
-              <tr>
-                <th>วันที่</th>
-                <th>รุ่นอายุ</th>
-                <th>ประเภท</th>
-                <th>Phase</th>
-                <th>หัวข้อหลัก</th>
-                <th>Physical</th>
-                <th>สถานะการส่ง</th>
-                <th>ไฟล์แนบ</th>
-                <th>ดำเนินการ</th>
-              </tr>
-            </thead>
-            <tbody id="training-plan-list-body">
-              <tr><td colspan="9" class="px-4 py-6 text-center text-slate-400">ยังไม่มีแผนการฝึกซ้อม</td></tr>
-            </tbody>
-          </table>
-        </div>
       </div>
     </section>
 

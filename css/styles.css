@@ -651,3 +651,9 @@ table.pro-table td.emphasis { font-weight: 600; color: var(--text-1); }
   body.printing-sheet .sheet-form .sheet-table td { height: var(--row-h); padding: 0 0.5mm; line-height: 1; }
   body.printing-sheet .sheet-form .sheet-note { margin: 0.6mm 0; font-size: 6pt; }
 }
+
+/* Training Plan: ตัวเลือกที่ยังไม่เปิดใช้งาน + ไฮไลต์รายงานที่เพิ่งส่ง */
+.match-data-card-off { border-style: dashed; opacity: 0.65; cursor: not-allowed; }
+.match-data-card-off:hover, .match-data-card-off:focus-visible { transform: none; }
+.coach-subtab-off { border-style: dashed; opacity: 0.6; cursor: not-allowed; }
+.report-row-new td { background: var(--accent-tint, #fef3c7); }

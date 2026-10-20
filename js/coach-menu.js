@@ -1,7 +1,8 @@
 // เมนูหลัก 9 รายการของโค้ช (ตรรกะล้วนๆ ไม่พึ่ง DOM/Firebase เพื่อเทสต์ใน Node ได้) — ใช้ทั้งเมนู ☰ ด้านข้าง (มือถือ) และแถบเมนูแนวนอน (คอมพิวเตอร์)
 // screen = รหัสหน้าจอตาม COACH_SCREEN_KEYS ใน screen-route.js; screens = ทุกหน้าที่นับว่าอยู่ภายใต้เมนูนี้ (ใช้ไฮไลต์เมนูที่เปิดอยู่)
+// disabled (ในเมนูย่อย) = ยังไม่เปิดใช้งาน แสดงจางๆ กดไม่ได้
 // children = เมนูย่อย (แสดงเป็นแถบเล็กใต้แถบเมนูหลักเมื่ออยู่ในเมนูนั้น) — external = หน้าอื่นนอก attendance.html
-// หน้าเดิมที่ยังไม่ได้กำหนดที่อยู่ถาวร (รอผู้ใช้แจ้ง) ผูกไว้ชั่วคราว: Daily (หน้าแรกหลังล็อกอิน) ไฮไลต์ใต้ Attendance, Evaluation → ผลทดสอบสมรรถภาพ + MASC, Training Plan → แผน + รายงานการฝึกซ้อม
+// หน้าเดิมที่ยังไม่ได้กำหนดที่อยู่ถาวร (รอผู้ใช้แจ้ง) ผูกไว้ชั่วคราว: Daily (หน้าแรกหลังล็อกอิน) ไฮไลต์ใต้ Attendance, Evaluation → ผลทดสอบสมรรถภาพ + MASC, (Training Plan ได้ที่อยู่ถาวรแล้ว)
 
 export const COACH_MENU = [
   { key: "instruction", label: "Instruction", hint: "คำชี้แจง", icon: "file-text", screen: "instruction", screens: ["instruction"] },
@@ -13,11 +14,17 @@ export const COACH_MENU = [
     label: "Training Plan",
     hint: "แผนการฝึกซ้อม",
     icon: "clipboard-list",
-    screen: "plan",
-    screens: ["plan", "report"],
+    screen: "training-plan",
+    screens: ["training-plan", "plan", "plan-data", "report", "report-data"],
+    // disabled = ยังไม่เปิดใช้งาน (แสดงจาง กดไม่ได้ รออัปเดต)
     children: [
-      { label: "แผนการฝึกซ้อม", screen: "plan" },
-      { label: "รายงานการฝึกซ้อม", screen: "report" }
+      { label: "Upload Training Plan", screen: "plan" },
+      { label: "Training Plan Data", screen: "plan-data" },
+      { label: "Training Report", screen: "report" },
+      { label: "Training Report Data", screen: "report-data" },
+      { label: "FootelligencePad", disabled: true },
+      { label: "Footelligence Logbook", disabled: true },
+      { label: "Export", disabled: true }
     ]
   },
   {

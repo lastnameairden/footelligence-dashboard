@@ -63,6 +63,17 @@ test("coach menu only points at screens that exist, and every coach screen belon
   assert.equal(menuItem("meeting").screen, "meeting-tasks");
 });
 
+test("Training Plan menu: landing + 4 live options + 3 disabled 'coming soon' options; old plan/report links stay under it", () => {
+  const tp = menuItem("training-plan");
+  assert.equal(tp.screen, "training-plan");
+  assert.deepEqual(tp.children.map((c) => c.label), ["Upload Training Plan", "Training Plan Data", "Training Report", "Training Report Data", "FootelligencePad", "Footelligence Logbook", "Export"]);
+  assert.deepEqual(tp.children.filter((c) => c.disabled).map((c) => c.label), ["FootelligencePad", "Footelligence Logbook", "Export"]);
+  for (const c of tp.children.filter((c) => c.disabled)) assert.equal(c.screen, undefined, `${c.label} must not navigate`);
+  for (const s of ["training-plan", "plan", "plan-data", "report", "report-data"]) assert.equal(menuKeyForScreen(s), "training-plan", s);
+  assert.equal(childMatchesScreen(tp.children[2], "report"), true);
+  assert.equal(childMatchesScreen(tp.children[4], "report"), false);
+});
+
 test("birthYearLabel / birthdayLabel show Gregorian / Buddhist years", () => {
   assert.equal(birthYearLabel("2009-03-12"), "2009 / 2552");
   assert.equal(birthYearLabel(""), "-");

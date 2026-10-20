@@ -63,5 +63,5 @@ test("empty or missing hash gives an empty route and an empty hash string", () =
 });
 
 test("coach screen keys are the ones the app can reopen", () => {
-  assert.deepEqual(COACH_SCREEN_KEYS, ["daily", "checkin", "report", "match", "injury", "plan", "players", "fitness", "meeting-tasks", "instruction", "player-detail", "player-form", "attendance-grid", "match-data", "match-form", "match-history", "match-sheet"]);
+  assert.deepEqual(COACH_SCREEN_KEYS, ["daily", "checkin", "report", "match", "injury", "plan", "players", "fitness", "meeting-tasks", "instruction", "player-detail", "player-form", "attendance-grid", "match-data", "match-form", "match-history", "match-sheet", "training-plan", "plan-data", "report-data"]);
 });
