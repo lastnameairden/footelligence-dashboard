@@ -84,6 +84,10 @@ let recaps = new Map(); // `${meetingId}_${coachId}` -> งานหลังป
 let comments = new Map(); // meetingId -> { all, player, gk, fit } ความคิดเห็นของแอดมิน/ทีมสต๊าฟ
 // ทีมสต๊าฟ (สิทธิ์ meetings) เห็นหน้าเดียวกับแอดมินแต่แก้ได้เฉพาะวาระ/ไฟล์/ความคิดเห็น — ลิงก์ Meet ผลเข้าประชุม และการแบ่งกลุ่มเป็นของแอดมินหลัก
 let staffMode = false;
+// หน้าทีมของทีมหลังบ้าน: แสดงเฉพาะทีมที่เลือก (scopeTeam) และเฉพาะโค้ชที่ดูแลรุ่นที่เลือก (scopeAgeGroup) — null/"" = ไม่กรอง (หน้าแอดมินเดิมเห็นทุกทีม)
+let scopeTeam = null;
+let scopeAgeGroup = "";
+const scopedSlots = () => (scopeTeam ? MEETING_TEAM_SLOTS.filter((s) => s.team === scopeTeam) : MEETING_TEAM_SLOTS);
 // ข้อความที่พิมพ์ค้างไว้ในช่องวาระ/ความคิดเห็น (ยังไม่กดบันทึก) — เก็บไว้เพราะทุกการกระทำโหลดหน้าใหม่ จะได้ไม่หายระหว่างสลับแท็บ/บันทึกอย่างอื่น
 const drafts = new Map(); // `${meetingId}|${section}` -> { plan, comment }
 const activeSection = new Map(); // meetingId -> section key ที่เปิดอยู่
@@ -239,6 +243,14 @@ function recapAnswerHtml(recap) {
   ).join("");
   return `<details class="w-full"><summary class="text-xs text-blue-700 cursor-pointer">ดูคำตอบ</summary>${rows}</details>`;
 }
+// โค้ชในนัดนี้ที่ผ่านตัวกรองรุ่นอายุ (ไม่ได้เลือกรุ่น = ทุกคน)
+function keptCoachIds(m) {
+  const ids = (m && m.coachIds) || [];
+  if (!scopeAgeGroup) return ids;
+  const roster = new Map((coachesByTeam.get(m.team) || []).map((c) => [c.id, c]));
+  return ids.filter((id) => (roster.get(id)?.ageGroups || []).includes(scopeAgeGroup));
+}
+
 function render() {
   setStatus("");
   if (meetings.size === 0) {
@@ -260,7 +272,7 @@ function render() {
   for (let w = 1; w <= MEETING_WEEKS_PER_MONTH; w++) {
     const day = weekdayOfWeek(w);
     const selected = w === selectedWeek;
-    const counts = MEETING_TEAM_SLOTS.map((s) => (meetings.get(meetingKey(s.team, w))?.coachIds || []).length);
+    const counts = scopedSlots().map((s) => keptCoachIds(meetings.get(meetingKey(s.team, w))).length);
     html += `
       <div class="card card-pad flex items-center gap-3 flex-wrap cursor-pointer ${selected ? "ring-2 ring-blue-500" : ""}" data-action="select-week" data-week="${w}">
         <span class="font-semibold text-slate-900 w-24">สัปดาห์ ${w}</span>
@@ -288,13 +300,14 @@ function render() {
     </div>
     <div class="space-y-3">`;
 
-  for (const slot of MEETING_TEAM_SLOTS) {
+  for (const slot of scopedSlots()) {
     const m = meetings.get(meetingKey(slot.team, selectedWeek));
     if (!m) {
       html += `<div class="card card-pad"><p class="font-semibold text-slate-900">${escapeHtml(slot.team)}</p><p class="text-sm text-slate-500">ไม่มีนัดในสัปดาห์นี้</p></div>`;
       continue;
     }
-    const sum = summarizeMeetingAttendance(m);
+    const keptIds = keptCoachIds(m);
+    const sum = summarizeMeetingAttendance({ ...m, coachIds: keptIds });
     const names = m.coachNames || [];
     const todayStr = todayBangkok();
     // แถวละโค้ช มีปุ่มเลือกผลชัดเจน 3 ปุ่ม (เข้าร่วม/ลา/ขาด) ปุ่มที่เลือกอยู่เป็นสีเต็ม กดซ้ำเพื่อล้าง (เฉพาะแอดมินหลัก — ทีมสต๊าฟเห็นผลอย่างเดียว)
@@ -305,6 +318,7 @@ function render() {
     };
     const rows = (m.coachIds || [])
       .map((id, i) => {
+        if (!keptIds.includes(id)) return "";
         const current = (m.attendance || {})[id] || "";
         const buttons = ["attended", "leave", "absent"]
           .map((status) => {
@@ -639,6 +653,8 @@ nextBtn.addEventListener("click", () => changeMonth(1));
 // opts.staffMode = true เมื่อเปิดโดยทีมหลังบ้าน (สิทธิ์ meetings) — ซ่อนเครื่องมือที่เป็นของแอดมินหลัก
 export function openAdminMeetings(opts = {}) {
   staffMode = opts.staffMode === true;
+  scopeTeam = opts.team || null;
+  scopeAgeGroup = opts.ageGroup || "";
   return reload();
 }
 

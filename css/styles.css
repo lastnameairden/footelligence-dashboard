@@ -736,4 +736,5 @@ html.embedded main { padding-top: 0.25rem; padding-bottom: 1rem; }
 .staff-filter-chip.active { background: var(--accent-tint); color: var(--accent); border-color: var(--accent); font-weight: 600; }
 .staff-filter-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (max-width: 767px) { .staff-filter-inner { padding-left: 1rem; padding-right: 1rem; } }
-.staff-space [data-staff-hide] { display: none !important; }
+.staff-space [data-staff-hide] { display: none !important; }/* ปุ่มแก้/ลบที่สร้างด้วย JS (แผนฝึก รายการบาดเจ็บ ปุ่มในหน้ารายละเอียดนักกีฬา) — ทีมหลังบ้านดูอย่างเดียว */
+.staff-space [data-plan-edit], .staff-space [data-plan-delete], .staff-space [data-injury-edit], .staff-space [data-injury-delete], .staff-space [data-detail-action] { display: none !important; }

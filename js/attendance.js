@@ -1784,7 +1784,8 @@ function openAdminFitnessRoundsSection() {
 function openAdminMeetingsSection() {
   hideAllScreens();
   adminMeetingsSection.classList.remove("hidden");
-  openAdminMeetings({ staffMode: isStaffSession() });
+  // ในหน้าทีมของทีมหลังบ้าน แสดงเฉพาะทีมที่เลือกและโค้ชของรุ่นที่กรองไว้ — แผงผู้ดูแลเดิมเห็นทุกทีม
+  openAdminMeetings({ staffMode: isStaffSession(), team: staffSpace() ? myTeam : null, ageGroup: staffSpace() ? staffAgeFilter : "" });
 }
 
 function openAdminMascRoundsSection() {
@@ -4572,7 +4573,9 @@ async function restoreAdminTeamContext(route) {
   if (!TEAMS.includes(route.team)) return false;
   if (route.as === "staff") {
     if (!isStaffSession() || !staffCan(currentStaffPerms, "view")) return false;
-    await enterStaffTeamSpace(route.team, () => openCoachScreen(route.screen || "staff-home", route.date));
+    // ลิงก์ไปหน้าที่ไม่อยู่ในเมนูของบัญชีนี้ (เช่น เช็คชื่อ หน้ากรอกข้อมูลของโค้ช) กลับมาที่ Home ของหน้าทีม
+    const allowed = new Set(staffMenuFor(currentStaffPerms).flatMap((m) => m.screens));
+    await enterStaffTeamSpace(route.team, () => openCoachScreen(allowed.has(route.screen) ? route.screen : "staff-home", route.date));
     return true;
   }
   const wantedRole = route.as === "executive" ? "executive" : "coach";
