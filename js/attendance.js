@@ -71,8 +71,9 @@ import { parseParentHeights } from "./fitness-calc.js";
 import { applyTeamTheme } from "./team-theme.js";
 import { initMatchDay, openMatchDay } from "./match-day-ui.js";
 import { buildAttendanceGrid, gridHtml, legendHtml } from "./attendance-grid.js";
+import { initMatchData, showMatchForm, showMatchHistory } from "./match-data-ui.js";
 import { addMonthsToMonth, thaiMonthLabel } from "./coach-meetings.js";
-import { COACH_MENU, menuItem, menuKeyForScreen } from "./coach-menu.js";
+import { COACH_MENU, childMatchesScreen, menuItem, menuKeyForScreen } from "./coach-menu.js";
 import { ageGroupsOf, birthYearLabel, birthdayLabel, filterAndSortPlayers, playerDisplayName } from "./player-gallery.js";
 import { STAFF_PERMISSIONS, canAccessAdminFeature, normalizePermissions, permissionsSummary, staffCan, staffLandingFeature } from "./staff-perms.js";
 import { isEvaluationComplete } from "./masc-data.js";
@@ -166,6 +167,10 @@ const trainingPlanLateCountEl = document.getElementById("training-plan-late-coun
 const dailySection = document.getElementById("daily-section");
 const meetingTasksSection = document.getElementById("meeting-tasks-section");
 const meetingTasksBody = document.getElementById("meeting-tasks-body");
+const matchDataSection = document.getElementById("match-data-section");
+const matchFormSection = document.getElementById("match-form-section");
+const matchHistorySection = document.getElementById("match-history-section");
+const matchSheetSection = document.getElementById("match-sheet-section");
 const attendanceGridSection = document.getElementById("attendance-grid-section");
 const attendanceGridCoachLabel = document.getElementById("attendance-grid-coach-label");
 const attendanceGridPrevBtn = document.getElementById("attendance-grid-prev-btn");
@@ -671,6 +676,10 @@ function hideAllScreens() {
   meetingTasksSection.classList.add("hidden");
   instructionSection.classList.add("hidden");
   attendanceGridSection.classList.add("hidden");
+  matchDataSection.classList.add("hidden");
+  matchFormSection.classList.add("hidden");
+  matchHistorySection.classList.add("hidden");
+  matchSheetSection.classList.add("hidden");
   playerGallerySection.classList.add("hidden");
   playerDetailSection.classList.add("hidden");
 }
@@ -1001,7 +1010,11 @@ const COACH_SCREEN_OPENERS = {
   daily: () => showDaily(),
   plan: () => openTrainingPlanSection(),
   report: () => openReportSection(),
-  match: () => openMatchReportSection(),
+  match: () => openMatchDataLanding(), // ฟอร์มรายงานผลเดิมถูกแทนที่ด้วย Match Data แล้ว
+  "match-data": () => openMatchDataLanding(),
+  "match-form": () => openMatchForm(),
+  "match-history": () => openMatchHistory(),
+  "match-sheet": () => openMatchHistory(),
   injury: () => openInjuryReportSection(),
   fitness: () => openFitnessEntrySection(),
   "meeting-tasks": () => openMeetingTasksSection()
@@ -1054,7 +1067,7 @@ function appendCoachMenuToDrawer() {
     for (const child of coachChildren(menu)) {
       const sub = drawerItem("", child.label, child.external ? openMascPage : COACH_SCREEN_OPENERS[child.screen]);
       sub.classList.add("drawer-subitem");
-      if (child.screen && child.screen === screen) sub.classList.add("active");
+      if (childMatchesScreen(child, screen)) sub.classList.add("active");
       wrap.appendChild(sub);
     }
   }
@@ -1082,7 +1095,7 @@ function renderCoachNav() {
   const children = active ? coachChildren(menuItem(active)) : [];
   coachSubtabsInner.innerHTML = children
     .map((child) => {
-      const cls = child.screen && child.screen === screen ? "coach-subtab active" : "coach-subtab";
+      const cls = childMatchesScreen(child, screen) ? "coach-subtab active" : "coach-subtab";
       return `<button type="button" class="${cls}" data-sub-screen="${child.screen ?? ""}" data-sub-external="${child.external ?? ""}">${escapeHtml(child.label)}</button>`;
     })
     .join("");
@@ -1102,6 +1115,46 @@ coachSubtabsInner.addEventListener("click", (e) => {
   if (btn.dataset.subExternal === "masc") openMascPage();
   else COACH_SCREEN_OPENERS[btn.dataset.subScreen]?.();
 });
+
+// ---------- Match Data (เมนู 6) ----------
+let pendingMatchDayAgeGroup = null; // รุ่นที่ให้ Match Day เปิดก่อน (ตอนกด "แก้ไขใน Match Day" จากรายงานผล)
+
+function openMatchDataLanding() {
+  hideAllScreens();
+  matchDataSection.classList.remove("hidden");
+}
+function openMatchForm() {
+  hideAllScreens();
+  matchFormSection.classList.remove("hidden");
+  showMatchForm();
+}
+function openMatchHistory() {
+  hideAllScreens();
+  matchHistorySection.classList.remove("hidden");
+  showMatchHistory();
+}
+
+// กดแก้ไขจากรายงานผล: ไปหน้า Attendance Check ของวันนั้น เลือก Match Day และเปิดรุ่นอายุของนัดนั้น
+async function openMatchDayFor(date, ageGroup) {
+  openCheckinSection();
+  dateInput.value = date;
+  pendingMatchDayAgeGroup = ageGroup;
+  await chooseDayType("match");
+}
+
+initMatchData({
+  team: () => myTeam,
+  ageGroups: () => myAgeGroups,
+  open: (screen) => (screen === "match-form" ? openMatchForm() : openMatchHistory()),
+  show: (screen) => {
+    hideAllScreens();
+    (screen === "match-sheet" ? matchSheetSection : matchHistorySection).classList.remove("hidden");
+  },
+  editMatchDay: openMatchDayFor,
+  ensureSession: (date) => findOrCreateSession(date)
+});
+
+for (const btn of document.querySelectorAll("[data-match-data-back]")) btn.addEventListener("click", openMatchDataLanding);
 
 // ---------- Attendance (เมนู 4): ตารางเช็คชื่อรายเดือนของรุ่นอายุที่โค้ชดูแล — ตรรกะ/สีอยู่ที่ attendance-grid.js ----------
 let attendanceGridMonth = "";
@@ -3972,6 +4025,10 @@ const ROUTE_SCREENS = [
   { el: addPlayerSection, key: "player-form", kind: "coach" },
   { el: instructionSection, key: "instruction", kind: "coach" },
   { el: attendanceGridSection, key: "attendance-grid", kind: "coach" },
+  { el: matchDataSection, key: "match-data", kind: "coach" },
+  { el: matchFormSection, key: "match-form", kind: "coach" },
+  { el: matchHistorySection, key: "match-history", kind: "coach" },
+  { el: matchSheetSection, key: "match-sheet", kind: "coach" },
   { el: fitnessEntrySection, key: "fitness", kind: "coach" },
   { el: executiveSection, key: "executive", kind: "executive" },
   { el: executivePlayersSection, key: "executive-players", kind: "executive" },
@@ -4069,7 +4126,15 @@ function openCoachScreen(screen, date) {
       if (d) trainingPlanDateInput.value = d;
       break;
     case "match":
-      openMatchReportSection();
+    case "match-data":
+      openMatchDataLanding();
+      break;
+    case "match-form":
+      openMatchForm();
+      break;
+    case "match-history":
+    case "match-sheet": // รหัสรายงานไม่ได้เก็บใน URL — รีเฟรชแล้วกลับมาที่ประวัติ
+      openMatchHistory();
       break;
     case "injury":
       openInjuryReportSection();
@@ -5133,6 +5198,7 @@ function startMatchDay() {
     team: myTeam,
     date: dateInput.value,
     ageGroups: myAgeGroups,
+    initialAgeGroup: pendingMatchDayAgeGroup,
     coachId: auth.currentUser.uid,
     coachName: myCoachName || auth.currentUser.email,
     ensureSession: findOrCreateSession

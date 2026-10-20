@@ -8,6 +8,7 @@ import {
   formationError,
   matchDayDocId,
   MATCH_RATING_MAX,
+  minutesPlayed,
   newRow,
   normalizeMinute,
   parseFormation,
@@ -250,4 +251,52 @@ test("rating scale is 4 stars in half steps", () => {
 test("matchDayDocId is stable per team + date + age group and safe as a document id", () => {
   assert.equal(matchDayDocId("THAWEE SC", "2026-10-19", "U16"), "md_2026-10-19_U16_THAWEE-SC");
   assert.equal(matchDayDocId("THAWEE SC", "2026-10-19", "U16"), matchDayDocId("THAWEE SC", "2026-10-19", "U16"));
+});
+
+test("minutesPlayed: starter until he leaves, substitute from his entry, full time for the rest, unknown without a length", () => {
+  let rows = validForm().rows.map((r) => (r.id === "P2" ? { ...r, outMinute: "67:00" } : r));
+  rows = setReplacement(rows, "P2", "S1");
+  const by = (id, length) => minutesPlayed(rows.find((r) => r.id === id), rows, length);
+  assert.equal(by("P2", 80), 67);
+  assert.equal(by("S1", 80), 13);
+  assert.equal(by("P3", 80), 80);
+  assert.equal(by("P3", null), null, "no match length and still on the pitch at the end");
+  assert.equal(by("P2", null), 67, "left at a known minute, length not needed");
+  assert.equal(by("N1", 80), 0, "not in the squad");
+  assert.equal(by("S1", null), null);
+});
+
+test("new Match Day fields: time, venue, length, cards and per-player notes are validated, saved and restored", () => {
+  const rows = validForm().rows.map((r) => (r.id === "P3" ? { ...r, yellow: "1", note: " ยิงสวย " } : r.id === "P4" ? { ...r, red: "1" } : r));
+  const form = validForm({ rows, matchTime: "13:00", venue: "สนาม A", matchLength: "80" });
+  assert.deepEqual(validateMatchDay(form).errors, []);
+  const payload = buildMatchDayPayload(form, "U16");
+  assert.deepEqual([payload.matchTime, payload.venue, payload.matchLengthMinutes], ["13:00", "สนาม A", 80]);
+  const p3 = payload.players.find((p) => p.id === "P3");
+  assert.deepEqual([p3.yellowCards, p3.redCards, p3.note, p3.minutes], [1, 0, "ยิงสวย", 80]);
+  assert.equal(payload.players.find((p) => p.id === "P4").redCards, 1);
+  const back = formFromReport(payload);
+  assert.deepEqual([back.matchTime, back.venue, back.matchLength], ["13:00", "สนาม A", "80"]);
+  const r3 = back.rows.find((r) => r.id === "P3");
+  assert.deepEqual([r3.yellow, r3.red, r3.note], ["1", "", "ยิงสวย"]);
+  // the optional fields may stay empty
+  const bare = buildMatchDayPayload(validForm(), "U16");
+  assert.deepEqual([bare.matchTime, bare.venue, bare.matchLengthMinutes], [null, null, null]);
+});
+
+test("new Match Day fields reject bad values", () => {
+  const e = (o) => validateMatchDay(validForm(o)).errors.join("|");
+  assert.match(e({ matchTime: "25:00" }), /เวลาแข่ง/);
+  assert.match(e({ matchTime: "1pm" }), /เวลาแข่ง/);
+  assert.match(e({ matchLength: "5" }), /ความยาวการแข่งขัน/);
+  assert.match(e({ matchLength: "80.5" }), /ความยาวการแข่งขัน/);
+  const rows = validForm().rows;
+  assert.match(e({ rows: rows.map((r) => (r.id === "P3" ? { ...r, yellow: "3" } : r)) }), /ใบเหลือง\/ใบแดงของ "P3"/);
+  assert.match(e({ rows: rows.map((r) => (r.id === "P3" ? { ...r, red: "2" } : r)) }), /ใบเหลือง\/ใบแดงของ "P3"/);
+});
+
+test("cards and notes are cleared for a player who did not play", () => {
+  let rows = [mk("A", "starter", { yellow: "1", red: "1", note: "x" })];
+  rows = setStatus(rows, "A", "none");
+  assert.deepEqual([rows[0].yellow, rows[0].red, rows[0].note], ["", "", ""]);
 });

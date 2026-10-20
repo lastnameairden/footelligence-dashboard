@@ -922,6 +922,73 @@
       </div>
     </section>
 
+    <!-- Match Data (เมนู 6): หน้าเลือกส่วนย่อย → Match Recording Form / ประวัติการแข่งขัน → รายงานผล Match Day -->
+    <section id="match-data-section" class="hidden space-y-6">
+      <div class="page-heading">
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><circle cx="12" cy="12" r="9"/><path d="m12 8 3.5 2.5-1.3 4h-4.4l-1.3-4Z"/></svg></div>
+        <div>
+          <h2>Match Data</h2>
+          <p>ข้อมูลการแข่งขันของรุ่นที่ดูแล</p>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <button id="match-data-go-form" type="button" class="card card-pad match-data-card">
+          <span class="match-data-card-title">Match Recording Form</span>
+          <span class="match-data-card-text">แบบฟอร์มสำหรับพิมพ์หรือบันทึกเป็น PDF ไปจดข้อมูลระหว่างแข่ง แล้วกลับมากรอกที่ Attendance Check → Match Day</span>
+        </button>
+        <button id="match-data-go-history" type="button" class="card card-pad match-data-card">
+          <span class="match-data-card-title">ประวัติการแข่งขัน</span>
+          <span class="match-data-card-text">ดูผลการแข่งขันย้อนหลังตามฤดูกาล และเปิดรายงานผล Match Day ของแต่ละนัด</span>
+        </button>
+      </div>
+    </section>
+
+    <section id="match-form-section" class="hidden space-y-4 print-host">
+      <div class="no-print space-y-4">
+        <button data-match-data-back type="button" class="btn btn-ghost px-0">← กลับ Match Data</button>
+        <div class="card card-pad flex flex-wrap items-end gap-3">
+          <div>
+            <label class="field-label">รุ่นอายุ</label>
+            <select id="match-form-age-select" class="field-input" style="width:auto"></select>
+          </div>
+          <button id="match-form-print-btn" type="button" class="btn btn-primary">พิมพ์ / บันทึกเป็น PDF</button>
+          <p class="text-sm text-slate-500">ใส่รายชื่อนักกีฬาทั้งรุ่นให้แล้ว มีแถวว่างท้ายตารางสำหรับนักกีฬาจากรุ่นอื่น (ในหน้าต่างพิมพ์เลือก "บันทึกเป็น PDF" ได้)</p>
+        </div>
+      </div>
+      <div id="match-form-sheet" class="match-sheet-wrap"></div>
+    </section>
+
+    <section id="match-history-section" class="hidden space-y-4">
+      <button data-match-data-back type="button" class="btn btn-ghost px-0">← กลับ Match Data</button>
+      <div class="page-heading">
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/><path d="M9 11h6M9 15h6M9 19h3"/></svg></div>
+        <div>
+          <h2>ประวัติการแข่งขัน</h2>
+          <p>คลิกที่แถวเพื่อดูรายงานผล Match Day</p>
+        </div>
+      </div>
+      <div class="card card-pad flex flex-wrap items-center gap-3">
+        <div class="flex items-center gap-2">
+          <label class="field-label mb-0">ฤดูกาล</label>
+          <select id="match-history-season-select" class="field-input" style="width:auto"></select>
+        </div>
+        <input id="match-history-search" type="search" class="field-input" style="max-width:16rem" placeholder="ค้นหาคู่แข่ง/รายการ/สถานที่" />
+        <p id="match-history-status" class="text-sm text-slate-500"></p>
+      </div>
+      <div id="match-history-body"></div>
+    </section>
+
+    <section id="match-sheet-section" class="hidden space-y-4 print-host">
+      <div class="no-print flex flex-wrap items-center gap-3">
+        <button id="match-sheet-back-btn" type="button" class="btn btn-ghost px-0">← กลับประวัติการแข่งขัน</button>
+        <button id="match-sheet-print-btn" type="button" class="btn btn-primary btn-sm">พิมพ์ / บันทึกเป็น PDF</button>
+        <button id="match-sheet-edit-btn" type="button" class="btn btn-secondary btn-sm">แก้ไขใน Match Day</button>
+        <button id="match-sheet-delete-btn" type="button" class="btn btn-danger-soft btn-sm">ลบ</button>
+        <p id="match-sheet-status" class="text-sm text-red-600"></p>
+      </div>
+      <div id="match-sheet-body" class="match-sheet-wrap"></div>
+    </section>
+
     <!-- Attendance: ตารางเช็คชื่อรายเดือน นักกีฬา × ทุกวันของเดือน (ซ้อมปกติ + Match Day) ของรุ่นอายุที่โค้ชดูแล -->
     <section id="attendance-grid-section" class="hidden space-y-4">
       <div class="page-heading">

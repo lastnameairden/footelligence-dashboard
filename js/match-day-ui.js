@@ -35,6 +35,9 @@ let state = null;
 const emptyForm = () => ({
   format: "",
   formatOther: "",
+  matchTime: "",
+  venue: "",
+  matchLength: "",
   competitionType: "",
   competition: "",
   opponent: "",
@@ -121,6 +124,8 @@ function rowHtml(row, rows, played, subs) {
   const statusSel = `<select class="field-input" data-row-status="${id}">${PLAYER_STATUSES.map((s) => optionHtml(s.key, s.label, row.status)).join("")}</select>`;
   const positionSel = row.status === "none" ? "-" : `<select class="field-input" data-row-position="${id}">${positionOptions(row.position)}</select>`;
   const numInput = (field, value) => (isPlayed ? `<input type="number" min="0" class="field-input match-num" data-row="${id}" data-rf="${field}" value="${escapeHtml(value)}" />` : "-");
+  const cardInput = (field, value) => (isPlayed ? `<input type="number" min="0" class="field-input match-num" data-row="${id}" data-rf="${field}" value="${escapeHtml(value)}" />` : "-");
+  const noteInput = isPlayed ? `<input type="text" class="field-input match-note" data-row="${id}" data-rf="note" value="${escapeHtml(row.note)}" placeholder="หมายเหตุ" />` : "-";
   let subCell = "-";
   let replacedCell = "-";
   const entered = subs.get(row.id);
@@ -146,8 +151,11 @@ function rowHtml(row, rows, played, subs) {
     <td>${positionSel}</td>
     <td>${numInput("goals", row.goals)}</td>
     <td>${numInput("assists", row.assists)}</td>
+    <td>${cardInput("yellow", row.yellow)}</td>
+    <td>${cardInput("red", row.red)}</td>
     <td>${subCell}</td>
     <td>${replacedCell}</td>
+    <td>${noteInput}</td>
     <td>${rating}</td>
     <td>${remove}</td>
   </tr>`;
@@ -159,10 +167,10 @@ function rosterHtml() {
   const subs = subInfo(rows);
   const own = rows.filter((r) => !r.guest);
   const guests = rows.filter((r) => r.guest);
-  const header = "<tr><th>ชื่อเล่น</th><th>ชื่อจริง</th><th>สถานะ</th><th>ตำแหน่ง</th><th>ประตู</th><th>Assist</th><th>เปลี่ยนตัว</th><th>ถูกเปลี่ยนแทนโดย</th><th>คะแนน</th><th></th></tr>";
+  const header = "<tr><th>ชื่อเล่น</th><th>ชื่อจริง</th><th>สถานะ</th><th>ตำแหน่ง</th><th>ประตู</th><th>Assist</th><th>ใบเหลือง</th><th>ใบแดง</th><th>เปลี่ยนตัว</th><th>ถูกเปลี่ยนแทนโดย</th><th>หมายเหตุ</th><th>คะแนน</th><th></th></tr>";
   const body =
     own.map((r) => rowHtml(r, rows, played, subs)).join("") +
-    (guests.length > 0 ? `<tr class="match-divider"><td colspan="10">นักกีฬาจากรุ่นอื่น (เพิ่มต่อท้ายรายชื่อรุ่น ${escapeHtml(state.ageGroup)})</td></tr>${guests.map((r) => rowHtml(r, rows, played, subs)).join("")}` : "");
+    (guests.length > 0 ? `<tr class="match-divider"><td colspan="13">นักกีฬาจากรุ่นอื่น (เพิ่มต่อท้ายรายชื่อรุ่น ${escapeHtml(state.ageGroup)})</td></tr>${guests.map((r) => rowHtml(r, rows, played, subs)).join("")}` : "");
   return `<div class="card table-wrap"><table class="pro-table match-day-table"><thead>${header}</thead><tbody>${body}</tbody></table></div>`;
 }
 
@@ -225,6 +233,9 @@ function render() {
             <select class="field-input" data-f="competitionType"><option value="">-- เลือก --</option>${COMPETITION_TYPES.map((t) => optionHtml(t, t, f.competitionType)).join("")}</select></div>
           ${textField("ชื่อรายการ", "competition", f.competition, { placeholder: "เช่น Thailand Youth League" })}
           ${textField("คู่แข่ง", "opponent", f.opponent, { placeholder: "ชื่อทีมคู่แข่ง", cls: "sm:col-span-2" })}
+          ${textField("เวลาแข่ง (ไม่บังคับ)", "matchTime", f.matchTime, { type: "time" })}
+          ${textField("สถานที่ (ไม่บังคับ)", "venue", f.venue, { placeholder: "เช่น สนาม A" })}
+          ${textField("ความยาวการแข่งขัน นาที (ไม่บังคับ — ใช้คำนวณนาทีที่ลงเล่น)", "matchLength", f.matchLength, { type: "number", placeholder: "เช่น 80", cls: "sm:col-span-2" })}
         </div>
       </div>
 
@@ -417,7 +428,7 @@ export function initMatchDay(panelEl) {
   panel.addEventListener("click", onClick);
 }
 
-// c = { team, date, ageGroups (รุ่นที่ดูแล — ว่าง = ทุกรุ่นที่มีนักกีฬา), coachId, coachName, ensureSession(date) }
+// c = { team, date, ageGroups (รุ่นที่ดูแล — ว่าง = ทุกรุ่นที่มีนักกีฬา), initialAgeGroup (เปิดรุ่นนี้ก่อน ถ้ามี), coachId, coachName, ensureSession(date) }
 export async function openMatchDay(c) {
   ctx = { ...c };
   panel.innerHTML = '<p class="text-sm text-slate-400">กำลังโหลด...</p>';
@@ -429,8 +440,9 @@ export async function openMatchDay(c) {
       return;
     }
     ctx.ageGroups = groups;
-    state = { pool, ageGroup: groups[0], form: emptyForm(), existing: null, errors: [], warnings: [], status: "", statusError: false, guest: { open: false, group: "", picked: new Set() } };
-    await loadAgeGroup(groups[0]);
+    const first = groups.includes(ctx.initialAgeGroup) ? ctx.initialAgeGroup : groups[0];
+    state = { pool, ageGroup: first, form: emptyForm(), existing: null, errors: [], warnings: [], status: "", statusError: false, guest: { open: false, group: "", picked: new Set() } };
+    await loadAgeGroup(first);
     render();
   } catch (err) {
     console.error(err);

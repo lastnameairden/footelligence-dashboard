@@ -20,7 +20,19 @@ export const COACH_MENU = [
       { label: "รายงานการฝึกซ้อม", screen: "report" }
     ]
   },
-  { key: "match-data", label: "Match Data", hint: "ข้อมูลการแข่งขัน", icon: "football", screen: "match", screens: ["match"] },
+  {
+    key: "match-data",
+    label: "Match Data",
+    hint: "ข้อมูลการแข่งขัน",
+    icon: "football",
+    screen: "match-data",
+    // "match" = หน้ารายงานผลการแข่งขันเดิม (ถูกแทนที่แล้ว ลิงก์เก่าพามาหน้า Match Data)
+    screens: ["match-data", "match-form", "match-history", "match-sheet", "match"],
+    children: [
+      { label: "Match Recording Form", screen: "match-form" },
+      { label: "ประวัติการแข่งขัน", screen: "match-history", screens: ["match-history", "match-sheet"] }
+    ]
+  },
   {
     key: "evaluation",
     label: "Evaluation",
@@ -36,6 +48,11 @@ export const COACH_MENU = [
   { key: "injury-sick", label: "Injury/Sick", hint: "บาดเจ็บ / เจ็บป่วย", icon: "heart-pulse", screen: "injury", screens: ["injury"] },
   { key: "meeting", label: "Meeting", hint: "นัดประชุม + งานหลังประชุม", icon: "book", screen: "meeting-tasks", screens: ["meeting-tasks"] }
 ];
+
+// เมนูย่อยนี้เปิดอยู่ไหม (เมนูย่อยบางตัวครอบคลุมหลายหน้าจอ เช่น ประวัติการแข่งขัน + รายงานผล)
+export function childMatchesScreen(child, screen) {
+  return !!screen && (child.screens || [child.screen]).includes(screen);
+}
 
 // เมนูที่หน้าจอนี้อยู่ภายใต้ (ไม่มี = null)
 export function menuKeyForScreen(screen) {

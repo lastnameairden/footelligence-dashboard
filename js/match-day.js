@@ -34,6 +34,9 @@ export const FORMATION_PRESETS = {
 
 export const MATCH_MAX_MINUTE = 130; // ครอบคลุมต่อเวลา
 export const MATCH_RATING_MAX = 4; // คะแนนผู้เล่น 0.5-4 ดาว ครั้งละครึ่งดาว
+export const MATCH_LENGTH_RANGE = [10, 150]; // ความยาวการแข่งขัน (นาที) ที่รับได้
+export const MAX_YELLOW_CARDS = 2;
+export const MAX_RED_CARDS = 1;
 
 // "67:00" → วินาที (ไม่ถูกต้อง = null) รูปแบบ นาที:วินาที นาที 0-130 วินาที 00-59
 export function parseMinute(text) {
@@ -84,7 +87,7 @@ export function formationError(format, formation) {
 }
 
 // ---------- แถวนักกีฬา ----------
-// row = { id, nickname, fullName, ageGroup, guest, defaultPosition, status, position, goals, assists, outMinute, replacedBy, rating }
+// row = { id, nickname, fullName, ageGroup, guest, defaultPosition, status, position, goals, assists, yellow, red, note, outMinute, replacedBy, rating }
 export function newRow(player, ownAgeGroup) {
   return {
     id: player.id,
@@ -97,6 +100,9 @@ export function newRow(player, ownAgeGroup) {
     position: "",
     goals: "",
     assists: "",
+    yellow: "",
+    red: "",
+    note: "",
     outMinute: "",
     replacedBy: "",
     rating: null
@@ -150,9 +156,12 @@ export function cleanupRows(rows) {
         changed = true;
       }
       if (!played.has(r.id)) {
-        if (r.goals !== "" || r.assists !== "" || r.rating !== null || r.outMinute !== "") {
+        if (r.goals !== "" || r.assists !== "" || r.yellow !== "" || r.red !== "" || r.note !== "" || r.rating !== null || r.outMinute !== "") {
           r.goals = "";
           r.assists = "";
+          r.yellow = "";
+          r.red = "";
+          r.note = "";
           r.rating = null;
           r.outMinute = "";
           changed = true;
@@ -234,11 +243,37 @@ export function validateMatchDay(form) {
   const goalSum = rows.filter((r) => played.has(r.id)).reduce((n, r) => n + (asInt(r.goals) || 0), 0);
   if (scoresOk && goalSum > us) warnings.push(`ผลรวมประตูของผู้เล่น (${goalSum}) มากกว่าประตูทีมเรา (${us})`);
 
+  const time = String(form.matchTime ?? "").trim();
+  if (time && !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) errors.push("เวลาแข่งต้องเป็นรูปแบบ 13:00");
+  const lengthText = String(form.matchLength ?? "").trim();
+  if (lengthText) {
+    const len = Number(lengthText);
+    if (!Number.isInteger(len) || len < MATCH_LENGTH_RANGE[0] || len > MATCH_LENGTH_RANGE[1]) errors.push(`ความยาวการแข่งขันต้องเป็นจำนวนเต็ม ${MATCH_LENGTH_RANGE[0]}-${MATCH_LENGTH_RANGE[1]} นาที`);
+  }
+  for (const r of rows) {
+    if (!played.has(r.id)) continue;
+    const y = asInt(r.yellow);
+    const rd = asInt(r.red);
+    if ((y !== null && (!Number.isInteger(y) || y < 0 || y > MAX_YELLOW_CARDS)) || (rd !== null && (!Number.isInteger(rd) || rd < 0 || rd > MAX_RED_CARDS))) {
+      errors.push(`ใบเหลือง/ใบแดงของ "${r.nickname}" ต้องเป็นตัวเลข (เหลือง 0-${MAX_YELLOW_CARDS}, แดง 0-${MAX_RED_CARDS})`);
+    }
+  }
   if (!String(form.oppAttack ?? "").trim()) errors.push("กรอกรูปแบบการเล่นเกมรุกของคู่แข่ง");
   if (!String(form.oppDefense ?? "").trim()) errors.push("กรอกรูปแบบการเล่นเกมรับของคู่แข่ง");
   const link = String(form.videoUrl ?? "").trim();
   if (link && !/^https:\/\/[^\s/]+\.[^\s]+$/.test(link)) errors.push("ลิงก์ดูการแข่งขันย้อนหลังต้องขึ้นต้นด้วย https://");
   return { errors, warnings };
+}
+
+// นาทีที่ลงเล่นของผู้เล่นหนึ่งคน (ปัดเป็นนาทีเต็ม) — ตัวจริง: 0 → นาทีที่ออก (ไม่ถูกเปลี่ยนออก = เต็มเวลา) · สำรองที่เข้าแทน: นาทีที่เข้า → นาทีที่ออก/เต็มเวลา
+// matchLength = ความยาวการแข่งขัน (นาที) — ไม่ทราบความยาวและผู้เล่นอยู่จนจบเกม = null (คำนวณไม่ได้) · ไม่ได้ลงสนาม = 0
+export function minutesPlayed(row, rows, matchLength) {
+  if (!playedIds(rows).has(row.id)) return 0;
+  const entered = subInfo(rows).get(row.id);
+  const inSecs = entered ? parseMinute(entered.minute) : 0;
+  const outSecs = row.replacedBy || String(row.outMinute ?? "").trim() ? parseMinute(row.outMinute) : matchLength ? matchLength * 60 : null;
+  if (inSecs === null || outSecs === null) return null;
+  return Math.max(Math.round((outSecs - inSecs) / 60), 0);
 }
 
 // id เอกสารคงที่ต่อ (ทีม, วัน, รุ่นอายุ) — บันทึกซ้ำ = แก้ของเดิม
@@ -252,6 +287,7 @@ export function buildMatchDayPayload(form, ageGroup) {
   const played = playedIds(rows);
   const infoBySub = subInfo(rows);
   const starters = rows.filter((r) => r.status === "starter");
+  const matchLength = String(form.matchLength ?? "").trim() ? Number(form.matchLength) : null;
   const players = rows.map((r) => {
     const entered = infoBySub.get(r.id);
     const did = played.has(r.id);
@@ -266,6 +302,10 @@ export function buildMatchDayPayload(form, ageGroup) {
       played: did,
       goals: did ? asInt(r.goals) ?? 0 : 0,
       assists: did ? asInt(r.assists) ?? 0 : 0,
+      yellowCards: did ? asInt(r.yellow) ?? 0 : 0,
+      redCards: did ? asInt(r.red) ?? 0 : 0,
+      note: did ? String(r.note ?? "").trim() || null : null,
+      minutes: minutesPlayed(r, rows, matchLength),
       subOutMinute: r.replacedBy || r.outMinute ? normalizeMinute(r.outMinute) : null,
       replacedById: r.replacedBy || null,
       subInMinute: entered ? normalizeMinute(entered.minute) : null,
@@ -286,6 +326,9 @@ export function buildMatchDayPayload(form, ageGroup) {
     competition: form.competition.trim(),
     matchFormat: format,
     matchFormatOther: format === "other" ? form.formatOther.trim() : null,
+    matchTime: String(form.matchTime ?? "").trim() || null,
+    venue: String(form.venue ?? "").trim() || null,
+    matchLengthMinutes: matchLength,
     result: form.result,
     scoreUs: Number(form.scoreUs),
     scoreThem: Number(form.scoreThem),
@@ -312,6 +355,9 @@ export function formFromReport(report) {
     position: p.position ?? "",
     goals: p.goals ? String(p.goals) : "",
     assists: p.assists ? String(p.assists) : "",
+    yellow: p.yellowCards ? String(p.yellowCards) : "",
+    red: p.redCards ? String(p.redCards) : "",
+    note: p.note ?? "",
     outMinute: p.subOutMinute ?? "",
     replacedBy: p.replacedById ?? "",
     rating: p.rating ?? null
@@ -319,6 +365,9 @@ export function formFromReport(report) {
   return {
     format: report.matchFormat ?? "",
     formatOther: report.matchFormatOther ?? "",
+    matchTime: report.matchTime ?? "",
+    venue: report.venue ?? "",
+    matchLength: report.matchLengthMinutes ? String(report.matchLengthMinutes) : "",
     competitionType: report.competitionType ?? "",
     competition: report.competition ?? "",
     opponent: report.opponent ?? "",

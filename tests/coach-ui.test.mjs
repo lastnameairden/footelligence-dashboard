@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { TEAM_THEMES, applyTeamTheme, contrastWithWhite, teamThemeVars } from "../js/team-theme.js";
-import { COACH_MENU, menuItem, menuKeyForScreen } from "../js/coach-menu.js";
+import fs from "node:fs";
+import { COACH_MENU, childMatchesScreen, menuItem, menuKeyForScreen } from "../js/coach-menu.js";
 import { COACH_SCREEN_KEYS } from "../js/screen-route.js";
 import { ageGroupsOf, birthYearLabel, birthdayLabel, filterAndSortPlayers, playerDisplayName } from "../js/player-gallery.js";
 
@@ -96,4 +97,27 @@ test("playerDisplayName prefers the nickname", () => {
   assert.equal(playerDisplayName({ nickname: "เจเจ", fullName: "x" }), "เจเจ");
   assert.equal(playerDisplayName({ fullName: "x" }), "x");
   assert.equal(playerDisplayName({}), "-");
+});
+
+test("Match Data menu: landing page plus two sub-menus; the history sub-menu also covers the report view; the old match screen maps here", () => {
+  const menu = menuItem("match-data");
+  assert.equal(menu.screen, "match-data");
+  assert.deepEqual(menu.children.map((c) => c.label), ["Match Recording Form", "ประวัติการแข่งขัน"]);
+  const [form, history] = menu.children;
+  assert.equal(childMatchesScreen(form, "match-form"), true);
+  assert.equal(childMatchesScreen(form, "match-history"), false);
+  assert.equal(childMatchesScreen(history, "match-history"), true);
+  assert.equal(childMatchesScreen(history, "match-sheet"), true);
+  assert.equal(menuKeyForScreen("match"), "match-data");
+  assert.equal(menuKeyForScreen("match-sheet"), "match-data");
+});
+
+// match-data-ui.js อ่าน element ผ่าน el("id") — เช็คว่ามีครบใน attendance.html (ตัวเช็ค getElementById ในเทสต์อื่นมองไม่เห็นรูปแบบนี้)
+test("every id match-data-ui.js reads through el(...) exists in attendance.html", () => {
+  const html = fs.readFileSync(new URL("../attendance.html", import.meta.url), "utf8");
+  const declared = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]));
+  const src = fs.readFileSync(new URL("../js/match-data-ui.js", import.meta.url), "utf8");
+  const used = [...new Set([...src.matchAll(/\bel\("([^"]+)"\)/g)].map((m) => m[1]))];
+  assert.ok(used.length >= 15, "found the ids");
+  assert.deepEqual(used.filter((id) => !declared.has(id)), []);
 });

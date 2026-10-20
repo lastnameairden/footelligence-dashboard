@@ -47,6 +47,7 @@ const PAGE_OF_SCRIPT = {
   "js/player.js": "player.html",
   "js/development.js": "development.html",
   "js/coach-meetings-ui.js": "attendance.html",
+  "js/match-data-ui.js": "attendance.html",
   "js/fitness-rounds-ui.js": "attendance.html",
   "js/fitness-entry-ui.js": "attendance.html"
 };
@@ -95,7 +96,7 @@ test("vercel.json CSP keeps scripts locked down", () => {
 // class ที่ใช้ใน HTML/JS ต้องมีนิยามใน css/tailwind.css หรือ css/styles.css หรือ <style> ของหน้านั้น ถ้าไม่มี
 // แปลว่าเพิ่ม Tailwind class ใหม่แล้วลืม build (คำสั่งอยู่ที่หัวไฟล์ tailwind.config.js)
 // รายการนี้คือ class ที่ใช้เป็น "ชื่ออ้างอิงให้ JS" ไม่มีสไตล์จริง
-const NON_STYLING_HOOKS = new Set(["edit-coach-age-group-checkbox", "edit-coach-permission-checkbox", "register-age-group-checkbox", "pagination-controls"]);
+const NON_STYLING_HOOKS = new Set(["edit-coach-age-group-checkbox", "edit-coach-permission-checkbox", "register-age-group-checkbox", "pagination-controls", "print-sheet", "match-history-table"]);
 
 test("every class used in HTML/JS is defined in the CSS", () => {
   let css = read("css/tailwind.css") + read("css/styles.css");

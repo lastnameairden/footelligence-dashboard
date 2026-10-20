@@ -565,7 +565,7 @@ table.pro-table td.emphasis { font-weight: 600; color: var(--text-1); }
 
 /* ---------- Match Day (Attendance Check) ---------- */
 .match-day-table select.field-input, .match-day-table input.field-input { min-width: 6.5rem; padding-top: 0.35rem; padding-bottom: 0.35rem; }
-@media (min-width: 768px) { .match-day-table { min-width: 980px; } .match-day-table td { white-space: nowrap; } }
+@media (min-width: 768px) { .match-day-table { min-width: 1300px; } .match-day-table td { white-space: nowrap; } }
 .match-num { width: 4.5rem; min-width: 0 !important; }
 .match-min { width: 6rem; min-width: 0 !important; }
 .match-divider td { background: var(--surface-2); color: var(--text-2); font-weight: 600; font-size: 0.8125rem; }
@@ -578,3 +578,60 @@ table.pro-table td.emphasis { font-weight: 600; color: var(--text-1); }
 .star-hit-left { left: 0; }
 .star-hit-right { left: 50%; }
 .star:focus-within { outline: 2px solid var(--accent); border-radius: 4px; }
+.match-note { width: 10rem; min-width: 0 !important; }
+
+/* ---------- Match Data: การ์ดเลือกส่วนย่อย + เอกสาร (รายงานผล / Match Recording Form) + การพิมพ์ ---------- */
+.match-data-card { display: flex; flex-direction: column; gap: 0.4rem; text-align: left; cursor: pointer; transition: transform 0.15s ease, border-color 0.15s ease; }
+.match-data-card:hover, .match-data-card:focus-visible { transform: translateY(-3px); border-color: var(--accent); outline: none; }
+.match-data-card-title { font-family: 'Mitr', sans-serif; font-size: 1.1rem; font-weight: 600; color: var(--text-1); }
+.match-data-card-text { font-size: 0.875rem; color: var(--text-2); }
+.match-history-row { cursor: pointer; }
+.match-history-row:hover, .match-history-row:focus-visible { background: var(--accent-tint); outline: none; }
+.match-sheet-wrap { overflow-x: auto; }
+.sheet { background: #fff; color: #222; border: 1px solid var(--border); border-radius: 0.5rem; padding: 1.1rem 1.25rem; font-size: 0.8125rem; line-height: 1.5; }
+.sheet h4 { margin: 0.9rem 0 0.35rem; font-size: 0.9rem; font-weight: 700; }
+.sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; border-bottom: 2px solid #222; padding-bottom: 0.5rem; }
+.sheet-brand { display: flex; align-items: center; gap: 0.6rem; }
+.sheet-logo { width: 2.6rem; height: 2.6rem; object-fit: contain; }
+.sheet-vs { font-weight: 600; }
+.sheet-score { border: 1px solid #bbb; border-radius: 0.4rem; padding: 0.6rem 0.8rem; margin-top: 0.7rem; }
+.sheet-scoreline { font-size: 1.05rem; }
+.sheet-scoreline b { font-size: 1.35rem; margin: 0 0.35rem; }
+.sheet-info { display: flex; flex-wrap: wrap; gap: 0.2rem 1.5rem; margin-top: 0.3rem; }
+.sheet-k { color: #666; }
+.sheet-v { font-weight: 600; }
+.sheet-result { display: inline-block; margin-left: 0.5rem; padding: 0 0.6rem; border-radius: 0.3rem; font-size: 0.8rem; font-weight: 700; border: 1px solid #222; }
+.sheet-result-win { background: #dff3e4; }
+.sheet-result-loss { background: #f9dcda; }
+.sheet-result-draw { background: #fbefd2; }
+.sheet-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+.sheet-table th, .sheet-table td { border: 1px solid #999; padding: 0.2rem 0.3rem; text-align: center; vertical-align: middle; }
+.sheet-table th { background: #eee; font-weight: 600; }
+.sheet-table .l { text-align: left; }
+.sheet-table tfoot td { background: #f4f4f4; font-weight: 700; }
+.sheet-table .nw { white-space: nowrap; }
+.sheet-out td { color: #777; }
+.sheet-sub { font-size: 0.68rem; color: #666; }
+.sheet-guest { font-size: 0.65rem; border: 1px solid #999; border-radius: 0.25rem; padding: 0 0.25rem; color: #444; }
+.sheet-card { display: inline-block; width: 0.55rem; height: 0.8rem; border: 1px solid #555; }
+.sheet-card-y { background: #f2c230; }
+.sheet-card-r { background: #d33; }
+.sheet-card-n { font-size: 0.65rem; margin-left: 0.15rem; }
+.sheet-note { color: #555; margin: 0.4rem 0; font-size: 0.75rem; }
+.sheet-report-lines p { margin: 0.2rem 0; }
+.sheet-fields > div { margin: 0.2rem 0; line-height: 2; }
+.sheet-line { display: inline-block; border-bottom: 1px solid #555; height: 1em; vertical-align: bottom; }
+.sheet-form-table td { height: 1.5rem; }
+.sheet-blank td { height: 1.7rem; }
+.sheet-form .sheet-table th { font-size: 0.65rem; }
+@media print {
+  body.printing-sheet header.app-header, body.printing-sheet #nav-drawer, body.printing-sheet #nav-drawer-overlay, body.printing-sheet footer { display: none !important; }
+  body.printing-sheet main > *:not(.print-host) { display: none !important; }
+  body.printing-sheet main { padding: 0 !important; max-width: none !important; }
+  body.printing-sheet .no-print { display: none !important; }
+  body.printing-sheet .match-sheet-wrap { overflow: visible; }
+  body.printing-sheet .sheet { border: 0; padding: 0; border-radius: 0; }
+  body.printing-sheet .sheet-table tr { page-break-inside: avoid; }
+  body.printing-sheet .sheet-table thead { display: table-header-group; }
+  body.printing-sheet { background: #fff !important; }
+}
