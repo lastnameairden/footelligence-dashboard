@@ -148,7 +148,6 @@ const reportDataSection = document.getElementById("report-data-section");
 const reportDataMonthSelect = document.getElementById("report-data-month-select");
 const reportDataStatus = document.getElementById("report-data-status");
 const reportDataBody = document.getElementById("report-data-body");
-const reportHistoryBody = document.getElementById("report-history-body");
 const trainingPlanDateInput = document.getElementById("training-plan-date");
 const trainingPlanPlayerGroupSegmentedWrap = document.getElementById("training-plan-player-group-segmented");
 const trainingPlanAgeGroupToggleWrap = document.getElementById("training-plan-age-group-toggle");
@@ -2112,7 +2111,6 @@ function openReportSection() {
   if (!reportDateInput.value) {
     reportDateInput.value = todayBangkok();
   }
-  loadReportHistory();
 }
 
 // ---------- Injury/Sick (เมนู 8): หน้าเลือก → Recording (ฟอร์มเดิม) / Results (สรุปผลและกราฟ) ----------
@@ -6141,7 +6139,6 @@ reportForm.addEventListener("submit", async (e) => {
     reportSummary.classList.remove("hidden");
     reportLoadStatus.innerHTML = `ส่งรายงานสำหรับวันที่ ${escapeHtml(dateStr)} เรียบร้อย ${icon("check")} (ซิงก์กับหน้าเช็คชื่อรายวันอัตโนมัติ)`;
     reportLoadStatus.className = "text-sm text-emerald-600 w-full";
-    loadReportHistory(dateStr);
   } catch (err) {
     console.error(err);
     reportStatus.textContent = "ส่งรายงานไม่สำเร็จ: " + err.message;
@@ -7013,21 +7010,6 @@ async function fetchMyReportsInMonths(months) {
   return filterReportsByMonths(filterByMyCoachName(all), months);
 }
 
-// highlightDate = วันที่ของรายงานที่เพิ่งส่ง (ไฮไลต์แถวนั้น)
-async function loadReportHistory(highlightDate = null) {
-  if (!myTeam) return;
-  const thisMonth = thisMonthBangkok();
-  reportHistoryBody.innerHTML = '<p class="text-sm text-slate-500">กำลังโหลด...</p>';
-  try {
-    const reports = await fetchMyReportsInMonths([addMonthsToMonth(thisMonth, -1), thisMonth]);
-    reportHistoryBody.innerHTML = reportHistoryHtml(groupByMonth(reports), { highlightDate });
-    applyDataLabels(reportHistoryBody.querySelector("tbody"));
-  } catch (err) {
-    console.error(err);
-    reportHistoryBody.innerHTML = `<p class="text-sm text-red-600">โหลดประวัติรายงานไม่สำเร็จ: ${escapeHtml(err.message)}</p>`;
-  }
-}
-
 async function renderReportData() {
   const month = reportDataMonthSelect.value || thisMonthBangkok();
   reportDataStatus.textContent = "กำลังโหลด...";
@@ -7060,12 +7042,10 @@ function openReportOfDate(date) {
   reportDateInput.value = date;
   reportLoadBtn.click();
 }
-for (const body of [reportHistoryBody, reportDataBody]) {
-  body.addEventListener("click", (e) => {
-    const btn = e.target.closest("[data-report-open]");
-    if (btn) openReportOfDate(btn.dataset.reportOpen);
-  });
-}
+reportDataBody.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-report-open]");
+  if (btn) openReportOfDate(btn.dataset.reportOpen);
+});
 
 function openTrainingPlanSection() {
   hideAllScreens();
