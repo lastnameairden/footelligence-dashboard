@@ -90,9 +90,9 @@
     <a id="header-attendance-link" href="./attendance.html" class="hidden btn btn-ghost px-0">
       ← กลับเมนูหลัก
     </a>
-    <!-- เฉพาะผู้ดูแลระบบตอนดูข้อมูลทีมใดทีมหนึ่งอยู่ (มี ?team= แนบมา) — กลับไปหน้าภาพรวมทุกทีม (หน้าแรกสุด) -->
+    <!-- เฉพาะผู้ดูแลระบบ/ทีมหลังบ้านตอนดูข้อมูลทีมใดทีมหนึ่งอยู่ (มี ?team= แนบมา) — กลับไปหน้าเลือกทีม (หน้าแรกสุด) -->
     <a id="dashboard-back-link" href="/" class="hidden btn btn-ghost px-0">
-      ← กลับภาพรวมทุกทีม
+      ← เปลี่ยนทีม
     </a>
     <p id="status-message" class="text-sm text-slate-500">กำลังเชื่อมต่อ...</p>
 
@@ -107,8 +107,22 @@
     </section>
 
 
+    <!-- หน้าแรกของผู้ดูแลระบบ/ทีมหลังบ้าน: เลือกทีมแบบเลือกโปรไฟล์ — ไม่มีภาพรวมหลายทีมรวมกันอีก ต้องเลือกทีมก่อนจึงเห็นข้อมูล
+         พื้นหลังเป็นโลโก้เว็บแอปเรียงเฉียงจางๆ (สร้างด้วย JS ตอนเปิดหน้านี้) -->
+    <section id="team-picker-section" class="hidden team-picker">
+      <div id="team-picker-bg" class="team-picker-bg" aria-hidden="true"></div>
+      <div class="team-picker-inner">
+        <h2 class="team-picker-title">เลือกทีมที่ต้องการดู</h2>
+        <p id="team-picker-greeting" class="team-picker-greeting"></p>
+        <div id="team-picker-grid" class="team-picker-grid"></div>
+      </div>
+    </section>
+
     <!-- เนื้อหา Dashboard (แสดงหลังล็อกอินและได้รับอนุมัติแล้วเท่านั้น) -->
     <div id="dashboard-content" class="hidden space-y-10">
+
+    <!-- ชื่อทีมที่กำลังดู (เฉพาะผู้ดูแลระบบ/ทีมหลังบ้านที่เลือกทีมมา) -->
+    <div id="dashboard-team-heading" class="hidden flex items-center gap-3"></div>
 
     <!-- ภาพรวมทั้งหมด -->
     <section>

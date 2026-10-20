@@ -927,7 +927,7 @@ function renderDrawerItems() {
         ["approvals", "file-text", "คำขอลงทะเบียนรออนุมัติ", openAdminApprovalsSection],
         ["matches", "football", "รายงานผลการแข่งขันทั้งหมด", openAdminMatchesSection],
         ["injuries", "heart-pulse", "รายงานอาการบาดเจ็บทั้งหมด", openAdminInjuriesSection],
-        ["dashboard", "bar-chart", "เลือกทีมเพื่อดู Dashboard", openAdminDashboardSection],
+        ["dashboard", "bar-chart", "เลือกทีมเพื่อดู Dashboard", goToDashboard],
         ["print", "printer", "พิมพ์สรุปผลงานโค้ช", openAdminPrintSection],
         ["report-card", "book", "สมุดพกนักกีฬา", openAdminReportCardSection],
         ["masc-rounds", "dna", "กำหนดรอบการประเมิน MASC", openAdminMascRoundsSection],
@@ -939,10 +939,6 @@ function renderDrawerItems() {
         // "development" (หน้าพัฒนาการนักกีฬา) เป็นของแอดมินหลักเท่านั้น — ไม่อยู่ในตารางสิทธิ์ของทีมหลังบ้าน
         if (feature === "development" ? isStaffSession() : !adminCan(feature)) continue;
         navDrawerItems.appendChild(drawerItem(icon(iconName), label, handler));
-      }
-      if (adminCan("dashboard")) {
-        navDrawerItems.appendChild(drawerDivider());
-        navDrawerItems.appendChild(drawerItem(icon("home"), "ภาพรวมทุกทีม (Dashboard)", goToDashboard));
       }
     }
     return;

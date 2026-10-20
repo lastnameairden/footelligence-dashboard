@@ -748,9 +748,9 @@ export async function loadAdminNotifications() {
       count: missingPlanDaysByTeam.size,
       title: `ทีมที่มีวันขาดส่งแผนการฝึกซ้อมใน 14 วันที่ผ่านมา ${missingPlanDaysByTeam.size} ทีม`,
       detail: Array.from(missingPlanDaysByTeam.entries()).map(([t, count]) => `${t} (ขาด ${count} วัน)`).join(", "),
-      // ?team=__ALL__ เพื่อให้ผู้ดูแลระบบเห็นข้อมูลทันที (ไม่งั้น Dashboard จะโชว์หน้าเลือกทีมแทน) และ
+      // เปิด Dashboard ของทีมแรกที่ขาดส่งแผน (Dashboard ไม่มีภาพรวมหลายทีมแล้ว ทีมอื่นเลือกดูต่อด้วยปุ่ม "เปลี่ยนทีม") และ
       // #training-plan-summary-section ให้เลื่อนไปที่ตารางสรุปแผนการฝึกซ้อมโดยตรง
-      link: "index.html?team=__ALL__#training-plan-summary-section"
+      link: `index.html?team=${encodeURIComponent(missingPlanDaysByTeam.keys().next().value)}#training-plan-summary-section`
     });
   }
 
@@ -775,7 +775,7 @@ export async function loadAdminNotifications() {
       count: lateCoaches.length,
       title: `โค้ชที่ส่งแผนการฝึกซ้อมสายเกินเกณฑ์เดือนนี้ ${lateCoaches.length} คน`,
       detail: lateCoaches.map((g) => `${g.coachName} (สาย ${g.late}/${g.total} ครั้ง)`).join(", "),
-      link: "index.html?team=__ALL__#training-plan-summary-section"
+      link: `index.html?team=${encodeURIComponent(lateCoaches[0].team)}#training-plan-summary-section`
     });
   }
 

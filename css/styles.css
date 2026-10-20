@@ -501,3 +501,23 @@ table.pro-table td.emphasis { font-weight: 600; color: var(--text-1); }
   }
   table.pro-table.grid-table td[data-label]::before { content: none; }
 }
+
+/* ---------- หน้าเลือกทีม (Dashboard หน้าแรกของผู้ดูแลระบบ/ทีมหลังบ้าน) ---------- */
+.team-picker { position: relative; min-height: 70vh; }
+/* พื้นหลังโลโก้เว็บแอปเรียงเฉียงหลายแถว จางๆ — ตรึงเต็มจอไว้หลังเนื้อหา (hidden พร้อม section เมื่อไม่ได้อยู่หน้านี้) */
+.team-picker-bg { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+.team-picker-bg-rows { position: absolute; left: -25%; top: -25%; width: 150%; height: 150%; transform: rotate(-24deg); opacity: 0.07; display: flex; flex-direction: column; gap: 40px; }
+.team-picker-bg-row { display: flex; gap: 56px; flex-shrink: 0; }
+.team-picker-bg-row:nth-child(even) { margin-left: 56px; }
+.team-picker-bg-row img { width: 56px; height: 56px; object-fit: contain; flex-shrink: 0; }
+.team-picker-inner { position: relative; z-index: 1; text-align: center; padding: 28px 0 40px; }
+.team-picker-title { font-size: 1.75rem; font-weight: 700; letter-spacing: -0.01em; color: var(--text-1); margin: 0; }
+.team-picker-greeting { margin: 6px 0 28px; color: var(--text-2); font-size: 0.95rem; }
+.team-picker-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 22px; max-width: 760px; margin: 0 auto; }
+.team-pick-card { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 26px 16px 20px; border-radius: 16px; background: var(--surface); border: 1px solid var(--border); border-bottom: 5px solid var(--team-color, var(--accent)); box-shadow: var(--card-shadow); color: var(--text-1); text-decoration: none; transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.team-pick-card:hover, .team-pick-card:focus-visible { transform: translateY(-5px); box-shadow: 0 14px 30px rgba(28, 35, 33, 0.14); outline: none; }
+.team-pick-card:focus-visible { box-shadow: 0 0 0 3px var(--team-color, var(--accent)); }
+.team-pick-logo { width: 128px; height: 128px; object-fit: contain; border-radius: 12px; }
+.team-pick-name { font-weight: 700; letter-spacing: 0.01em; }
+.team-pick-meta { min-height: 1.2em; font-size: 0.8rem; color: var(--text-2); }
+@media (prefers-reduced-motion: reduce) { .team-pick-card { transition: none; } .team-pick-card:hover, .team-pick-card:focus-visible { transform: none; } }

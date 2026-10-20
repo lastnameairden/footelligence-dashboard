@@ -89,6 +89,11 @@ const statusEl = document.getElementById("status-message");
 const loginGate = document.getElementById("login-gate");
 const loginGateMessage = document.getElementById("login-gate-message");
 const dashboardContent = document.getElementById("dashboard-content");
+const teamPickerSection = document.getElementById("team-picker-section");
+const teamPickerBg = document.getElementById("team-picker-bg");
+const teamPickerGreeting = document.getElementById("team-picker-greeting");
+const teamPickerGrid = document.getElementById("team-picker-grid");
+const dashboardTeamHeading = document.getElementById("dashboard-team-heading");
 const adminSearchBtn = document.getElementById("admin-search-btn");
 const adminSearchPanel = document.getElementById("admin-search-panel");
 const adminSearchInput = document.getElementById("admin-search-input");
@@ -161,8 +166,54 @@ function showLoginGate(message) {
   loginGateMessage.textContent = message;
   loginGate.classList.remove("hidden");
   dashboardContent.classList.add("hidden");
+  teamPickerSection.classList.add("hidden");
   headerAttendanceLink.classList.add("hidden");
   setStatus("");
+}
+
+// ---------- หน้าเลือกทีม (หน้าแรกของผู้ดูแลระบบ/ทีมหลังบ้าน) ----------
+// พื้นหลัง: โลโก้เว็บแอปเรียงเป็นแถวเฉียงสลับฟันปลา สร้างให้พอดีขนาดจอ (container หมุน -24° ใหญ่ 150% ของจอ — ดู .team-picker-bg ใน styles.css)
+const PICKER_BG_ROW_STEP = 96; // สูง 56 + ช่องว่าง 40
+const PICKER_BG_COL_STEP = 112; // กว้าง 56 + ช่องว่าง 56
+function buildTeamPickerBackground() {
+  const rows = Math.min(24, Math.ceil((window.innerHeight * 1.5) / PICKER_BG_ROW_STEP) + 1);
+  const cols = Math.min(36, Math.ceil((window.innerWidth * 1.5) / PICKER_BG_COL_STEP) + 2);
+  const row = `<div class="team-picker-bg-row">${'<img src="./assets/logo.png" alt="" />'.repeat(cols)}</div>`;
+  teamPickerBg.innerHTML = `<div class="team-picker-bg-rows">${row.repeat(rows)}</div>`;
+}
+
+function teamPickCardHtml(team) {
+  const color = TEAM_COLORS[team] || "#0E6B52";
+  return `<a class="team-pick-card" href="/?team=${encodeURIComponent(team)}" style="--team-color:${color}">
+    ${teamLogoImg(team, "team-pick-logo")}
+    <span class="team-pick-name">${escapeHtml(team)}</span>
+    <span class="team-pick-meta" data-team-meta="${escapeHtml(team)}"></span>
+  </a>`;
+}
+
+// จำนวนนักกีฬา/โค้ชใต้ชื่อทีม — โหลดทีหลังการ์ดขึ้นแล้ว อ่านไม่ได้ก็ปล่อยว่าง (ไม่ใช่ข้อมูลหลักของหน้า)
+async function fillTeamPickerCounts() {
+  try {
+    const [coaches, ...playersByTeam] = await Promise.all([loadCollection("coaches"), ...TEAMS.map((t) => loadCollectionForTeam("players", t))]);
+    TEAMS.forEach((team, i) => {
+      const coachCount = coaches.filter((c) => c.role === "coach" && c.status === "approved" && c.team === team).length;
+      const el = teamPickerGrid.querySelector(`[data-team-meta="${CSS.escape(team)}"]`);
+      if (el) el.textContent = `นักกีฬา ${playersByTeam[i].length} คน · โค้ช ${coachCount} คน`;
+    });
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+function showTeamPicker(displayName) {
+  dashboardContent.classList.add("hidden");
+  dashboardBackLink.classList.add("hidden");
+  teamPickerGreeting.textContent = `สวัสดี ${displayName} · เลือกทีมเพื่อเข้าไปดูข้อมูลเฉพาะทีมนั้น`;
+  teamPickerGrid.innerHTML = TEAMS.map(teamPickCardHtml).join("");
+  buildTeamPickerBackground();
+  teamPickerSection.classList.remove("hidden");
+  setStatus("");
+  fillTeamPickerCounts();
 }
 
 async function loadCollection(name) {
@@ -1724,7 +1775,7 @@ function renderDrawerItems() {
     const teamFromUrl = new URLSearchParams(window.location.search).get("team");
     if (teamFromUrl && TEAMS.includes(teamFromUrl)) {
       navDrawerItems.appendChild(drawerDivider());
-      navDrawerItems.appendChild(drawerItem(icon("refresh"), "กลับภาพรวมทุกทีม", "/"));
+      navDrawerItems.appendChild(drawerItem(icon("refresh"), "เปลี่ยนทีม", "/"));
     }
   } else if (currentViewerRole === "staff") {
     // ทีมหลังบ้าน: เห็นเฉพาะเครื่องมือที่ได้รับสิทธิ์ (ซ่อนเมนูอย่างเดียว — ตัวบังคับจริงคือกฎ Firestore ดู staff-perms.js)
@@ -1745,7 +1796,7 @@ function renderDrawerItems() {
     const staffTeamFromUrl = new URLSearchParams(window.location.search).get("team");
     if (staffTeamFromUrl && TEAMS.includes(staffTeamFromUrl)) {
       navDrawerItems.appendChild(drawerDivider());
-      navDrawerItems.appendChild(drawerItem(icon("refresh"), "กลับภาพรวมทุกทีม", "/"));
+      navDrawerItems.appendChild(drawerItem(icon("refresh"), "เปลี่ยนทีม", "/"));
     }
   } else if (currentViewerRole === "coach") {
     navDrawerItems.appendChild(drawerSectionLabel("เมนู"));
@@ -1820,18 +1871,18 @@ onAuthStateChanged(auth, async (user) => {
     // กลับมาหน้านี้ทันที) จึงซ่อนไว้เฉพาะผู้ดูแลระบบ ให้ใช้เมนู ☰ แทน — โค้ช/ผู้บริหารทีมยังใช้ได้ตามปกติ
     headerAttendanceLink.classList.toggle("hidden", seesAllTeams);
     if (seesAllTeams) {
-      // หน้าแรกสุดของผู้ดูแลระบบ (ไม่มี ?team= แนบมาเลย หรือแนบมาเป็น __ALL__) คือภาพรวมทุกทีมตรงๆ ทันที ไม่ต้อง
-      // เลือกทีมก่อน — อยากดูแยกทีมไหนค่อยกดที่การ์ดทีมนั้นในภาพรวม (ลิงก์ไป ?team=ชื่อทีม) ปุ่ม "← กลับภาพรวม
-      // ทุกทีม" จึงโชว์เฉพาะตอนดูทีมใดทีมหนึ่งอยู่เท่านั้น เพราะหน้าภาพรวมทุกทีมไม่มีหน้าก่อนหน้าให้ย้อนกลับแล้ว
+      // หน้าแรกสุดของผู้ดูแลระบบ/ทีมหลังบ้าน (ไม่มี ?team= หรือชื่อทีมไม่ตรง รวมลิงก์เก่า ?team=__ALL__) คือหน้าเลือกทีม — ไม่มีภาพรวม
+      // หลายทีมรวมกันอีกแล้ว เลือกทีมก่อนแล้วจึงเห็นข้อมูลเฉพาะทีมนั้น (?team=ชื่อทีม) ปุ่ม "← เปลี่ยนทีม" กลับมาหน้าเลือกทีม
       const teamFromUrl = new URLSearchParams(window.location.search).get("team");
       if (teamFromUrl && TEAMS.includes(teamFromUrl)) {
+        teamPickerSection.classList.add("hidden");
         dashboardContent.classList.remove("hidden");
         dashboardBackLink.classList.remove("hidden");
+        dashboardTeamHeading.innerHTML = `${teamLogoImg(teamFromUrl, "w-10 h-10 object-contain inline-block rounded")}<h2 class="text-xl font-bold tracking-tight">${escapeHtml(teamFromUrl)}</h2>`;
+        dashboardTeamHeading.classList.remove("hidden");
         loadDashboard(teamFromUrl);
       } else {
-        dashboardContent.classList.remove("hidden");
-        dashboardBackLink.classList.add("hidden");
-        loadDashboard(null);
+        showTeamPicker(data.name || user.email);
       }
     } else {
       dashboardBackLink.classList.add("hidden");
