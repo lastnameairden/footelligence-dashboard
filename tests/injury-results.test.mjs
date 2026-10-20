@@ -20,7 +20,11 @@ test("scopeReports: selected group, else the coach's groups, else the whole team
 test("buildResults: period rows, delta vs previous period, active now, severity/status/type counts", () => {
   const m = buildResults({ reports, myAgeGroups: ["U17", "U18"], mode: "term", key: "2026-T1", todayStr: "2026-10-20" });
   assert.equal(m.total, 3);
-  assert.deepEqual(m.rows.map((r) => r.id), ["c", "b", "a"]);
+  // ประวัติแยกรุ่นเป็นทุกช่วงเวลา: U17 (เจเจ 3 ครั้งรวมรายการเทอมก่อน, ยังบาดเจ็บอยู่) ขึ้นก่อน U18
+  assert.deepEqual(m.history.map((g) => [g.ageGroup, g.players.length, g.totalReports, g.activePlayers]), [["U17", 1, 3, 1], ["U18", 1, 1, 1]]);
+  assert.deepEqual(m.history[0].players[0].reports.map((r) => r.id), ["b", "a", "d"], "newest first, includes reports outside the period");
+  assert.equal(m.history[0].players[0].status, "กำลังพักฟื้น", "current status comes from the active report");
+  assert.equal(m.history[0].players[0].recurrence, 1);
   assert.equal(m.totalDelta.text, "+2 จากช่วงก่อน");
   assert.equal(m.totalDelta.tone, "bad");
   assert.deepEqual(m.activeNow.map((x) => x.report.id), ["b", "c"], "oldest first; healed ones excluded");
@@ -47,6 +51,8 @@ test("buildResults: a selected age group narrows everything; a month with no inj
   assert.equal(empty.total, 0);
   assert.equal(empty.activeNow.length, 1, "active injuries are shown whatever period is selected");
   assert.match(resultsHtml(empty), /ยังไม่มีรายงานบาดเจ็บในช่วงที่เลือก/);
+  assert.match(resultsHtml(empty), /ประวัติการบาดเจ็บแยกตามรุ่นอายุ/);
+  assert.equal(empty.history.length, 1, "history is not tied to the selected period");
 });
 
 test("resultsHtml: summary cards, charts, tables, edit buttons, escaped text", () => {
@@ -61,6 +67,9 @@ test("resultsHtml: summary cards, charts, tables, edit buttons, escaped text", (
   assert.match(html, /เลยกำหนด 10 วัน/);
   assert.match(html, /data-injury-edit="b"/);
   assert.match(html, /data-injury-delete="b"/);
+  assert.match(html, /<details class="card injury-history-group" open>/);
+  assert.match(html, /ยังบาดเจ็บ 1 คน/);
+  assert.match(html, /2 ครั้ง \(ซ้ำ 1\)/);
   assert.match(html, /เจเจ<\/span> <span class="text-slate-400">U17<\/span> · 2 ครั้ง \(ซ้ำ 1\)/);
   assert.ok(!html.includes("<img src=x") && !html.includes("<script>"));
   assert.ok((html.match(/<svg/g) || []).length >= 6, "bars and stacked bars are SVG");

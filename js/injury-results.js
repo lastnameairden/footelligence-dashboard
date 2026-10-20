@@ -1,7 +1,7 @@
 // หน้าแสดงผล Injury/Sick → Results: สรุปการบาดเจ็บของรุ่นที่โค้ชดูแลในช่วงที่เลือก พร้อมกราฟ (ตรรกะล้วนๆ + HTML เป็นสตริง ไม่พึ่ง DOM/Firebase)
 // ใช้ตัวคำนวณ/กราฟเดิมร่วมกับ Dashboard (injury-form.js, injury-period.js, injury-stats-view.js) — กราฟแท่งเป็น SVG เพื่อให้พิมพ์สีได้
 import { escapeHtml, injurySeverityBadge, injuryStatusBadge } from "./ui-utils.js";
-import { buildInjuryStats, contextFor, formStatusFor, injuryDaysOut, injuryDetailLabels } from "./injury-form.js";
+import { buildInjuryStats, contextFor, formStatusFor, injuryDaysOut } from "./injury-form.js";
 import { formatDelta, monthShortLabel, monthlyCounts, periodFor, rowsInPeriod, shiftPeriodKey } from "./injury-period.js";
 import { barsHtml, injuryTrendHtml } from "./injury-stats-view.js";
 
@@ -78,7 +78,7 @@ export function buildResults({ reports, myAgeGroups = [], ageGroup = "", mode, k
     byType: countBy(inPeriod, (r) => r.injuryType),
     byAgeGroup: ageGroups.length > 1 ? ageGroups : [],
     frequent,
-    rows: [...inPeriod].sort((a, b) => String(b.date).localeCompare(String(a.date))),
+    history: buildHistory(scoped, todayStr),
     todayStr
   };
 }
@@ -126,18 +126,39 @@ function activeTableHtml(model) {
   return `<div class="table-wrap"><table class="pro-table injury-results-table"><thead><tr><th>นักกีฬา</th><th>อาการ</th><th>สถานะ</th><th>หยุดมาแล้ว</th><th>คาดว่ากลับ</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
-function detailTableHtml(model) {
-  if (model.rows.length === 0) return '<div class="card card-pad text-center text-slate-500">ไม่มีรายการบาดเจ็บในช่วงที่เลือก</div>';
-  const rows = model.rows
+// ประวัติการบาดเจ็บแยกรุ่น ทุกช่วงเวลา: รุ่นที่ยังมีคนบาดเจ็บอยู่ขึ้นก่อน (เปิดไว้) แล้วเรียงตามรุ่นอายุ — ในรุ่นเรียงคนที่ยังบาดเจ็บก่อน แล้วตามวันล่าสุด
+export function buildHistory(scoped, todayStr) {
+  const groups = new Map();
+  for (const r of scoped) {
+    const ag = r.ageGroup || "ไม่ระบุรุ่น";
+    if (!groups.has(ag)) groups.set(ag, new Map());
+    const players = groups.get(ag);
+    const id = r.playerId || r.playerName || "?";
+    if (!players.has(id)) players.set(id, { name: r.playerName ?? "-", reports: [] });
+    players.get(id).reports.push(r);
+  }
+  const ageNo = (g) => Number(String(g).replace(/\D/g, "")) || 999;
+  return [...groups]
+    .map(([ageGroup, players]) => {
+      const list = [...players.values()].map((p) => {
+        const reports = [...p.reports].sort((a, b) => String(b.date).localeCompare(String(a.date)));
+        const active = reports.find((r) => r.status !== HEALED) ?? null;
+        return { name: p.name, count: reports.length, recurrence: reports.filter((r) => r.isRecurrence).length, latest: reports[0], status: (active ?? reports[0]).status, active: !!active, reports };
+      });
+      list.sort((a, b) => Number(b.active) - Number(a.active) || String(b.latest.date).localeCompare(String(a.latest.date)) || a.name.localeCompare(b.name, "th"));
+      return { ageGroup, players: list, totalReports: list.reduce((s, p) => s + p.count, 0), activePlayers: list.filter((p) => p.active).length };
+    })
+    .sort((a, b) => Number(b.activePlayers > 0) - Number(a.activePlayers > 0) || ageNo(a.ageGroup) - ageNo(b.ageGroup));
+}
+
+function playerReportsTableHtml(player, todayStr) {
+  const rows = player.reports
     .map((r) => {
-      const { tags, daysText } = injuryDetailLabels(r, model.todayStr);
       const place = r.bodyRegion ? (r.side && r.side !== "ไม่เกี่ยวข้อง" ? `${r.bodyRegion} (${r.side})` : r.bodyRegion) : "-";
-      const out = injuryDaysOut(r, model.todayStr);
-      const days = out ? (out.final ? `${out.days}` : `${out.days}+`) : "-";
+      const out = injuryDaysOut(r, todayStr);
+      const days = out ? (out.final ? `${out.days} วัน` : `${out.days}+ วัน`) : "-";
       return `<tr>
         <td class="emphasis">${escapeHtml(r.date ?? "-")}</td>
-        <td>${escapeHtml(r.playerName ?? "-")}</td>
-        <td>${escapeHtml(r.ageGroup ?? "-")}</td>
         <td>${escapeHtml(r.description ?? "-")}${r.isRecurrence ? ' <span class="badge badge-warning">ซ้ำ</span>' : ""}</td>
         <td>${escapeHtml(place)}</td>
         <td>${escapeHtml(r.injuryType ?? "-")}</td>
@@ -145,14 +166,36 @@ function detailTableHtml(model) {
         <td>${escapeHtml(contextFor(r) ?? "-")}</td>
         <td>${injurySeverityBadge(r.severity)}</td>
         <td>${injuryStatusBadge(r.status)}</td>
-        <td title="${escapeHtml(daysText)}">${days}</td>
+        <td>${days}</td>
         <td class="whitespace-nowrap"><button type="button" class="btn btn-secondary btn-sm" data-injury-edit="${escapeHtml(r.id)}">แก้ไข</button> <button type="button" class="btn btn-danger-soft btn-sm" data-injury-delete="${escapeHtml(r.id)}">ลบ</button></td>
       </tr>`;
     })
     .join("");
-  return `<div class="card table-wrap"><table class="pro-table injury-results-table"><thead><tr><th>วันที่</th><th>นักกีฬา</th><th>รุ่น</th><th>อาการ</th><th>ตำแหน่ง/ข้าง</th><th>ประเภท</th><th>กลไก</th><th>เกิดที่</th><th>ความรุนแรง</th><th>สถานะ</th><th>หยุด (วัน)</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  return `<div class="table-wrap"><table class="pro-table injury-results-table"><thead><tr><th>วันที่</th><th>อาการ</th><th>ตำแหน่ง/ข้าง</th><th>ประเภท</th><th>กลไก</th><th>เกิดที่</th><th>ความรุนแรง</th><th>สถานะ</th><th>หยุด</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
+function historyHtml(model) {
+  if (model.history.length === 0) return '<div class="card card-pad text-center text-slate-500">ยังไม่มีประวัติการบาดเจ็บ</div>';
+  return model.history
+    .map((g) => {
+      const open = g.activePlayers > 0 ? " open" : "";
+      const activeBadge = g.activePlayers > 0 ? `<span class="badge badge-warning">ยังบาดเจ็บ ${g.activePlayers} คน</span>` : "";
+      const players = g.players
+        .map((p) => {
+          const latest = `${escapeHtml(p.latest.description ?? "-")} · ${escapeHtml(p.latest.date ?? "-")}`;
+          return `<details class="injury-history-player">
+            <summary class="injury-history-summary"><span class="font-medium">${escapeHtml(p.name)}</span><span class="text-slate-500">${p.count} ครั้ง${p.recurrence > 0 ? ` (ซ้ำ ${p.recurrence})` : ""}</span><span class="text-slate-500 injury-history-latest">${latest}</span>${injuryStatusBadge(p.status)}</summary>
+            ${playerReportsTableHtml(p, model.todayStr)}
+          </details>`;
+        })
+        .join("");
+      return `<details class="card injury-history-group"${open}>
+        <summary class="injury-history-group-summary"><span class="font-semibold">${escapeHtml(g.ageGroup)}</span><span class="text-sm text-slate-500">${g.players.length} ราย · ${g.totalReports} ครั้ง</span>${activeBadge}</summary>
+        <div class="injury-history-list">${players}</div>
+      </details>`;
+    })
+    .join("");
+}
 export function resultsHtml(model) {
   const s = model.stats;
   const avg = s.avgDaysOut === null ? "-" : s.avgDaysOut.toFixed(1).replace(/\.0$/, "");
@@ -184,5 +227,5 @@ export function resultsHtml(model) {
     </div>
     <div class="card card-pad space-y-2"><h3 class="section-title">กำลังบาดเจ็บ/พักฟื้นอยู่ตอนนี้</h3>${activeTableHtml(model)}</div>
     <div class="card card-pad space-y-2"><h3 class="section-title">นักกีฬาที่บาดเจ็บบ่อย</h3>${frequent}</div>
-    <div class="space-y-2"><h3 class="section-title">รายการทั้งหมดในช่วงนี้ (${model.total})</h3>${detailTableHtml(model)}</div>`;
+    <div class="space-y-2"><div class="flex flex-wrap items-baseline justify-between gap-2"><h3 class="section-title">ประวัติการบาดเจ็บแยกตามรุ่นอายุ</h3><span class="text-xs text-slate-400">ทุกช่วงเวลา · ไม่ผูกกับช่วงที่เลือกด้านบน</span></div>${historyHtml(model)}</div>`;
 }
