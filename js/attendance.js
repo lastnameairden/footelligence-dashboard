@@ -79,6 +79,7 @@ import { COACH_MENU, childMatchesScreen, menuItem, menuKeyForScreen } from "./co
 import { initPhysical, showAthleteResults, showInstruction, showTestingForm } from "./physical-ui.js";
 import { initProfile, showProfile } from "./coach-profile-ui.js";
 import { initPlayerDetailProgress, showPlayerProgress } from "./player-detail-ui.js";
+import { PLAYER_FEET, PLAYER_POSITIONS, contactExtraRows, healthAlertHtml, parsePlayerExtras, positionExtraRows } from "./player-profile-fields.js";
 import { clearEmbedded, showEmbedded } from "./embed-frame.js";
 import { athleteResultsNotification, fitnessRoundNotification, unreadNotesNotification } from "./coach-notifications.js";
 import { initResults, showResults } from "./injury-results-ui.js";
@@ -4660,15 +4661,18 @@ function playerDetailRows(p) {
     heights && (heights.father || heights.mother)
       ? `${heights.father ?? "-"} / ${heights.mother ?? "-"} ซม.${heights.source ? ` (${heights.source})` : ""}`
       : "-";
+  // แถวที่ escape แล้ว: [ป้าย, HTML] — แถวใหม่จาก player-profile-fields.js มีลิงก์โทรจึงเป็น HTML อยู่แล้ว
   return [
-    ["ชื่อ-นามสกุล", p.fullName ?? "-"],
-    ["รุ่นอายุ", p.ageGroup ?? "-"],
-    ["วันเกิด / ปีเกิด", birthdayLabel(p.birthday)],
-    ["ตำแหน่ง", p.position ?? "-"],
-    ["เพศ", p.sex ?? "-"],
-    ["ส่วนสูงพ่อ / แม่", parents]
+    ["ชื่อ-นามสกุล", escapeHtml(p.fullName ?? "-")],
+    ["รุ่นอายุ", escapeHtml(p.ageGroup ?? "-")],
+    ["วันเกิด / ปีเกิด", escapeHtml(birthdayLabel(p.birthday))],
+    ["ตำแหน่ง", escapeHtml(p.position ?? "-")],
+    ...positionExtraRows(p),
+    ["เพศ", escapeHtml(p.sex ?? "-")],
+    ["ส่วนสูงพ่อ / แม่", escapeHtml(parents)],
+    ...contactExtraRows(p)
   ]
-    .map(([label, value]) => `<div class="player-detail-row"><dt>${label}</dt><dd>${escapeHtml(value)}</dd></div>`)
+    .map(([label, html]) => `<div class="player-detail-row"><dt>${label}</dt><dd>${html}</dd></div>`)
     .join("");
 }
 
@@ -4685,6 +4689,7 @@ function openPlayerDetail(id) {
     <div class="player-detail-photo">${playerPhotoHtml(p)}</div>
     <div class="flex-1 min-w-[240px]">
       <h2 class="text-xl font-bold">${escapeHtml(playerDisplayName(p))}${p.number != null ? ` <span class="badge badge-neutral">เบอร์ ${escapeHtml(p.number)}</span>` : ""}</h2>
+      ${healthAlertHtml(p)}
       <dl class="mt-2">${playerDetailRows(p)}</dl>
       <div class="flex gap-2 flex-wrap mt-4">
         <button type="button" class="btn btn-secondary" data-detail-action="edit">${icon("edit")} แก้ไขข้อมูล</button>
@@ -4726,6 +4731,45 @@ function leavePlayerForm() {
   else openPlayerGallery();
 }
 playerFormBackBtn.addEventListener("click", leavePlayerForm);
+// ตำแหน่งรอง (เลือกหลายค่า) และเท้าถนัด (เลือกค่าเดียว กดซ้ำเพื่อยกเลิก) — เก็บสถานะไว้ในตัวแปร ไม่ใช่ input
+let playerFormFoot = "";
+let playerFormSecondary = new Set();
+
+function renderPlayerExtraControls() {
+  const primary = document.getElementById("player-position").value;
+  playerFormSecondary.delete(primary); // ตำแหน่งหลักห้ามซ้ำกับตำแหน่งรอง
+  const secondaryBox = document.getElementById("player-secondary-positions");
+  secondaryBox.innerHTML = "";
+  secondaryBox.appendChild(
+    createChipToggleGroup(PLAYER_POSITIONS.filter((pos) => pos !== primary), playerFormSecondary, (pos) => {
+      if (playerFormSecondary.has(pos)) playerFormSecondary.delete(pos);
+      else playerFormSecondary.add(pos);
+      renderPlayerExtraControls();
+    })
+  );
+  const footBox = document.getElementById("player-foot");
+  footBox.innerHTML = "";
+  footBox.appendChild(
+    createSegmentedGroup(PLAYER_FEET, playerFormFoot, (foot) => {
+      playerFormFoot = playerFormFoot === foot ? "" : foot;
+      renderPlayerExtraControls();
+    })
+  );
+}
+document.getElementById("player-position").addEventListener("change", renderPlayerExtraControls);
+
+function fillPlayerExtraFields(p) {
+  playerFormFoot = p.foot ?? "";
+  playerFormSecondary = new Set(Array.isArray(p.secondaryPositions) ? p.secondaryPositions : []);
+  document.getElementById("player-health").value = p.healthNote ?? "";
+  document.getElementById("player-guardian-name").value = p.guardian?.name ?? "";
+  document.getElementById("player-guardian-relation").value = p.guardian?.relation ?? "";
+  document.getElementById("player-guardian-phone").value = p.guardian?.phone ?? "";
+  document.getElementById("player-backup-name").value = p.backupContact?.name ?? "";
+  document.getElementById("player-backup-phone").value = p.backupContact?.phone ?? "";
+  renderPlayerExtraControls();
+}
+
 function startEditPlayer(p) {
   openPlayerFormScreen();
   editingPlayerId = p.id;
@@ -4739,6 +4783,7 @@ function startEditPlayer(p) {
   document.getElementById("player-father-height").value = p.parentHeights?.father ?? "";
   document.getElementById("player-mother-height").value = p.parentHeights?.mother ?? "";
   document.getElementById("player-parent-height-source").value = p.parentHeights?.source ?? "แจ้งเอง";
+  fillPlayerExtraFields(p);
   applyAgeGroupLock();
   playerPhotoInput.value = "";
   playerExistingPhotoUrl = p.photoUrl ?? null;
@@ -4755,6 +4800,7 @@ function startEditPlayer(p) {
 function stopEditPlayer() {
   editingPlayerId = null;
   addPlayerForm.reset();
+  fillPlayerExtraFields({});
   applyAgeGroupLock();
   playerExistingPhotoUrl = null;
   playerExistingPhotoPath = null;
@@ -4826,6 +4872,26 @@ addPlayerForm.addEventListener("submit", async (e) => {
     addPlayerStatus.className = "text-sm text-red-600";
     return;
   }
+  const extras = parsePlayerExtras({
+    position,
+    foot: playerFormFoot,
+    secondaryPositions: [...playerFormSecondary],
+    health: document.getElementById("player-health").value,
+    guardian: {
+      name: document.getElementById("player-guardian-name").value,
+      relation: document.getElementById("player-guardian-relation").value,
+      phone: document.getElementById("player-guardian-phone").value
+    },
+    backup: {
+      name: document.getElementById("player-backup-name").value,
+      phone: document.getElementById("player-backup-phone").value
+    }
+  });
+  if (extras.error) {
+    addPlayerStatus.textContent = extras.error;
+    addPlayerStatus.className = "text-sm text-red-600";
+    return;
+  }
   const numberNum = numberVal ? Number(numberVal) : null;
 
   // เบอร์/ลำดับห้ามซ้ำกันภายในรุ่นอายุเดียวกัน (ต่างรุ่นอายุใช้เบอร์เดียวกันได้ปกติ) — เช็คจากรายชื่อนักกีฬา
@@ -4864,6 +4930,7 @@ addPlayerForm.addEventListener("submit", async (e) => {
     position: position || null,
     sex: sex || null,
     parentHeights: parentHeights.value,
+    ...extras.value,
     team: myTeam
   };
 

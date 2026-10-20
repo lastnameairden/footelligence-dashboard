@@ -1412,7 +1412,53 @@
                 <option value="แจ้งเอง" selected>แจ้งเอง (ผู้ปกครองบอก)</option>
               </select>
             </div>
-          </div>          <div class="sm:col-span-2">
+          </div>
+          <div class="sm:col-span-2">
+            <label class="field-label">ตำแหน่งรอง (ถ้ามี — เลือกได้หลายตำแหน่ง)</label>
+            <div id="player-secondary-positions"></div>
+          </div>
+          <div class="sm:col-span-2">
+            <label class="field-label">เท้าถนัด (ถ้ามี — กดซ้ำเพื่อยกเลิก)</label>
+            <div id="player-foot"></div>
+          </div>
+          <div class="sm:col-span-2">
+            <h3 class="field-section-title">สุขภาพ</h3>
+            <label class="field-label" for="player-health">โรคประจำตัว / แพ้ยา-อาหาร (ถ้ามี)</label>
+            <textarea id="player-health" rows="2" maxlength="300" class="field-input" placeholder="เช่น หอบหืด, แพ้ยาเพนิซิลลิน, แพ้อาหารทะเล"></textarea>
+            <p class="text-xs text-slate-400 mt-1">แสดงเป็นแถบเตือนในหน้านักกีฬาเมื่อมีข้อมูล · ไม่แสดงในสมุดพกและเอกสารพิมพ์</p>
+          </div>
+          <div class="sm:col-span-2">
+            <h3 class="field-section-title">ผู้ปกครอง / ติดต่อฉุกเฉิน</h3>
+            <p class="text-xs text-slate-400 mb-2">กรอกชื่อและเบอร์โทรคู่กัน · ไม่แสดงในสมุดพกและเอกสารพิมพ์</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="field-label" for="player-guardian-name">ผู้ปกครองหลัก — ชื่อ</label>
+                <input id="player-guardian-name" type="text" class="field-input" />
+              </div>
+              <div>
+                <label class="field-label" for="player-guardian-relation">ความสัมพันธ์</label>
+                <select id="player-guardian-relation" class="field-input">
+                  <option value="">-- ไม่ระบุ --</option>
+                  <option value="พ่อ">พ่อ</option>
+                  <option value="แม่">แม่</option>
+                  <option value="ผู้ปกครองอื่น">ผู้ปกครองอื่น</option>
+                </select>
+              </div>
+              <div class="sm:col-span-2">
+                <label class="field-label" for="player-guardian-phone">เบอร์โทร</label>
+                <input id="player-guardian-phone" type="tel" inputmode="tel" class="field-input" placeholder="08x-xxx-xxxx" />
+              </div>
+              <div>
+                <label class="field-label" for="player-backup-name">ผู้ติดต่อสำรอง — ชื่อ (ถ้ามี)</label>
+                <input id="player-backup-name" type="text" class="field-input" />
+              </div>
+              <div>
+                <label class="field-label" for="player-backup-phone">เบอร์โทร</label>
+                <input id="player-backup-phone" type="tel" inputmode="tel" class="field-input" />
+              </div>
+            </div>
+          </div>
+          <div class="sm:col-span-2">
             <label class="field-label">รูปนักกีฬา (ถ้ามี ไม่เกิน 5MB)</label>
             <input id="player-photo-input" type="file" accept="image/*" class="field-input" />
             <p id="player-photo-status" class="text-sm text-slate-500 mt-1"></p>
