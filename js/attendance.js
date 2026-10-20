@@ -75,7 +75,7 @@ import { buildAttendanceGrid, gridHtml, legendHtml } from "./attendance-grid.js"
 import { initMatchData, showMatchForm, showMatchHistory } from "./match-data-ui.js";
 import { addMonthsToMonth, thaiMonthLabel } from "./coach-meetings.js";
 import { filterPlans, filterReportsByMonths, groupByMonth, monthOptionsOf, monthsBack, planAgeGroupsOf, planDataHtml, reportHistoryHtml } from "./plan-report-data.js";
-import { COACH_MENU, activeChildFor, childMatchesScreen, menuItem, menuKeyForScreen } from "./coach-menu.js";
+import { COACH_MENU, childMatchesScreen, menuItem, menuKeyForScreen } from "./coach-menu.js";
 import { initPhysical, showAthleteResults, showInstruction, showTestingForm } from "./physical-ui.js";
 import { initProfile, showProfile } from "./coach-profile-ui.js";
 import { clearEmbedded, showEmbedded } from "./embed-frame.js";
@@ -203,10 +203,6 @@ const playerDetailBody = document.getElementById("player-detail-body");
 const playerFormBackBtn = document.getElementById("player-form-back-btn");
 const coachTabbar = document.getElementById("coach-tabbar");
 const coachTabbarInner = document.getElementById("coach-tabbar-inner");
-const coachSubtabs = document.getElementById("coach-subtabs");
-const coachSubtabsInner = document.getElementById("coach-subtabs-inner");
-const coachSubtabs2 = document.getElementById("coach-subtabs2");
-const coachSubtabs2Inner = document.getElementById("coach-subtabs2-inner");
 const evaluationMenuSection = document.getElementById("evaluation-menu-section");
 const physicalTestMenuSection = document.getElementById("physical-test-menu-section");
 const physicalInstructionSection = document.getElementById("physical-instruction-section");
@@ -1213,10 +1209,6 @@ function renderCoachNav() {
   coachBar.classList.toggle("coach-bar-off", visible);
   if (!visible) {
     coachTabbarInner.innerHTML = "";
-    coachSubtabsInner.innerHTML = "";
-    coachSubtabs.classList.remove("is-on");
-    coachSubtabs2Inner.innerHTML = "";
-    coachSubtabs2.classList.remove("is-on");
     return;
   }
   const screen = currentScreenKey();
@@ -1226,37 +1218,13 @@ function renderCoachNav() {
     return `<button type="button" class="${cls}" data-menu="${menu.key}" title="${escapeHtml(menu.hint)}">${icon(menu.icon)} ${menu.label}${menuBadgeHtml(menu.key)}</button>`;
   });
   coachTabbarInner.innerHTML = tabs.join("");
-
-  const subtabHtml = (child) => {
-    if (child.disabled) return `<button type="button" class="coach-subtab coach-subtab-off" data-sub-off title="เร็วๆ นี้">${escapeHtml(child.label)}</button>`;
-    const cls = childMatchesScreen(child, screen) ? "coach-subtab active" : "coach-subtab";
-    return `<button type="button" class="${cls}" data-sub-screen="${child.screen ?? ""}">${escapeHtml(child.label)}</button>`;
-  };
-  const menu = active ? menuItem(active) : null;
-  const children = menu ? coachChildren(menu) : [];
-  coachSubtabsInner.innerHTML = children.map(subtabHtml).join("");
-  coachSubtabs.classList.toggle("is-on", children.length > 0);
-
-  // แถบแถวที่สอง: เมนูย่อยของเมนูย่อยที่เปิดอยู่ (เช่น Physical Test)
-  const grandChildren = activeChildFor(menu, screen)?.children ?? [];
-  coachSubtabs2Inner.innerHTML = grandChildren.map(subtabHtml).join("");
-  coachSubtabs2.classList.toggle("is-on", grandChildren.length > 0);
 }
 
 coachTabbarInner.addEventListener("click", (e) => {
   const btn = e.target.closest("[data-menu]");
   if (!btn) return;
   openCoachMenuItem(btn.dataset.menu);
-
 });
-
-for (const row of [coachSubtabsInner, coachSubtabs2Inner]) {
-  row.addEventListener("click", (e) => {
-    const btn = e.target.closest("button");
-    if (!btn || btn.hasAttribute("data-sub-off")) return;
-    COACH_SCREEN_OPENERS[btn.dataset.subScreen]?.();
-  });
-}
 
 // ---------- Match Data (เมนู 6) ----------
 let pendingMatchDayAgeGroup = null; // รุ่นที่ให้ Match Day เปิดก่อน (ตอนกด "แก้ไขใน Match Day" จากรายงานผล)

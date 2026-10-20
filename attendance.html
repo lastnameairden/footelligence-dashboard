@@ -41,8 +41,6 @@
     </div>
     <!-- เมนูหลักของโค้ช 9 รายการ แบบแถบแนวนอน (แสดงเฉพาะหน้าจอกว้าง) + แถบเมนูย่อยของเมนูที่มีหน้าย่อย — สร้างโดย attendance.js -->
     <nav id="coach-tabbar" class="coach-tabbar" aria-label="เมนูหลักของโค้ช"><div id="coach-tabbar-inner" class="coach-tabbar-inner"></div></nav>
-    <div id="coach-subtabs" class="coach-subtabs"><div id="coach-subtabs-inner" class="coach-subtabs-inner"></div></div>
-    <div id="coach-subtabs2" class="coach-subtabs coach-subtabs-2"><div id="coach-subtabs2-inner" class="coach-subtabs-inner"></div></div>
   </header>
 
   <!-- เมนูนำทางแบบเลื่อนออกจากด้านซ้าย (เปิดด้วยปุ่ม ☰) -->
@@ -1055,7 +1053,8 @@
     </section>
 
     <!-- Footelligence Test (MASC): ฝังหน้าประเมินเดิม (masc.html) ไว้ในกรอบเมนู — ไม่พาออกไปหน้าแยก -->
-    <section id="footelligence-test-section" class="hidden">
+    <section id="footelligence-test-section" class="hidden space-y-2">
+      <button data-eval-back type="button" class="btn btn-ghost px-0">← กลับ Evaluation</button>
       <iframe id="footelligence-test-frame" class="embed-frame" title="Footelligence Test" src="about:blank"></iframe>
     </section>
     <section id="physical-test-menu-section" class="hidden space-y-6">
