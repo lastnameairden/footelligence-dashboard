@@ -102,11 +102,11 @@ export function activeChildFor(menu, screen) {
   return (menu?.children || []).find((c) => c.children && childMatchesScreen(c, screen)) ?? null;
 }
 
-// เมนูที่หน้าจอนี้อยู่ภายใต้ (ไม่มี = null)
-export function menuKeyForScreen(screen) {
-  return COACH_MENU.find((m) => m.screens.includes(screen))?.key ?? null;
+// เมนูที่หน้าจอนี้อยู่ภายใต้ (ไม่มี = null) — menu ค่าเริ่มต้นคือเมนูโค้ช, ทีมหลังบ้านส่งเมนูของตัวเองมา (staff-menu.js)
+export function menuKeyForScreen(screen, menu = COACH_MENU) {
+  return menu.find((m) => m.screens.includes(screen))?.key ?? null;
 }
 
-export function menuItem(key) {
-  return COACH_MENU.find((m) => m.key === key) ?? null;
+export function menuItem(key, menu = COACH_MENU) {
+  return menu.find((m) => m.key === key) ?? null;
 }

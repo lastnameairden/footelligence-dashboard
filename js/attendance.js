@@ -76,6 +76,8 @@ import { initMatchData, showMatchForm, showMatchHistory } from "./match-data-ui.
 import { addMonthsToMonth, thaiMonthLabel } from "./coach-meetings.js";
 import { filterPlans, filterReportsByMonths, groupByMonth, monthOptionsOf, monthsBack, planAgeGroupsOf, planDataHtml, reportHistoryHtml } from "./plan-report-data.js";
 import { COACH_MENU, childMatchesScreen, menuItem, menuKeyForScreen } from "./coach-menu.js";
+import { STAFF_UNFILTERED_SCREENS, staffMenuFor } from "./staff-menu.js";
+import { ageGroupsForFilter, matchesAgeFilter, validFilter } from "./age-filter.js";
 import { initPhysical, showAthleteResults, showInstruction, showTestingForm } from "./physical-ui.js";
 import { initProfile, showProfile } from "./coach-profile-ui.js";
 import { initPlayerDetailProgress, showPlayerProgress } from "./player-detail-ui.js";
@@ -211,6 +213,13 @@ const physicalInstructionSection = document.getElementById("physical-instruction
 const physicalFormSection = document.getElementById("physical-form-section");
 const athleteResultsSection = document.getElementById("athlete-results-section");
 const profileSection = document.getElementById("profile-section");
+const staffHomeSection = document.getElementById("staff-home-section");
+const staffHomeBody = document.getElementById("staff-home-body");
+const staffCoachesSection = document.getElementById("staff-coaches-section");
+const staffCoachesBody = document.getElementById("staff-coaches-body");
+const staffCoachesSubtitle = document.getElementById("staff-coaches-subtitle");
+const staffFilterNav = document.getElementById("staff-filter");
+const staffFilterInner = document.getElementById("staff-filter-inner");
 const footelligenceTestSection = document.getElementById("footelligence-test-section");
 const footelligenceTestFrame = document.getElementById("footelligence-test-frame");
 const athleteResultsFrame = document.getElementById("athlete-results-frame");
@@ -700,6 +709,8 @@ function hideAllScreens() {
   physicalFormSection.classList.add("hidden");
   athleteResultsSection.classList.add("hidden");
   profileSection.classList.add("hidden");
+  staffHomeSection.classList.add("hidden");
+  staffCoachesSection.classList.add("hidden");
   footelligenceTestSection.classList.add("hidden");
   injuryMenuSection.classList.add("hidden");
   injuryResultsSection.classList.add("hidden");
@@ -1009,6 +1020,22 @@ function goToDashboard() {
   window.location.href = `${window.location.origin}/`;
 }
 
+// เครื่องมือแผงผู้ดูแลที่เปิดจากเมนูหน้าทีมของทีมหลังบ้าน — เปลี่ยนแค่ hash หน้าไม่โหลดใหม่ จึงต้อง reload เองเพื่อล้างสถานะหน้าทีม
+const STAFF_TOOL_LINKS = [
+  ["coaches", "users", "รายชื่อโค้ชในระบบ"],
+  ["approvals", "file-text", "คำขอลงทะเบียนรออนุมัติ"],
+  ["player-audit", "search", "ตรวจสอบข้อมูลนักกีฬาที่ผิดปกติ"],
+  ["progress", "trending-up", "ความคืบหน้าเช็คชื่อรายวัน"],
+  ["matches", "football", "รายงานผลการแข่งขันทั้งหมด"],
+  ["injuries", "heart-pulse", "รายงานอาการบาดเจ็บทั้งหมด"],
+  ["print", "printer", "พิมพ์สรุปผลงานโค้ช"],
+  ["report-card", "book", "สมุดพกนักกีฬา"]
+];
+function goToAdminTool(feature) {
+  window.location.hash = `admin=${feature}`;
+  window.location.reload();
+}
+
 // ผู้ดูแลระบบออกจากโหมด "จัดการทีมแทนโค้ช" กลับไปยังจุดที่พาเข้ามา (ทีละสเต็ป ตาม adminReturnSection —
 // เซ็ตไว้เสมอตอนเข้าโหมดนี้ใน enterTeamManagementMode จึงไม่มีทางเป็น null จริงๆ แต่กันไว้ด้วย fallback)
 // พร้อมล้าง myTeam ไม่ให้เมนูค้างแสดงเครื่องมือของทีมเดิมหลังออกจากโหมดนี้แล้ว
@@ -1057,6 +1084,17 @@ function renderDrawerItemsInner() {
       navDrawerItems.appendChild(drawerItem(icon("bar-chart"), "Dashboard", goToDashboard));
       navDrawerItems.appendChild(drawerDivider());
       navDrawerItems.appendChild(drawerItem(icon("shield"), "กลับแผงควบคุมผู้ดูแลระบบ", exitTeamManagementToAdminPanel));
+    } else if (staffSpace()) {
+      navDrawerItems.appendChild(drawerSectionLabel(`ทีม: ${teamLogoImg(myTeam)}${myTeam}`));
+      appendCoachMenuToDrawer();
+      navDrawerItems.appendChild(drawerDivider());
+      navDrawerItems.appendChild(drawerItem(icon("bar-chart"), "Dashboard ของทีม", () => (window.location.href = `${window.location.origin}/?team=${encodeURIComponent(myTeam)}`)));
+      // เครื่องมือของแผงผู้ดูแลที่ทีมหลังบ้านมีสิทธิ์ (อนุมัติโค้ช พิมพ์สรุป สมุดพก ฯลฯ) — ไม่อยู่ในเมนู 9 รายการ แต่ยังเข้าถึงได้จากที่นี่
+      for (const [feature, iconName, label] of STAFF_TOOL_LINKS) {
+        if (adminCan(feature)) navDrawerItems.appendChild(drawerItem(icon(iconName), label, () => goToAdminTool(feature)));
+      }
+      navDrawerItems.appendChild(drawerDivider());
+      navDrawerItems.appendChild(drawerItem(icon("refresh"), "เปลี่ยนทีม", goToDashboard));
     } else if (myTeam) {
       navDrawerItems.appendChild(drawerSectionLabel(`จัดการทีม: ${teamLogoImg(myTeam)}${myTeam}`));
       appendCoachMenuToDrawer();
@@ -1138,7 +1176,10 @@ const COACH_SCREEN_OPENERS = {
   "meeting-menu": () => openMeetingMenu(),
   "meeting-next": () => openMeetingNext(),
   "meeting-tasks": () => openMeetingTasksSection(),
-  "meeting-history": () => openMeetingHistory()
+  "meeting-history": () => openMeetingHistory(),
+  "staff-home": () => openStaffHome(),
+  "staff-coaches": () => openStaffCoaches(),
+  "staff-meeting": () => openAdminMeetingsSection()
 };
 
 // Footelligence Test (MASC) แสดงในกรอบเมนูเลย (ฝัง masc.html) — ผู้ดูแลระบบที่สวมบทบาทโค้ชแนบรุ่นอายุ/ตำแหน่งของโค้ชคนนั้นไปด้วย เพื่อให้เห็นรายชื่อตรงกับที่โค้ชเห็นจริง
@@ -1154,13 +1195,19 @@ function openReportCardFrame({ team, ageGroup, start, end }) {
   showEmbedded(athleteResultsFrame, "report-card.html", { team, ageGroup, start, end }, { reload: true });
   athleteResultsFrame.scrollIntoView({ behavior: "smooth", block: "start" });
 }
+// เมนูที่ใช้อยู่ตอนนี้: ทีมหลังบ้านในหน้าทีม = เมนู 9 รายการของตัวเอง (staff-menu.js) ที่เหลือ = เมนูโค้ช
+const staffSpace = () => isStaffSession() && !!myTeam && adminViewingAs === "staff";
+const activeMenu = () => (staffSpace() ? staffMenuFor(currentStaffPerms) : COACH_MENU);
+
 // เมนูของโค้ชใช้ตอนมีทีมที่ดูแลอยู่ (โค้ชจริง หรือผู้ดูแลระบบ/ทีมหลังบ้านที่สวมบทบาทโค้ช) — โหมดผู้บริหารทีมไม่ใช้
 function coachNavVisible() {
   return !!myTeam && !(currentIsAdmin && adminViewingAs === "executive");
 }
 
 function currentScreenKey() {
-  return ROUTE_SCREENS.find((s) => !s.el.classList.contains("hidden"))?.key ?? null;
+  const key = ROUTE_SCREENS.find((s) => !s.el.classList.contains("hidden"))?.key ?? null;
+  // หน้านัดประชุมของผู้ดูแล (meetings) คือเมนู Meeting ของหน้าทีมหลังบ้าน
+  return staffSpace() && key === "meetings" ? "staff-meeting" : key;
 }
 
 // เมนูย่อยของเมนูหนึ่ง (ทีมหลังบ้านไม่เห็น MASC เหมือนเดิม)
@@ -1169,7 +1216,7 @@ function coachChildren(menu) {
 }
 
 function openCoachMenuItem(key) {
-  const menu = menuItem(key);
+  const menu = menuItem(key, activeMenu());
   if (menu) COACH_SCREEN_OPENERS[menu.screen]?.();
 }
 
@@ -1180,9 +1227,9 @@ function menuBadgeHtml(key) {
 function appendCoachMenuToDrawer() {
   const wrap = document.createElement("div");
   wrap.className = "coach-drawer-menu";
-  const active = menuKeyForScreen(currentScreenKey());
+  const active = menuKeyForScreen(currentScreenKey(), activeMenu());
   const screen = currentScreenKey();
-  for (const menu of COACH_MENU) {
+  for (const menu of activeMenu()) {
     const btn = drawerItem(icon(menu.icon), `${menu.label}<span class="drawer-hint">${menu.hint}</span>${menuBadgeHtml(menu.key)}`, () => openCoachMenuItem(menu.key));
     if (menu.key === active) btn.classList.add("active");
     wrap.appendChild(btn);
@@ -1205,6 +1252,12 @@ function appendCoachMenuToDrawer() {
 }
 
 function renderCoachNav() {
+  renderCoachTabs();
+  document.body.classList.toggle("staff-space", staffSpace());
+  renderStaffFilter();
+}
+
+function renderCoachTabs() {
   const visible = coachNavVisible();
   coachTabbar.classList.toggle("is-on", visible);
   // การ์ดชื่อโค้ช (coach-bar) ไม่แสดงในหน้าของเมนูโค้ช — ข้อมูลอยู่ที่เมนู Profile (ยังอยู่ใน DOM เพราะลิ้นชักดึงชื่อ/ป้ายบทบาทจากที่นี่)
@@ -1214,8 +1267,8 @@ function renderCoachNav() {
     return;
   }
   const screen = currentScreenKey();
-  const active = menuKeyForScreen(screen);
-  const tabs = COACH_MENU.map((menu) => {
+  const active = menuKeyForScreen(screen, activeMenu());
+  const tabs = activeMenu().map((menu) => {
     const cls = menu.key === active ? "coach-tab active" : "coach-tab";
     return `<button type="button" class="${cls}" data-menu="${menu.key}" title="${escapeHtml(menu.hint)}">${icon(menu.icon)} ${menu.label}${menuBadgeHtml(menu.key)}</button>`;
   });
@@ -3589,6 +3642,112 @@ async function enterTeamManagementMode(team, returnSection, coachRecordOverride,
   landing();
 }
 
+// ---------- ทีมหลังบ้าน: หน้าทีม (เมนู 9 รายการ ดูอย่างเดียว) ----------
+// เข้าจากหน้าเลือกทีม (#admin=team&team=<ทีม>&as=staff) — ใช้โมดูลของโค้ชทั้งหมดต่อ โดยตั้ง myAgeGroups ตามตัวกรองรุ่นอายุ
+// ("" = รวมทุกรุ่น = [] เหมือนโหมดจัดการทีมแบบกว้างของผู้ดูแลระบบ) เปลี่ยนตัวกรองแล้วเปิดหน้าจอเดิมใหม่ให้โหลดข้อมูลตามรุ่นที่เลือก
+// การแก้ข้อมูลแทนโค้ชยังทำได้ในโหมดจัดการทีมเดิม (สิทธิ์ manageTeams) หน้าทีมนี้ซ่อนปุ่มแก้/ลบ/เพิ่มของโค้ชทั้งหมด (body.staff-space)
+let staffAgeFilter = "";
+let staffTeamAgeGroups = [];
+const staffFilterKey = (team) => `staffAgeFilter:${team}`;
+
+function readStoredStaffFilter(team) {
+  try {
+    return sessionStorage.getItem(staffFilterKey(team)) || "";
+  } catch {
+    return "";
+  }
+}
+
+function storeStaffFilter(team, value) {
+  try {
+    sessionStorage.setItem(staffFilterKey(team), value);
+  } catch {
+    // เก็บค่าตัวกรองไม่ได้ (โหมดส่วนตัว/บล็อกคุกกี้) ก็ใช้งานต่อได้ แค่ไม่จำค่าข้ามการรีเฟรช
+  }
+}
+
+async function enterStaffTeamSpace(team, landing = () => openStaffHome()) {
+  myTeam = team;
+  adminViewingAs = "staff";
+  adminViewingCoachId = null;
+  myAgeGroups = [];
+  myCoachPosition = null;
+  currentCoachRecord = null;
+  myCoachName = adminOwnName;
+  coachTeamEl.innerHTML = `${teamLogoImg(team)}${team}`;
+  coachAgeGroupsWrap.classList.add("hidden");
+  if (!dateInput.value) dateInput.value = todayBangkok();
+  // โหลดทุกรุ่นก่อนเพื่อรู้ว่าทีมนี้มีรุ่นอายุอะไรบ้าง แล้วค่อยโหลดซ้ำตามตัวกรองที่จำไว้
+  await loadPlayers();
+  staffTeamAgeGroups = ageGroupsOf(players);
+  staffAgeFilter = validFilter(readStoredStaffFilter(team), staffTeamAgeGroups);
+  if (staffAgeFilter) {
+    myAgeGroups = ageGroupsForFilter(staffAgeFilter);
+    await loadPlayers();
+  }
+  adminReturnSection = null;
+  renderDrawerItems();
+  landing();
+}
+
+function renderStaffFilter() {
+  const show = staffSpace() && staffTeamAgeGroups.length > 0 && !STAFF_UNFILTERED_SCREENS.includes(currentScreenKey());
+  staffFilterNav.classList.toggle("hidden", !show);
+  if (!show) {
+    staffFilterInner.innerHTML = "";
+    return;
+  }
+  const chip = (value, label) => {
+    const cls = value === staffAgeFilter ? "staff-filter-chip active" : "staff-filter-chip";
+    return `<button type="button" class="${cls}" data-age="${escapeHtml(value)}" aria-pressed="${value === staffAgeFilter}">${escapeHtml(label)}</button>`;
+  };
+  staffFilterInner.innerHTML = `<span class="staff-filter-label">รุ่นอายุ</span>${chip("", "รวมทุกรุ่น")}${staffTeamAgeGroups.map((g) => chip(g, g)).join("")}`;
+}
+
+async function setStaffAgeFilter(value) {
+  const next = validFilter(value, staffTeamAgeGroups);
+  if (next === staffAgeFilter) return;
+  staffAgeFilter = next;
+  storeStaffFilter(myTeam, next);
+  myAgeGroups = ageGroupsForFilter(next);
+  await loadPlayers();
+  // เปิดหน้าจอเดิมซ้ำให้โหลดข้อมูลตามรุ่นที่เลือก (หน้าที่ไม่มีใน openCoachScreen เช่น รายละเอียดนักกีฬา กลับไปแกลเลอรี)
+  openCoachScreen(currentScreenKey() || "staff-home", dateInput.value);
+}
+
+staffFilterInner.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-age]");
+  if (btn) setStaffAgeFilter(btn.dataset.age);
+});
+
+// Home ของหน้าทีม — ประกาศจากผู้ดูแลระบบและงาน Meeting ที่รอตรวจ (เนื้อหาเติมในขั้นถัดไป)
+function openStaffHome() {
+  hideAllScreens();
+  staffHomeSection.classList.remove("hidden");
+  staffHomeBody.innerHTML = '<div class="card card-pad text-sm text-slate-500">ยังไม่มีประกาศจากผู้ดูแลระบบ</div>';
+}
+
+// Coach Data — โค้ชของทีม (ใช้ตารางสรุปการทำงานโค้ชเดือนนี้ชุดเดียวกับหน้าผู้บริหาร) กรองตามรุ่นอายุที่โค้ชรับผิดชอบ
+async function openStaffCoaches() {
+  hideAllScreens();
+  staffCoachesSection.classList.remove("hidden");
+  staffCoachesSubtitle.textContent = `${myTeam} · ${staffAgeFilter ? `รุ่น ${staffAgeFilter}` : "ทุกรุ่น"} · ดูอย่างเดียว`;
+  staffCoachesBody.innerHTML = '<p class="text-sm text-slate-400">กำลังโหลด...</p>';
+  const team = myTeam;
+  try {
+    const rows = (await computeCoachMonthlySummaryRows(team)).filter((r) => matchesAgeFilter(r.ageGroups, staffAgeFilter));
+    if (team !== myTeam) return;
+    if (rows.length === 0 && staffAgeFilter) {
+      staffCoachesBody.innerHTML = `<p class="text-sm text-slate-400">ไม่มีโค้ชที่ดูแลรุ่น ${escapeHtml(staffAgeFilter)} ในทีมนี้</p>`;
+      return;
+    }
+    renderCoachActivitySummaryTable(staffCoachesBody, rows);
+  } catch (err) {
+    console.error(err);
+    staffCoachesBody.innerHTML = `<p class="text-sm text-red-600">โหลดข้อมูลโค้ชไม่สำเร็จ: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
 // ผู้ดูแลระบบสวมบทบาทเป็น "ผู้บริหารทีม" (ดูอย่างเดียว) แทนที่จะเป็นโค้ชเต็มรูปแบบ — ใช้ตรวจสอบว่าหน้าจอ
 // ที่ผู้บริหารทีมจริงเห็นถูกต้องหรือไม่ โดยไม่ต้องขอให้ผู้บริหารทีมจริงล็อกอินทดสอบให้
 async function enterExecutiveViewMode(team, returnSection, execRecordOverride) {
@@ -4212,6 +4371,8 @@ const ROUTE_SCREENS = [
   { el: physicalFormSection, key: "physical-form", kind: "coach" },
   { el: athleteResultsSection, key: "athlete-results", kind: "coach" },
   { el: profileSection, key: "profile", kind: "coach" },
+  { el: staffHomeSection, key: "staff-home", kind: "coach" },
+  { el: staffCoachesSection, key: "staff-coaches", kind: "coach" },
   { el: footelligenceTestSection, key: "footelligence-test", kind: "coach" },
   { el: injuryMenuSection, key: "injury-menu", kind: "coach" },
   { el: injuryResultsSection, key: "injury-results", kind: "coach" },
@@ -4246,13 +4407,15 @@ function currentRouteFromScreen() {
     const route = {
       admin: "team",
       team: myTeam,
-      as: adminViewingAs === "executive" ? "executive" : "coach",
+      as: adminViewingAs === "executive" ? "executive" : adminViewingAs === "staff" ? "staff" : "coach",
       coach: adminViewingCoachId || undefined,
       ret: adminReturnSection === adminCoachesSection ? "coaches" : "manage-team"
     };
     if (active.kind === "coach") {
       route.screen = active.key;
       route.date = routeDateForScreen(active.key);
+    } else if (staffSpace() && active.key === "meetings") {
+      route.screen = "staff-meeting";
     }
     return route;
   }
@@ -4389,6 +4552,15 @@ function openCoachScreen(screen, date) {
     case "meeting-tasks":
       openMeetingTasksSection();
       break;
+    case "staff-home":
+      openStaffHome();
+      break;
+    case "staff-coaches":
+      openStaffCoaches();
+      break;
+    case "staff-meeting":
+      openAdminMeetingsSection();
+      break;
     default:
       showDaily();
   }
@@ -4398,6 +4570,11 @@ function openCoachScreen(screen, date) {
 // ใช้ไม่ได้ (ทีมไม่มีจริง) ให้ผู้เรียก fallback ไปทางเดิม
 async function restoreAdminTeamContext(route) {
   if (!TEAMS.includes(route.team)) return false;
+  if (route.as === "staff") {
+    if (!isStaffSession() || !staffCan(currentStaffPerms, "view")) return false;
+    await enterStaffTeamSpace(route.team, () => openCoachScreen(route.screen || "staff-home", route.date));
+    return true;
+  }
   const wantedRole = route.as === "executive" ? "executive" : "coach";
   let record = null;
   if (route.coach) {
@@ -4496,7 +4673,8 @@ onAuthStateChanged(auth, async (user) => {
         "athlete-windows": openAdminAthleteWindowsSection
       };
       const route = parseRouteHash(window.location.hash);
-      if (route.admin === "team" && adminCan("team") && (await restoreAdminTeamContext(route))) {
+      const mayEnterTeam = adminCan("team") || (route.as === "staff" && isStaffRole && staffCan(currentStaffPerms, "view"));
+      if (route.admin === "team" && mayEnterTeam && (await restoreAdminTeamContext(route))) {
         enableRouteSync();
         return;
       }

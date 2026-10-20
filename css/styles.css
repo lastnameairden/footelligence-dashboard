@@ -727,3 +727,13 @@ html.embedded main { padding-top: 0.25rem; padding-bottom: 1rem; }
 .player-phone { color: var(--accent); text-decoration: none; }
 .player-phone:hover { text-decoration: underline; }
 .field-section-title { margin: 4px 0 8px; padding-top: 12px; border-top: 1px solid var(--border, #e2e8f0); font-size: 0.875rem; font-weight: 600; color: #1e293b; }
+/* ทีมหลังบ้าน: ตัวกรองรุ่นอายุใต้แถบเมนูของหน้าทีม + ซ่อนปุ่มของโค้ชที่ทีมหลังบ้านไม่ต้องใช้ (หน้าทีมดูอย่างเดียว) */
+.staff-filter { background: var(--surface); border-top: 1px solid var(--border); }
+.staff-filter-inner { max-width: 64rem; margin: 0 auto; padding: 0.5rem 1.5rem; display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+.staff-filter-label { font-size: 0.8125rem; color: var(--text-2); margin-right: 0.25rem; }
+.staff-filter-chip { font-size: 0.8125rem; padding: 0.25rem 0.75rem; border-radius: 999px; border: 1px solid var(--border); background: none; color: var(--text-2); cursor: pointer; }
+.staff-filter-chip:hover { background: var(--surface-2); }
+.staff-filter-chip.active { background: var(--accent-tint); color: var(--accent); border-color: var(--accent); font-weight: 600; }
+.staff-filter-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 767px) { .staff-filter-inner { padding-left: 1rem; padding-right: 1rem; } }
+.staff-space [data-staff-hide] { display: none !important; }

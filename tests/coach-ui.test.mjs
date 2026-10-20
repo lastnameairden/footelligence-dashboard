@@ -56,7 +56,8 @@ test("coach menu only points at screens that exist, and every coach screen belon
     assert.ok(m.screens.includes(m.screen));
     for (const c of m.children || []) if (c.screen) assert.ok(m.screens.includes(c.screen), `${m.key} child ${c.screen}`);
   }
-  for (const screen of COACH_SCREEN_KEYS) assert.notEqual(menuKeyForScreen(screen), null, `screen ${screen} has no menu`);
+  // staff-* คือหน้าของหน้าทีมสำหรับทีมหลังบ้าน (เมนูของตัวเองใน staff-menu.js) ไม่ใช่หน้าโค้ช
+  for (const screen of COACH_SCREEN_KEYS.filter((k) => !k.startsWith("staff-"))) assert.notEqual(menuKeyForScreen(screen), null, `screen ${screen} has no menu`);
   assert.equal(menuKeyForScreen("report"), "training-plan");
   assert.equal(menuKeyForScreen("player-detail"), "player-data");
   assert.equal(menuKeyForScreen("nope"), null);

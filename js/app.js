@@ -185,7 +185,9 @@ function buildTeamPickerBackground() {
 
 function teamPickCardHtml(team) {
   const color = TEAM_COLORS[team] || "#0E6B52";
-  return `<a class="team-pick-card" href="/?team=${encodeURIComponent(team)}" style="--team-color:${color}">
+  // ทีมหลังบ้านเข้าหน้าทีมของตัวเอง (เมนู 9 รายการ) ส่วนแอดมินหลักไปหน้า Dashboard ของทีมเหมือนเดิม
+  const href = currentViewerRole === "staff" ? `./attendance.html#admin=team&team=${encodeURIComponent(team)}&as=staff` : `/?team=${encodeURIComponent(team)}`;
+  return `<a class="team-pick-card" href="${href}" style="--team-color:${color}">
     ${teamLogoImg(team, "team-pick-logo")}
     <span class="team-pick-name">${escapeHtml(team)}</span>
     <span class="team-pick-meta" data-team-meta="${escapeHtml(team)}"></span>

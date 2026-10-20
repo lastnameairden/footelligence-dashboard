@@ -41,6 +41,8 @@
     </div>
     <!-- เมนูหลักของโค้ช 9 รายการ แบบแถบแนวนอน (แสดงเฉพาะหน้าจอกว้าง) + แถบเมนูย่อยของเมนูที่มีหน้าย่อย — สร้างโดย attendance.js -->
     <nav id="coach-tabbar" class="coach-tabbar" aria-label="เมนูหลักของโค้ช"><div id="coach-tabbar-inner" class="coach-tabbar-inner"></div></nav>
+    <!-- ทีมหลังบ้าน: ตัวกรองรุ่นอายุ (รวมทุกรุ่น / ทีละรุ่น) ใช้กับทุกเมนูของหน้าทีม — สร้างโดย attendance.js -->
+    <nav id="staff-filter" class="staff-filter hidden" aria-label="กรองตามรุ่นอายุ"><div id="staff-filter-inner" class="staff-filter-inner"></div></nav>
   </header>
 
   <!-- เมนูนำทางแบบเลื่อนออกจากด้านซ้าย (เปิดด้วยปุ่ม ☰) -->
@@ -276,6 +278,30 @@
         <!-- แบ่งเป็นการ์ดแยกตามรุ่นอายุ (สร้างด้วย JS ต่อรุ่น เพราะจำนวนรุ่นอายุของแต่ละทีมไม่เท่ากัน) -->
         <div id="executive-players-groups" class="space-y-6"></div>
       </div>
+    </section>
+
+    <!-- ทีมหลังบ้าน: Home ของหน้าทีม (ประกาศจากผู้ดูแลระบบ + งาน Meeting ที่รอตรวจ) — เติมโดย attendance.js -->
+    <section id="staff-home-section" class="hidden space-y-6">
+      <div class="page-heading">
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M4 11 12 4l8 7v8a1 1 0 0 1-1 1h-4v-5H9v5H5a1 1 0 0 1-1-1z"/></svg></div>
+        <div>
+          <h2>Home</h2>
+          <p>แจ้งเตือนจากผู้ดูแลระบบและงานที่รอตรวจ</p>
+        </div>
+      </div>
+      <div id="staff-home-body" class="space-y-4"></div>
+    </section>
+
+    <!-- ทีมหลังบ้าน: Coach Data — โค้ชของทีมที่เลือก (ดูอย่างเดียว) กรองตามรุ่นอายุที่โค้ชรับผิดชอบ -->
+    <section id="staff-coaches-section" class="hidden space-y-6">
+      <div class="page-heading">
+        <div class="icon-badge icon-badge-lg"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><circle cx="9" cy="8" r="3.2"/><path d="M3 19c0-3.6 2.7-6 6-6s6 2.4 6 6"/><path d="M16 5.5a3 3 0 0 1 0 5.8M18 14c1.8.6 3 2.3 3 5"/></svg></div>
+        <div>
+          <h2>Coach Data</h2>
+          <p id="staff-coaches-subtitle">โค้ชของทีม · ดูอย่างเดียว</p>
+        </div>
+      </div>
+      <div id="staff-coaches-body"></div>
     </section>
 
     <!-- แถบโปรไฟล์ผู้ใช้งาน (แสดงหลังล็อกอินสำเร็จ ทุกหน้าจอย่อย) -->
@@ -989,7 +1015,7 @@
         </div>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <button type="button" data-injury-nav="injury" class="card card-pad match-data-card"><span class="match-data-card-title">Recording</span><span class="match-data-card-text">บันทึกอาการบาดเจ็บ ความคืบหน้าการรักษา และแก้ไขรายการที่บันทึกไว้</span></button>
+        <button type="button" data-injury-nav="injury" data-staff-hide class="card card-pad match-data-card"><span class="match-data-card-title">Recording</span><span class="match-data-card-text">บันทึกอาการบาดเจ็บ ความคืบหน้าการรักษา และแก้ไขรายการที่บันทึกไว้</span></button>
         <button type="button" data-injury-nav="injury-results" class="card card-pad match-data-card"><span class="match-data-card-title">Results</span><span class="match-data-card-text">สรุปผลละเอียด กราฟ และรายการบาดเจ็บของรุ่นที่ดูแล</span></button>
       </div>
     </section>
@@ -1046,7 +1072,7 @@
         </div>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <button type="button" data-eval-nav="footelligence-test" class="card card-pad match-data-card"><span class="match-data-card-title">Footelligence Test</span><span class="match-data-card-text">ประเมินนักกีฬาตามเกณฑ์ MASC (Motricity · Availability · Smart · Commitment)</span></button>
+        <button type="button" data-eval-nav="footelligence-test" data-staff-hide class="card card-pad match-data-card"><span class="match-data-card-title">Footelligence Test</span><span class="match-data-card-text">ประเมินนักกีฬาตามเกณฑ์ MASC (Motricity · Availability · Smart · Commitment)</span></button>
         <button type="button" data-eval-nav="physical-test" class="card card-pad match-data-card"><span class="match-data-card-title">Physical Test</span><span class="match-data-card-text">ทดสอบสมรรถภาพทางกาย: วิธีทดสอบ แบบฟอร์มพิมพ์ และลงข้อมูลหลังทดสอบ</span></button>
         <button type="button" data-eval-nav="athlete-results" class="card card-pad match-data-card"><span class="match-data-card-title">Athlete Results</span><span class="match-data-card-text">สมุดพกนักกีฬา รวมการเติบโตและผลทดสอบสมรรถภาพ</span></button>
       </div>
@@ -1069,7 +1095,7 @@
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <button type="button" data-eval-nav="physical-instruction" class="card card-pad match-data-card"><span class="match-data-card-title">Instruction</span><span class="match-data-card-text">ชื่อการทดสอบ วิธีทดสอบ อุปกรณ์ รูป และวิดีโอ</span></button>
         <button type="button" data-eval-nav="physical-form" class="card card-pad match-data-card"><span class="match-data-card-title">Testing Form</span><span class="match-data-card-text">แบบฟอร์มพิมพ์ A4 ไว้จดผลขณะทดสอบ</span></button>
-        <button type="button" data-eval-nav="fitness" class="card card-pad match-data-card"><span class="match-data-card-title">Data Entry</span><span class="match-data-card-text">ลงข้อมูลผลทดสอบหลังทดสอบเสร็จ</span></button>
+        <button type="button" data-eval-nav="fitness" data-staff-hide class="card card-pad match-data-card"><span class="match-data-card-title">Data Entry</span><span class="match-data-card-text">ลงข้อมูลผลทดสอบหลังทดสอบเสร็จ</span></button>
       </div>
     </section>
 
@@ -1142,9 +1168,9 @@
         </div>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <button type="button" data-plan-nav="plan" class="card card-pad match-data-card"><span class="match-data-card-title">Upload Training Plan</span><span class="match-data-card-text">ส่งแผนการฝึกซ้อมรายวัน พร้อมไฟล์แผน (ต้องส่งภายใน 14:00 น.)</span></button>
+        <button type="button" data-plan-nav="plan" data-staff-hide class="card card-pad match-data-card"><span class="match-data-card-title">Upload Training Plan</span><span class="match-data-card-text">ส่งแผนการฝึกซ้อมรายวัน พร้อมไฟล์แผน (ต้องส่งภายใน 14:00 น.)</span></button>
         <button type="button" data-plan-nav="plan-data" class="card card-pad match-data-card"><span class="match-data-card-title">Training Plan Data</span><span class="match-data-card-text">ประวัติการอัปโหลดแผนการฝึกซ้อม แก้ไข/ลบได้</span></button>
-        <button type="button" data-plan-nav="report" class="card card-pad match-data-card"><span class="match-data-card-title">Training Report</span><span class="match-data-card-text">ส่งรายงานการฝึกซ้อมรายวัน (ดูประวัติได้ที่ Training Report Data)</span></button>
+        <button type="button" data-plan-nav="report" data-staff-hide class="card card-pad match-data-card"><span class="match-data-card-title">Training Report</span><span class="match-data-card-text">ส่งรายงานการฝึกซ้อมรายวัน (ดูประวัติได้ที่ Training Report Data)</span></button>
         <button type="button" data-plan-nav="report-data" class="card card-pad match-data-card"><span class="match-data-card-title">Training Report Data</span><span class="match-data-card-text">ประวัติรายงานการฝึกซ้อมย้อนหลังรายเดือน</span></button>
         <button type="button" data-plan-off class="card card-pad match-data-card match-data-card-off"><span class="match-data-card-title">FootelligencePad <span class="badge badge-warning">เร็วๆ นี้</span></span><span class="match-data-card-text">หน้าต่างสำหรับเขียนแผนการฝึกซ้อม</span></button>
         <button type="button" data-plan-off class="card card-pad match-data-card match-data-card-off"><span class="match-data-card-title">Footelligence Logbook <span class="badge badge-warning">เร็วๆ นี้</span></span><span class="match-data-card-text">สมุดบันทึกการฝึกซ้อม</span></button>
