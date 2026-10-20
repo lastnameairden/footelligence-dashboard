@@ -7,6 +7,7 @@ import {
   formFromReport,
   formationError,
   matchDayDocId,
+  MATCH_RATING_MAX,
   newRow,
   normalizeMinute,
   parseFormation,
@@ -90,7 +91,7 @@ test("moving a substitute to replace someone else frees the previous link", () =
 });
 
 test("changing a starter to 'none' clears goals, rating, minute and the substitute link", () => {
-  let rows = [mk("A", "starter", { goals: "2", assists: "1", rating: 4.5, outMinute: "60:00" }), mk("S", "sub", { goals: "1", rating: 3 })];
+  let rows = [mk("A", "starter", { goals: "2", assists: "1", rating: 3.5, outMinute: "60:00" }), mk("S", "sub", { goals: "1", rating: 3 })];
   rows = setReplacement(rows, "A", "S");
   rows = setStatus(rows, "A", "none");
   const a = rows.find((r) => r.id === "A");
@@ -191,9 +192,9 @@ test("validateMatchDay: a substitute taken off before he came on is rejected", (
 });
 
 test("buildMatchDayPayload keeps the old matchReports fields and adds the Match Day ones", () => {
-  let rows = validForm().rows.map((r) => (r.id === "P2" ? { ...r, goals: "2", outMinute: "67:00", rating: 4.5 } : r));
+  let rows = validForm().rows.map((r) => (r.id === "P2" ? { ...r, goals: "2", outMinute: "67:00", rating: 3.5 } : r));
   rows = setReplacement(rows, "P2", "S1");
-  rows = rows.map((r) => (r.id === "S1" ? { ...r, goals: "1", assists: "1", rating: 3.5 } : r));
+  rows = rows.map((r) => (r.id === "S1" ? { ...r, goals: "1", assists: "1", rating: 2.5 } : r));
   rows.push(newRow({ id: "G1", nickname: "ฟิวส์", ageGroup: "U15", position: "CM" }, "U16"));
   rows = setStatus(rows, "G1", "sub");
   const payload = buildMatchDayPayload(validForm({ rows }), "U16");
@@ -205,9 +206,9 @@ test("buildMatchDayPayload keeps the old matchReports fields and adds the Match 
   assert.equal(payload.startingLineupIds.length, 11, "old lineup field = starters only");
   assert.equal(payload.lineupGuestCount, 0, "the guest is only a substitute who never played");
   const p2 = payload.players.find((p) => p.id === "P2");
-  assert.deepEqual([p2.goals, p2.subOutMinute, p2.replacedById, p2.rating, p2.played], [2, "67:00", "S1", 4.5, true]);
+  assert.deepEqual([p2.goals, p2.subOutMinute, p2.replacedById, p2.rating, p2.played], [2, "67:00", "S1", 3.5, true]);
   const s1 = payload.players.find((p) => p.id === "S1");
-  assert.deepEqual([s1.goals, s1.assists, s1.subInMinute, s1.replacesId, s1.played, s1.rating], [1, 1, "67:00", "P2", true, 3.5]);
+  assert.deepEqual([s1.goals, s1.assists, s1.subInMinute, s1.replacesId, s1.played, s1.rating], [1, 1, "67:00", "P2", true, 2.5]);
   const g1 = payload.players.find((p) => p.id === "G1");
   assert.deepEqual([g1.guest, g1.ageGroup, g1.played, g1.rating], [true, "U15", false, null]);
   assert.equal(payload.players.find((p) => p.id === "N1").played, false);
@@ -225,14 +226,25 @@ test("a guest starter shows up in the legacy lineup fields", () => {
 });
 
 test("formFromReport restores what buildMatchDayPayload saved", () => {
-  let rows = validForm().rows.map((r) => (r.id === "P2" ? { ...r, goals: "2", outMinute: "67:00", rating: 4.5 } : r));
+  let rows = validForm().rows.map((r) => (r.id === "P2" ? { ...r, goals: "2", outMinute: "67:00", rating: 3.5 } : r));
   rows = setReplacement(rows, "P2", "S1");
   const form = validForm({ rows });
   const back = formFromReport(buildMatchDayPayload(form, "U16"));
   assert.deepEqual(validateMatchDay(back), validateMatchDay(form));
   const p2 = back.rows.find((r) => r.id === "P2");
-  assert.deepEqual([p2.goals, p2.outMinute, p2.replacedBy, p2.rating], ["2", "67:00", "S1", 4.5]);
+  assert.deepEqual([p2.goals, p2.outMinute, p2.replacedBy, p2.rating], ["2", "67:00", "S1", 3.5]);
   assert.equal(back.format, "11v11");
+});
+
+test("rating scale is 4 stars in half steps", () => {
+  assert.equal(MATCH_RATING_MAX, 4);
+  const rows = validForm().rows;
+  const withRating = (rating) => validateMatchDay(validForm({ rows: rows.map((r) => (r.id === "P2" ? { ...r, rating } : r)) })).errors.join("|");
+  assert.equal(withRating(4), "");
+  assert.equal(withRating(0.5), "");
+  assert.match(withRating(4.5), /ระหว่าง 0\.5-4 ดาว/);
+  assert.match(withRating(5), /ระหว่าง 0\.5-4 ดาว/);
+  assert.match(withRating(2.3), /ครั้งละครึ่งดาว/);
 });
 
 test("matchDayDocId is stable per team + date + age group and safe as a document id", () => {

@@ -10,6 +10,7 @@ import {
   COMPETITION_TYPES,
   FORMATION_PRESETS,
   MATCH_FORMATS,
+  MATCH_RATING_MAX,
   MATCH_RESULTS,
   POSITION_GROUPS,
   PLAYER_STATUSES,
@@ -96,7 +97,7 @@ function textField(label, field, value, { placeholder = "", type = "text", cls =
 
 function starsHtml(row) {
   const value = row.rating || 0;
-  const stars = [1, 2, 3, 4, 5]
+  const stars = Array.from({ length: MATCH_RATING_MAX }, (_, i) => i + 1)
     .map((n) => {
       const fill = value >= n ? 100 : value >= n - 0.5 ? 50 : 0;
       return `<span class="star"><span class="star-bg">★</span><span class="star-fg" style="width:${fill}%">★</span>

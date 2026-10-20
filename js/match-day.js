@@ -33,6 +33,7 @@ export const FORMATION_PRESETS = {
 };
 
 export const MATCH_MAX_MINUTE = 130; // ครอบคลุมต่อเวลา
+export const MATCH_RATING_MAX = 4; // คะแนนผู้เล่น 0.5-4 ดาว ครั้งละครึ่งดาว
 
 // "67:00" → วินาที (ไม่ถูกต้อง = null) รูปแบบ นาที:วินาที นาที 0-130 วินาที 00-59
 export function parseMinute(text) {
@@ -211,6 +212,9 @@ export function validateMatchDay(form) {
       if (parseMinute(r.outMinute) === null) errors.push(`ระบุนาทีที่ "${r.nickname}" ถูกเปลี่ยนออก เป็นรูปแบบ 00:00`);
     } else if (String(r.outMinute ?? "").trim() !== "" && parseMinute(r.outMinute) === null) {
       errors.push(`นาทีที่ "${r.nickname}" ออกจากสนามต้องเป็นรูปแบบ 00:00`);
+    }
+    if (r.rating !== null && r.rating !== undefined && (!(r.rating > 0 && r.rating <= MATCH_RATING_MAX) || (r.rating * 2) % 1 !== 0)) {
+      errors.push(`คะแนนของ "${r.nickname}" ต้องอยู่ระหว่าง 0.5-${MATCH_RATING_MAX} ดาว (ครั้งละครึ่งดาว)`);
     }
     if (played.has(r.id)) {
       const g = asInt(r.goals);
