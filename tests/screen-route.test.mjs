@@ -49,6 +49,7 @@ test("invalid dates and roles are dropped instead of trusted", () => {
   assert.equal(parseRouteHash("#screen=checkin&d=not-a-date").date, null);
   assert.equal(parseRouteHash("#admin=team&team=X&as=superuser").as, null);
   assert.equal(parseRouteHash("#admin=team&team=X&as=staff").as, "staff");
+  assert.equal(parseRouteHash("#admin=team&team=X&as=admin").as, "admin");
   assert.equal(buildRouteHash({ admin: "team", team: "THAWEE SC", as: "staff", screen: "staff-coaches" }), "admin=team&team=THAWEE+SC&as=staff&screen=staff-coaches");
   assert.equal(isValidRouteDate("2026-03-10"), true);
   assert.equal(isValidRouteDate("2026-3-1"), false);
@@ -65,5 +66,5 @@ test("empty or missing hash gives an empty route and an empty hash string", () =
 });
 
 test("coach screen keys are the ones the app can reopen", () => {
-  assert.deepEqual(COACH_SCREEN_KEYS, ["daily", "checkin", "report", "match", "injury", "plan", "players", "fitness", "meeting-tasks", "instruction", "player-detail", "player-form", "attendance-grid", "match-data", "match-form", "match-history", "match-sheet", "training-plan", "plan-data", "report-data", "evaluation", "physical-test", "physical-instruction", "physical-form", "athlete-results", "profile", "injury-menu", "injury-results", "meeting-menu", "meeting-next", "meeting-history", "footelligence-test", "staff-home", "staff-coaches", "staff-meeting"]);
+  assert.deepEqual(COACH_SCREEN_KEYS, ["daily", "checkin", "report", "match", "injury", "plan", "players", "fitness", "meeting-tasks", "instruction", "player-detail", "player-form", "attendance-grid", "match-data", "match-form", "match-history", "match-sheet", "training-plan", "plan-data", "report-data", "evaluation", "physical-test", "physical-instruction", "physical-form", "athlete-results", "profile", "injury-menu", "injury-results", "meeting-menu", "meeting-next", "meeting-history", "footelligence-test", "staff-home", "staff-coaches", "staff-meeting", "staff-attendance-menu"]);
 });

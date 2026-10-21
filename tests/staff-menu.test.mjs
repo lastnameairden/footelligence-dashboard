@@ -4,6 +4,7 @@ import { STAFF_MENU, STAFF_UNFILTERED_SCREENS, staffMenuFor } from "../js/staff-
 import { COACH_MENU, menuItem, menuKeyForScreen } from "../js/coach-menu.js";
 import { ageGroupsForFilter, matchesAgeFilter, validFilter } from "../js/age-filter.js";
 import { COACH_SCREEN_KEYS } from "../js/screen-route.js";
+import { ADMIN_TEAM_MENU } from "../js/admin-menu.js";
 
 test("staff menu: the nine agreed items in order", () => {
   assert.deepEqual(STAFF_MENU.map((m) => m.label), ["Home", "Coach Data", "Player Data", "Attendance", "Training", "Match Data", "Evaluation", "Injury/Sick", "Meeting"]);
@@ -62,11 +63,34 @@ test("age filter: '' means all groups, a group maps to the coach-side myAgeGroup
 });
 
 test("every staff-* route key belongs to the staff menu, and every staff menu screen is a known route key", () => {
-  const staffScreens = STAFF_MENU.flatMap((m) => m.screens);
+  const staffScreens = [...STAFF_MENU, ...ADMIN_TEAM_MENU].flatMap((m) => m.screens);
   for (const key of COACH_SCREEN_KEYS.filter((k) => k.startsWith("staff-"))) assert.ok(staffScreens.includes(key), key);
   for (const m of STAFF_MENU) {
     assert.ok(COACH_SCREEN_KEYS.includes(m.screen), `${m.key} → ${m.screen}`);
     assert.ok(m.screens.includes(m.screen));
     for (const c of m.children || []) for (const s of [c.screen, ...(c.children || []).map((g) => g.screen)]) assert.ok(m.screens.includes(s), `${m.key} child ${s}`);
   }
+});
+test("admin team menu: the nine items, full coach submenus, shared staff pages for Home / Coach Data / Meeting", () => {
+  assert.deepEqual(ADMIN_TEAM_MENU.map((m) => m.label), ["Home", "Coach Data", "Player Data", "Attendance", "Training", "Match Data", "Evaluation", "Injury/Sick", "Meeting"]);
+  assert.equal(new Set(ADMIN_TEAM_MENU.map((m) => m.key)).size, 9);
+  assert.deepEqual(ADMIN_TEAM_MENU.find((m) => m.key === "home").screens, ["staff-home"]);
+  assert.equal(ADMIN_TEAM_MENU.find((m) => m.key === "meeting").screen, "staff-meeting");
+  const training = ADMIN_TEAM_MENU.find((m) => m.key === "training");
+  assert.deepEqual(training.children.slice(0, 4).map((c) => c.screen), ["plan", "plan-data", "report", "report-data"]);
+  assert.deepEqual(ADMIN_TEAM_MENU.find((m) => m.key === "match-data").children.map((c) => c.screen), ["match-form", "match-history"]);
+  const evaluation = ADMIN_TEAM_MENU.find((m) => m.key === "evaluation");
+  assert.deepEqual(evaluation.children.map((c) => c.screen), ["footelligence-test", "physical-test", "athlete-results"]);
+  assert.deepEqual(ADMIN_TEAM_MENU.find((m) => m.key === "injury-sick").children.map((c) => c.screen), ["injury", "injury-results"]);
+  assert.deepEqual(ADMIN_TEAM_MENU.find((m) => m.key === "attendance").children.map((c) => c.screen), ["attendance-grid", "checkin"]);
+  for (const m of ADMIN_TEAM_MENU) {
+    assert.ok(COACH_SCREEN_KEYS.includes(m.screen), `${m.key} → ${m.screen}`);
+    assert.ok(m.screens.includes(m.screen));
+    assert.equal(m.perm, undefined, "the admin menu is not permission-filtered");
+  }
+  // แต่ละหน้าจออยู่ภายใต้เมนูเดียวเท่านั้น
+  const seen = new Map();
+  for (const m of ADMIN_TEAM_MENU) for (const s of m.screens) assert.equal(seen.has(s), false, `${s} listed under ${seen.get(s)} and ${m.key}`), seen.set(s, m.key);
+  assert.equal(menuKeyForScreen("report", ADMIN_TEAM_MENU), "training");
+  assert.equal(menuKeyForScreen("checkin", ADMIN_TEAM_MENU), "attendance");
 });

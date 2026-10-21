@@ -185,8 +185,13 @@ function buildTeamPickerBackground() {
 
 function teamPickCardHtml(team) {
   const color = TEAM_COLORS[team] || "#0E6B52";
-  // ทีมหลังบ้านเข้าหน้าทีมของตัวเอง (เมนู 9 รายการ) ส่วนแอดมินหลักไปหน้า Dashboard ของทีมเหมือนเดิม
-  const href = currentViewerRole === "staff" ? `./attendance.html#admin=team&team=${encodeURIComponent(team)}&as=staff` : `/?team=${encodeURIComponent(team)}`;
+  // ทีมหลังบ้านและแอดมินหลักเข้าหน้าทีมแบบใหม่ (เมนู 9 รายการ; แอดมินดู/แก้ได้ครบ) — Dashboard ของทีมเปิดได้จากลิ้นชัก ☰ ของหน้าทีม
+  const href =
+    currentViewerRole === "staff"
+      ? `./attendance.html#admin=team&team=${encodeURIComponent(team)}&as=staff`
+      : currentViewerRole === "admin"
+        ? `./attendance.html#admin=team&team=${encodeURIComponent(team)}&as=admin`
+        : `/?team=${encodeURIComponent(team)}`;
   return `<a class="team-pick-card" href="${href}" style="--team-color:${color}">
     ${teamLogoImg(team, "team-pick-logo")}
     <span class="team-pick-name">${escapeHtml(team)}</span>

@@ -7,8 +7,9 @@
 //   ผู้ดูแลระบบ (แผงควบคุม):         admin=<coaches|progress|...>         ← รูปแบบเดิมของ deep link ทั้งหมด ใช้ต่อได้เหมือนเดิม
 //   ผู้ดูแลระบบสวมบทบาทจัดการทีม:   admin=team&team=<ทีม>&as=<coach|executive>[&coach=<id>][&ret=<coaches|manage-team>][&screen=..][&d=..]
 //   ทีมหลังบ้านเข้าหน้าทีม (ดูอย่างเดียว): admin=team&team=<ทีม>&as=staff[&screen=..]
+//   แอดมินหลักเข้าหน้าทีมแบบใหม่ (เมนูครบ ดู/แก้ได้):    admin=team&team=<ทีม>&as=admin[&screen=..]
 
-export const COACH_SCREEN_KEYS = ["daily", "checkin", "report", "match", "injury", "plan", "players", "fitness", "meeting-tasks", "instruction", "player-detail", "player-form", "attendance-grid", "match-data", "match-form", "match-history", "match-sheet", "training-plan", "plan-data", "report-data", "evaluation", "physical-test", "physical-instruction", "physical-form", "athlete-results", "profile", "injury-menu", "injury-results", "meeting-menu", "meeting-next", "meeting-history", "footelligence-test", "staff-home", "staff-coaches", "staff-meeting"];
+export const COACH_SCREEN_KEYS = ["daily", "checkin", "report", "match", "injury", "plan", "players", "fitness", "meeting-tasks", "instruction", "player-detail", "player-form", "attendance-grid", "match-data", "match-form", "match-history", "match-sheet", "training-plan", "plan-data", "report-data", "evaluation", "physical-test", "physical-instruction", "physical-form", "athlete-results", "profile", "injury-menu", "injury-results", "meeting-menu", "meeting-next", "meeting-history", "footelligence-test", "staff-home", "staff-coaches", "staff-meeting", "staff-attendance-menu"];
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -46,7 +47,7 @@ export function parseRouteHash(hash) {
   return {
     admin: params.get("admin") || null,
     team: params.get("team") || null,
-    as: as === "coach" || as === "executive" || as === "staff" ? as : null,
+    as: as === "coach" || as === "executive" || as === "staff" || as === "admin" ? as : null,
     coach: params.get("coach") || null,
     ret: params.get("ret") || null,
     screen: params.get("screen") || null,
