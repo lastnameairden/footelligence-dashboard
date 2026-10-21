@@ -23,29 +23,9 @@ export const STAFF_MENU = [
     ]
   },
   { key: "match-data", label: "Match Data", hint: "ประวัติการแข่งขัน", icon: "football", screen: "match-history", screens: ["match-history", "match-sheet"], perm: "view" },
-  {
-    key: "evaluation",
-    label: "Evaluation",
-    hint: "การประเมิน",
-    icon: "target",
-    screen: "evaluation",
-    screens: ["evaluation", "physical-test", "physical-instruction", "physical-form", "athlete-results"],
-    perm: "view",
-    // Footelligence Test (หน้ากรอกคะแนน MASC) และ Data Entry (กรอกผลทดสอบ) เป็นหน้ากรอกข้อมูลของโค้ช — ทีมหลังบ้านดูผลได้ที่ Athlete Results และหน้านักกีฬารายบุคคล
-    children: [
-      {
-        label: "Physical Test",
-        screen: "physical-test",
-        screens: ["physical-test", "physical-instruction", "physical-form"],
-        children: [
-          { label: "Instruction", screen: "physical-instruction" },
-          { label: "Testing Form", screen: "physical-form" }
-        ]
-      },
-      { label: "Athlete Results", screen: "athlete-results" }
-    ]
-  },
-  { key: "injury-sick", label: "Injury/Sick", hint: "ประวัติบาดเจ็บ / เจ็บป่วย", icon: "heart-pulse", screen: "injury-results", screens: ["injury-results"], perm: "view" },
+  // Evaluation ของทีมหลังบ้านมีแค่ Athlete Results (สมุดพกนักกีฬา) — เปิดดูได้ทุกช่วงเวลาโดยไม่ติดช่วงเปิดของโค้ช (physical-ui.js canBypass)
+  // Footelligence Test / Physical Test (หน้ากรอกและแบบฟอร์มของโค้ช) ไม่อยู่ในเมนูนี้ ผลทดสอบดูได้ในสมุดพกและหน้านักกีฬารายบุคคล
+  { key: "evaluation", label: "Evaluation", hint: "สมุดพกนักกีฬา", icon: "target", screen: "athlete-results", screens: ["athlete-results", "evaluation"], perm: "view" },  { key: "injury-sick", label: "Injury/Sick", hint: "ประวัติบาดเจ็บ / เจ็บป่วย", icon: "heart-pulse", screen: "injury-results", screens: ["injury-results"], perm: "view" },
   { key: "meeting", label: "Meeting", hint: "นัดประชุมและคำตอบจากโค้ช", icon: "book", screen: "staff-meeting", screens: ["staff-meeting"], perm: "meetings" }
 ];
 

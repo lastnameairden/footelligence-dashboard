@@ -13,7 +13,7 @@ import { printSheet } from "./print-sheet.js";
 import { coachAccessModel, dateLabel, daysLeft, periodAllowed, windowLabel } from "./athlete-windows.js";
 
 const el = (id) => document.getElementById(id);
-let api = null; // { team(), ageGroups(), canBypass() = แอดมินที่สวมบทบาทโค้ช, openReportCard({team,ageGroup,start,end}), closeReportCard() } — ageGroups() ว่าง = ดูแลทั้งทีม (ใช้รุ่นที่มีนักกีฬา)
+let api = null; // { team(), ageGroups(), canBypass() = แอดมินที่สวมบทบาทโค้ช / ทีมหลังบ้าน, bypassWho() = ข้อความในแบนเนอร์ (ไม่ส่ง = "แอดมิน"), openReportCard({team,ageGroup,start,end}), closeReportCard() } — ageGroups() ว่าง = ดูแลทั้งทีม (ใช้รุ่นที่มีนักกีฬา)
 let rounds = [];
 let pool = [];
 
@@ -136,7 +136,7 @@ export async function showAthleteResults() {
     const thisMonth = thisMonthBangkok();
     fillSelect(el("athlete-results-start"), monthOptions(), el("athlete-results-start").value || addMonthsToMonth(thisMonth, -2));
     fillSelect(el("athlete-results-end"), monthOptions(), el("athlete-results-end").value || thisMonth);
-    showBanner("แอดมินเปิดดูสมุดพกได้ทุกช่วง (โค้ชเปิดได้เฉพาะช่วงที่กำหนดในเมนู เปิดสมุดพกให้โค้ช)", "text-slate-500 text-sm");
+    showBanner(`${escapeHtml(api.bypassWho ? api.bypassWho() : "แอดมิน")}เปิดดูสมุดพกได้ทุกช่วง (โค้ชเปิดได้เฉพาะช่วงที่ผู้ดูแลระบบกำหนด)`, "text-slate-500 text-sm");
   } else {
     fillSelect(periodSelect, access.windows.map((w) => ({ value: `${w.startMonth}|${w.endMonth}`, label: windowLabel(w) })), periodSelect.value);
     const first = access.windows[0];

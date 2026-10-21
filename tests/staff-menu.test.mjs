@@ -21,6 +21,13 @@ test("staff menu: view permission sees eight, Meeting needs the meetings permiss
   assert.equal(staffMenuFor(["manageTeams"]).length, 8);
 });
 
+test("staff menu: Evaluation is Athlete Results only (no landing, no Physical Test / Footelligence Test)", () => {
+  const ev = STAFF_MENU.find((m) => m.key === "evaluation");
+  assert.equal(ev.screen, "athlete-results");
+  assert.equal(ev.children, undefined);
+  for (const s of ["physical-test", "physical-instruction", "physical-form", "footelligence-test", "fitness"]) assert.equal(ev.screens.includes(s), false, s);
+});
+
 test("staff menu: only the agreed read-only parts of Training, Match Data and Injury/Sick", () => {
   const training = STAFF_MENU.find((m) => m.key === "training");
   assert.deepEqual(training.children.map((c) => c.screen), ["plan-data", "report-data"]);

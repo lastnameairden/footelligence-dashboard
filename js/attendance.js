@@ -1750,6 +1750,7 @@ initPhysical({
   team: () => myTeam,
   ageGroups: () => myAgeGroups,
   canBypass: () => currentIsAdmin,
+  bypassWho: () => (isStaffSession() ? "ทีมหลังบ้าน" : "แอดมิน"),
   openReportCard: openReportCardFrame,
   closeReportCard: () => clearEmbedded(athleteResultsFrame)
 });
