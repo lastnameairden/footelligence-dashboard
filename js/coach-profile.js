@@ -86,41 +86,22 @@ function createdLabel(coach) {
 }
 
 // todo = { tasks: จำนวนงานหลังประชุมที่ค้าง (null = ไม่ทราบ), round: ข้อความรอบทดสอบที่เปิด (ไม่มี = null), book: ข้อความช่วงสมุดพกที่เปิด (ไม่มี = null) }
+// หน้า Profile ของโค้ชใช้ข้อมูลเบื้องต้นชุดเดียวกับหน้ารายบุคคลใน Coach Data ของทีมหลังบ้าน (coachDetailHtml) แล้วต่อด้วยการ์ด "ที่ต้องทำตอนนี้"
 export function profileInfoHtml({ coach, team, ageRows, todo }) {
-  const statusBadge = coach.status === "approved" ? '<span class="badge badge-success">อนุมัติแล้ว</span>' : '<span class="badge badge-warning">รออนุมัติ</span>';
-  const ageHtml = ageRows.length > 0 ? ageRows.map((r) => `${escapeHtml(r.ageGroup)} · ${r.count} คน`).join("<br>") : "-";
   const none = '<span class="text-slate-400">ไม่มี</span>';
   const taskText = todo.tasks === null || todo.tasks === undefined ? "-" : todo.tasks > 0 ? `<span class="badge badge-warning">${todo.tasks} งาน</span>` : "ไม่มีงานค้าง";
   return `
-    <div class="card card-pad profile-head">
-      <div class="profile-avatar" aria-hidden="true">${avatarInner(coach)}</div>
-      <div class="profile-head-main">
-        <p class="profile-name">${escapeHtml(coach.name ?? "-")} ${statusBadge}</p>
-        <p class="text-sm text-slate-500">${escapeHtml(coach.email ?? "-")}</p>
-      </div>
-      <div class="profile-head-side">${teamLogoImg(team)}${escapeHtml(team ?? "-")}<br><span class="text-xs text-slate-400">สมัครเมื่อ ${escapeHtml(createdLabel(coach))}</span></div>
+    ${coachDetailHtml({ coach, team, ageRows })}
+    <div class="card card-pad">
+      <h3 class="section-title mb-2">ที่ต้องทำตอนนี้</h3>
+      ${kv([
+        ["งานหลังประชุมที่ค้าง", taskText],
+        ["รอบทดสอบสมรรถภาพที่เปิด", todo.round ? escapeHtml(todo.round) : none],
+        ["สมุดพกที่เปิดให้ดู", todo.book ? escapeHtml(todo.book) : none]
+      ])}
     </div>
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <div class="card card-pad">
-        <h3 class="section-title mb-2">บทบาทและความรับผิดชอบ</h3>
-        ${kv([
-          ["ตำแหน่ง", escapeHtml(coachPositionLabel(coach.coachPosition))],
-          ["ทีม", escapeHtml(team ?? "-")],
-          ["รุ่นอายุที่ดูแล", ageHtml]
-        ])}
-      </div>
-      <div class="card card-pad">
-        <h3 class="section-title mb-2">ที่ต้องทำตอนนี้</h3>
-        ${kv([
-          ["งานหลังประชุมที่ค้าง", taskText],
-          ["รอบทดสอบสมรรถภาพที่เปิด", todo.round ? escapeHtml(todo.round) : none],
-          ["สมุดพกที่เปิดให้ดู", todo.book ? escapeHtml(todo.book) : none]
-        ])}
-      </div>
-    </div>
-    <p class="text-sm text-slate-500">แก้ไขชื่อ ตำแหน่ง หรือรุ่นอายุที่ดูแล: แจ้งผู้ดูแลระบบ</p>`;
+    <p class="text-sm text-slate-500">แก้ไขชื่อ ตำแหน่ง หรือรุ่นอายุที่ดูแล: แจ้งผู้ดูแลระบบ · ชื่อจริง เบอร์โทร ใบประกาศ และรูปแก้ได้ที่ฟอร์ม "ข้อมูลส่วนตัว" ด้านล่าง</p>`;
 }
-
 // ข้อมูลเบื้องต้นของโค้ชแบบละเอียด (หน้ารายบุคคลใน Coach Data ของทีมหลังบ้าน): ส่วนหัว + ข้อมูลส่วนตัว/ติดต่อ + บทบาทและรุ่นที่ดูแล
 // ageRows = ageGroupRows(coach, players) — จำนวนนักกีฬาที่โค้ชคนนี้ดูแลจริงในแต่ละรุ่น
 export function coachDetailHtml({ coach, team, ageRows }) {

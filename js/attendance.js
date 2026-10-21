@@ -1752,7 +1752,7 @@ function openProfileSection() {
 }
 
 initProfile({ record: () => currentCoachRecord, team: () => myTeam, taskCount: profileTaskCount });
-initCoachPersonal(document.getElementById("profile-personal"), { record: () => currentCoachRecord });
+initCoachPersonal(document.getElementById("profile-personal"), { record: () => currentCoachRecord, onSaved: () => showProfile() });
 
 function openAthleteResultsSection() {
   hideAllScreens();

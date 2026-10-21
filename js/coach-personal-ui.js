@@ -8,7 +8,7 @@ import { escapeHtml, safeHttpUrl } from "./ui-utils.js";
 import { COACH_CERTIFICATES, COACH_FULLNAME_MAX, COACH_OTHER_CERT_MAX, parseCoachPersonal, splitCertificates } from "./coach-card.js";
 
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024; // ต้องตรงกับ storage.rules (coachPhotos)
-let api = null; // { record() = เอกสารโค้ช {id, ...} หรือ null }
+let api = null; // { record() = เอกสารโค้ช {id, ...} หรือ null, onSaved() = เรียกหลังบันทึกสำเร็จ (วาดข้อมูลเบื้องต้นด้านบนใหม่) }
 let container = null;
 let removePhoto = false;
 
@@ -105,6 +105,7 @@ async function save() {
     removePhoto = false;
     render();
     setStatus("บันทึกแล้ว");
+    if (api.onSaved) api.onSaved();
   } catch (err) {
     console.error(err);
     setStatus("บันทึกไม่สำเร็จ: " + err.message, true);
