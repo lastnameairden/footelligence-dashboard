@@ -31,6 +31,7 @@ import {
   SCORE_CATEGORIES,
   computeAvgScore,
   isPlayerFullyEvaluated,
+  teamLogoFallbackHtml,
   teamLogoImg,
   isTrainingPlanLate,
   TRAINING_PLAN_LATE_WARNING_THRESHOLD,
@@ -4035,7 +4036,7 @@ async function openExecutivePlayersSection(team) {
 function executiveAvatarHtml(p) {
   const photo = p.photoUrl
     ? `<img src="${safeHttpUrl(p.photoUrl)}" alt="" class="w-full h-full object-cover" />`
-    : icon("user");
+    : teamLogoFallbackHtml(p.team) || icon("user");
   return `<div class="w-9 h-9 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center overflow-hidden flex-shrink-0">${photo}</div>`;
 }
 
@@ -5012,7 +5013,7 @@ let detailPlayerId = null;
 
 function playerPhotoHtml(p) {
   const src = safeHttpUrl(p.photoUrl);
-  return src ? `<img src="${src}" alt="" loading="lazy" />` : icon("user");
+  return src ? `<img src="${src}" alt="" loading="lazy" />` : teamLogoFallbackHtml(p.team) || icon("user");
 }
 
 function openPlayerGallery(message = "") {

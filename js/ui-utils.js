@@ -117,14 +117,14 @@ export function coachPositionAllowsMultipleAgeGroups(coachPosition) {
 // ---------- โลโก้ทีม (ใช้แทนอิโมจิ 🛡️ ทุกจุดที่แสดงชื่อ/ไอคอนของแต่ละทีม) ----------
 export const TEAM_LOGOS = {
   "KHAMPHEE FOOTBALL": "./assets/logo-khamphee-football.png",
-  "THAWEE SC": "./assets/logo-thawee-sc.jpg",
-  "THAMMASATHIT": "./assets/logo-thammasathit.jpg"
+  "THAWEE SC": "./assets/logo-thawee-sc.png",
+  "THAMMASATHIT": "./assets/logo-thammasathit.png"
 };
 
 // ---------- สีประจำทีม (ใช้กับกราฟ/แผนภูมิทุกจุดที่ต้องแยกสีตามทีม เพื่อให้สีของแต่ละทีมคงที่เสมอ
 // ไม่ว่าจะเรียงลำดับอย่างไรบนหน้าจอ) ----------
 export const TEAM_COLORS = {
-  "KHAMPHEE FOOTBALL": "#0ea5e9", // ฟ้า/น้ำเงิน
+  "KHAMPHEE FOOTBALL": "#2563eb", // น้ำเงิน
   "THAWEE SC": "#dc2626", // แดง
   "THAMMASATHIT": "#16a34a" // เขียว
 };
@@ -132,22 +132,25 @@ export const TEAM_COLORS = {
 // กล่องไอคอนสี่เหลี่ยมมน (เหมือน .icon-badge/.icon-badge-lg เดิม) แต่ใส่โลโก้ทีมจริงแทนอิโมจิ
 // ใช้แทนที่ `<div class="icon-badge icon-badge-lg">🛡️</div>` ได้ทันที — ทีมที่ไม่รู้จัก (เช่นยังไม่ตั้งชื่อ)
 // จะ fallback กลับไปใช้อิโมจิ 🛡️ เดิมโดยอัตโนมัติ
-// ไฟล์โลโก้ที่ได้มามีพื้นหลังขาว/เทาอ่อนติดมาด้วย (ไม่ใช่พื้นหลังโปร่งใสจริง — โดยเฉพาะไฟล์ .jpg ที่ไม่รองรับ
-// ความโปร่งใสอยู่แล้ว) จึงใช้ mix-blend-multiply ผสมกับพื้นหลังสีขาวของกล่องที่ห่อไว้ ทำให้พื้นหลังของโลโก้
-// กลืนไปกับพื้นหลังการ์ด/ตารางโดยไม่ต้องแก้ไฟล์รูปเอง (ใช้ได้ผลดีเมื่อพื้นหลังโดยรอบเป็นสีขาว/อ่อนเช่นกัน)
+// ไฟล์โลโก้ทุกไฟล์ใน assets เป็น PNG พื้นหลังโปร่งใส (ทีม THAWEE/THAMMASATHIT ตัดพื้นหลังขาวออกแล้ว) — วางบนพื้นสีใดก็ได้ ไม่มีกล่องรอง
 export function teamIconBadge(team, { large = true, extraClass = "" } = {}) {
   const sizeClass = `icon-badge${large ? " icon-badge-lg" : ""}${extraClass ? " " + extraClass : ""}`;
   const src = TEAM_LOGOS[team];
   if (!src) return `<div class="${sizeClass}">${icon("shield")}</div>`;
-  return `<div class="${sizeClass} overflow-hidden p-0.5 bg-white"><img src="${src}" alt="${escapeHtml(team)}" class="w-full h-full object-contain rounded mix-blend-multiply" /></div>`;
+  return `<div class="${sizeClass} team-logo-badge overflow-hidden p-0.5"><img src="${src}" alt="${escapeHtml(team)}" class="w-full h-full object-contain" /></div>`;
 }
 
 // รูปโลโก้ทีมแบบเปล่าๆ (ไม่มีกล่องล้อม) สำหรับวางแทรกหน้าชื่อทีมในข้อความ/ตาราง — คืนสตริงว่างถ้าไม่รู้จักทีมนี้
-// เติม mix-blend-multiply ให้เสมอไม่ว่าจะส่ง className เองหรือไม่ เพื่อกลืนพื้นหลังขาวของไฟล์โลโก้เข้ากับพื้นหลังโดยรอบ
 export function teamLogoImg(team, className = "w-6 h-6 object-contain inline-block align-middle rounded mr-1.5") {
   const src = TEAM_LOGOS[team];
   if (!src) return "";
-  return `<img src="${src}" alt="${escapeHtml(team)}" class="${className} mix-blend-multiply" />`;
+  return `<img src="${src}" alt="${escapeHtml(team)}" class="${className}" />`;
+}
+
+// แทนรูปโค้ช/นักกีฬาที่ยังไม่มีรูป: โลโก้ทีมของตัวเองสีจางๆ (ไม่รู้จักทีม = สตริงว่าง ให้ผู้เรียกใช้ตัวแทนอื่น) — จางด้วย CSS .photo-fallback-logo
+export function teamLogoFallbackHtml(team) {
+  const src = TEAM_LOGOS[team];
+  return src ? `<img src="${src}" alt="" class="photo-fallback-logo" aria-hidden="true" />` : "";
 }
 
 // การ์ดตัวเลขสรุปแบบสั้นๆ (label + value) ใช้ในหน้าสรุปภาพรวมต่างๆ

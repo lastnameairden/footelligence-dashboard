@@ -4,7 +4,7 @@
 import { doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 import { deleteObject, getDownloadURL, ref as storageRef, uploadBytes } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-storage.js";
 import { db, storage } from "./firebase-init.js";
-import { escapeHtml, safeHttpUrl } from "./ui-utils.js";
+import { escapeHtml, safeHttpUrl, teamLogoFallbackHtml } from "./ui-utils.js";
 import { COACH_CERTIFICATES, COACH_FULLNAME_MAX, COACH_OTHER_CERT_MAX, parseCoachPersonal, splitCertificates } from "./coach-card.js";
 
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024; // ต้องตรงกับ storage.rules (coachPhotos)
@@ -20,7 +20,7 @@ function formHtml(coach) {
     <h3 class="section-title">ข้อมูลส่วนตัว</h3>
     <p class="text-sm text-slate-500">แสดงในการ์ดโค้ชของหน้า Coach Data ที่ทีมหลังบ้านและผู้ดูแลระบบเห็น</p>
     <div class="flex items-center gap-4 flex-wrap">
-      <div class="coach-photo-preview">${photo ? `<img src="${photo}" alt="" />` : '<span class="coach-card-photo-empty" aria-hidden="true"></span>'}</div>
+      <div class="coach-photo-preview">${photo ? `<img src="${photo}" alt="" />` : teamLogoFallbackHtml(coach.team) || '<span class="coach-card-photo-empty" aria-hidden="true"></span>'}</div>
       <div class="space-y-1">
         <input type="file" accept="image/*" data-photo-input class="field-input" />
         ${photo ? '<button type="button" class="btn btn-ghost-danger btn-sm" data-photo-remove>ลบรูปเดิม</button>' : ""}
@@ -131,7 +131,7 @@ export function initCoachPersonal(box, coachApi) {
     if (e.target.closest("[data-save]")) save();
     else if (e.target.closest("[data-photo-remove]")) {
       removePhoto = true;
-      container.querySelector(".coach-photo-preview").innerHTML = '<span class="coach-card-photo-empty" aria-hidden="true"></span>';
+      container.querySelector(".coach-photo-preview").innerHTML = teamLogoFallbackHtml(api.record()?.team) || '<span class="coach-card-photo-empty" aria-hidden="true"></span>';
       e.target.closest("[data-photo-remove]").remove();
     }
   });

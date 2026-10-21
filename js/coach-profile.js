@@ -10,6 +10,7 @@ import {
   isReportLate,
   isTrainingPlanLate,
   safeHttpUrl,
+  teamLogoFallbackHtml,
   teamLogoImg,
   todayBangkok,
   trainingDaysQuotaForTeamMonth
@@ -75,9 +76,9 @@ const kv = (rows) =>
 const initialOf = (name) => escapeHtml(Array.from(String(name ?? "").trim())[0] ?? "?");
 
 // รูปโค้ชถ้ามี (https เท่านั้น) ไม่มีก็ใช้ตัวอักษรแรกของชื่อ
-const avatarInner = (coach) => {
+const avatarInner = (coach, team) => {
   const src = safeHttpUrl(coach.photoUrl);
-  return src ? `<img src="${src}" alt="" />` : initialOf(coach.name);
+  return src ? `<img src="${src}" alt="" />` : teamLogoFallbackHtml(team ?? coach.team) || initialOf(coach.name);
 };
 
 function createdLabel(coach) {
@@ -107,6 +108,7 @@ export function profileInfoHtml({ coach, team, ageRows, todo }) {
 export function coachDetailHtml({ coach, team, ageRows }) {
   const statusBadge = coach.status === "approved" ? '<span class="badge badge-success">อนุมัติแล้ว</span>' : '<span class="badge badge-warning">รออนุมัติ</span>';
   const empty = '<span class="text-slate-400">ยังไม่กรอก</span>';
+  const avatarClass = safeHttpUrl(coach.photoUrl) ? "profile-avatar" : "profile-avatar profile-avatar-fallback";
   const certs = Array.isArray(coach.certificates) ? coach.certificates : [];
   const total = ageRows.reduce((n, r) => n + r.count, 0);
   const ageHtml = ageRows.length > 0 ? ageRows.map((r) => `${escapeHtml(r.ageGroup)} · ${r.count} คน`).join("<br>") : "-";
@@ -114,7 +116,7 @@ export function coachDetailHtml({ coach, team, ageRows }) {
   const certHtml = certs.length > 0 ? `<span class="coach-card-tags">${certs.map((c) => `<span class="coach-tag coach-tag-cert">${escapeHtml(c)}</span>`).join("")}</span>` : empty;
   return `
     <div class="card card-pad profile-head">
-      <div class="profile-avatar" aria-hidden="true">${avatarInner(coach)}</div>
+      <div class="${avatarClass}" aria-hidden="true">${avatarInner(coach, team)}</div>
       <div class="profile-head-main">
         <p class="profile-name">${escapeHtml(coach.name ?? "-")} ${statusBadge}</p>
         <p class="text-sm text-slate-600">${coach.fullName ? escapeHtml(coach.fullName) : "ยังไม่กรอกชื่อจริง"}</p>

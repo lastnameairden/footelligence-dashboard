@@ -219,6 +219,7 @@ async function fillTeamPickerCounts() {
 }
 
 function showTeamPicker(displayName) {
+  document.documentElement.classList.add("picker-on"); // หน้านี้มีลายโลโก้ของตัวเอง — ซ่อนลายพื้นหลังรวมของทุกหน้า
   dashboardContent.classList.add("hidden");
   dashboardBackLink.classList.add("hidden");
   teamPickerGreeting.textContent = `สวัสดี ${displayName} · เลือกทีมเพื่อเข้าไปดูข้อมูลเฉพาะทีมนั้น`;

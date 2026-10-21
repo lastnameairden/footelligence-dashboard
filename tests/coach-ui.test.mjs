@@ -19,8 +19,10 @@ test("teamThemeVars covers the three teams and nothing else; accent tint is a 10
   assert.equal(teamThemeVars("NOPE"), null);
   assert.equal(teamThemeVars(null), null);
   const v = teamThemeVars("THAWEE SC");
-  assert.equal(v["--accent"], "#b01e38");
-  assert.equal(v["--accent-tint"], "rgba(176, 30, 56, 0.1)");
+  assert.equal(v["--accent"], "#dc2626", "THAWEE = red");
+  assert.equal(v["--accent-tint"], "rgba(220, 38, 38, 0.1)");
+  assert.equal(teamThemeVars("THAMMASATHIT")["--accent"], "#15803d", "THAMMASATHIT = green");
+  assert.equal(teamThemeVars("KHAMPHEE FOOTBALL")["--accent"], "#1d4ed8", "KHAMPHEE = blue");
   assert.equal(v["--header-ink"], "#FFFFFF");
 });
 
@@ -33,10 +35,10 @@ test("applyTeamTheme sets then clears the CSS variables and the data attribute",
     removeAttribute: (k) => attrs.delete(k)
   };
   applyTeamTheme("KHAMPHEE FOOTBALL", root);
-  assert.equal(store.get("--header-bg"), "#0b2a5b");
+  assert.equal(store.get("--header-bg"), "#1e3a8a");
   assert.equal(attrs.get("data-team-theme"), "KHAMPHEE FOOTBALL");
   applyTeamTheme("THAMMASATHIT", root);
-  assert.equal(store.get("--accent"), "#c2410c", "switching teams replaces the previous theme");
+  assert.equal(store.get("--accent"), "#15803d", "switching teams replaces the previous theme");
   applyTeamTheme(null, root);
   assert.equal(store.size, 0);
   assert.equal(attrs.size, 0);

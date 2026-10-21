@@ -3,9 +3,9 @@
 // ตัวแปร CSS ที่ตั้ง: --accent / --accent-hover / --accent-tint (ปุ่มหลัก, ป้ายที่เลือก ฯลฯ ใน styles.css ใช้อยู่แล้ว) และ --header-bg / --header-ink / --team-highlight
 
 export const TEAM_THEMES = {
-  "THAWEE SC": { header: "#5b0f1f", accent: "#b01e38", accentHover: "#8f1830", highlight: "#d4a63a" }, // แดงเลือดหมู + ทอง
-  "KHAMPHEE FOOTBALL": { header: "#0b2a5b", accent: "#1e6fd0", accentHover: "#1859ab", highlight: "#d4a63a" }, // น้ำเงินกรมท่า + ทอง
-  THAMMASATHIT: { header: "#1f1a17", accent: "#c2410c", accentHover: "#9a3412", highlight: "#e8932a" } // ดำ + ส้มแดง
+  "THAWEE SC": { header: "#991b1b", accent: "#dc2626", accentHover: "#b91c1c", highlight: "#d4a63a" }, // แดง
+  "KHAMPHEE FOOTBALL": { header: "#1e3a8a", accent: "#1d4ed8", accentHover: "#1e40af", highlight: "#d4a63a" }, // น้ำเงิน
+  THAMMASATHIT: { header: "#14532d", accent: "#15803d", accentHover: "#166534", highlight: "#d4a63a" } // เขียว
 };
 
 const hexToRgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));

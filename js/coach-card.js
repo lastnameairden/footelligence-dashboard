@@ -1,7 +1,7 @@
 // ข้อมูลส่วนตัวของโค้ช (รูป ชื่อจริง เบอร์โทร ใบประกาศผู้ฝึกสอน) และการ์ดโค้ชในหน้า Coach Data (ตรรกะล้วนๆ + HTML เป็นสตริง)
 // เก็บในเอกสาร coaches/{uid} เดียวกับบัญชี: fullName, phone, certificates[], photoUrl, photoPath — โค้ชกรอกเองที่ Profile
 // ส่วนแอดมิน/ทีมหลังบ้านที่มีสิทธิ์ coaches แก้ให้ได้ที่หน้าแก้ไขโค้ช (ดู firestore.rules: coaches update)
-import { coachPositionLabel, escapeHtml, safeHttpUrl } from "./ui-utils.js";
+import { coachPositionLabel, escapeHtml, safeHttpUrl, teamLogoFallbackHtml } from "./ui-utils.js";
 import { formatPhone, normalizePhone } from "./player-profile-fields.js";
 
 export const COACH_CERTIFICATES = ["G - License", "C - License", "B - License", "A - License", "Pro - License"];
@@ -34,7 +34,7 @@ export function splitCertificates(list) {
 export function coachMiniAvatarHtml(coach) {
   const src = safeHttpUrl(coach.photoUrl);
   const initial = escapeHtml(Array.from(String(coach.name ?? "").trim())[0] ?? "?");
-  return `<span class="coach-mini-avatar" aria-hidden="true">${src ? `<img src="${src}" alt="" loading="lazy" />` : initial}</span>`;
+  return `<span class="coach-mini-avatar" aria-hidden="true">${src ? `<img src="${src}" alt="" loading="lazy" />` : teamLogoFallbackHtml(coach.team) || initial}</span>`;
 }
 
 const FIELD = (label, body) => `<div><p class="coach-card-label">${escapeHtml(label)}</p>${body}</div>`;
@@ -44,7 +44,7 @@ const tags = (items, cls) => `<div class="coach-card-tags">${items.map((t) => `<
 // การ์ดโค้ชหนึ่งคน (กดเปิดรายละเอียดผลงานเดือนนี้ผ่าน data-coach-card) — showPhone = false ซ่อนแถวเบอร์โทร (เฉพาะทีมหลังบ้าน/แอดมินเห็น)
 export function coachCardHtml(coach, { showPhone = true } = {}) {
   const photo = safeHttpUrl(coach.photoUrl);
-  const photoBox = photo ? `<img src="${photo}" alt="" loading="lazy" />` : '<span class="coach-card-photo-empty" aria-hidden="true"></span>';
+  const photoBox = photo ? `<img src="${photo}" alt="" loading="lazy" />` : teamLogoFallbackHtml(coach.team) || '<span class="coach-card-photo-empty" aria-hidden="true"></span>';
   const ages = Array.isArray(coach.ageGroups) ? coach.ageGroups : [];
   const certs = Array.isArray(coach.certificates) ? coach.certificates : [];
   const phone = coach.phone ? `<p class="coach-card-value">${escapeHtml(formatPhone(coach.phone))}</p>` : EMPTY;
