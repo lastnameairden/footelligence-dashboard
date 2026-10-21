@@ -766,3 +766,17 @@ html.embedded main { padding-top: 0.25rem; padding-bottom: 1rem; }
 .coach-fullname { display: block; font-size: 0.75rem; font-weight: 400; color: var(--text-2); }
 /* หน้าทีม (ทีมหลังบ้านและแอดมิน): ซ่อนตัวเลือกรุ่นอายุซ้ำในหน้า (ใช้ตัวกรองบนแถบหลักที่เดียว) และปุ่มกลับไปแผงเดิม */
 .team-space [data-age-dup], .team-space [data-team-hide] { display: none !important; }
+/* Home ของแอดมิน (หน้าทีม): การ์ดสรุปตัวเลข + แถวสถานะรายรุ่นอายุ */
+.admin-home-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr)); gap: 0.5rem; }
+.admin-home-tile { display: flex; flex-direction: column; gap: 0.15rem; text-align: left; padding: 0.6rem 0.75rem; border-radius: 0.5rem; background: var(--surface-2); border: 0; font: inherit; color: var(--text-1); }
+button.admin-home-tile { cursor: pointer; }
+button.admin-home-tile:hover { outline: 1px solid var(--accent); }
+.admin-home-tile-label { font-size: 0.75rem; color: var(--text-2); }
+.admin-home-tile-value { font-size: 1.35rem; font-weight: 600; }
+.admin-home-tile-warn .admin-home-tile-value { color: #b45309; }
+.admin-home-tile-bad .admin-home-tile-value { color: #b91c1c; }
+.admin-home-tile-ok .admin-home-tile-value { color: #15803d; }
+.admin-home-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; padding: 0.55rem 0; border-top: 1px solid var(--border); }
+.admin-home-row:first-child { border-top: 0; }
+.admin-home-row-state { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }.admin-home-rows { display: flex; flex-direction: column; }
+.admin-home-row-who { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }

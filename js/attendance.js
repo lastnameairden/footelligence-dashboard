@@ -81,6 +81,7 @@ import { STAFF_UNFILTERED_SCREENS, staffMenuFor } from "./staff-menu.js";
 import { ADMIN_TEAM_MENU } from "./admin-menu.js";
 import { toolGroupsFor } from "./admin-tools.js";
 import { initStaffHome, showStaffHome } from "./staff-home-ui.js";
+import { initAdminHome, showAdminHome } from "./admin-home-ui.js";
 import { COACH_CERTIFICATES, coachCardHtml, coachMiniAvatarHtml, parseCoachPersonal, splitCertificates } from "./coach-card.js";
 import { initCoachPersonal, showCoachPersonal } from "./coach-personal-ui.js";
 import { ageGroupRows, coachDetailHtml } from "./coach-profile.js";
@@ -225,6 +226,7 @@ const staffAttendanceMenuSection = document.getElementById("staff-attendance-men
 const staffToolsSection = document.getElementById("staff-tools-section");
 const staffToolsBody = document.getElementById("staff-tools-body");
 const staffHomeBody = document.getElementById("staff-home-body");
+const staffHomeSubtitle = document.getElementById("staff-home-subtitle");
 const staffCoachesSection = document.getElementById("staff-coaches-section");
 const staffCoachesGrid = document.getElementById("staff-coaches-grid");
 const staffCoachDetail = document.getElementById("staff-coach-detail");
@@ -3858,9 +3860,16 @@ for (const btn of document.querySelectorAll("[data-staff-att-nav]")) btn.addEven
 
 // Home ของหน้าทีม — ประกาศจากผู้ดูแลระบบ + (สิทธิ์ meetings) งาน Meeting ที่รอตรวจ (staff-home-ui.js)
 initStaffHome(staffHomeBody, () => openCoachMenuItem("meeting"));
+// Home ของแอดมิน: ภาพรวมของทีมที่เลือกวันนี้ (admin-home-ui.js) — กดการ์ดคำขอลงทะเบียน/บาดเจ็บไปหน้านั้น
+initAdminHome(staffHomeBody, (go) => (go === "approvals" ? TOOL_OPENERS.approvals() : openInjuryResults()));
 function openStaffHome() {
   hideAllScreens();
   staffHomeSection.classList.remove("hidden");
+  staffHomeSubtitle.textContent = adminSpace() ? "ภาพรวมของทีมวันนี้และงานที่รอตรวจ" : "แจ้งเตือนจากผู้ดูแลระบบและงานที่รอตรวจ";
+  if (adminSpace()) {
+    showAdminHome(staffHomeBody, { team: myTeam });
+    return;
+  }
   showStaffHome(staffHomeBody, { team: myTeam, uid: auth.currentUser.uid, canMeetings: staffCan(currentStaffPerms, "meetings") });
 }
 

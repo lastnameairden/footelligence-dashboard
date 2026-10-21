@@ -27,7 +27,8 @@ function writeSeen(uid, ms) {
 const docsOf = (snap) => snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 const errorBox = (what, err) => `<div class="card card-pad text-sm text-red-600">โหลด${what}ไม่สำเร็จ: ${escapeHtml(err.message)}</div>`;
 
-async function meetingCardHtml(team) {
+// การ์ด Meeting ของเดือนนี้ (งานหลังประชุมที่รอตรวจ) — ใช้ร่วมกับ Home ของแอดมิน (admin-home-ui.js)
+export async function meetingCardHtml(team) {
   const month = thisMonthBangkok();
   const { start, end } = monthDateRange(month);
   const [meetingSnap, recapSnap] = await Promise.all([
