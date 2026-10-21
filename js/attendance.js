@@ -226,6 +226,8 @@ const staffAttendanceMenuSection = document.getElementById("staff-attendance-men
 const staffToolsSection = document.getElementById("staff-tools-section");
 const staffDevelopmentSection = document.getElementById("staff-development-section");
 const staffDevelopmentFrame = document.getElementById("staff-development-frame");
+const staffDashboardSection = document.getElementById("staff-dashboard-section");
+const staffDashboardFrame = document.getElementById("staff-dashboard-frame");
 const staffToolsBody = document.getElementById("staff-tools-body");
 const staffHomeBody = document.getElementById("staff-home-body");
 const staffHomeSubtitle = document.getElementById("staff-home-subtitle");
@@ -733,6 +735,7 @@ function hideAllScreens() {
   staffAttendanceMenuSection.classList.add("hidden");
   staffToolsSection.classList.add("hidden");
   staffDevelopmentSection.classList.add("hidden");
+  staffDashboardSection.classList.add("hidden");
   staffCoachesSection.classList.add("hidden");
   footelligenceTestSection.classList.add("hidden");
   injuryMenuSection.classList.add("hidden");
@@ -1106,7 +1109,7 @@ function renderDrawerItemsInner() {
       appendCoachMenuToDrawer();
       navDrawerItems.appendChild(drawerDivider());
       if (adminSpace()) {
-        navDrawerItems.appendChild(drawerItem(icon("bar-chart"), "Dashboard ของทีม", () => (window.location.href = `${window.location.origin}/?team=${encodeURIComponent(myTeam)}`)));
+        navDrawerItems.appendChild(drawerItem(icon("bar-chart"), "Dashboard ของทีม", () => TOOL_OPENERS["team-dashboard"]()));
       }
       navDrawerItems.appendChild(drawerItem(icon("refresh"), "เปลี่ยนทีม", goToDashboard));
     } else if (myTeam) {
@@ -3835,8 +3838,16 @@ const TOOL_OPENERS = {
   "masc-rounds": () => openAdminMascRoundsSection(),
   "fitness-rounds": () => openAdminFitnessRoundsSection(),
   "athlete-windows": () => openAdminAthleteWindowsSection(),
-  development: () => openStaffDevelopment()
+  development: () => openStaffDevelopment(),
+  "team-dashboard": () => openStaffDashboard()
 };
+
+// Dashboard ของทีม: ฝัง index.html ไว้ในหน้าทีม ใช้ทีมของหน้าทีม (Dashboard ไม่มีตัวกรองรุ่นอายุ — ตัวกรองด้านบนจึงไม่มีผลกับหน้านี้)
+function openStaffDashboard() {
+  hideAllScreens();
+  staffDashboardSection.classList.remove("hidden");
+  showEmbedded(staffDashboardFrame, "index.html", { team: myTeam });
+}
 
 // พัฒนาการนักกีฬา: ฝังหน้า development.html ไว้ในหน้าทีม ใช้ทีมและรุ่นอายุจากตัวกรองด้านบน (เปลี่ยนตัวกรอง = เปิดหน้านี้ซ้ำด้วยค่าใหม่)
 function openStaffDevelopment() {
@@ -3863,10 +3874,7 @@ function openStaffTools() {
 staffToolsBody.addEventListener("click", (e) => {
   const btn = e.target.closest("[data-tool]");
   if (!btn) return;
-  const feature = btn.dataset.tool;
-  if (feature === "team-dashboard") window.location.href = `${window.location.origin}/?team=${encodeURIComponent(myTeam)}`;
-
-  else TOOL_OPENERS[feature]?.();
+  TOOL_OPENERS[btn.dataset.tool]?.();
 });
 
 // แอดมิน: เมนู Attendance ของหน้าทีม (สรุปการเข้าซ้อม / เช็คชื่อแทนโค้ช)
@@ -4581,6 +4589,7 @@ const ROUTE_SCREENS = [
   { el: staffAttendanceMenuSection, key: "staff-attendance-menu", kind: "coach" },
   { el: staffToolsSection, key: "staff-tools", kind: "coach" },
   { el: staffDevelopmentSection, key: "development", kind: "admin" },
+  { el: staffDashboardSection, key: "team-dashboard", kind: "admin" },
   { el: staffCoachesSection, key: "staff-coaches", kind: "coach" },
   { el: footelligenceTestSection, key: "footelligence-test", kind: "coach" },
   { el: injuryMenuSection, key: "injury-menu", kind: "coach" },

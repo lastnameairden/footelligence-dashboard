@@ -94,6 +94,11 @@ const teamPickerSection = document.getElementById("team-picker-section");
 const teamPickerBg = document.getElementById("team-picker-bg");
 const teamPickerGreeting = document.getElementById("team-picker-greeting");
 const teamPickerGrid = document.getElementById("team-picker-grid");
+// ฝังในหน้าทีมของแอดมิน/ทีมหลังบ้าน (attendance.html เมนู Admin → Dashboard ของทีม): #embed=1&team=<ทีม> — ซ่อนหัว/ท้าย/ปุ่มกลับ (html.embedded)
+// และอ่านทีมจาก hash ด้วย เพราะกรอบฝังใช้ query string แค่กันแคช (ปกติทีมมาจาก ?team=)
+const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+if (hashParams.get("embed") === "1" && window.self !== window.top) document.documentElement.classList.add("embedded");
+const urlTeam = () => new URLSearchParams(window.location.search).get("team") || hashParams.get("team");
 const dashboardTeamHeading = document.getElementById("dashboard-team-heading");
 const adminSearchBtn = document.getElementById("admin-search-btn");
 const adminSearchPanel = document.getElementById("admin-search-panel");
@@ -1772,7 +1777,7 @@ function renderDrawerItems() {
     // (ใช้ URL hash เพราะเซิร์ฟเวอร์ทดสอบในเครื่อง redirect "attendance.html" แล้วตัด query string ทิ้งแต่ไม่ตัด hash)
     // ถ้าอยู่ที่หน้าเลือกทีม (ไม่มี ?team= ที่ตรงชื่อทีมจริง) ไม่ต้องมีปุ่มเหล่านี้ เพราะกดแล้วไม่มีประโยชน์
     const as = currentViewerRole === "admin" ? "admin" : "staff";
-    const teamFromUrl = new URLSearchParams(window.location.search).get("team");
+    const teamFromUrl = urlTeam();
     if (teamFromUrl && TEAMS.includes(teamFromUrl)) {
       navDrawerItems.appendChild(drawerSectionLabel(currentViewerRole === "admin" ? "ผู้ดูแลระบบ" : "ทีมหลังบ้าน"));
       navDrawerItems.appendChild(drawerItem(icon("users"), "กลับหน้าทีม", `./attendance.html#admin=team&team=${encodeURIComponent(teamFromUrl)}&as=${as}`));
@@ -1854,7 +1859,7 @@ onAuthStateChanged(auth, async (user) => {
     if (seesAllTeams) {
       // หน้าแรกสุดของผู้ดูแลระบบ/ทีมหลังบ้าน (ไม่มี ?team= หรือชื่อทีมไม่ตรง รวมลิงก์เก่า ?team=__ALL__) คือหน้าเลือกทีม — ไม่มีภาพรวม
       // หลายทีมรวมกันอีกแล้ว เลือกทีมก่อนแล้วจึงเห็นข้อมูลเฉพาะทีมนั้น (?team=ชื่อทีม) ปุ่ม "← เปลี่ยนทีม" กลับมาหน้าเลือกทีม
-      const teamFromUrl = new URLSearchParams(window.location.search).get("team");
+      const teamFromUrl = urlTeam();
       if (teamFromUrl && TEAMS.includes(teamFromUrl)) {
         teamPickerSection.classList.add("hidden");
         dashboardContent.classList.remove("hidden");
