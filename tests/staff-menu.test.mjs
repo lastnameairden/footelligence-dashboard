@@ -102,11 +102,12 @@ test("admin team menu: nine items + Admin, full coach submenus, shared staff pag
 test("admin tools: admin sees every tool in four groups; staff only what the permission allows", () => {
   const all = toolGroupsFor(null);
   assert.deepEqual(all.map((g) => g.key), ["accounts", "monitoring", "evaluation", "other"]);
-  assert.equal(all.flatMap((g) => g.tools).length, 12);
+  assert.equal(all.flatMap((g) => g.tools).length, 11);
   const names = (perms) => toolGroupsFor(perms).flatMap((g) => g.tools.map((t) => t.feature));
   assert.deepEqual(names(["view"]), ["progress", "print", "team-dashboard"]);
   assert.deepEqual(names(["coaches"]), ["approvals", "coaches"]);
-  assert.deepEqual(names(["manageTeams"]), ["progress", "print", "player-audit", "team-dashboard", "manage-team"]);
+  assert.deepEqual(names(["manageTeams"]), ["progress", "print", "player-audit", "team-dashboard"]);
+  assert.equal(toolGroupsFor(null).flatMap((g) => g.tools).some((x) => x.feature === "manage-team"), false, "manage-team tool was removed (per-coach view button in Coach Data instead)");
   // ผลแข่งขัน/บาดเจ็บ/สมุดพกของทีมอยู่ในเมนู Match Data / Injury/Sick / Evaluation แล้ว ไม่ซ้ำเป็นเครื่องมือ
   for (const covered of ["matches", "injuries", "report-card"]) assert.equal(toolGroupsFor(null).flatMap((g) => g.tools).some((x) => x.feature === covered), false, covered);
   assert.deepEqual(names(["meetings"]), []);
@@ -115,5 +116,5 @@ test("admin tools: admin sees every tool in four groups; staff only what the per
   for (const adminOnly of ["staff-announcements", "masc-rounds", "fitness-rounds", "athlete-windows", "development"]) assert.equal(names(["view", "coaches", "manageTeams", "meetings"]).includes(adminOnly), false, adminOnly);
   assert.equal(toolsMenuItem(true).label, "Admin");
   assert.equal(toolsMenuItem(false).label, "Tools");
-  assert.ok(toolsMenuItem(true).screens.includes("approvals") && toolsMenuItem(true).screens.includes("development") && !toolsMenuItem(true).screens.includes("manage-team"));
+  assert.ok(toolsMenuItem(true).screens.includes("approvals") && toolsMenuItem(true).screens.includes("development"));
 });

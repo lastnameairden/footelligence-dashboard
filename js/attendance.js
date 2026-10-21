@@ -1072,7 +1072,7 @@ function exitTeamManagementToAdminPanel() {
   coachTeamEl.textContent = isStaffSession() ? "เข้าถึงตามสิทธิ์ที่ได้รับ" : "เข้าถึงได้ทุกทีม";
   coachAgeGroupsWrap.classList.add("hidden");
   renderDrawerItems();
-  if (back) enterTeamSpace(back.team, back.mode, () => openStaffTools());
+  if (back) enterTeamSpace(back.team, back.mode, () => openCoachScreen(back.screen || "staff-tools"));
 }
 
 // เนื้อหาเมนูปรับตามบทบาทและบริบทปัจจุบัน (โค้ช / ผู้บริหารทีม / ผู้ดูแลระบบ, กำลังจัดการทีมอยู่หรือไม่)
@@ -3708,7 +3708,7 @@ async function findCoachRecordForTeam(team, role) {
 // landing: ฟังก์ชันที่เปิดหน้าจอแรกหลังเข้าโหมด (ค่าเริ่มต้น Daily — ตอนรีเฟรชจะส่งฟังก์ชันที่เปิดหน้าจอเดิมมาแทน)
 async function enterTeamManagementMode(team, returnSection, coachRecordOverride, landing = showDaily) {
   // เข้ามาจากหน้าทีม (เช่น กดชื่อโค้ช/"จัดการทีมนี้" ในรายชื่อโค้ชของเมนู Admin) = ตอนกดออกกลับหน้าทีมเดิม ไม่ใช่แผงเก่า
-  if (teamSpace()) returnToTeamSpace = { team: myTeam, mode: adminSpace() ? "admin" : "staff" };
+  if (teamSpace()) returnToTeamSpace = { team: myTeam, mode: adminSpace() ? "admin" : "staff", screen: currentScreenKey() };
   myTeam = team;
   adminViewingAs = "coach";
   adminViewingCoachId = coachRecordOverride?.id || null;
@@ -3823,7 +3823,7 @@ staffFilterInner.addEventListener("click", (e) => {
 
 // เมนู Admin (แอดมิน) / Tools (ทีมหลังบ้าน): การ์ดเครื่องมือตามสิทธิ์ (admin-tools.js) — กดการ์ดเปิดหน้าเครื่องมือในแผงผู้ดูแล
 // หน้าเครื่องมือเหล่านี้ไม่ผูกกับทีม (เช่น รายชื่อโค้ชทุกทีม) แต่ยังอยู่ในหน้าทีม: แถบเมนู/ปุ่มกลับพามาหน้านี้ได้
-let returnToTeamSpace = null; // { team, mode } — จำไว้ตอนเข้า "จัดการทีมแทนโค้ช" เพื่อกลับมาหน้าทีมเดิมเมื่อกดออก
+let returnToTeamSpace = null; // { team, mode, screen } — จำหน้าทีมที่มาจาก (เช่น ดูหน้าจอของโค้ชรายคน) เพื่อกลับมาหน้าเดิมเมื่อกดออก
 
 const TOOL_OPENERS = {
   approvals: () => openAdminApprovalsSection(),
@@ -3866,10 +3866,7 @@ staffToolsBody.addEventListener("click", (e) => {
   const feature = btn.dataset.tool;
   if (feature === "team-dashboard") window.location.href = `${window.location.origin}/?team=${encodeURIComponent(myTeam)}`;
 
-  else if (feature === "manage-team") {
-    returnToTeamSpace = { team: myTeam, mode: adminSpace() ? "admin" : "staff" };
-    enterTeamManagementMode(myTeam, staffToolsSection);
-  } else TOOL_OPENERS[feature]?.();
+  else TOOL_OPENERS[feature]?.();
 });
 
 // แอดมิน: เมนู Attendance ของหน้าทีม (สรุปการเข้าซ้อม / เช็คชื่อแทนโค้ช)
@@ -3939,6 +3936,15 @@ staffCoachesGrid.addEventListener("click", (e) => {
     editBtn.addEventListener("click", () => openEditCoachModal(row.coach));
     staffCoachDetailInfo.appendChild(editBtn);
   }
+  // แอดมิน (และทีมหลังบ้านที่มีสิทธิ์ manageTeams) ดูหน้าจอของโค้ชคนนี้ตามที่โค้ชเห็นจริงได้ — กด "กลับหน้าทีม" ในลิ้นชัก ☰ เพื่อกลับมาที่หน้านี้
+  if (adminCan("manage-team") && row.coach.role === "coach") {
+    const viewBtn = document.createElement("button");
+    viewBtn.type = "button";
+    viewBtn.className = "btn btn-secondary btn-sm ml-2";
+    viewBtn.textContent = "ดูหน้าจอของโค้ชคนนี้";
+    viewBtn.addEventListener("click", () => enterTeamManagementMode(myTeam, staffCoachesSection, row.coach));
+    staffCoachDetailInfo.appendChild(viewBtn);
+  }
   staffCoachDetailName.textContent = `ผลงานเดือนนี้ · ${row.coachName}`;
   staffCoachDetailBody.innerHTML = "";
   staffCoachDetailBody.appendChild(renderCoachDetailContent(row));
@@ -3950,7 +3956,7 @@ document.getElementById("staff-coach-detail-back").addEventListener("click", sho
 // ผู้ดูแลระบบสวมบทบาทเป็น "ผู้บริหารทีม" (ดูอย่างเดียว) แทนที่จะเป็นโค้ชเต็มรูปแบบ — ใช้ตรวจสอบว่าหน้าจอ
 // ที่ผู้บริหารทีมจริงเห็นถูกต้องหรือไม่ โดยไม่ต้องขอให้ผู้บริหารทีมจริงล็อกอินทดสอบให้
 async function enterExecutiveViewMode(team, returnSection, execRecordOverride) {
-  if (teamSpace()) returnToTeamSpace = { team: myTeam, mode: adminSpace() ? "admin" : "staff" };
+  if (teamSpace()) returnToTeamSpace = { team: myTeam, mode: adminSpace() ? "admin" : "staff", screen: currentScreenKey() };
   myTeam = team;
   myAgeGroups = [];
   myCoachPosition = null;
