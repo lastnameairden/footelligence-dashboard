@@ -79,7 +79,7 @@ import { filterPlans, filterReportsByMonths, groupByMonth, monthOptionsOf, month
 import { COACH_MENU, childMatchesScreen, menuItem, menuKeyForScreen } from "./coach-menu.js";
 import { STAFF_UNFILTERED_SCREENS, staffMenuFor } from "./staff-menu.js";
 import { initStaffHome, showStaffHome } from "./staff-home-ui.js";
-import { COACH_CERTIFICATES, coachCardHtml, parseCoachPersonal, splitCertificates } from "./coach-card.js";
+import { COACH_CERTIFICATES, coachCardHtml, coachMiniAvatarHtml, parseCoachPersonal, splitCertificates } from "./coach-card.js";
 import { initCoachPersonal, showCoachPersonal } from "./coach-personal-ui.js";
 import { ageGroupRows, coachDetailHtml } from "./coach-profile.js";
 import { ageGroupsForFilter, matchesAgeFilter, validFilter } from "./age-filter.js";
@@ -2383,7 +2383,15 @@ function buildCoachRow(c, sessions, attendanceRecords, players) {
       openEditCoachModal(c);
     }
   });
-  nameTd.appendChild(nameBtn);
+  // รูปวงกลม + ชื่อ (คลิกได้) + ชื่อจริงตัวเล็กใต้ชื่อ (ถ้าโค้ชกรอกไว้)
+  const nameCell = document.createElement("div");
+  nameCell.className = "coach-name-cell";
+  nameCell.insertAdjacentHTML("beforeend", coachMiniAvatarHtml(c));
+  const nameText = document.createElement("div");
+  nameText.appendChild(nameBtn);
+  if (c.fullName) nameText.insertAdjacentHTML("beforeend", `<span class="coach-fullname">${escapeHtml(c.fullName)}</span>`);
+  nameCell.appendChild(nameText);
+  nameTd.appendChild(nameCell);
 
   const roleTd = document.createElement("td");
   roleTd.innerHTML = roleLabel(c.role);

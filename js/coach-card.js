@@ -30,6 +30,13 @@ export function splitCertificates(list) {
   return { picked: items.filter((c) => COACH_CERTIFICATES.includes(c)), other: items.filter((c) => !COACH_CERTIFICATES.includes(c)).join(", ") };
 }
 
+// รูปวงกลมเล็กหน้าชื่อโค้ชในตารางรายชื่อโค้ชของแอดมิน — ไม่มีรูปใช้ตัวอักษรแรกของชื่อ
+export function coachMiniAvatarHtml(coach) {
+  const src = safeHttpUrl(coach.photoUrl);
+  const initial = escapeHtml(Array.from(String(coach.name ?? "").trim())[0] ?? "?");
+  return `<span class="coach-mini-avatar" aria-hidden="true">${src ? `<img src="${src}" alt="" loading="lazy" />` : initial}</span>`;
+}
+
 const FIELD = (label, body) => `<div><p class="coach-card-label">${escapeHtml(label)}</p>${body}</div>`;
 const EMPTY = '<p class="coach-card-empty">ยังไม่กรอก</p>';
 const tags = (items, cls) => `<div class="coach-card-tags">${items.map((t) => `<span class="${cls}">${escapeHtml(t)}</span>`).join("")}</div>`;

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { coachDetailHtml } from "../js/coach-profile.js";
-import { COACH_CERTIFICATES, COACH_FULLNAME_MAX, coachCardHtml, parseCoachPersonal, splitCertificates } from "../js/coach-card.js";
+import { COACH_CERTIFICATES, COACH_FULLNAME_MAX, coachCardHtml, coachMiniAvatarHtml, parseCoachPersonal, splitCertificates } from "../js/coach-card.js";
 
 test("parseCoachPersonal: all optional; blank clears to null/[]", () => {
   assert.deepEqual(parseCoachPersonal({}), { value: { fullName: null, phone: null, certificates: [] }, error: null });
@@ -61,4 +61,10 @@ test("coachDetailHtml: head, contact, certificates, age groups with player count
   assert.equal((empty.match(/ยังไม่กรอก/g) || []).length, 5, "head full name + detail full name, phone, email and certificates are empty");
   assert.match(empty, /ยังไม่กรอกชื่อจริง/);
   assert.match(empty, /รออนุมัติ/);
+});
+test("coachMiniAvatarHtml: https photo, else the first letter of the name (escaped)", () => {
+  assert.match(coachMiniAvatarHtml({ name: "ปิ", photoUrl: "https://example.com/a.jpg" }), /<img src="https:\/\/example\.com\/a\.jpg"/);
+  assert.match(coachMiniAvatarHtml({ name: "ปิ" }), />ป<\/span>/);
+  assert.match(coachMiniAvatarHtml({ name: "<b>", photoUrl: "http://insecure/a.jpg" }), />&lt;<\/span>/);
+  assert.match(coachMiniAvatarHtml({}), />\?<\/span>/);
 });

@@ -759,3 +759,8 @@ html.embedded main { padding-top: 0.25rem; padding-bottom: 1rem; }
 .coach-photo-preview img { width: 100%; height: 100%; object-fit: cover; }
 .profile-avatar { overflow: hidden; }
 .profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
+/* ตารางรายชื่อโค้ชของแอดมิน: รูปวงกลมเล็ก + ชื่อจริงใต้ชื่อ */
+.coach-name-cell { display: flex; align-items: center; gap: 0.6rem; }
+.coach-mini-avatar { flex: none; width: 2rem; height: 2rem; border-radius: 50%; overflow: hidden; display: inline-flex; align-items: center; justify-content: center; background: var(--accent-tint); color: var(--accent); font-size: 0.8125rem; font-weight: 600; }
+.coach-mini-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.coach-fullname { display: block; font-size: 0.75rem; font-weight: 400; color: var(--text-2); }
