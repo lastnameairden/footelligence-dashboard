@@ -1094,6 +1094,12 @@ function renderDrawerItemsInner() {
     } else {
       // เมนูของแผงผู้ดูแลระบบ: แอดมินหลักเห็นครบ ทีมหลังบ้านเห็นเฉพาะที่มีสิทธิ์ (ซ่อนเมนูอย่างเดียว — ตัวบังคับจริงคือกฎ Firestore)
       navDrawerItems.appendChild(drawerSectionLabel(isStaffSession() ? "ทีมหลังบ้าน" : "ผู้ดูแลระบบ"));
+      // ทีมหลังบ้านที่มีสิทธิ์ view ใช้หน้าทีมแบบใหม่ — ไม่แสดงรายการเครื่องมือเดิม (เหลือทางกลับไปเลือกทีม) ส่วนบัญชีที่ไม่มีสิทธิ์ view
+      // (เช่น มีแค่ meetings/coaches) ไม่มีหน้าเลือกทีม จึงยังใช้รายการนี้เป็นทางเข้าเครื่องมือของตัวเอง
+      if (isStaffSession() && staffCan(currentStaffPerms, "view")) {
+        navDrawerItems.appendChild(drawerItem(icon("refresh"), "เลือกทีม", goToDashboard));
+        return;
+      }
       const adminItems = [
         ["coaches", "users", "รายชื่อโค้ชในระบบ", openAdminCoachesSection],
         ["player-audit", "search", "ตรวจสอบข้อมูลนักกีฬาที่ผิดปกติ", openAdminPlayerAuditSection],

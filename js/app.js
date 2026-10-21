@@ -10,7 +10,7 @@ import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/
 import { db, auth } from "./firebase-init.js";
 import { icon } from "./icons.js";
 import { injuryStatsHtml, injuryTrendHtml } from "./injury-stats-view.js";
-import { canAccessAdminFeature, normalizePermissions, staffCan } from "./staff-perms.js";
+import { normalizePermissions, staffCan } from "./staff-perms.js";
 import { applyTeamTheme } from "./team-theme.js";
 import { buildInjuryStats } from "./injury-form.js";
 import {
@@ -1788,27 +1788,12 @@ function renderDrawerItems() {
       navDrawerItems.appendChild(drawerItem(icon("refresh"), "เปลี่ยนทีม", "/"));
     }
   } else if (currentViewerRole === "staff") {
-    // ทีมหลังบ้าน: เห็นเฉพาะเครื่องมือที่ได้รับสิทธิ์ (ซ่อนเมนูอย่างเดียว — ตัวบังคับจริงคือกฎ Firestore ดู staff-perms.js)
-    navDrawerItems.appendChild(drawerSectionLabel("ทีมหลังบ้าน"));
-    const staffItems = [
-      ["coaches", "users", "รายชื่อโค้ชในระบบ", "./attendance.html#admin=coaches"],
-      ["player-audit", "search", "ตรวจสอบข้อมูลนักกีฬาที่ผิดปกติ", "./attendance.html#admin=player-audit"],
-      ["progress", "trending-up", "ความคืบหน้าเช็คชื่อรายวัน", "./attendance.html#admin=progress"],
-      ["approvals", "file-text", "คำขอลงทะเบียนรออนุมัติ", "./attendance.html#admin=approvals"],
-      ["matches", "football", "รายงานผลการแข่งขันทั้งหมด", "./attendance.html#admin=matches"],
-      ["injuries", "heart-pulse", "รายงานอาการบาดเจ็บทั้งหมด", "./attendance.html#admin=injuries"],
-      ["print", "printer", "พิมพ์สรุปผลงานโค้ช", "./attendance.html#admin=print"],
-      ["report-card", "book", "สมุดพกนักกีฬา", "./attendance.html#admin=report-card"]
-    ];
-    for (const [feature, iconName, label, href] of staffItems) {
-      if (canAccessAdminFeature(feature, currentStaffPerms)) navDrawerItems.appendChild(drawerItem(icon(iconName), label, href));
-    }
+    // ทีมหลังบ้านที่เข้าหน้านี้ได้ (มีสิทธิ์ view) ใช้เมนู 9 รายการแบบใหม่ในหน้าทีมเท่านั้น — ไม่มีรายการเครื่องมือแผงผู้ดูแลเดิมในลิ้นชักนี้อีก
     const staffTeamFromUrl = new URLSearchParams(window.location.search).get("team");
     if (staffTeamFromUrl && TEAMS.includes(staffTeamFromUrl)) {
-      navDrawerItems.appendChild(drawerDivider());
+      navDrawerItems.appendChild(drawerSectionLabel("ทีมหลังบ้าน"));
       navDrawerItems.appendChild(drawerItem(icon("refresh"), "เปลี่ยนทีม", "/"));
-    }
-  } else if (currentViewerRole === "coach") {
+    }  } else if (currentViewerRole === "coach") {
     navDrawerItems.appendChild(drawerSectionLabel("เมนู"));
     navDrawerItems.appendChild(drawerItem(icon("calendar"), "กลับหน้า Daily", "./attendance.html"));
     navDrawerItems.appendChild(drawerItem(icon("book"), "งานหลังประชุม", "./attendance.html#screen=meeting-tasks"));
@@ -1867,7 +1852,9 @@ onAuthStateChanged(auth, async (user) => {
         ? '<span class="badge badge-info">ผู้ดูแลระบบ</span>'
         : data.role === "executive"
           ? '<span class="badge badge-neutral">ผู้บริหารทีม</span>'
-          : '<span class="badge badge-success">โค้ช</span>';
+          : data.role === "staff"
+            ? '<span class="badge badge-warning">ทีมหลังบ้าน</span>'
+            : '<span class="badge badge-success">โค้ช</span>';
     renderDrawerItems();
 
     const isAdmin = data.role === "admin";
