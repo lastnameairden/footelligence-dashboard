@@ -1767,36 +1767,15 @@ function drawerDivider() {
 function renderDrawerItems() {
   navDrawerItems.innerHTML = "";
 
-  if (currentViewerRole === "admin") {
-    // ใช้ URL hash (#admin=...) แทน query string เพราะเซิร์ฟเวอร์ทดสอบในเครื่อง (serve, clean-url) จะ
-    // redirect "attendance.html" ไปเป็น "attendance" และตัด query string ทิ้งระหว่างทาง แต่ไม่ตัด hash
-    navDrawerItems.appendChild(drawerSectionLabel("ผู้ดูแลระบบ"));
-    navDrawerItems.appendChild(drawerItem(icon("users"), "รายชื่อโค้ชในระบบ", "./attendance.html#admin=coaches"));
-    navDrawerItems.appendChild(drawerItem(icon("search"), "ตรวจสอบข้อมูลนักกีฬาที่ผิดปกติ", "./attendance.html#admin=player-audit"));
-    navDrawerItems.appendChild(drawerItem(icon("trending-up"), "ความคืบหน้าเช็คชื่อรายวัน", "./attendance.html#admin=progress"));
-    navDrawerItems.appendChild(drawerItem(icon("file-text"), "คำขอลงทะเบียนรออนุมัติ", "./attendance.html#admin=approvals"));
-    navDrawerItems.appendChild(drawerItem(icon("football"), "รายงานผลการแข่งขันทั้งหมด", "./attendance.html#admin=matches"));
-    navDrawerItems.appendChild(drawerItem(icon("heart-pulse"), "รายงานอาการบาดเจ็บทั้งหมด", "./attendance.html#admin=injuries"));
-    navDrawerItems.appendChild(drawerItem(icon("printer"), "พิมพ์สรุปผลงานโค้ช", "./attendance.html#admin=print"));
-    navDrawerItems.appendChild(drawerItem(icon("book"), "สมุดพกนักกีฬา", "./attendance.html#admin=report-card"));
-    navDrawerItems.appendChild(drawerItem(icon("dna"), "กำหนดรอบการประเมิน MASC", "./attendance.html#admin=masc-rounds"));
-    navDrawerItems.appendChild(drawerItem(icon("calendar"), "นัดประชุมโค้ชรายสัปดาห์", "./attendance.html#admin=meetings"));
-    navDrawerItems.appendChild(drawerItem(icon("trending-up"), "รอบทดสอบสมรรถภาพ", "./attendance.html#admin=fitness-rounds"));
-    navDrawerItems.appendChild(drawerItem(icon("trending-up"), "พัฒนาการนักกีฬา", "./development.html"));
-    navDrawerItems.appendChild(drawerItem(icon("bell"), "ประกาศถึงทีมหลังบ้าน", "./attendance.html#admin=staff-announcements"));
-    // "กลับภาพรวมทุกทีม" มีประโยชน์เฉพาะตอนกำลังดูทีมใดทีมหนึ่งอยู่ (มี ?team= เจาะจงทีมจริงในนี้) — ถ้าอยู่ที่
-    // ภาพรวมทุกทีมอยู่แล้ว (หน้าแรกสุด ไม่มี ?team= หรือมีแต่ไม่ตรงชื่อทีมไหนเลย) กดแล้วจะแค่โหลดหน้าเดิมซ้ำ
-    // ไม่มีประโยชน์ จึงไม่ต้องมีปุ่มนี้ให้เห็นเลย (เหมือน dashboardBackLink ในหน้าที่ซ่อนกรณีเดียวกัน)
+  if (currentViewerRole === "admin" || currentViewerRole === "staff") {
+    // เครื่องมือผู้ดูแลทั้งหมดอยู่ในเมนู Admin/Tools ของหน้าทีมแล้ว — ลิ้นชักนี้เหลือแค่ทางกลับหน้าทีม/เปลี่ยนทีม
+    // (ใช้ URL hash เพราะเซิร์ฟเวอร์ทดสอบในเครื่อง redirect "attendance.html" แล้วตัด query string ทิ้งแต่ไม่ตัด hash)
+    // ถ้าอยู่ที่หน้าเลือกทีม (ไม่มี ?team= ที่ตรงชื่อทีมจริง) ไม่ต้องมีปุ่มเหล่านี้ เพราะกดแล้วไม่มีประโยชน์
+    const as = currentViewerRole === "admin" ? "admin" : "staff";
     const teamFromUrl = new URLSearchParams(window.location.search).get("team");
     if (teamFromUrl && TEAMS.includes(teamFromUrl)) {
-      navDrawerItems.appendChild(drawerDivider());
-      navDrawerItems.appendChild(drawerItem(icon("refresh"), "เปลี่ยนทีม", "/"));
-    }
-  } else if (currentViewerRole === "staff") {
-    // ทีมหลังบ้านที่เข้าหน้านี้ได้ (มีสิทธิ์ view) ใช้เมนู 9 รายการแบบใหม่ในหน้าทีมเท่านั้น — ไม่มีรายการเครื่องมือแผงผู้ดูแลเดิมในลิ้นชักนี้อีก
-    const staffTeamFromUrl = new URLSearchParams(window.location.search).get("team");
-    if (staffTeamFromUrl && TEAMS.includes(staffTeamFromUrl)) {
-      navDrawerItems.appendChild(drawerSectionLabel("ทีมหลังบ้าน"));
+      navDrawerItems.appendChild(drawerSectionLabel(currentViewerRole === "admin" ? "ผู้ดูแลระบบ" : "ทีมหลังบ้าน"));
+      navDrawerItems.appendChild(drawerItem(icon("users"), "กลับหน้าทีม", `./attendance.html#admin=team&team=${encodeURIComponent(teamFromUrl)}&as=${as}`));
       navDrawerItems.appendChild(drawerItem(icon("refresh"), "เปลี่ยนทีม", "/"));
     }  } else if (currentViewerRole === "coach") {
     navDrawerItems.appendChild(drawerSectionLabel("เมนู"));

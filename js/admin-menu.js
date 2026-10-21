@@ -1,8 +1,9 @@
-// เมนูหน้าทีมของ "แอดมินหลัก" (ตรรกะล้วนๆ ไม่พึ่ง DOM/Firebase เพื่อเทสต์ใน Node ได้)
+// เมนูหน้าทีมของ "แอดมินหลัก" (9 เมนูเดียวกับทีมหลังบ้าน + เมนู Admin) (ตรรกะล้วนๆ ไม่พึ่ง DOM/Firebase เพื่อเทสต์ใน Node ได้)
 // รูปแบบเดียวกับเมนูโค้ช/ทีมหลังบ้าน (key/label/hint/icon/screen/screens/children) แต่เมนูย่อยครบเท่าที่โค้ชมี — แอดมินดูและแก้ข้อมูลของทีมได้ในที่เดียว
 // (Training มี Upload/Report, Match Data มีฟอร์มบันทึก, Evaluation มี Footelligence Test/Physical Test, Injury มี Recording ฯลฯ)
 // หน้าที่ใช้ร่วมกับทีมหลังบ้าน: Home (staff-home), Coach Data (staff-coaches), Meeting (staff-meeting) — หน้าอื่นเป็นหน้าเดียวกับของโค้ช
 import { menuItem } from "./coach-menu.js";
+import { toolsMenuItem } from "./admin-tools.js";
 
 const fromCoach = (key, overrides = {}) => ({ ...menuItem(key), ...overrides });
 
@@ -26,5 +27,7 @@ export const ADMIN_TEAM_MENU = [
   fromCoach("match-data"),
   fromCoach("evaluation"),
   fromCoach("injury-sick"),
-  { key: "meeting", label: "Meeting", hint: "นัดประชุมและคำตอบจากโค้ช", icon: "book", screen: "staff-meeting", screens: ["staff-meeting"] }
+  { key: "meeting", label: "Meeting", hint: "นัดประชุมและคำตอบจากโค้ช", icon: "book", screen: "staff-meeting", screens: ["staff-meeting"] },
+  // เมนูที่ 10: เครื่องมือผู้ดูแลระบบทั้งหมด (admin-tools.js)
+  toolsMenuItem(true)
 ];

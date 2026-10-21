@@ -79,6 +79,7 @@ import { filterPlans, filterReportsByMonths, groupByMonth, monthOptionsOf, month
 import { COACH_MENU, childMatchesScreen, menuItem, menuKeyForScreen } from "./coach-menu.js";
 import { STAFF_UNFILTERED_SCREENS, staffMenuFor } from "./staff-menu.js";
 import { ADMIN_TEAM_MENU } from "./admin-menu.js";
+import { toolGroupsFor } from "./admin-tools.js";
 import { initStaffHome, showStaffHome } from "./staff-home-ui.js";
 import { COACH_CERTIFICATES, coachCardHtml, coachMiniAvatarHtml, parseCoachPersonal, splitCertificates } from "./coach-card.js";
 import { initCoachPersonal, showCoachPersonal } from "./coach-personal-ui.js";
@@ -221,6 +222,8 @@ const athleteResultsSection = document.getElementById("athlete-results-section")
 const profileSection = document.getElementById("profile-section");
 const staffHomeSection = document.getElementById("staff-home-section");
 const staffAttendanceMenuSection = document.getElementById("staff-attendance-menu-section");
+const staffToolsSection = document.getElementById("staff-tools-section");
+const staffToolsBody = document.getElementById("staff-tools-body");
 const staffHomeBody = document.getElementById("staff-home-body");
 const staffCoachesSection = document.getElementById("staff-coaches-section");
 const staffCoachesGrid = document.getElementById("staff-coaches-grid");
@@ -724,6 +727,7 @@ function hideAllScreens() {
   profileSection.classList.add("hidden");
   staffHomeSection.classList.add("hidden");
   staffAttendanceMenuSection.classList.add("hidden");
+  staffToolsSection.classList.add("hidden");
   staffCoachesSection.classList.add("hidden");
   footelligenceTestSection.classList.add("hidden");
   injuryMenuSection.classList.add("hidden");
@@ -1040,8 +1044,13 @@ function goToDashboard() {
 // เซ็ตไว้เสมอตอนเข้าโหมดนี้ใน enterTeamManagementMode จึงไม่มีทางเป็น null จริงๆ แต่กันไว้ด้วย fallback)
 // พร้อมล้าง myTeam ไม่ให้เมนูค้างแสดงเครื่องมือของทีมเดิมหลังออกจากโหมดนี้แล้ว
 function exitTeamManagementToAdminPanel() {
-  hideAllScreens();
-  (adminReturnSection || adminManageTeamSection).classList.remove("hidden");
+  // เข้าโหมดนี้มาจากเมนู Admin/Tools ของหน้าทีม (จัดการทีมแทนโค้ช) = กลับหน้าทีมเดิม ไม่ใช่แผงเดิม
+  const back = returnToTeamSpace;
+  returnToTeamSpace = null;
+  if (!back) {
+    hideAllScreens();
+    (adminReturnSection || adminManageTeamSection).classList.remove("hidden");
+  }
   myTeam = null;
   myAgeGroups = [];
   myCoachPosition = null;
@@ -1058,6 +1067,7 @@ function exitTeamManagementToAdminPanel() {
   coachTeamEl.textContent = isStaffSession() ? "เข้าถึงตามสิทธิ์ที่ได้รับ" : "เข้าถึงได้ทุกทีม";
   coachAgeGroupsWrap.classList.add("hidden");
   renderDrawerItems();
+  if (back) enterTeamSpace(back.team, back.mode, () => openStaffTools());
 }
 
 // เนื้อหาเมนูปรับตามบทบาทและบริบทปัจจุบัน (โค้ช / ผู้บริหารทีม / ผู้ดูแลระบบ, กำลังจัดการทีมอยู่หรือไม่)
@@ -1098,13 +1108,14 @@ function renderDrawerItemsInner() {
       navDrawerItems.appendChild(drawerSectionLabel(`จัดการทีม: ${teamLogoImg(myTeam)}${myTeam}`));
       appendCoachMenuToDrawer();
       navDrawerItems.appendChild(drawerDivider());
-      navDrawerItems.appendChild(drawerItem(icon("shield"), "กลับแผงควบคุมผู้ดูแลระบบ", exitTeamManagementToAdminPanel));
+      navDrawerItems.appendChild(drawerItem(icon("shield"), returnToTeamSpace ? "กลับหน้าทีม" : "กลับแผงควบคุมผู้ดูแลระบบ", exitTeamManagementToAdminPanel));
     } else {
       // เมนูของแผงผู้ดูแลระบบ: แอดมินหลักเห็นครบ ทีมหลังบ้านเห็นเฉพาะที่มีสิทธิ์ (ซ่อนเมนูอย่างเดียว — ตัวบังคับจริงคือกฎ Firestore)
       navDrawerItems.appendChild(drawerSectionLabel(isStaffSession() ? "ทีมหลังบ้าน" : "ผู้ดูแลระบบ"));
       // ทีมหลังบ้านที่มีสิทธิ์ view ใช้หน้าทีมแบบใหม่ — ไม่แสดงรายการเครื่องมือเดิม (เหลือทางกลับไปเลือกทีม) ส่วนบัญชีที่ไม่มีสิทธิ์ view
       // (เช่น มีแค่ meetings/coaches) ไม่มีหน้าเลือกทีม จึงยังใช้รายการนี้เป็นทางเข้าเครื่องมือของตัวเอง
-      if (isStaffSession() && staffCan(currentStaffPerms, "view")) {
+      // แอดมินหลักก็เช่นกัน: เครื่องมือทั้งหมดอยู่ในเมนู Admin ของหน้าทีมแล้ว
+      if (!isStaffSession() || staffCan(currentStaffPerms, "view")) {
         navDrawerItems.appendChild(drawerItem(icon("refresh"), "เลือกทีม", goToDashboard));
         return;
       }
@@ -1185,6 +1196,7 @@ const COACH_SCREEN_OPENERS = {
   "meeting-history": () => openMeetingHistory(),
   "staff-home": () => openStaffHome(),
   "staff-attendance-menu": () => openStaffAttendanceMenu(),
+  "staff-tools": () => openStaffTools(),
   "staff-coaches": () => openStaffCoaches(),
   "staff-meeting": () => openAdminMeetingsSection()
 };
@@ -2123,8 +2135,9 @@ adminMascRoundStartBtn.addEventListener("click", async () => {
 
 // หน้าแผงควบคุมแบบการ์ด (admin-menu-section) ถูกยกเลิกไปแล้ว — ปุ่ม "← กลับหน้า Dashboard" ในแต่ละ
 // เครื่องมือของผู้ดูแลระบบจึงย้อนกลับไปหน้า Dashboard โดยตรงแทน (ซึ่งเป็นหน้าหลักของผู้ดูแลระบบอยู่แล้ว)
+// ปุ่มกลับของหน้าเครื่องมือผู้ดูแล: ในหน้าทีมกลับไปหน้าเมนู Admin/Tools ไม่ก็กลับหน้าเลือกทีมเหมือนเดิม
 for (const btn of adminBackButtons) {
-  btn.addEventListener("click", goToDashboard);
+  btn.addEventListener("click", () => (teamSpace() ? openStaffTools() : goToDashboard()));
 }
 
 // ล็อก/จำกัดช่องเลือกรุ่นอายุของนักกีฬาตามรุ่นที่โค้ชคนนี้รับผิดชอบ (ถ้ามีการระบุไว้ตอนลงทะเบียน)
@@ -3790,6 +3803,52 @@ staffFilterInner.addEventListener("click", (e) => {
   if (btn) setStaffAgeFilter(btn.dataset.age);
 });
 
+// เมนู Admin (แอดมิน) / Tools (ทีมหลังบ้าน): การ์ดเครื่องมือตามสิทธิ์ (admin-tools.js) — กดการ์ดเปิดหน้าเครื่องมือในแผงผู้ดูแล
+// หน้าเครื่องมือเหล่านี้ไม่ผูกกับทีม (เช่น รายชื่อโค้ชทุกทีม) แต่ยังอยู่ในหน้าทีม: แถบเมนู/ปุ่มกลับพามาหน้านี้ได้
+let returnToTeamSpace = null; // { team, mode } — จำไว้ตอนเข้า "จัดการทีมแทนโค้ช" เพื่อกลับมาหน้าทีมเดิมเมื่อกดออก
+
+const TOOL_OPENERS = {
+  approvals: () => openAdminApprovalsSection(),
+  coaches: () => openAdminCoachesSection(),
+  "staff-announcements": () => openAdminStaffAnnouncementsSection(),
+  progress: () => openAdminProgressSection(),
+  matches: () => openAdminMatchesSection(),
+  injuries: () => openAdminInjuriesSection(),
+  print: () => openAdminPrintSection(),
+  "player-audit": () => openAdminPlayerAuditSection(),
+  "report-card": () => openAdminReportCardSection(),
+  "masc-rounds": () => openAdminMascRoundsSection(),
+  "fitness-rounds": () => openAdminFitnessRoundsSection(),
+  "athlete-windows": () => openAdminAthleteWindowsSection()
+};
+
+function openStaffTools() {
+  hideAllScreens();
+  staffToolsSection.classList.remove("hidden");
+  const groups = toolGroupsFor(isStaffSession() ? currentStaffPerms : null);
+  staffToolsBody.innerHTML = groups
+    .map(
+      (g) => `<div class="space-y-3"><h3 class="section-title">${escapeHtml(g.label)}</h3><div class="grid grid-cols-1 sm:grid-cols-2 gap-3">${g.tools
+        .map(
+          (t) => `<button type="button" data-tool="${escapeHtml(t.feature)}" class="card card-pad match-data-card"><span class="match-data-card-title">${icon(t.icon)} ${escapeHtml(t.label)}</span><span class="match-data-card-text">${escapeHtml(t.hint)}</span></button>`
+        )
+        .join("")}</div></div>`
+    )
+    .join("");
+}
+
+staffToolsBody.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-tool]");
+  if (!btn) return;
+  const feature = btn.dataset.tool;
+  if (feature === "team-dashboard") window.location.href = `${window.location.origin}/?team=${encodeURIComponent(myTeam)}`;
+  else if (feature === "development") window.location.href = "./development.html";
+  else if (feature === "manage-team") {
+    returnToTeamSpace = { team: myTeam, mode: adminSpace() ? "admin" : "staff" };
+    enterTeamManagementMode(myTeam, staffToolsSection);
+  } else TOOL_OPENERS[feature]?.();
+});
+
 // แอดมิน: เมนู Attendance ของหน้าทีม (สรุปการเข้าซ้อม / เช็คชื่อแทนโค้ช)
 function openStaffAttendanceMenu() {
   hideAllScreens();
@@ -4483,6 +4542,7 @@ const ROUTE_SCREENS = [
   { el: profileSection, key: "profile", kind: "coach" },
   { el: staffHomeSection, key: "staff-home", kind: "coach" },
   { el: staffAttendanceMenuSection, key: "staff-attendance-menu", kind: "coach" },
+  { el: staffToolsSection, key: "staff-tools", kind: "coach" },
   { el: staffCoachesSection, key: "staff-coaches", kind: "coach" },
   { el: footelligenceTestSection, key: "footelligence-test", kind: "coach" },
   { el: injuryMenuSection, key: "injury-menu", kind: "coach" },
@@ -4528,6 +4588,8 @@ function currentRouteFromScreen() {
       route.date = routeDateForScreen(active.key);
     } else if (teamSpace() && active.key === "meetings") {
       route.screen = "staff-meeting";
+    } else if (teamSpace() && TOOL_OPENERS[active.key]) {
+      route.screen = active.key; // หน้าเครื่องมือผู้ดูแลที่เปิดจากเมนู Admin/Tools
     }
     return route;
   }
@@ -4670,6 +4732,9 @@ function openCoachScreen(screen, date) {
     case "staff-attendance-menu":
       openStaffAttendanceMenu();
       break;
+    case "staff-tools":
+      openStaffTools();
+      break;
     case "staff-coaches":
       openStaffCoaches();
       break;
@@ -4677,7 +4742,9 @@ function openCoachScreen(screen, date) {
       openAdminMeetingsSection();
       break;
     default:
-      showDaily();
+      // หน้าเครื่องมือผู้ดูแลที่เปิดจากเมนู Admin/Tools (รีเฟรชแล้วกลับมาหน้าเดิม) ไม่รู้จัก key = Home ของหน้าทีม/Daily
+      if (teamSpace() && TOOL_OPENERS[screen]) TOOL_OPENERS[screen]();
+      else showDaily();
   }
 }
 

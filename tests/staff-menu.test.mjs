@@ -5,21 +5,25 @@ import { COACH_MENU, menuItem, menuKeyForScreen } from "../js/coach-menu.js";
 import { ageGroupsForFilter, matchesAgeFilter, validFilter } from "../js/age-filter.js";
 import { COACH_SCREEN_KEYS } from "../js/screen-route.js";
 import { ADMIN_TEAM_MENU } from "../js/admin-menu.js";
+import { hasAdminTools, toolGroupsFor, toolsMenuItem } from "../js/admin-tools.js";
 
 test("staff menu: the nine agreed items in order", () => {
   assert.deepEqual(STAFF_MENU.map((m) => m.label), ["Home", "Coach Data", "Player Data", "Attendance", "Training", "Match Data", "Evaluation", "Injury/Sick", "Meeting"]);
   assert.equal(new Set(STAFF_MENU.map((m) => m.key)).size, 9);
 });
 
-test("staff menu: view permission sees eight, Meeting needs the meetings permission", () => {
+test("staff menu: view permission sees the eight data menus + Tools, Meeting needs the meetings permission", () => {
   const view = staffMenuFor(["view"]).map((m) => m.key);
   assert.equal(view.includes("meeting"), false);
-  assert.equal(view.length, 8);
-  assert.equal(staffMenuFor(["view", "meetings"]).length, 9);
-  assert.deepEqual(staffMenuFor(["meetings"]).map((m) => m.key), ["meeting"]);
+  assert.equal(view.length, 9);
+  assert.equal(view[view.length - 1], "admin-tools");
+  assert.equal(staffMenuFor(["view", "meetings"]).length, 10);
+  assert.deepEqual(staffMenuFor(["meetings"]).map((m) => m.key), ["meeting"], "meetings alone has no admin tool, so no Tools menu");
   assert.deepEqual(staffMenuFor([]), []);
   // manageTeams ให้ view ในตัว
-  assert.equal(staffMenuFor(["manageTeams"]).length, 8);
+  assert.equal(staffMenuFor(["manageTeams"]).length, 9);
+  // coaches อย่างเดียว: ไม่มีเมนูข้อมูล มีแต่ Tools (อนุมัติ/รายชื่อโค้ช)
+  assert.deepEqual(staffMenuFor(["coaches"]).map((m) => m.key), ["admin-tools"]);
 });
 
 test("staff menu: Evaluation is Athlete Results only (no landing, no Physical Test / Footelligence Test)", () => {
@@ -71,9 +75,9 @@ test("every staff-* route key belongs to the staff menu, and every staff menu sc
     for (const c of m.children || []) for (const s of [c.screen, ...(c.children || []).map((g) => g.screen)]) assert.ok(m.screens.includes(s), `${m.key} child ${s}`);
   }
 });
-test("admin team menu: the nine items, full coach submenus, shared staff pages for Home / Coach Data / Meeting", () => {
-  assert.deepEqual(ADMIN_TEAM_MENU.map((m) => m.label), ["Home", "Coach Data", "Player Data", "Attendance", "Training", "Match Data", "Evaluation", "Injury/Sick", "Meeting"]);
-  assert.equal(new Set(ADMIN_TEAM_MENU.map((m) => m.key)).size, 9);
+test("admin team menu: nine items + Admin, full coach submenus, shared staff pages for Home / Coach Data / Meeting", () => {
+  assert.deepEqual(ADMIN_TEAM_MENU.map((m) => m.label), ["Home", "Coach Data", "Player Data", "Attendance", "Training", "Match Data", "Evaluation", "Injury/Sick", "Meeting", "Admin"]);
+  assert.equal(new Set(ADMIN_TEAM_MENU.map((m) => m.key)).size, 10);
   assert.deepEqual(ADMIN_TEAM_MENU.find((m) => m.key === "home").screens, ["staff-home"]);
   assert.equal(ADMIN_TEAM_MENU.find((m) => m.key === "meeting").screen, "staff-meeting");
   const training = ADMIN_TEAM_MENU.find((m) => m.key === "training");
@@ -87,10 +91,27 @@ test("admin team menu: the nine items, full coach submenus, shared staff pages f
     assert.ok(COACH_SCREEN_KEYS.includes(m.screen), `${m.key} → ${m.screen}`);
     assert.ok(m.screens.includes(m.screen));
     assert.equal(m.perm, undefined, "the admin menu is not permission-filtered");
+    if (m.key === "admin-tools") continue;
   }
   // แต่ละหน้าจออยู่ภายใต้เมนูเดียวเท่านั้น
   const seen = new Map();
   for (const m of ADMIN_TEAM_MENU) for (const s of m.screens) assert.equal(seen.has(s), false, `${s} listed under ${seen.get(s)} and ${m.key}`), seen.set(s, m.key);
   assert.equal(menuKeyForScreen("report", ADMIN_TEAM_MENU), "training");
   assert.equal(menuKeyForScreen("checkin", ADMIN_TEAM_MENU), "attendance");
+});
+test("admin tools: admin sees every tool in four groups; staff only what the permission allows", () => {
+  const all = toolGroupsFor(null);
+  assert.deepEqual(all.map((g) => g.key), ["accounts", "monitoring", "evaluation", "other"]);
+  assert.equal(all.flatMap((g) => g.tools).length, 15);
+  const names = (perms) => toolGroupsFor(perms).flatMap((g) => g.tools.map((t) => t.feature));
+  assert.deepEqual(names(["view"]), ["progress", "matches", "injuries", "print", "report-card", "team-dashboard"]);
+  assert.deepEqual(names(["coaches"]), ["approvals", "coaches"]);
+  assert.deepEqual(names(["manageTeams"]), ["progress", "matches", "injuries", "print", "player-audit", "report-card", "team-dashboard", "manage-team"]);
+  assert.deepEqual(names(["meetings"]), []);
+  assert.equal(hasAdminTools(["meetings"]), false);
+  assert.equal(hasAdminTools(["view"]), true);
+  for (const adminOnly of ["staff-announcements", "masc-rounds", "fitness-rounds", "athlete-windows", "development"]) assert.equal(names(["view", "coaches", "manageTeams", "meetings"]).includes(adminOnly), false, adminOnly);
+  assert.equal(toolsMenuItem(true).label, "Admin");
+  assert.equal(toolsMenuItem(false).label, "Tools");
+  assert.ok(toolsMenuItem(true).screens.includes("approvals") && !toolsMenuItem(true).screens.includes("manage-team"));
 });

@@ -3,6 +3,7 @@
 // perm = สิทธิ์ของทีมหลังบ้านที่ต้องมีจึงจะเห็นเมนูนี้ (ดู staff-perms.js) — ซ่อนเมนูอย่างเดียว ตัวบังคับจริงคือกฎ Firestore
 // หน้าทีมนี้ "ดูอย่างเดียว": การแก้ข้อมูลแทนโค้ชยังอยู่ในโหมดจัดการทีมเดิม (สิทธิ์ manageTeams)
 import { staffCan } from "./staff-perms.js";
+import { hasAdminTools, toolsMenuItem } from "./admin-tools.js";
 
 export const STAFF_MENU = [
   { key: "home", label: "Home", hint: "แจ้งเตือน", icon: "home", screen: "staff-home", screens: ["staff-home"], perm: "view" },
@@ -31,7 +32,9 @@ export const STAFF_MENU = [
 
 // เมนูที่บัญชีนี้เห็น (perms = รายการสิทธิ์ของบัญชี ยังไม่ normalize ก็ได้)
 export function staffMenuFor(perms) {
-  return STAFF_MENU.filter((m) => staffCan(perms, m.perm));
+  const items = STAFF_MENU.filter((m) => staffCan(perms, m.perm));
+  // เมนู Tools: เครื่องมือผู้ดูแลที่ทีมหลังบ้านมีสิทธิ์ (อนุมัติโค้ช พิมพ์สรุป สมุดพก ฯลฯ) — ไม่มีสิทธิ์เครื่องมือใดเลยก็ไม่แสดงเมนูนี้
+  return hasAdminTools(perms) ? [...items, toolsMenuItem(false)] : items;
 }
 
 // หน้าจอที่ไม่นับว่าเป็น "ข้อมูลรายรุ่น" — ไม่แสดงตัวกรองรุ่นอายุ
