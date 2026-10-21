@@ -1334,21 +1334,26 @@ function renderAttendanceGridView() {
   const keep = groups.includes(attendanceGridAgeSelect.value) ? attendanceGridAgeSelect.value : groups[0];
   attendanceGridAgeSelect.innerHTML = groups.map((g) => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join("");
   attendanceGridAgeSelect.value = keep;
-  const coaches = (attendanceGridData.coaches || []).filter((c) => (c.ageGroups || []).includes(keep));
+  // ทีมหลังบ้าน: ตัวกรองรุ่นอยู่บนแถบหลัก — ไม่มีตัวเลือกรุ่นในหน้านี้ รวมทุกรุ่น = วางตารางทีละรุ่นต่อกัน
+  const shown = staffSpace() ? groups : [keep];
+  const coaches = (attendanceGridData.coaches || []).filter((c) => (c.ageGroups || []).some((g) => shown.includes(g)));
   attendanceGridCoachLabel.textContent =
     coaches.length > 0 ? `โค้ชผู้รับผิดชอบ: ${coaches.map((c) => `${c.name ?? "-"} (${coachPositionLabel(c.coachPosition)})`).join(", ")}` : "สรุปการเข้าซ้อมรายเดือน";
-  const rosterOfGroup = filterAndSortPlayers(players, { ageGroup: keep, sort: "number" });
-  const grid = buildAttendanceGrid({
-    month: attendanceGridMonth,
-    ageGroup: keep,
-    players: rosterOfGroup,
-    attendanceRecords: attendanceGridData.attendanceRecords,
-    sessions: attendanceGridData.sessions,
-    matchReports: attendanceGridData.matchReports,
-    weekdays: TEAM_TRAINING_WEEKDAYS[myTeam],
-    today: todayBangkok()
-  });
-  attendanceGridWrap.innerHTML = gridHtml(grid);
+  attendanceGridWrap.innerHTML = shown
+    .map((g) => {
+      const grid = buildAttendanceGrid({
+        month: attendanceGridMonth,
+        ageGroup: g,
+        players: filterAndSortPlayers(players, { ageGroup: g, sort: "number" }),
+        attendanceRecords: attendanceGridData.attendanceRecords,
+        sessions: attendanceGridData.sessions,
+        matchReports: attendanceGridData.matchReports,
+        weekdays: TEAM_TRAINING_WEEKDAYS[myTeam],
+        today: todayBangkok()
+      });
+      return `${shown.length > 1 ? `<h3 class="section-title px-4 pt-3">${escapeHtml(g)}</h3>` : ""}${gridHtml(grid)}`;
+    })
+    .join("");
 }
 
 async function loadAttendanceGrid() {
@@ -1750,6 +1755,7 @@ initPhysical({
   team: () => myTeam,
   ageGroups: () => myAgeGroups,
   canBypass: () => currentIsAdmin,
+  ageLocked: () => staffSpace(),
   bypassWho: () => (isStaffSession() ? "ทีมหลังบ้าน" : "แอดมิน"),
   openReportCard: openReportCardFrame,
   closeReportCard: () => clearEmbedded(athleteResultsFrame)
@@ -4877,6 +4883,8 @@ function playerCardHtml(p) {
 
 function renderPlayerGallery() {
   const groups = ageGroupsOf(players);
+  // หน้าทีมของทีมหลังบ้านกรองรุ่นอายุจากแถบตัวกรองด้านบนที่เดียว (players ถูกกรองมาแล้ว) — ไม่มีชิปรุ่นซ้ำในหน้านี้
+  if (staffSpace()) galleryAgeGroup = "all";
   if (galleryAgeGroup !== "all" && !groups.includes(galleryAgeGroup)) galleryAgeGroup = "all";
   // ปุ่มสลับรุ่นอายุ แสดงเมื่อโค้ชดูแลหลายรุ่น (รุ่นเดียวไม่ต้องมีตัวเลือก)
   playerGalleryChips.innerHTML =
@@ -6742,6 +6750,7 @@ function startEditInjury(inj) {
 initResults({
   team: () => myTeam,
   ageGroups: () => myAgeGroups,
+  ageLocked: () => staffSpace(),
   edit: (report) => {
     openInjuryReportSection();
     startEditInjury(report);
@@ -7267,7 +7276,8 @@ function renderPlanData() {
   planDataMonthSelect.value = month;
 
   const ages = planAgeGroupsOf(trainingPlansCache);
-  const ageGroup = ages.includes(planDataAgeSelect.value) ? planDataAgeSelect.value : "";
+  // ทีมหลังบ้าน: รุ่นอายุมาจากแถบตัวกรองด้านบนที่เดียว ("" = ทุกรุ่น)
+  const ageGroup = staffSpace() ? staffAgeFilter : ages.includes(planDataAgeSelect.value) ? planDataAgeSelect.value : "";
   planDataAgeSelect.innerHTML = '<option value="">ทุกรุ่น</option>' + ages.map((a) => `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join("");
   planDataAgeSelect.value = ageGroup;
 

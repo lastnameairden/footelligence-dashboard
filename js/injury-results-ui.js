@@ -7,7 +7,7 @@ import { buildResults, resultsHtml } from "./injury-results.js";
 import { ageNumberOf } from "./fitness-calc.js";
 
 const el = (id) => document.getElementById(id);
-let api = null; // { team(), ageGroups(), edit(report) = เปิด Recording ในโหมดแก้ไข, remove(report) = ลบรายการแล้วโหลดผลใหม่ }
+let api = null; // { team(), ageGroups(), ageLocked() = รุ่นอายุถูกเลือกจากแถบตัวกรองภายนอก (ไม่ใช้ตัวเลือกรุ่นของหน้านี้), edit(report) = เปิด Recording ในโหมดแก้ไข, remove(report) = ลบรายการแล้วโหลดผลใหม่ }
 let reports = [];
 let mode = "term";
 let key = null;
@@ -26,7 +26,8 @@ function render() {
   const select = el("injury-results-age");
   const groups = mine.length > 0 ? mine : [...new Set(reports.map((r) => r.ageGroup).filter(Boolean))];
   groups.sort((a, b) => (ageNumberOf(a) ?? 99) - (ageNumberOf(b) ?? 99));
-  const keep = groups.includes(select.value) ? select.value : "";
+  // ทีมหลังบ้าน: รุ่นอายุมาจากแถบตัวกรองด้านบนที่เดียว — mine ถูกจำกัดตามรุ่นนั้นอยู่แล้ว ("" = ทุกรุ่นในขอบเขต)
+  const keep = api.ageLocked && api.ageLocked() ? "" : groups.includes(select.value) ? select.value : "";
   select.innerHTML = `<option value="">${mine.length > 0 ? "ทุกรุ่นที่ดูแล" : "ทุกรุ่น"}</option>` + groups.map((g) => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join("");
   select.value = keep;
   const model = buildResults({ reports, myAgeGroups: mine, ageGroup: keep, mode, key, todayStr: todayBangkok() });

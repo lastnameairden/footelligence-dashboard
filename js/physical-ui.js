@@ -13,7 +13,7 @@ import { printSheet } from "./print-sheet.js";
 import { coachAccessModel, dateLabel, daysLeft, periodAllowed, windowLabel } from "./athlete-windows.js";
 
 const el = (id) => document.getElementById(id);
-let api = null; // { team(), ageGroups(), canBypass() = แอดมินที่สวมบทบาทโค้ช / ทีมหลังบ้าน, bypassWho() = ข้อความในแบนเนอร์ (ไม่ส่ง = "แอดมิน"), openReportCard({team,ageGroup,start,end}), closeReportCard() } — ageGroups() ว่าง = ดูแลทั้งทีม (ใช้รุ่นที่มีนักกีฬา)
+let api = null; // { team(), ageGroups(), canBypass() = แอดมินที่สวมบทบาทโค้ช / ทีมหลังบ้าน, bypassWho() = ข้อความในแบนเนอร์ (ไม่ส่ง = "แอดมิน"), ageLocked() = true เมื่อรุ่นอายุถูกเลือกจากแถบตัวกรองภายนอก (ซ่อนตัวเลือกรุ่นของหน้านี้), openReportCard({team,ageGroup,start,end}), closeReportCard() } — ageGroups() ว่าง = ดูแลทั้งทีม (ใช้รุ่นที่มีนักกีฬา)
 let rounds = [];
 let pool = [];
 
@@ -128,6 +128,8 @@ export async function showAthleteResults() {
   const options = [...(mine.length === 0 ? [{ value: "__ALL__", label: "ทุกรุ่น" }] : []), ...groups.map((g) => ({ value: g, label: g }))];
   const ageSelect = el("athlete-results-age");
   fillSelect(ageSelect, options, ageSelect.value);
+  // ทีมหลังบ้าน: รุ่นอายุมาจากแถบตัวกรองด้านบนที่เดียว (ไม่มีตัวเลือกรุ่นในหน้านี้) — รุ่นที่เลือก หรือ "ทุกรุ่น" เมื่อรวมทุกรุ่น
+  if (api.ageLocked && api.ageLocked()) ageSelect.value = mine[0] ?? "__ALL__";
 
   const periodSelect = el("athlete-results-period");
   el("athlete-results-period-wrap").classList.toggle("hidden", bypass);
