@@ -1,7 +1,8 @@
 // เมนู Admin/Tools ของหน้าทีม: เครื่องมือผู้ดูแลระบบทั้งหมดรวมที่เดียว (ตรรกะล้วนๆ ไม่พึ่ง DOM/Firebase เพื่อเทสต์ใน Node ได้)
 // แอดมินหลัก (perms = null) เห็นครบ — ทีมหลังบ้านเห็นเฉพาะที่ได้รับสิทธิ์ (ตารางสิทธิ์อยู่ที่ ADMIN_FEATURE_REQUIREMENTS ใน staff-perms.js)
 // ผลแข่งขัน/อาการบาดเจ็บ/สมุดพกของทีมอยู่ในเมนู Match Data, Injury/Sick และ Evaluation (Athlete Results) ตามรุ่นอายุที่กรองแล้ว จึงไม่ซ้ำเป็นเครื่องมือที่นี่
-// feature = รหัสหน้าในแผงผู้ดูแล (ตรงกับ key ใน ROUTE_SCREENS) ยกเว้น 3 รายการที่ไม่ใช่หน้าในแผง: team-dashboard / development (ลิงก์ออก) และ manage-team (เข้าโหมดจัดการทีมแทนโค้ช)
+// feature = รหัสหน้าในแผงผู้ดูแล (ตรงกับ key ใน ROUTE_SCREENS) ยกเว้น 2 รายการที่ไม่ใช่หน้าในแผง: team-dashboard (ลิงก์ออก) และ manage-team (เข้าโหมดจัดการทีมแทนโค้ช)
+// development (พัฒนาการนักกีฬา) เป็นหน้าฝัง development.html ในหน้าทีม จึงนับเป็นหน้าในเมนูนี้
 import { canAccessAdminFeature } from "./staff-perms.js";
 
 export const ADMIN_TOOL_GROUPS = [
@@ -44,7 +45,7 @@ export const ADMIN_TOOL_GROUPS = [
 ];
 
 // หน้าในแผงผู้ดูแลที่เปิดจากเมนูนี้ (ใช้ไฮไลต์เมนู + จำหน้าตอนรีเฟรช) — ไม่รวมรายการที่เป็นลิงก์/โหมดอื่น
-export const ADMIN_TOOL_SCREENS = ADMIN_TOOL_GROUPS.flatMap((g) => g.tools.map((t) => t.feature)).filter((f) => !["team-dashboard", "development", "manage-team"].includes(f));
+export const ADMIN_TOOL_SCREENS = ADMIN_TOOL_GROUPS.flatMap((g) => g.tools.map((t) => t.feature)).filter((f) => !["team-dashboard", "manage-team"].includes(f));
 
 // เครื่องมือที่บัญชีนี้ใช้ได้ แยกตามกลุ่ม (ตัดกลุ่มที่ว่าง) — perms = null คือแอดมินหลัก
 export function toolGroupsFor(perms) {

@@ -224,6 +224,8 @@ const profileSection = document.getElementById("profile-section");
 const staffHomeSection = document.getElementById("staff-home-section");
 const staffAttendanceMenuSection = document.getElementById("staff-attendance-menu-section");
 const staffToolsSection = document.getElementById("staff-tools-section");
+const staffDevelopmentSection = document.getElementById("staff-development-section");
+const staffDevelopmentFrame = document.getElementById("staff-development-frame");
 const staffToolsBody = document.getElementById("staff-tools-body");
 const staffHomeBody = document.getElementById("staff-home-body");
 const staffHomeSubtitle = document.getElementById("staff-home-subtitle");
@@ -730,6 +732,7 @@ function hideAllScreens() {
   staffHomeSection.classList.add("hidden");
   staffAttendanceMenuSection.classList.add("hidden");
   staffToolsSection.classList.add("hidden");
+  staffDevelopmentSection.classList.add("hidden");
   staffCoachesSection.classList.add("hidden");
   footelligenceTestSection.classList.add("hidden");
   injuryMenuSection.classList.add("hidden");
@@ -3831,8 +3834,16 @@ const TOOL_OPENERS = {
   "player-audit": () => openAdminPlayerAuditSection(),
   "masc-rounds": () => openAdminMascRoundsSection(),
   "fitness-rounds": () => openAdminFitnessRoundsSection(),
-  "athlete-windows": () => openAdminAthleteWindowsSection()
+  "athlete-windows": () => openAdminAthleteWindowsSection(),
+  development: () => openStaffDevelopment()
 };
+
+// พัฒนาการนักกีฬา: ฝังหน้า development.html ไว้ในหน้าทีม ใช้ทีมและรุ่นอายุจากตัวกรองด้านบน (เปลี่ยนตัวกรอง = เปิดหน้านี้ซ้ำด้วยค่าใหม่)
+function openStaffDevelopment() {
+  hideAllScreens();
+  staffDevelopmentSection.classList.remove("hidden");
+  showEmbedded(staffDevelopmentFrame, "development.html", { team: myTeam, ageGroup: staffAgeFilter || "__ALL__" });
+}
 
 function openStaffTools() {
   hideAllScreens();
@@ -3854,7 +3865,7 @@ staffToolsBody.addEventListener("click", (e) => {
   if (!btn) return;
   const feature = btn.dataset.tool;
   if (feature === "team-dashboard") window.location.href = `${window.location.origin}/?team=${encodeURIComponent(myTeam)}`;
-  else if (feature === "development") window.location.href = "./development.html";
+
   else if (feature === "manage-team") {
     returnToTeamSpace = { team: myTeam, mode: adminSpace() ? "admin" : "staff" };
     enterTeamManagementMode(myTeam, staffToolsSection);
@@ -4563,6 +4574,7 @@ const ROUTE_SCREENS = [
   { el: staffHomeSection, key: "staff-home", kind: "coach" },
   { el: staffAttendanceMenuSection, key: "staff-attendance-menu", kind: "coach" },
   { el: staffToolsSection, key: "staff-tools", kind: "coach" },
+  { el: staffDevelopmentSection, key: "development", kind: "admin" },
   { el: staffCoachesSection, key: "staff-coaches", kind: "coach" },
   { el: footelligenceTestSection, key: "footelligence-test", kind: "coach" },
   { el: injuryMenuSection, key: "injury-menu", kind: "coach" },

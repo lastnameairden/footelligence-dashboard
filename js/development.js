@@ -21,6 +21,11 @@ const devFilterNote = document.getElementById("dev-filter-note");
 const devDeltaBars = document.getElementById("dev-delta-bars");
 const devTableBody = document.getElementById("dev-table-body");
 
+// ฝังในหน้าทีมของแอดมิน (attendance.html เมนู Admin → พัฒนาการนักกีฬา): #embed=1&team=<ทีม>&ageGroup=<รุ่น> — ซ่อนหัว/ท้าย/ปุ่มกลับ
+// (html.embedded) และใช้ทีม/รุ่นจากหน้าทีมแทนตัวเลือกของหน้านี้ ไม่มี team = ใช้งานแบบหน้าแยกเดิม
+const embedParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+if (window.self !== window.top) document.documentElement.classList.add("embedded");
+
 let allPlayers = [];
 let attendanceByPlayerId = new Map();
 let currentDevRows = [];
@@ -43,6 +48,13 @@ for (const team of TEAMS) {
   opt.value = team;
   opt.textContent = team;
   devTeamSelect.appendChild(opt);
+}
+
+if (TEAMS.includes(embedParams.get("team"))) {
+  devTeamSelect.value = embedParams.get("team");
+  const ageParam = embedParams.get("ageGroup");
+  if (ageParam && [...devAgeGroupSelect.options].some((o) => o.value === ageParam)) devAgeGroupSelect.value = ageParam;
+  document.getElementById("dev-filters").classList.add("hidden");
 }
 
 // ---------- คำนวณอันดับพัฒนาการ ----------

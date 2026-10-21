@@ -19,7 +19,7 @@
   </header>
 
   <main class="max-w-5xl mx-auto px-6 py-8 space-y-8">
-    <a href="/" class="btn btn-ghost px-0">← กลับ Dashboard</a>
+    <a href="/" data-embed-hide class="btn btn-ghost px-0">← กลับ Dashboard</a>
     <p id="status-message" class="text-sm text-slate-500">กำลังเชื่อมต่อ...</p>
 
     <!-- แสดงเมื่อยังไม่ได้ล็อกอิน / ไม่ใช่บัญชีผู้ดูแลระบบ -->
@@ -42,7 +42,7 @@
       </div>
 
       <!-- ตัวกรอง -->
-      <div class="card card-pad flex flex-wrap items-end gap-4">
+      <div id="dev-filters" class="card card-pad flex flex-wrap items-end gap-4">
         <div>
           <label class="field-label">ทีม</label>
           <select id="dev-team-select" class="field-input w-56">

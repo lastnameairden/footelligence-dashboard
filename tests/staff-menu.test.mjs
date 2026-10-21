@@ -115,5 +115,5 @@ test("admin tools: admin sees every tool in four groups; staff only what the per
   for (const adminOnly of ["staff-announcements", "masc-rounds", "fitness-rounds", "athlete-windows", "development"]) assert.equal(names(["view", "coaches", "manageTeams", "meetings"]).includes(adminOnly), false, adminOnly);
   assert.equal(toolsMenuItem(true).label, "Admin");
   assert.equal(toolsMenuItem(false).label, "Tools");
-  assert.ok(toolsMenuItem(true).screens.includes("approvals") && !toolsMenuItem(true).screens.includes("manage-team"));
+  assert.ok(toolsMenuItem(true).screens.includes("approvals") && toolsMenuItem(true).screens.includes("development") && !toolsMenuItem(true).screens.includes("manage-team"));
 });
