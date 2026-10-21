@@ -1031,22 +1031,6 @@ function goToDashboard() {
   window.location.href = `${window.location.origin}/`;
 }
 
-// เครื่องมือแผงผู้ดูแลที่เปิดจากเมนูหน้าทีมของทีมหลังบ้าน — เปลี่ยนแค่ hash หน้าไม่โหลดใหม่ จึงต้อง reload เองเพื่อล้างสถานะหน้าทีม
-const STAFF_TOOL_LINKS = [
-  ["coaches", "users", "รายชื่อโค้ชในระบบ"],
-  ["approvals", "file-text", "คำขอลงทะเบียนรออนุมัติ"],
-  ["player-audit", "search", "ตรวจสอบข้อมูลนักกีฬาที่ผิดปกติ"],
-  ["progress", "trending-up", "ความคืบหน้าเช็คชื่อรายวัน"],
-  ["matches", "football", "รายงานผลการแข่งขันทั้งหมด"],
-  ["injuries", "heart-pulse", "รายงานอาการบาดเจ็บทั้งหมด"],
-  ["print", "printer", "พิมพ์สรุปผลงานโค้ช"],
-  ["report-card", "book", "สมุดพกนักกีฬา"]
-];
-function goToAdminTool(feature) {
-  window.location.hash = `admin=${feature}`;
-  window.location.reload();
-}
-
 // ผู้ดูแลระบบออกจากโหมด "จัดการทีมแทนโค้ช" กลับไปยังจุดที่พาเข้ามา (ทีละสเต็ป ตาม adminReturnSection —
 // เซ็ตไว้เสมอตอนเข้าโหมดนี้ใน enterTeamManagementMode จึงไม่มีทางเป็น null จริงๆ แต่กันไว้ด้วย fallback)
 // พร้อมล้าง myTeam ไม่ให้เมนูค้างแสดงเครื่องมือของทีมเดิมหลังออกจากโหมดนี้แล้ว
@@ -1097,13 +1081,9 @@ function renderDrawerItemsInner() {
       navDrawerItems.appendChild(drawerItem(icon("shield"), "กลับแผงควบคุมผู้ดูแลระบบ", exitTeamManagementToAdminPanel));
     } else if (staffSpace()) {
       navDrawerItems.appendChild(drawerSectionLabel(`ทีม: ${teamLogoImg(myTeam)}${myTeam}`));
+      // หน้าทีมของทีมหลังบ้านมีแค่เมนู 9 รายการแบบใหม่ (แถบเมนูบนคอมพิวเตอร์ / รายการนี้บนมือถือ) — เครื่องมือแผงผู้ดูแลเดิมไม่แสดงที่นี่
+      // เข้าถึงได้จากลิ้นชัก ☰ ของหน้าเลือกทีม (กด "เปลี่ยนทีม")
       appendCoachMenuToDrawer();
-      navDrawerItems.appendChild(drawerDivider());
-      navDrawerItems.appendChild(drawerItem(icon("bar-chart"), "Dashboard ของทีม", () => (window.location.href = `${window.location.origin}/?team=${encodeURIComponent(myTeam)}`)));
-      // เครื่องมือของแผงผู้ดูแลที่ทีมหลังบ้านมีสิทธิ์ (อนุมัติโค้ช พิมพ์สรุป สมุดพก ฯลฯ) — ไม่อยู่ในเมนู 9 รายการ แต่ยังเข้าถึงได้จากที่นี่
-      for (const [feature, iconName, label] of STAFF_TOOL_LINKS) {
-        if (adminCan(feature)) navDrawerItems.appendChild(drawerItem(icon(iconName), label, () => goToAdminTool(feature)));
-      }
       navDrawerItems.appendChild(drawerDivider());
       navDrawerItems.appendChild(drawerItem(icon("refresh"), "เปลี่ยนทีม", goToDashboard));
     } else if (myTeam) {
