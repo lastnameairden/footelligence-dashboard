@@ -79,6 +79,8 @@ import { filterPlans, filterReportsByMonths, groupByMonth, monthOptionsOf, month
 import { COACH_MENU, childMatchesScreen, menuItem, menuKeyForScreen } from "./coach-menu.js";
 import { STAFF_UNFILTERED_SCREENS, staffMenuFor } from "./staff-menu.js";
 import { initStaffHome, showStaffHome } from "./staff-home-ui.js";
+import { COACH_CERTIFICATES, coachCardHtml, parseCoachPersonal, splitCertificates } from "./coach-card.js";
+import { initCoachPersonal, showCoachPersonal } from "./coach-personal-ui.js";
 import { ageGroupsForFilter, matchesAgeFilter, validFilter } from "./age-filter.js";
 import { initPhysical, showAthleteResults, showInstruction, showTestingForm } from "./physical-ui.js";
 import { initProfile, showProfile } from "./coach-profile-ui.js";
@@ -218,7 +220,10 @@ const profileSection = document.getElementById("profile-section");
 const staffHomeSection = document.getElementById("staff-home-section");
 const staffHomeBody = document.getElementById("staff-home-body");
 const staffCoachesSection = document.getElementById("staff-coaches-section");
-const staffCoachesBody = document.getElementById("staff-coaches-body");
+const staffCoachesGrid = document.getElementById("staff-coaches-grid");
+const staffCoachDetail = document.getElementById("staff-coach-detail");
+const staffCoachDetailName = document.getElementById("staff-coach-detail-name");
+const staffCoachDetailBody = document.getElementById("staff-coach-detail-body");
 const staffCoachesSubtitle = document.getElementById("staff-coaches-subtitle");
 const staffFilterNav = document.getElementById("staff-filter");
 const staffFilterInner = document.getElementById("staff-filter-inner");
@@ -1741,9 +1746,11 @@ function openProfileSection() {
   hideAllScreens();
   profileSection.classList.remove("hidden");
   showProfile();
+  showCoachPersonal();
 }
 
 initProfile({ record: () => currentCoachRecord, team: () => myTeam, taskCount: profileTaskCount });
+initCoachPersonal(document.getElementById("profile-personal"), { record: () => currentCoachRecord });
 
 function openAthleteResultsSection() {
   hideAllScreens();
@@ -2640,6 +2647,7 @@ async function computeCoachMonthlySummaryRows(team) {
       }));
 
     return {
+      coach: c, // เอกสารโค้ชทั้งก้อน (รูป ชื่อจริง เบอร์ ใบประกาศ) ใช้กับการ์ดโค้ชในหน้า Coach Data ของทีมหลังบ้าน
       coachId: c.id,
       coachName: c.name ?? "-",
       coachPosition: c.coachPosition,
@@ -3220,6 +3228,27 @@ function updateEditCoachFieldVisibility() {
   editCoachTeamWrap.classList.toggle("hidden", role === "admin" || role === "staff");
   editCoachAgeGroupWrap.classList.toggle("hidden", role !== "coach");
   editCoachPermissionsWrap.classList.toggle("hidden", role !== "staff");
+  document.getElementById("edit-coach-personal-wrap").classList.toggle("hidden", role !== "coach");
+}
+
+// ชื่อจริง/เบอร์/ใบประกาศของโค้ช (แสดงในการ์ด Coach Data) — โค้ชกรอกเองที่ Profile แอดมินและทีมหลังบ้านที่มีสิทธิ์ coaches แก้ให้ได้ที่นี่
+function fillEditCoachPersonal(c) {
+  document.getElementById("edit-coach-fullname").value = c.fullName || "";
+  document.getElementById("edit-coach-phone").value = c.phone || "";
+  const { picked, other } = splitCertificates(c.certificates);
+  document.getElementById("edit-coach-certs").innerHTML = COACH_CERTIFICATES.map(
+    (cert) => `<label class="flex items-center gap-2 text-sm"><input type="checkbox" class="edit-coach-cert-checkbox" value="${escapeHtml(cert)}"${picked.includes(cert) ? " checked" : ""} /> ${escapeHtml(cert)}</label>`
+  ).join("");
+  document.getElementById("edit-coach-cert-other").value = other;
+}
+
+function readEditCoachPersonal() {
+  return parseCoachPersonal({
+    fullName: document.getElementById("edit-coach-fullname").value,
+    phone: document.getElementById("edit-coach-phone").value,
+    certificates: [...document.querySelectorAll(".edit-coach-cert-checkbox:checked")].map((b) => b.value),
+    other: document.getElementById("edit-coach-cert-other").value
+  });
 }
 
 // ช่องติ๊กสิทธิ์ของทีมหลังบ้านในหน้าแก้ไขบัญชี (เฉพาะแอดมินหลักที่เปลี่ยนบทบาทเป็นทีมหลังบ้านหรือแก้สิทธิ์ได้)
@@ -3262,6 +3291,7 @@ function openEditCoachModal(c) {
     cb.checked = ageGroups.includes(cb.value);
   }
   editCoachStatusSelect.value = c.status || "pending";
+  fillEditCoachPersonal(c);
   updateEditCoachFieldVisibility();
   editCoachModalStatus.textContent = "";
   editCoachOverlay.classList.remove("hidden");
@@ -3305,6 +3335,15 @@ editCoachSaveBtn.addEventListener("click", async () => {
     ageGroups: role === "coach" ? ageGroups : null,
     coachPosition: role === "coach" ? editCoachPositionSelect.value : null
   };
+  if (role === "coach") {
+    const personal = readEditCoachPersonal();
+    if (personal.error) {
+      editCoachModalStatus.textContent = personal.error;
+      editCoachModalStatus.className = "text-sm text-red-600";
+      return;
+    }
+    Object.assign(payload, personal.value);
+  }
   // สิทธิ์ทีมหลังบ้าน: แอดมินหลักเท่านั้นที่ตั้ง/ล้างได้ (ทีมหลังบ้านที่แก้บัญชีโค้ชต้องไม่ส่งฟิลด์ permissions — กฎ Firestore ห้ามแตะ)
   if (!isStaffSession()) {
     if (role === "staff") {
@@ -3740,27 +3779,49 @@ function openStaffHome() {
   showStaffHome(staffHomeBody, { team: myTeam, uid: auth.currentUser.uid, canMeetings: staffCan(currentStaffPerms, "meetings") });
 }
 
-// Coach Data — โค้ชของทีม (ใช้ตารางสรุปการทำงานโค้ชเดือนนี้ชุดเดียวกับหน้าผู้บริหาร) กรองตามรุ่นอายุที่โค้ชรับผิดชอบ
+// Coach Data — แกลเลอรีการ์ดโค้ชของทีม (รูป ชื่อ ตำแหน่ง รุ่นอายุ เบอร์ ใบประกาศ อีเมล) กรองตามรุ่นอายุที่โค้ชรับผิดชอบ
+// กดการ์ดเพื่อดูผลงานเดือนนี้ของโค้ชคนนั้น (ตารางสรุปชุดเดียวกับหน้าผู้บริหาร) — เบอร์โทรแสดงเฉพาะหน้านี้ (ทีมหลังบ้าน/แอดมิน)
+let staffCoachRows = [];
+
+function showStaffCoachGrid() {
+  staffCoachDetail.classList.add("hidden");
+  staffCoachesGrid.classList.remove("hidden");
+}
+
 async function openStaffCoaches() {
   hideAllScreens();
   staffCoachesSection.classList.remove("hidden");
+  showStaffCoachGrid();
   staffCoachesSubtitle.textContent = `${myTeam} · ${staffAgeFilter ? `รุ่น ${staffAgeFilter}` : "ทุกรุ่น"} · ดูอย่างเดียว`;
-  staffCoachesBody.innerHTML = '<p class="text-sm text-slate-400">กำลังโหลด...</p>';
+  staffCoachesGrid.innerHTML = '<p class="text-sm text-slate-400">กำลังโหลด...</p>';
   const team = myTeam;
   try {
     const rows = (await computeCoachMonthlySummaryRows(team)).filter((r) => matchesAgeFilter(r.ageGroups, staffAgeFilter));
     if (team !== myTeam) return;
-    if (rows.length === 0 && staffAgeFilter) {
-      staffCoachesBody.innerHTML = `<p class="text-sm text-slate-400">ไม่มีโค้ชที่ดูแลรุ่น ${escapeHtml(staffAgeFilter)} ในทีมนี้</p>`;
+    staffCoachRows = rows;
+    if (rows.length === 0) {
+      staffCoachesGrid.innerHTML = `<p class="text-sm text-slate-400">${staffAgeFilter ? `ไม่มีโค้ชที่ดูแลรุ่น ${escapeHtml(staffAgeFilter)} ในทีมนี้` : "ยังไม่มีโค้ชในทีมนี้"}</p>`;
       return;
     }
-    renderCoachActivitySummaryTable(staffCoachesBody, rows);
+    staffCoachesGrid.innerHTML = rows.map((r) => coachCardHtml(r.coach, { showPhone: true })).join("");
   } catch (err) {
     console.error(err);
-    staffCoachesBody.innerHTML = `<p class="text-sm text-red-600">โหลดข้อมูลโค้ชไม่สำเร็จ: ${escapeHtml(err.message)}</p>`;
+    staffCoachesGrid.innerHTML = `<p class="text-sm text-red-600">โหลดข้อมูลโค้ชไม่สำเร็จ: ${escapeHtml(err.message)}</p>`;
   }
 }
 
+staffCoachesGrid.addEventListener("click", (e) => {
+  const card = e.target.closest("[data-coach-card]");
+  const row = card && staffCoachRows.find((r) => r.coachId === card.dataset.coachCard);
+  if (!row) return;
+  staffCoachDetailName.textContent = `ผลงานเดือนนี้ · ${row.coachName}`;
+  staffCoachDetailBody.innerHTML = "";
+  staffCoachDetailBody.appendChild(renderCoachDetailContent(row));
+  staffCoachesGrid.classList.add("hidden");
+  staffCoachDetail.classList.remove("hidden");
+  staffCoachDetail.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+document.getElementById("staff-coach-detail-back").addEventListener("click", showStaffCoachGrid);
 // ผู้ดูแลระบบสวมบทบาทเป็น "ผู้บริหารทีม" (ดูอย่างเดียว) แทนที่จะเป็นโค้ชเต็มรูปแบบ — ใช้ตรวจสอบว่าหน้าจอ
 // ที่ผู้บริหารทีมจริงเห็นถูกต้องหรือไม่ โดยไม่ต้องขอให้ผู้บริหารทีมจริงล็อกอินทดสอบให้
 async function enterExecutiveViewMode(team, returnSection, execRecordOverride) {

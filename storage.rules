@@ -34,6 +34,14 @@ service firebase.storage {
       allow delete: if isSignedInCoach();
     }
 
+    // รูปโค้ช (การ์ดในหน้า Coach Data) แยกโฟลเดอร์ตามบัญชีโค้ช — ไม่เกิน 5MB เหตุผลเรื่องการไม่เช็คบัญชีเหมือนโฟลเดอร์อื่นด้านบน
+    // (ผู้ดูแลระบบที่สวมบทบาทโค้ชก็ต้องอัปโหลดแทนได้ จึงไม่ล็อกให้เจ้าของ uid เท่านั้น)
+    match /coachPhotos/{uid}/{allPaths=**} {
+      allow read: if isSignedInCoach();
+      allow create, update: if isSignedInCoach() && request.resource.size < 5 * 1024 * 1024;
+      allow delete: if isSignedInCoach();
+    }
+
     // รูปโปรไฟล์นักกีฬา — จำกัดขนาดไฟล์ไม่เกิน 5MB (เล็กกว่าไฟล์แนบอื่นเพราะเป็นแค่รูปคนเดียว ไม่ใช่เอกสาร/ภาพ
     // การฝึกซ้อมทั้งสนาม)
     match /players/{team}/{allPaths=**} {

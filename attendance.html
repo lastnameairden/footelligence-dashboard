@@ -301,7 +301,14 @@
           <p id="staff-coaches-subtitle">โค้ชของทีม · ดูอย่างเดียว</p>
         </div>
       </div>
-      <div id="staff-coaches-body"></div>
+      <div id="staff-coaches-body">
+        <div id="staff-coaches-grid" class="coach-gallery"></div>
+        <div id="staff-coach-detail" class="hidden space-y-4">
+          <button id="staff-coach-detail-back" type="button" class="btn btn-ghost px-0">← กลับรายชื่อโค้ช</button>
+          <h3 id="staff-coach-detail-name" class="section-title"></h3>
+          <div id="staff-coach-detail-body"></div>
+        </div>
+      </div>
     </section>
 
     <!-- แถบโปรไฟล์ผู้ใช้งาน (แสดงหลังล็อกอินสำเร็จ ทุกหน้าจอย่อย) -->
@@ -413,6 +420,21 @@
             <label class="field-label">สิทธิ์ของทีมหลังบ้าน (ติ๊กรายข้อ)</label>
             <div id="edit-coach-permissions" class="space-y-2"></div>
             <p class="text-xs text-slate-400 mt-1">ทีมหลังบ้านไม่ผูกกับทีมใด และเข้าใช้นัดประชุม รอบทดสอบ รอบ MASC และบัญชีผู้ใช้ไม่ได้ (เฉพาะผู้ดูแลระบบหลัก)</p>
+          </div>
+          <div id="edit-coach-personal-wrap" class="space-y-3">
+            <div>
+              <label class="field-label">ชื่อจริง</label>
+              <input id="edit-coach-fullname" type="text" maxlength="80" class="field-input w-full" />
+            </div>
+            <div>
+              <label class="field-label">เบอร์โทรศัพท์</label>
+              <input id="edit-coach-phone" type="tel" inputmode="tel" class="field-input w-full" placeholder="08x-xxx-xxxx" />
+            </div>
+            <div>
+              <label class="field-label">ใบประกาศผู้ฝึกสอน</label>
+              <div id="edit-coach-certs" class="flex flex-wrap gap-3"></div>
+              <input id="edit-coach-cert-other" type="text" maxlength="40" class="field-input w-full mt-2" placeholder="ใบประกาศอื่น ๆ (ถ้ามี)" />
+            </div>
           </div>
           <div id="edit-coach-team-wrap">
             <label class="field-label">ทีม</label>
@@ -1079,6 +1101,7 @@
         </div>
       </div>
       <div id="profile-info" class="space-y-4"></div>
+      <div id="profile-personal" class="space-y-4"></div>
       <div id="profile-stats-wrap" class="card card-pad space-y-3">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <h3 class="section-title">ผลการทำงานของฉัน</h3>

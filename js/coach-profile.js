@@ -9,6 +9,7 @@ import {
   isRecordOfCoach,
   isReportLate,
   isTrainingPlanLate,
+  safeHttpUrl,
   teamLogoImg,
   todayBangkok,
   trainingDaysQuotaForTeamMonth
@@ -72,6 +73,12 @@ const kv = (rows) =>
 
 const initialOf = (name) => escapeHtml(Array.from(String(name ?? "").trim())[0] ?? "?");
 
+// รูปโค้ชถ้ามี (https เท่านั้น) ไม่มีก็ใช้ตัวอักษรแรกของชื่อ
+const avatarInner = (coach) => {
+  const src = safeHttpUrl(coach.photoUrl);
+  return src ? `<img src="${src}" alt="" />` : initialOf(coach.name);
+};
+
 function createdLabel(coach) {
   const ts = coach.createdAt;
   return ts && typeof ts.toDate === "function" ? dateLabel(todayBangkok(ts.toDate())) : "-";
@@ -85,7 +92,7 @@ export function profileInfoHtml({ coach, team, ageRows, todo }) {
   const taskText = todo.tasks === null || todo.tasks === undefined ? "-" : todo.tasks > 0 ? `<span class="badge badge-warning">${todo.tasks} งาน</span>` : "ไม่มีงานค้าง";
   return `
     <div class="card card-pad profile-head">
-      <div class="profile-avatar" aria-hidden="true">${initialOf(coach.name)}</div>
+      <div class="profile-avatar" aria-hidden="true">${avatarInner(coach)}</div>
       <div class="profile-head-main">
         <p class="profile-name">${escapeHtml(coach.name ?? "-")} ${statusBadge}</p>
         <p class="text-sm text-slate-500">${escapeHtml(coach.email ?? "-")}</p>

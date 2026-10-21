@@ -30,6 +30,12 @@ service cloud.firestore {
     function canManageAll() { return isAdmin() || hasPerm('manageTeams'); }
     function canViewAll() { return isAdmin() || hasPerm('view') || hasPerm('manageTeams'); }
 
+    // ฟิลด์ข้อความไม่บังคับของเอกสารที่กำลังเขียน: ไม่มี/null ได้ ไม่งั้นต้องเป็นสตริงไม่เกิน max ตัวอักษรและไม่มี < >
+    function optText(key, max) {
+      return !(key in request.resource.data) || request.resource.data[key] == null
+             || (request.resource.data[key] is string && request.resource.data[key].size() <= max && !request.resource.data[key].matches('.*[<>].*'));
+    }
+
     match /coaches/{coachId} {
       allow read: if isSignedIn();
       // ผู้ลงทะเบียนใหม่สร้างโปรไฟล์ของตัวเองได้ (สถานะ pending) เลือกบทบาทได้แค่ coach/executive
@@ -62,11 +68,23 @@ service cloud.firestore {
       // ผู้ดูแลระบบจึงเป็นคนเดียวที่เพิ่มรุ่นอายุที่ 2 ให้ Head Coach ได้)
       // ผู้ดูแลระบบหลักแก้ได้ทุกฟิลด์ ส่วนทีมหลังบ้านที่มีสิทธิ์ coaches อนุมัติ/แก้/ลบได้เฉพาะบัญชีโค้ชและผู้บริหารทีม — ห้ามแตะ permissions/email
       // และห้ามเปลี่ยนบทบาทเป็นอย่างอื่นนอกจากสองบทบาทนี้ (กันไม่ให้เลื่อนขั้นตัวเองหรือคนอื่นเป็นแอดมิน/ทีมหลังบ้าน)
+      // โค้ชแก้ข้อมูลส่วนตัวของตัวเองได้เฉพาะ 5 ฟิลด์ที่แสดงในการ์ด Coach Data (ชื่อจริง เบอร์ ใบประกาศ รูป) — ห้ามแตะบทบาท/ทีม/สถานะ/รุ่นอายุ
+      // ข้อความต้องเป็นสตริงสั้นๆ ไม่มี < > และรูปต้องเป็น URL https (เหตุผลเดียวกับกฎชื่อตอนสมัคร: กัน XSS อีกชั้น)
       allow update: if isAdmin()
                     || (hasPerm('coaches')
                         && resource.data.role in ['coach', 'executive']
                         && request.resource.data.role in ['coach', 'executive']
-                        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['permissions', 'email']));
+                        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['permissions', 'email']))
+                    || (request.auth.uid == coachId
+                        && isApproved()
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fullName', 'phone', 'certificates', 'photoUrl', 'photoPath'])
+                        && optText('fullName', 80)
+                        && optText('phone', 15)
+                        && optText('photoPath', 200)
+                        && (!('certificates' in request.resource.data) || request.resource.data.certificates == null
+                            || (request.resource.data.certificates is list && request.resource.data.certificates.size() <= 8))
+                        && (!('photoUrl' in request.resource.data) || request.resource.data.photoUrl == null
+                            || (request.resource.data.photoUrl is string && request.resource.data.photoUrl.size() <= 600 && request.resource.data.photoUrl.matches('https://.*'))));
       allow delete: if isAdmin() || (hasPerm('coaches') && resource.data.role in ['coach', 'executive']);
     }
 
