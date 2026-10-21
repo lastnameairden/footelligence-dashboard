@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { coachDetailHtml } from "../js/coach-profile.js";
 import { COACH_CERTIFICATES, COACH_FULLNAME_MAX, coachCardHtml, parseCoachPersonal, splitCertificates } from "../js/coach-card.js";
 
 test("parseCoachPersonal: all optional; blank clears to null/[]", () => {
@@ -40,4 +41,24 @@ test("coachCardHtml: photo, escaped text, empty-field placeholders, phone only w
   assert.match(empty, /coach-card-photo-empty/);
   assert.equal((empty.match(/ยังไม่กรอก/g) || []).length, 5, "full name, age groups, phone, certificates and email show the placeholder");
   assert.match(coachCardHtml({ id: "c3", name: "x", photoUrl: "javascript:alert(1)" }), /coach-card-photo-empty/);
+});
+
+test("coachDetailHtml: head, contact, certificates, age groups with player counts; placeholders when empty", () => {
+  const html = coachDetailHtml({
+    coach: { id: "c1", name: "โค้ชปิ", fullName: "ปิยะ <สมศรี>", status: "approved", coachPosition: "head_coach", phone: "0828846090", email: "pi@example.com", certificates: ["G - License", "AFC Futsal"], createdAt: { toDate: () => new Date("2026-05-01T05:00:00Z") } },
+    team: "THAWEE SC",
+    ageRows: [{ ageGroup: "U13", count: 12 }, { ageGroup: "U14", count: 8 }]
+  });
+  assert.match(html, /ปิยะ &lt;สมศรี&gt;/);
+  assert.match(html, /href="tel:0828846090"[^>]*>082-884-6090/);
+  assert.match(html, /pi@example\.com/);
+  assert.match(html, /coach-tag-cert">G - License/);
+  assert.match(html, /AFC Futsal/);
+  assert.match(html, /U13 · 12 คน<br>U14 · 8 คน/);
+  assert.match(html, /นักกีฬาที่ดูแลรวม[\s\S]*20 คน/);
+  assert.match(html, /อนุมัติแล้ว/);
+  const empty = coachDetailHtml({ coach: { id: "c2", name: "โค้ชซัน", status: "pending", coachPosition: "gk_coach" }, team: "THAWEE SC", ageRows: [] });
+  assert.equal((empty.match(/ยังไม่กรอก/g) || []).length, 5, "head full name + detail full name, phone, email and certificates are empty");
+  assert.match(empty, /ยังไม่กรอกชื่อจริง/);
+  assert.match(empty, /รออนุมัติ/);
 });

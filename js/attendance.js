@@ -81,6 +81,7 @@ import { STAFF_UNFILTERED_SCREENS, staffMenuFor } from "./staff-menu.js";
 import { initStaffHome, showStaffHome } from "./staff-home-ui.js";
 import { COACH_CERTIFICATES, coachCardHtml, parseCoachPersonal, splitCertificates } from "./coach-card.js";
 import { initCoachPersonal, showCoachPersonal } from "./coach-personal-ui.js";
+import { ageGroupRows, coachDetailHtml } from "./coach-profile.js";
 import { ageGroupsForFilter, matchesAgeFilter, validFilter } from "./age-filter.js";
 import { initPhysical, showAthleteResults, showInstruction, showTestingForm } from "./physical-ui.js";
 import { initProfile, showProfile } from "./coach-profile-ui.js";
@@ -223,6 +224,7 @@ const staffCoachesSection = document.getElementById("staff-coaches-section");
 const staffCoachesGrid = document.getElementById("staff-coaches-grid");
 const staffCoachDetail = document.getElementById("staff-coach-detail");
 const staffCoachDetailName = document.getElementById("staff-coach-detail-name");
+const staffCoachDetailInfo = document.getElementById("staff-coach-detail-info");
 const staffCoachDetailBody = document.getElementById("staff-coach-detail-body");
 const staffCoachesSubtitle = document.getElementById("staff-coaches-subtitle");
 const staffFilterNav = document.getElementById("staff-filter");
@@ -2648,6 +2650,7 @@ async function computeCoachMonthlySummaryRows(team) {
 
     return {
       coach: c, // เอกสารโค้ชทั้งก้อน (รูป ชื่อจริง เบอร์ ใบประกาศ) ใช้กับการ์ดโค้ชในหน้า Coach Data ของทีมหลังบ้าน
+      teamPlayers: players, // นักกีฬาทั้งทีม — นับจำนวนที่โค้ชคนนี้ดูแลต่อรุ่นในหน้ารายบุคคล
       coachId: c.id,
       coachName: c.name ?? "-",
       coachPosition: c.coachPosition,
@@ -3814,6 +3817,7 @@ staffCoachesGrid.addEventListener("click", (e) => {
   const card = e.target.closest("[data-coach-card]");
   const row = card && staffCoachRows.find((r) => r.coachId === card.dataset.coachCard);
   if (!row) return;
+  staffCoachDetailInfo.innerHTML = coachDetailHtml({ coach: row.coach, team: myTeam, ageRows: ageGroupRows(row.coach, row.teamPlayers || []) });
   staffCoachDetailName.textContent = `ผลงานเดือนนี้ · ${row.coachName}`;
   staffCoachDetailBody.innerHTML = "";
   staffCoachDetailBody.appendChild(renderCoachDetailContent(row));

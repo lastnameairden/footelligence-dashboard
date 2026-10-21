@@ -16,6 +16,7 @@ import {
 } from "./ui-utils.js";
 import { ageNumberOf } from "./fitness-calc.js";
 import { dateLabel } from "./athlete-windows.js";
+import { formatPhone } from "./player-profile-fields.js";
 
 const inMonth = (record, month) => String(record?.date ?? "").startsWith(month);
 
@@ -118,6 +119,50 @@ export function profileInfoHtml({ coach, team, ageRows, todo }) {
       </div>
     </div>
     <p class="text-sm text-slate-500">แก้ไขชื่อ ตำแหน่ง หรือรุ่นอายุที่ดูแล: แจ้งผู้ดูแลระบบ</p>`;
+}
+
+// ข้อมูลเบื้องต้นของโค้ชแบบละเอียด (หน้ารายบุคคลใน Coach Data ของทีมหลังบ้าน): ส่วนหัว + ข้อมูลส่วนตัว/ติดต่อ + บทบาทและรุ่นที่ดูแล
+// ageRows = ageGroupRows(coach, players) — จำนวนนักกีฬาที่โค้ชคนนี้ดูแลจริงในแต่ละรุ่น
+export function coachDetailHtml({ coach, team, ageRows }) {
+  const statusBadge = coach.status === "approved" ? '<span class="badge badge-success">อนุมัติแล้ว</span>' : '<span class="badge badge-warning">รออนุมัติ</span>';
+  const empty = '<span class="text-slate-400">ยังไม่กรอก</span>';
+  const certs = Array.isArray(coach.certificates) ? coach.certificates : [];
+  const total = ageRows.reduce((n, r) => n + r.count, 0);
+  const ageHtml = ageRows.length > 0 ? ageRows.map((r) => `${escapeHtml(r.ageGroup)} · ${r.count} คน`).join("<br>") : "-";
+  const phone = coach.phone ? `<a href="tel:${escapeHtml(coach.phone)}" class="player-phone">${escapeHtml(formatPhone(coach.phone))}</a>` : empty;
+  const certHtml = certs.length > 0 ? `<span class="coach-card-tags">${certs.map((c) => `<span class="coach-tag coach-tag-cert">${escapeHtml(c)}</span>`).join("")}</span>` : empty;
+  return `
+    <div class="card card-pad profile-head">
+      <div class="profile-avatar" aria-hidden="true">${avatarInner(coach)}</div>
+      <div class="profile-head-main">
+        <p class="profile-name">${escapeHtml(coach.name ?? "-")} ${statusBadge}</p>
+        <p class="text-sm text-slate-600">${coach.fullName ? escapeHtml(coach.fullName) : "ยังไม่กรอกชื่อจริง"}</p>
+        <p class="text-sm text-slate-500">${escapeHtml(coachPositionLabel(coach.coachPosition))}</p>
+      </div>
+      <div class="profile-head-side">${teamLogoImg(team)}${escapeHtml(team ?? "-")}<br><span class="text-xs text-slate-400">สมัครเมื่อ ${escapeHtml(createdLabel(coach))}</span></div>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div class="card card-pad">
+        <h3 class="section-title mb-2">ข้อมูลส่วนตัวและการติดต่อ</h3>
+        ${kv([
+          ["ชื่อที่ใช้ในระบบ", escapeHtml(coach.name ?? "-")],
+          ["ชื่อจริง", coach.fullName ? escapeHtml(coach.fullName) : empty],
+          ["เบอร์โทรศัพท์", phone],
+          ["อีเมล", coach.email ? escapeHtml(coach.email) : empty],
+          ["ใบประกาศผู้ฝึกสอน", certHtml]
+        ])}
+      </div>
+      <div class="card card-pad">
+        <h3 class="section-title mb-2">บทบาทและความรับผิดชอบ</h3>
+        ${kv([
+          ["ตำแหน่ง", escapeHtml(coachPositionLabel(coach.coachPosition))],
+          ["ทีม", escapeHtml(team ?? "-")],
+          ["รุ่นอายุที่ดูแล", ageHtml],
+          ["นักกีฬาที่ดูแลรวม", ageRows.length > 0 ? `${total} คน` : "-"],
+          ["สถานะบัญชี", statusBadge]
+        ])}
+      </div>
+    </div>`;
 }
 
 const tile = (label, value, sub) =>
