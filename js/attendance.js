@@ -3795,7 +3795,8 @@ async function enterTeamSpace(team, mode, landing = () => openStaffHome()) {
 }
 
 function renderStaffFilter() {
-  const show = teamSpace() && staffTeamAgeGroups.length > 0 && !STAFF_UNFILTERED_SCREENS.includes(currentScreenKey());
+  // Home ของแอดมินมีกราฟตามรุ่นอายุ จึงแสดงตัวกรองด้วย (Home ของทีมหลังบ้านเป็นประกาศ ไม่แยกรุ่น)
+  const show = teamSpace() && staffTeamAgeGroups.length > 0 && (adminSpace() || !STAFF_UNFILTERED_SCREENS.includes(currentScreenKey()));
   staffFilterNav.classList.toggle("hidden", !show);
   if (!show) {
     staffFilterInner.innerHTML = "";
@@ -3893,7 +3894,7 @@ function openStaffHome() {
   staffHomeSection.classList.remove("hidden");
   staffHomeSubtitle.textContent = adminSpace() ? "ภาพรวมของทีมวันนี้และงานที่รอตรวจ" : "แจ้งเตือนจากผู้ดูแลระบบและงานที่รอตรวจ";
   if (adminSpace()) {
-    showAdminHome(staffHomeBody, { team: myTeam });
+    showAdminHome(staffHomeBody, { team: myTeam, ageGroup: staffAgeFilter });
     return;
   }
   showStaffHome(staffHomeBody, { team: myTeam, uid: auth.currentUser.uid, canMeetings: staffCan(currentStaffPerms, "meetings") });

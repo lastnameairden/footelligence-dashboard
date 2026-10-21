@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { adminHomeHtml, adminHomeModel, dayKind, isInjuryActive } from "../js/admin-home.js";
+import { adminChartsHtml, adminChartsModel, adminHomeHtml, adminHomeModel, dayKind, isInjuryActive } from "../js/admin-home.js";
 
 const players = [
   { id: "p1", ageGroup: "U13" }, { id: "p2", ageGroup: "U13" },
@@ -78,4 +78,67 @@ test("adminHomeHtml: tiles, per-group rows, escaped text, dashes on off days", (
   assert.match(off, /ไม่ใช่วันซ้อมของทีม/);
   assert.doesNotMatch(off, /ยังไม่เช็คชื่อ/);
   assert.match(adminHomeHtml(adminHomeModel({ ...base, players: [] })), /ยังไม่มีนักกีฬา/);
+});
+
+test("adminHomeModel: age filter narrows rows, injuries and summary but not pending approvals", () => {
+  const injuries = [{ ageGroup: "U13", status: "บาดเจ็บ" }, { ageGroup: "U15", status: "บาดเจ็บ" }];
+  const m = adminHomeModel({ ...base, injuries, pendingApprovals: 3, ageGroup: "U13" });
+  assert.deepEqual(m.rows.map((r) => r.ageGroup), ["U13"]);
+  assert.equal(m.summary.injured, 1);
+  assert.equal(m.summary.pendingApprovals, 3);
+  assert.equal(m.summary.notChecked, 1);
+  assert.equal(adminHomeModel({ ...base, injuries, ageGroup: "" }).rows.length, 3);
+});
+
+const scores = (v) => ({ physical: v, ballSkill: v, gameReading: v, attitude: v });
+const rec = (date, playerId, status, v) => ({ date, playerId, status, scores: v === undefined ? {} : scores(v) });
+
+test("adminChartsModel: 30-day trend vs the 30 days before, per-day averages, filter by age group", () => {
+  const attendance = [
+    rec("2026-10-20", "p1", "A", 4), rec("2026-10-20", "p2", "A", 2), // วันเดียวกัน (U13 เฉลี่ย 3 / รวม U14 ด้วย 2.33)
+    rec("2026-10-10", "p1", "A", 3),
+    rec("2026-09-10", "p1", "A", 2), // ก่อนหน้า (09-22..10-21 คือช่วงปัจจุบัน → 09-10 อยู่ช่วงก่อนหน้า)
+    rec("2026-07-01", "p1", "A", 4), // เก่าเกินไป
+    rec("2026-10-20", "p3", "A", 1) // รุ่น U14 ไม่นับเมื่อกรอง U13
+  ];
+  const all = adminChartsModel({ players, attendance, today });
+  assert.deepEqual(all.trend.points.map((p) => [p.date, Math.round(p.avg * 100) / 100]), [["2026-10-10", 3], ["2026-10-20", 2.33]], "10-20 averages p1 4, p2 2 and p3 1");
+  assert.equal(Math.round(all.trend.current * 100) / 100, 2.5);
+  assert.equal(all.trend.previous, 2);
+  assert.equal(all.trend.delta, 0.5);
+  const u13 = adminChartsModel({ players, attendance, today, ageGroup: "U13" });
+  assert.equal(u13.trend.current, 3);
+  assert.deepEqual(u13.groups.map((g) => g.ageGroup), ["U13"]);
+});
+
+test("adminChartsModel: this month attendance % uses the Dashboard rule (A or 1-4 attended, leave/injury/rehab not), score average per group", () => {
+  const attendance = [
+    rec("2026-10-02", "p1", "A", 4), rec("2026-10-02", "p2", "P"), rec("2026-10-03", "p1", "I"), rec("2026-10-03", "p2", "3", 2), // U13: 2 มา / 4
+    rec("2026-10-02", "p3", "A", 3), // U14: 1/1
+    rec("2026-09-30", "p1", "A", 4), // เดือนก่อน ไม่นับ
+    { date: "2026-10-04", playerId: "p4", status: "", scores: {} } // ไม่มีสถานะ ไม่นับ
+  ];
+  const { groups } = adminChartsModel({ players, attendance, today });
+  const by = Object.fromEntries(groups.map((g) => [g.ageGroup, g]));
+  assert.deepEqual([by.U13.pct, by.U13.records, by.U13.avgScore], [50, 4, 3]);
+  assert.deepEqual([by.U14.pct, by.U14.avgScore], [100, 3]);
+  assert.deepEqual([by.U15.pct, by.U15.avgScore, by.U15.records], [null, null, 0]);
+});
+
+test("adminChartsModel: empty data gives null trend values; html shows the empty messages", () => {
+  const m = adminChartsModel({ players, attendance: [], today });
+  assert.deepEqual([m.trend.current, m.trend.previous, m.trend.delta, m.trend.points.length], [null, null, null, 0]);
+  const html = adminChartsHtml(m);
+  assert.match(html, /ยังไม่มีคะแนนใน 30 วันล่าสุด/);
+  assert.equal((html.match(/ยังไม่มีข้อมูลเดือนนี้/g) || []).length, 2);
+});
+
+test("adminChartsHtml: sparkline, bars per group with escaped labels, trend text with arrow", () => {
+  const attendance = [rec("2026-10-20", "p1", "A", 4), rec("2026-10-19", "p1", "A", 3), rec("2026-09-10", "p1", "A", 2)];
+  const html = adminChartsHtml(adminChartsModel({ players, attendance, today }));
+  assert.match(html, /<svg/);
+  assert.match(html, /เฉลี่ย 3\.5 \/ 4 · เทียบ 30 วันก่อนหน้า ↑ \+1\.5/);
+  assert.match(html, /class="admin-bar-label">U13</);
+  assert.match(html, /width:100%/);
+  assert.match(html, /class="admin-bar-value">100%</);
 });

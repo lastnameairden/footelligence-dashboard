@@ -780,3 +780,14 @@ button.admin-home-tile:hover { outline: 1px solid var(--accent); }
 .admin-home-row:first-child { border-top: 0; }
 .admin-home-row-state { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }.admin-home-rows { display: flex; flex-direction: column; }
 .admin-home-row-who { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+/* Home ของแอดมิน: กราฟที่ย้ายมาจาก Dashboard (แนวโน้ม 30 วัน + แท่งรายรุ่น) */
+.admin-chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 0.75rem; margin-bottom: 0.75rem; }
+.admin-chart-card { display: flex; flex-direction: column; gap: 0.4rem; }
+.admin-chart-title { font-size: 0.9rem; font-weight: 600; margin: 0; }
+.admin-chart-line { color: var(--accent); }
+.admin-chart-sub { margin: 0; font-size: 0.75rem; color: var(--text-2); }
+.admin-bar { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8125rem; }
+.admin-bar-label { width: 2.5rem; color: var(--text-2); }
+.admin-bar-track { flex: 1; height: 0.65rem; border-radius: 999px; background: var(--surface-2); overflow: hidden; display: block; }
+.admin-bar-fill { display: block; height: 100%; border-radius: 999px; background: var(--accent); opacity: 0.8; }
+.admin-bar-value { width: 3rem; text-align: right; }
