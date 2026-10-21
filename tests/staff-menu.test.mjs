@@ -102,11 +102,13 @@ test("admin team menu: nine items + Admin, full coach submenus, shared staff pag
 test("admin tools: admin sees every tool in four groups; staff only what the permission allows", () => {
   const all = toolGroupsFor(null);
   assert.deepEqual(all.map((g) => g.key), ["accounts", "monitoring", "evaluation", "other"]);
-  assert.equal(all.flatMap((g) => g.tools).length, 15);
+  assert.equal(all.flatMap((g) => g.tools).length, 12);
   const names = (perms) => toolGroupsFor(perms).flatMap((g) => g.tools.map((t) => t.feature));
-  assert.deepEqual(names(["view"]), ["progress", "matches", "injuries", "print", "report-card", "team-dashboard"]);
+  assert.deepEqual(names(["view"]), ["progress", "print", "team-dashboard"]);
   assert.deepEqual(names(["coaches"]), ["approvals", "coaches"]);
-  assert.deepEqual(names(["manageTeams"]), ["progress", "matches", "injuries", "print", "player-audit", "report-card", "team-dashboard", "manage-team"]);
+  assert.deepEqual(names(["manageTeams"]), ["progress", "print", "player-audit", "team-dashboard", "manage-team"]);
+  // ผลแข่งขัน/บาดเจ็บ/สมุดพกของทีมอยู่ในเมนู Match Data / Injury/Sick / Evaluation แล้ว ไม่ซ้ำเป็นเครื่องมือ
+  for (const covered of ["matches", "injuries", "report-card"]) assert.equal(toolGroupsFor(null).flatMap((g) => g.tools).some((x) => x.feature === covered), false, covered);
   assert.deepEqual(names(["meetings"]), []);
   assert.equal(hasAdminTools(["meetings"]), false);
   assert.equal(hasAdminTools(["view"]), true);

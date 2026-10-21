@@ -1,5 +1,6 @@
 // เมนู Admin/Tools ของหน้าทีม: เครื่องมือผู้ดูแลระบบทั้งหมดรวมที่เดียว (ตรรกะล้วนๆ ไม่พึ่ง DOM/Firebase เพื่อเทสต์ใน Node ได้)
 // แอดมินหลัก (perms = null) เห็นครบ — ทีมหลังบ้านเห็นเฉพาะที่ได้รับสิทธิ์ (ตารางสิทธิ์อยู่ที่ ADMIN_FEATURE_REQUIREMENTS ใน staff-perms.js)
+// ผลแข่งขัน/อาการบาดเจ็บ/สมุดพกของทีมอยู่ในเมนู Match Data, Injury/Sick และ Evaluation (Athlete Results) ตามรุ่นอายุที่กรองแล้ว จึงไม่ซ้ำเป็นเครื่องมือที่นี่
 // feature = รหัสหน้าในแผงผู้ดูแล (ตรงกับ key ใน ROUTE_SCREENS) ยกเว้น 3 รายการที่ไม่ใช่หน้าในแผง: team-dashboard / development (ลิงก์ออก) และ manage-team (เข้าโหมดจัดการทีมแทนโค้ช)
 import { canAccessAdminFeature } from "./staff-perms.js";
 
@@ -18,17 +19,14 @@ export const ADMIN_TOOL_GROUPS = [
     label: "ติดตามงาน",
     tools: [
       { feature: "progress", label: "ความคืบหน้าเช็คชื่อรายวัน", hint: "ดูทุกทีมพร้อมกัน", icon: "trending-up" },
-      { feature: "matches", label: "รายงานผลการแข่งขันทั้งหมด", hint: "ทุกทีมทุกรุ่น", icon: "football" },
-      { feature: "injuries", label: "รายงานอาการบาดเจ็บทั้งหมด", hint: "ทุกทีมทุกรุ่น", icon: "heart-pulse" },
       { feature: "print", label: "พิมพ์สรุปผลงานโค้ช", hint: "รายเดือน", icon: "printer" },
       { feature: "player-audit", label: "ตรวจสอบข้อมูลนักกีฬาที่ผิดปกติ", hint: "รุ่นอายุ วันเกิด", icon: "search" }
     ]
   },
   {
     key: "evaluation",
-    label: "สมุดพกและรอบการประเมิน",
+    label: "รอบการประเมิน",
     tools: [
-      { feature: "report-card", label: "สมุดพกนักกีฬา", hint: "สร้างและพิมพ์ทุกทีม", icon: "book" },
       { feature: "masc-rounds", label: "รอบการประเมิน MASC", hint: "กำหนดรอบ แก้รอบเดิม", icon: "dna" },
       { feature: "fitness-rounds", label: "รอบทดสอบสมรรถภาพ", hint: "เปิด/ปิดรอบ", icon: "trending-up" },
       { feature: "athlete-windows", label: "เปิดสมุดพกให้โค้ช", hint: "ช่วงที่โค้ชเปิดดูได้", icon: "book" }

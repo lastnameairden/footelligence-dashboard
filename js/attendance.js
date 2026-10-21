@@ -1095,7 +1095,7 @@ function renderDrawerItemsInner() {
       navDrawerItems.appendChild(drawerItem(icon("users"), "รายชื่อนักกีฬาในทีม", () => openExecutivePlayersSection(myTeam)));
       navDrawerItems.appendChild(drawerItem(icon("bar-chart"), "Dashboard", goToDashboard));
       navDrawerItems.appendChild(drawerDivider());
-      navDrawerItems.appendChild(drawerItem(icon("shield"), "กลับแผงควบคุมผู้ดูแลระบบ", exitTeamManagementToAdminPanel));
+      navDrawerItems.appendChild(drawerItem(icon("shield"), returnToTeamSpace ? "กลับหน้าทีม" : "กลับแผงควบคุมผู้ดูแลระบบ", exitTeamManagementToAdminPanel));
     } else if (teamSpace()) {
       navDrawerItems.appendChild(drawerSectionLabel(`ทีม: ${teamLogoImg(myTeam)}${myTeam}`));
       // หน้าทีมของทีมหลังบ้านมีแค่เมนู 9 รายการแบบใหม่ (แถบเมนูบนคอมพิวเตอร์ / รายการนี้บนมือถือ) — เครื่องมือแผงผู้ดูแลเดิมไม่แสดงที่นี่
@@ -1280,6 +1280,8 @@ function renderCoachNav() {
   renderCoachTabs();
   document.body.classList.toggle("staff-space", staffSpace());
   document.body.classList.toggle("team-space", teamSpace());
+  // ปุ่มกลับของหน้าเครื่องมือผู้ดูแล: ในหน้าทีมกลับไปเมนูเครื่องมือ ไม่ใช่ Dashboard
+  for (const btn of adminBackButtons) btn.textContent = teamSpace() ? "← กลับเมนูเครื่องมือ" : "← กลับหน้า Dashboard";
   renderStaffFilter();
 }
 
@@ -1594,6 +1596,11 @@ function openAdminPrintSection() {
   adminPrintSection.classList.remove("hidden");
   populateTeamSelect(adminPrintTeamSelect, null);
   adminPrintAgeGroupSelect.value = "__ALL__";
+  // หน้าทีม: ทีมและรุ่นอายุมาจากหน้าทีม/ตัวกรองด้านบน (ซ่อนช่องเลือกของหน้านี้) — เหลือเลือกเดือนอย่างเดียว
+  if (teamSpace()) {
+    adminPrintTeamSelect.value = myTeam;
+    adminPrintAgeGroupSelect.value = staffAgeFilter || "__ALL__";
+  }
   if (!adminPrintMonthSelect.value) {
     adminPrintMonthSelect.value = thisMonthBangkok(); // "YYYY-MM" — ค่าเริ่มต้นเป็นเดือนนี้
   }
@@ -3175,23 +3182,25 @@ async function loadPlayerAudit() {
   playerAuditBody.innerHTML =
     '<tr><td colspan="7" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>';
   try {
-    const snap = await getDocs(collection(db, "players"));
+    // หน้าทีม: เฉพาะนักกีฬาของทีมที่เลือกและรุ่นอายุที่กรองไว้ (นักกีฬาที่ไม่ระบุรุ่นแสดงเมื่อรวมทุกรุ่น)
+    const snap = await getDocs(teamSpace() ? query(collection(db, "players"), where("team", "==", myTeam)) : collection(db, "players"));
     const players = [];
     snap.forEach((d) => players.push({ id: d.id, ...d.data() }));
+    const scoped = teamSpace() && staffAgeFilter ? players.filter((p) => p.ageGroup === staffAgeFilter) : players;
 
-    const flagged = players.filter((p) => playerAuditIssues(p, calcAge(p.birthday)).length > 0);
+    const flagged = scoped.filter((p) => playerAuditIssues(p, calcAge(p.birthday)).length > 0);
     flagged.sort(
       (a, b) => (a.team ?? "").localeCompare(b.team ?? "") || ageGroupNumber(a.ageGroup) - ageGroupNumber(b.ageGroup)
     );
 
     if (flagged.length === 0) {
-      playerAuditStatus.innerHTML = `ตรวจสอบนักกีฬาทั้งหมด ${players.length} คนแล้ว ไม่พบข้อมูลที่ผิดปกติ ${icon("check")}`;
+      playerAuditStatus.innerHTML = `ตรวจสอบนักกีฬาทั้งหมด ${scoped.length} คนแล้ว ไม่พบข้อมูลที่ผิดปกติ ${icon("check")}`;
       playerAuditBody.innerHTML =
         '<tr><td colspan="7" class="px-4 py-6 text-center text-slate-400">ไม่พบนักกีฬาที่ข้อมูลผิดปกติ</td></tr>';
       return;
     }
 
-    playerAuditStatus.textContent = `พบนักกีฬา ${flagged.length} คน (จากทั้งหมด ${players.length} คน) ที่ข้อมูลอาจไม่ถูกต้อง — แก้ไขแล้วกด "บันทึก" ทีละแถวได้เลย`;
+    playerAuditStatus.textContent = `พบนักกีฬา ${flagged.length} คน (จากทั้งหมด ${scoped.length} คน) ที่ข้อมูลอาจไม่ถูกต้อง — แก้ไขแล้วกด "บันทึก" ทีละแถวได้เลย`;
     playerAuditBody.innerHTML = flagged.map(playerAuditRowHtml).join("");
   } catch (err) {
     console.error(err);
@@ -3516,6 +3525,8 @@ async function loadDailyProgress(dateStr) {
   coachSnap.forEach((d) => {
     const data = d.data();
     if (data.status === "approved" && data.role === "coach" && data.team) {
+      // หน้าทีม: เฉพาะโค้ชของทีมที่เลือกและรุ่นอายุที่กรองไว้ (ไม่มีแท็บเลือกทีมซ้ำ)
+      if (teamSpace() && !(data.team === myTeam && matchesAgeFilter(data.ageGroups, staffAgeFilter))) return;
       coaches.push({ id: d.id, ...data });
     }
   });
@@ -3585,7 +3596,7 @@ async function loadDailyProgress(dateStr) {
 
   // เลือกดูทีละทีมผ่านปุ่มแทนการแสดงทุกทีมพร้อมกัน โดย default เลือกทีมแรกให้อัตโนมัติ
   const teamsPresent = Array.from(new Set(rows.map((r) => r.coach.team)));
-  progressTeamTabs.classList.remove("hidden");
+  progressTeamTabs.classList.toggle("hidden", teamSpace());
   progressTeamTabs.innerHTML = "";
 
   function showTeam(team, btn) {
@@ -3693,6 +3704,8 @@ async function findCoachRecordForTeam(team, role) {
 // จะ fallback ไปหาโค้ชคนแรกของทีมเหมือนเดิม (ใช้ตอนกดจากปุ่ม "จัดการทีมนี้ →" ซึ่งไม่ได้เจาะจงคนใดคนหนึ่ง)
 // landing: ฟังก์ชันที่เปิดหน้าจอแรกหลังเข้าโหมด (ค่าเริ่มต้น Daily — ตอนรีเฟรชจะส่งฟังก์ชันที่เปิดหน้าจอเดิมมาแทน)
 async function enterTeamManagementMode(team, returnSection, coachRecordOverride, landing = showDaily) {
+  // เข้ามาจากหน้าทีม (เช่น กดชื่อโค้ช/"จัดการทีมนี้" ในรายชื่อโค้ชของเมนู Admin) = ตอนกดออกกลับหน้าทีมเดิม ไม่ใช่แผงเก่า
+  if (teamSpace()) returnToTeamSpace = { team: myTeam, mode: adminSpace() ? "admin" : "staff" };
   myTeam = team;
   adminViewingAs = "coach";
   adminViewingCoachId = coachRecordOverride?.id || null;
@@ -3814,11 +3827,8 @@ const TOOL_OPENERS = {
   coaches: () => openAdminCoachesSection(),
   "staff-announcements": () => openAdminStaffAnnouncementsSection(),
   progress: () => openAdminProgressSection(),
-  matches: () => openAdminMatchesSection(),
-  injuries: () => openAdminInjuriesSection(),
   print: () => openAdminPrintSection(),
   "player-audit": () => openAdminPlayerAuditSection(),
-  "report-card": () => openAdminReportCardSection(),
   "masc-rounds": () => openAdminMascRoundsSection(),
   "fitness-rounds": () => openAdminFitnessRoundsSection(),
   "athlete-windows": () => openAdminAthleteWindowsSection()
@@ -3929,6 +3939,7 @@ document.getElementById("staff-coach-detail-back").addEventListener("click", sho
 // ผู้ดูแลระบบสวมบทบาทเป็น "ผู้บริหารทีม" (ดูอย่างเดียว) แทนที่จะเป็นโค้ชเต็มรูปแบบ — ใช้ตรวจสอบว่าหน้าจอ
 // ที่ผู้บริหารทีมจริงเห็นถูกต้องหรือไม่ โดยไม่ต้องขอให้ผู้บริหารทีมจริงล็อกอินทดสอบให้
 async function enterExecutiveViewMode(team, returnSection, execRecordOverride) {
+  if (teamSpace()) returnToTeamSpace = { team: myTeam, mode: adminSpace() ? "admin" : "staff" };
   myTeam = team;
   myAgeGroups = [];
   myCoachPosition = null;
