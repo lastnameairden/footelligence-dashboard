@@ -85,6 +85,8 @@ let comments = new Map(); // meetingId -> { all, player, gk, fit } ความ�
 // ทีมสต๊าฟ (สิทธิ์ meetings) เห็นหน้าเดียวกับแอดมินแต่แก้ได้เฉพาะวาระ/ไฟล์/ความคิดเห็น — ลิงก์ Meet ผลเข้าประชุม และการแบ่งกลุ่มเป็นของแอดมินหลัก
 let staffMode = false;
 // หน้าทีมของทีมหลังบ้าน: แสดงเฉพาะทีมที่เลือก (scopeTeam) และเฉพาะโค้ชที่ดูแลรุ่นที่เลือก (scopeAgeGroup) — null/"" = ไม่กรอง (หน้าแอดมินเดิมเห็นทุกทีม)
+// readOnly = ผู้บริหารทีมดูสรุปการประชุมของทีมตัวเอง (อ่านอย่างเดียว): ไม่มีฟอร์มวาระ/ความเห็น/แนบไฟล์ ไม่โหลดความเห็นของแอดมิน (ผู้บริหารไม่มีสิทธิ์อ่าน)
+let readOnly = false;
 let scopeTeam = null;
 let scopeAgeGroup = "";
 const scopedSlots = () => (scopeTeam ? MEETING_TEAM_SLOTS.filter((s) => s.team === scopeTeam) : MEETING_TEAM_SLOTS);
@@ -104,11 +106,13 @@ async function reload() {
   monthLabelEl.textContent = thaiMonthLabel(viewMonth);
   bodyEl.innerHTML = '<p class="text-sm text-slate-400">กำลังโหลด...</p>';
   try {
+    // เปิดจากหน้าทีม (scopeTeam) ดึงเฉพาะของทีมนั้น — จำเป็นสำหรับผู้บริหารที่กฎ Firestore ให้อ่านได้เฉพาะเอกสารของทีมตัวเอง
+    const scope = scopeTeam ? [where("team", "==", scopeTeam)] : [];
     const [coachSnap, meetingSnap, recapSnap, commentSnap] = await Promise.all([
       getDocs(query(collection(db, "coaches"), where("role", "==", "coach"))),
-      getDocs(query(collection(db, "coachMeetings"), where("month", "==", viewMonth))),
-      getDocs(query(collection(db, "coachMeetingRecaps"), where("month", "==", viewMonth))),
-      getDocs(query(collection(db, "coachMeetingComments"), where("month", "==", viewMonth)))
+      getDocs(query(collection(db, "coachMeetings"), ...scope, where("month", "==", viewMonth))),
+      getDocs(query(collection(db, "coachMeetingRecaps"), ...scope, where("month", "==", viewMonth))),
+      readOnly ? Promise.resolve({ forEach: () => {} }) : getDocs(query(collection(db, "coachMeetingComments"), ...scope, where("month", "==", viewMonth)))
     ]);
     const teams = new Set(MEETING_TEAM_SLOTS.map((s) => s.team));
     coachesByTeam = new Map(MEETING_TEAM_SLOTS.map((s) => [s.team, []]));
@@ -189,6 +193,21 @@ function fileTagsHtml(m, sec, files, removable) {
       return `<span class="badge badge-neutral">${icon("paperclip")} ${href ? `<a href="${href}" target="_blank" rel="noopener noreferrer">${name}</a>` : name}${remove}</span>`;
     })
     .join(" ");
+}
+
+// โหมดอ่านอย่างเดียว (ผู้บริหารทีม): วาระและไฟล์ประกอบการประชุมของส่วนนี้ ไม่มีช่องกรอก
+function sectionReadHtml(m, sec) {
+  const saved = (m.sections || {})[sec] || {};
+  const plan = String(saved.plan || "").trim();
+  const mine = membersOfSection(m, sec);
+  const who = sec === "all" ? "โค้ชทุกคนในกลุ่มเห็น" : `โค้ชสาย${sectionLabel(sec)}ในกลุ่มนี้: ${mine.length ? escapeHtml(mine.join(", ")) : "ไม่มี"}`;
+  const files = saved.files || [];
+  return `
+    <div class="space-y-3">
+      <p class="text-xs text-slate-500">${who}</p>
+      ${plan ? `<p class="text-sm text-slate-800" ${preLine}>${escapeHtml(plan)}</p>` : '<p class="text-sm text-slate-400">ยังไม่มีวาระในส่วนนี้</p>'}
+      ${files.length ? `<div class="flex items-center gap-2 flex-wrap">${fileTagsHtml(m, sec, files, false)}</div>` : ""}
+    </div>`;
 }
 
 function sectionFormHtml(m, sec) {
@@ -382,9 +401,9 @@ function render() {
         ${linkControl}
         ${moveControl}
         <div class="border-t border-slate-100 pt-3 space-y-3">
-          <p class="font-semibold text-slate-900 text-sm">วาระก่อนประชุม และความคิดเห็นหลังประชุม</p>
+          <p class="font-semibold text-slate-900 text-sm">${readOnly ? "วาระและเอกสารประกอบการประชุม" : "วาระก่อนประชุม และความคิดเห็นหลังประชุม"}</p>
           <div class="flex flex-wrap gap-2">${tabs}</div>
-          ${sectionFormHtml(m, sec)}
+          ${readOnly ? sectionReadHtml(m, sec) : sectionFormHtml(m, sec)}
         </div>
       </div>`;
   }
@@ -615,10 +634,12 @@ const actions = {
 
 // ทีมสต๊าฟแก้ได้เฉพาะวาระ/ไฟล์/ความคิดเห็น (กฎ Firestore บังคับอีกชั้น) — action อื่นของแอดมินหลักถูกปิดไว้ที่นี่ด้วย
 const STAFF_ALLOWED_ACTIONS = new Set(["select-week", "sec-tab", "pick-file", "remove-file", "save-section"]);
+const READONLY_ALLOWED_ACTIONS = new Set(["select-week", "sec-tab"]);
 
 bodyEl.addEventListener("click", (e) => {
   const el = e.target.closest("[data-action]");
   if (!el || !bodyEl.contains(el)) return;
+  if (readOnly && !READONLY_ALLOWED_ACTIONS.has(el.dataset.action)) return;
   if (staffMode && !STAFF_ALLOWED_ACTIONS.has(el.dataset.action)) return;
   // ปุ่มวันพุธ/พฤหัสบดีอยู่ในแถวที่คลิกเลือกสัปดาห์ได้ — ทำงานของปุ่มอย่างเดียว ไม่ให้แถวทำซ้ำ
   e.stopPropagation();
@@ -652,7 +673,8 @@ nextBtn.addEventListener("click", () => changeMonth(1));
 
 // opts.staffMode = true เมื่อเปิดโดยทีมหลังบ้าน (สิทธิ์ meetings) — ซ่อนเครื่องมือที่เป็นของแอดมินหลัก
 export function openAdminMeetings(opts = {}) {
-  staffMode = opts.staffMode === true;
+  readOnly = opts.readOnly === true;
+  staffMode = opts.staffMode === true || readOnly;
   scopeTeam = opts.team || null;
   scopeAgeGroup = opts.ageGroup || "";
   return reload();

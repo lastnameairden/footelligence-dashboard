@@ -18,6 +18,8 @@ service cloud.firestore {
     function canManageTeam() { return isApproved() && myRole() == 'coach'; }
     function canViewTeam() { return isApproved() && (myRole() == 'coach' || myRole() == 'executive'); }
     function myTeam() { return myCoachDoc().team; }
+    // ผู้บริหารทีม (ดูอย่างเดียว) — ต่างจาก canViewTeam() ที่รวมโค้ชด้วย ใช้กับข้อมูลที่โค้ชไม่ควรอ่านของเพื่อนร่วมทีม (เช่น งานหลังประชุม)
+    function isExecutive() { return isApproved() && myRole() == 'executive'; }
     function ownsTeam() { return 'team' in resource.data && resource.data.team == myTeam(); }
 
     // ทีมหลังบ้าน (role = 'staff') — สมัครเองด้วยอีเมลของตัวเอง ผู้ดูแลระบบหลักอนุมัติพร้อมกำหนดสิทธิ์รายคนไว้ใน coaches/{uid}.permissions
@@ -163,7 +165,9 @@ service cloud.firestore {
     // ทีมหลังบ้านที่มีสิทธิ์ meetings อ่านได้ทั้งหมด ลบได้เฉพาะแอดมินหลัก
     match /coachMeetingRecaps/{id} {
       allow read: if canManageAll() || hasPerm('meetings')
-                  || (canManageTeam() && resource.data.coachId == request.auth.uid);
+                  || (canManageTeam() && resource.data.coachId == request.auth.uid)
+                  // ผู้บริหารทีมอ่านงานหลังประชุมของโค้ชในทีมตัวเองได้ (สรุปการประชุมแบบอ่านอย่างเดียว) — ต้อง query ด้วย where team ตรงกับทีมตัวเอง
+                  || (isExecutive() && ownsTeam());
       allow create: if (canManageAll()
                         || (canManageTeam()
                             && request.resource.data.coachId == request.auth.uid

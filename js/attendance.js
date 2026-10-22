@@ -1850,7 +1850,7 @@ function openAdminMeetingsSection() {
   hideAllScreens();
   adminMeetingsSection.classList.remove("hidden");
   // ในหน้าทีมของทีมหลังบ้าน แสดงเฉพาะทีมที่เลือกและโค้ชของรุ่นที่กรองไว้ — แผงผู้ดูแลเดิมเห็นทุกทีม
-  openAdminMeetings({ staffMode: isStaffSession(), team: teamSpace() ? myTeam : null, ageGroup: teamSpace() ? staffAgeFilter : "" });
+  openAdminMeetings({ staffMode: isStaffSession(), readOnly: execSpace(), team: teamSpace() ? myTeam : null, ageGroup: teamSpace() ? staffAgeFilter : "" });
 }
 
 function openAdminMascRoundsSection() {

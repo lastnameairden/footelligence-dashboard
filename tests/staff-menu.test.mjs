@@ -6,6 +6,7 @@ import { ageGroupsForFilter, matchesAgeFilter, validFilter } from "../js/age-fil
 import { COACH_SCREEN_KEYS } from "../js/screen-route.js";
 import { ADMIN_TEAM_MENU } from "../js/admin-menu.js";
 import { hasAdminTools, toolGroupsFor, toolsMenuItem } from "../js/admin-tools.js";
+import { EXEC_TEAM_MENU } from "../js/exec-menu.js";
 
 test("staff menu: the nine agreed items in order", () => {
   assert.deepEqual(STAFF_MENU.map((m) => m.label), ["Home", "Coach Data", "Player Data", "Attendance", "Training", "Match Data", "Evaluation", "Injury/Sick", "Meeting"]);
@@ -117,4 +118,16 @@ test("admin tools: admin sees every tool in four groups; staff only what the per
   assert.equal(toolsMenuItem(true).label, "Admin");
   assert.equal(toolsMenuItem(false).label, "Tools");
   assert.ok(toolsMenuItem(true).screens.includes("approvals") && toolsMenuItem(true).screens.includes("development"));
+});
+test("executive menu: ten read-only items, Dashboard after Home, no Tools, only staff data pages", () => {
+  assert.deepEqual(EXEC_TEAM_MENU.map((m) => m.label), ["Home", "Dashboard", "Coach Data", "Player Data", "Attendance", "Training", "Match Data", "Evaluation", "Injury/Sick", "Meeting"]);
+  assert.equal(new Set(EXEC_TEAM_MENU.map((m) => m.key)).size, 10);
+  assert.equal(EXEC_TEAM_MENU.some((m) => m.key === "admin-tools"), false);
+  assert.ok(EXEC_TEAM_MENU.every((m) => m.perm === undefined), "no permission filtering for executives");
+  const seen = new Map();
+  for (const m of EXEC_TEAM_MENU) for (const s of m.screens) assert.equal(seen.has(s), false, `${s} listed twice`), seen.set(s, m.key);
+  const editing = ["plan", "report", "match-form", "injury", "fitness", "player-form", "checkin", "profile", "footelligence-test", "physical-form"];
+  for (const s of editing) assert.equal(seen.has(s), false, `${s} is a coach editing screen`);
+  assert.equal(EXEC_TEAM_MENU.find((m) => m.key === "evaluation").screen, "athlete-results");
+  assert.equal(menuKeyForScreen("team-dashboard", EXEC_TEAM_MENU), "dashboard");
 });
