@@ -78,7 +78,7 @@ const tile = (label, value, tone, go = "") => {
   return go ? `<button type="button" class="${cls}" data-home-go="${escapeHtml(go)}">${body}</button>` : `<div class="${cls}">${body}</div>`;
 };
 
-export function adminHomeHtml(model, { team = "" } = {}) {
+export function adminHomeHtml(model, { team = "", showApprovals = true } = {}) {
   const { summary: s, rows, kind } = model;
   const off = kind !== "training";
   const tone = (n) => (off ? "" : n > 0 ? "warn" : "ok");
@@ -87,7 +87,7 @@ export function adminHomeHtml(model, { team = "" } = {}) {
     tile("รุ่นที่ยังไม่ส่งแผนฝึก", off ? "-" : s.plansMissing, tone(s.plansMissing)),
     tile("รุ่นที่ยังไม่ส่งรายงานฝึก", off ? "-" : s.reportsMissing, tone(s.reportsMissing)),
     tile("นักกีฬาบาดเจ็บอยู่", s.injured, s.injured > 0 ? "warn" : "ok", "injury"),
-    tile("คำขอลงทะเบียนรออนุมัติ", s.pendingApprovals, s.pendingApprovals > 0 ? "warn" : "ok", "approvals")
+    showApprovals ? tile("คำขอลงทะเบียนรออนุมัติ", s.pendingApprovals, s.pendingApprovals > 0 ? "warn" : "ok", "approvals") : ""
   ].join("");
   const body =
     rows.length === 0

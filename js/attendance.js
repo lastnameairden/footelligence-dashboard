@@ -80,6 +80,7 @@ import { filterPlans, filterReportsByMonths, groupByMonth, monthOptionsOf, month
 import { COACH_MENU, childMatchesScreen, menuItem, menuKeyForScreen } from "./coach-menu.js";
 import { STAFF_UNFILTERED_SCREENS, staffMenuFor } from "./staff-menu.js";
 import { ADMIN_TEAM_MENU } from "./admin-menu.js";
+import { EXEC_TEAM_MENU } from "./exec-menu.js";
 import { toolGroupsFor } from "./admin-tools.js";
 import { initStaffHome, showStaffHome } from "./staff-home-ui.js";
 import { initAdminHome, showAdminHome } from "./admin-home-ui.js";
@@ -1112,6 +1113,10 @@ function renderDrawerItemsInner() {
       if (adminSpace()) {
         navDrawerItems.appendChild(drawerItem(icon("bar-chart"), "Dashboard ของทีม", () => TOOL_OPENERS["team-dashboard"]()));
       }
+      // แอดมินที่ดูในมุมมองผู้บริหาร: ทางกลับ (หน้าทีมเดิมถ้ามาจากหน้าทีม ไม่งั้นแผงผู้ดูแล)
+      if (execSpace()) {
+        navDrawerItems.appendChild(drawerItem(icon("shield"), returnToTeamSpace ? "กลับหน้าทีม" : "กลับแผงควบคุมผู้ดูแลระบบ", exitTeamManagementToAdminPanel));
+      }
       navDrawerItems.appendChild(drawerItem(icon("refresh"), "เปลี่ยนทีม", goToDashboard));
     } else if (myTeam) {
       navDrawerItems.appendChild(drawerSectionLabel(`จัดการทีม: ${teamLogoImg(myTeam)}${myTeam}`));
@@ -1206,6 +1211,7 @@ const COACH_SCREEN_OPENERS = {
   "staff-home": () => openStaffHome(),
   "staff-attendance-menu": () => openStaffAttendanceMenu(),
   "staff-tools": () => openStaffTools(),
+  "team-dashboard": () => openStaffDashboard(),
   "staff-coaches": () => openStaffCoaches(),
   "staff-meeting": () => openAdminMeetingsSection()
 };
@@ -1226,10 +1232,14 @@ function openReportCardFrame({ team, ageGroup, start, end }) {
 // เมนูที่ใช้อยู่ตอนนี้: ทีมหลังบ้านในหน้าทีม = เมนู 9 รายการของตัวเอง (staff-menu.js) ที่เหลือ = เมนูโค้ช
 // หน้าทีมแบบใหม่มี 2 แบบ: ทีมหลังบ้าน (adminViewingAs = "staff", ดูอย่างเดียว) และแอดมินหลัก (adminViewingAs = "admin-space", ดู/แก้ได้ครบ)
 // teamSpace = ทั้งสองแบบ (แถบตัวกรองรุ่น เมนูของหน้าทีม) · staffSpace = เฉพาะทีมหลังบ้าน (ซ่อนปุ่มแก้/ลบ และข้อมูลส่วนตัว) · adminSpace = เฉพาะแอดมิน
-const teamSpace = () => !!myTeam && (adminViewingAs === "staff" || adminViewingAs === "admin-space");
+const teamSpace = () => !!myTeam && (adminViewingAs === "staff" || adminViewingAs === "admin-space" || adminViewingAs === "exec-space");
 const staffSpace = () => isStaffSession() && !!myTeam && adminViewingAs === "staff";
 const adminSpace = () => !isStaffSession() && !!myTeam && adminViewingAs === "admin-space";
-const activeMenu = () => (staffSpace() ? staffMenuFor(currentStaffPerms) : adminSpace() ? ADMIN_TEAM_MENU : COACH_MENU);
+// ผู้บริหารทีม (adminViewingAs = "exec-space"): บัญชีผู้บริหารจริง หรือแอดมินที่ดูในมุมมองผู้บริหาร — ทีมเดียว ดูอย่างเดียว
+const execSpace = () => !!myTeam && adminViewingAs === "exec-space";
+// หน้าทีมที่ดูอย่างเดียว (ทีมหลังบ้านและผู้บริหาร): ซ่อนปุ่มแก้/ลบ/เพิ่มของโค้ช และข้อมูลผู้ปกครอง/สุขภาพของนักกีฬา
+const viewOnlySpace = () => staffSpace() || execSpace();
+const activeMenu = () => (staffSpace() ? staffMenuFor(currentStaffPerms) : execSpace() ? EXEC_TEAM_MENU : adminSpace() ? ADMIN_TEAM_MENU : COACH_MENU);
 
 // เมนูของโค้ชใช้ตอนมีทีมที่ดูแลอยู่ (โค้ชจริง หรือผู้ดูแลระบบ/ทีมหลังบ้านที่สวมบทบาทโค้ช) — โหมดผู้บริหารทีมไม่ใช้
 function coachNavVisible() {
@@ -1285,7 +1295,7 @@ function appendCoachMenuToDrawer() {
 
 function renderCoachNav() {
   renderCoachTabs();
-  document.body.classList.toggle("staff-space", staffSpace());
+  document.body.classList.toggle("staff-space", viewOnlySpace());
   document.body.classList.toggle("team-space", teamSpace());
   // ปุ่มกลับของหน้าเครื่องมือผู้ดูแล: ในหน้าทีมกลับไปเมนูเครื่องมือ ไม่ใช่ Dashboard
   for (const btn of adminBackButtons) btn.textContent = teamSpace() ? "← กลับเมนูเครื่องมือ" : "← กลับหน้า Dashboard";
@@ -1796,9 +1806,9 @@ function openAthleteResultsSection() {
 initPhysical({
   team: () => myTeam,
   ageGroups: () => myAgeGroups,
-  canBypass: () => currentIsAdmin,
+  canBypass: () => currentIsAdmin || execSpace(),
   ageLocked: () => teamSpace(),
-  bypassWho: () => (isStaffSession() ? "ทีมหลังบ้าน" : "แอดมิน"),
+  bypassWho: () => (execSpace() ? "ผู้บริหารทีม" : isStaffSession() ? "ทีมหลังบ้าน" : "แอดมิน"),
   openReportCard: openReportCardFrame,
   closeReportCard: () => clearEmbedded(athleteResultsFrame)
 });
@@ -3773,7 +3783,7 @@ function storeStaffFilter(team, value) {
 
 async function enterTeamSpace(team, mode, landing = () => openStaffHome()) {
   myTeam = team;
-  adminViewingAs = mode === "admin" ? "admin-space" : "staff";
+  adminViewingAs = mode === "admin" ? "admin-space" : mode === "executive" ? "exec-space" : "staff";
   adminViewingCoachId = null;
   myAgeGroups = [];
   myCoachPosition = null;
@@ -3790,14 +3800,14 @@ async function enterTeamSpace(team, mode, landing = () => openStaffHome()) {
     myAgeGroups = ageGroupsForFilter(staffAgeFilter);
     await loadPlayers();
   }
-  adminReturnSection = null;
+  if (!(execSpace() && currentIsAdmin)) adminReturnSection = null; // แอดมินที่ดูในมุมมองผู้บริหารต้องรู้ว่าจะกลับแผงไหน
   renderDrawerItems();
   landing();
 }
 
 function renderStaffFilter() {
   // Home ของแอดมินมีกราฟตามรุ่นอายุ จึงแสดงตัวกรองด้วย (Home ของทีมหลังบ้านเป็นประกาศ ไม่แยกรุ่น)
-  const show = teamSpace() && staffTeamAgeGroups.length > 0 && (adminSpace() || !STAFF_UNFILTERED_SCREENS.includes(currentScreenKey()));
+  const show = teamSpace() && staffTeamAgeGroups.length > 0 && (adminSpace() || execSpace() || !STAFF_UNFILTERED_SCREENS.includes(currentScreenKey()));
   staffFilterNav.classList.toggle("hidden", !show);
   if (!show) {
     staffFilterInner.innerHTML = "";
@@ -3893,9 +3903,16 @@ initAdminHome(staffHomeBody, (go) => (go === "approvals" ? TOOL_OPENERS.approval
 function openStaffHome() {
   hideAllScreens();
   staffHomeSection.classList.remove("hidden");
-  staffHomeSubtitle.textContent = adminSpace() ? "ภาพรวมของทีมวันนี้และงานที่รอตรวจ" : "แจ้งเตือนจากผู้ดูแลระบบและงานที่รอตรวจ";
+  staffHomeSubtitle.textContent = execSpace() ? "ข้อความจากผู้ดูแลระบบและภาพรวมของทีมวันนี้" : adminSpace() ? "ภาพรวมของทีมวันนี้และงานที่รอตรวจ" : "แจ้งเตือนจากผู้ดูแลระบบและงานที่รอตรวจ";
   if (adminSpace()) {
     showAdminHome(staffHomeBody, { team: myTeam, ageGroup: staffAgeFilter });
+    return;
+  }
+  // ผู้บริหาร: ข้อความจากผู้ดูแลระบบ (กด "ทำเครื่องหมายว่าอ่านแล้ว" ได้เหมือนหน้าสรุปเดิม) + ภาพรวมทีมวันนี้และกราฟ ตามตัวกรองรุ่นอายุ
+  if (execSpace()) {
+    staffHomeBody.innerHTML = '<div id="exec-home-notes" class="space-y-3"></div><div id="exec-home-overview" class="space-y-4"></div>';
+    loadExecutiveNotes(myTeam, staffHomeBody.querySelector("#exec-home-notes"));
+    showAdminHome(staffHomeBody.querySelector("#exec-home-overview"), { team: myTeam, ageGroup: staffAgeFilter, executive: true });
     return;
   }
   showStaffHome(staffHomeBody, { team: myTeam, uid: auth.currentUser.uid, canMeetings: staffCan(currentStaffPerms, "meetings") });
@@ -3965,30 +3982,20 @@ staffCoachesGrid.addEventListener("click", (e) => {
 document.getElementById("staff-coach-detail-back").addEventListener("click", showStaffCoachGrid);
 // ผู้ดูแลระบบสวมบทบาทเป็น "ผู้บริหารทีม" (ดูอย่างเดียว) แทนที่จะเป็นโค้ชเต็มรูปแบบ — ใช้ตรวจสอบว่าหน้าจอ
 // ที่ผู้บริหารทีมจริงเห็นถูกต้องหรือไม่ โดยไม่ต้องขอให้ผู้บริหารทีมจริงล็อกอินทดสอบให้
-async function enterExecutiveViewMode(team, returnSection, execRecordOverride) {
+async function enterExecutiveViewMode(team, returnSection, execRecordOverride, landing = () => openStaffHome()) {
   if (teamSpace()) returnToTeamSpace = { team: myTeam, mode: adminSpace() ? "admin" : "staff", screen: currentScreenKey() };
-  myTeam = team;
-  myAgeGroups = [];
-  myCoachPosition = null;
-  adminViewingAs = "executive";
-  adminViewingCoachId = execRecordOverride?.id || null;
   const execRecord = execRecordOverride || (await findCoachRecordForTeam(team, "executive"));
+  adminViewingCoachId = execRecordOverride?.id || null;
+  adminReturnSection = returnSection || adminManageTeamSection;
+  await enterTeamSpace(team, "executive", landing);
   // แสดงชื่อ/อีเมล/สถานะของผู้บริหารทีมตัวจริง (ถ้าหาเจอ) แทนข้อมูลของผู้ดูแลระบบเอง เหมือนกับโหมดโค้ช
   coachNameEl.textContent = execRecord?.name || team;
   coachEmailEl.textContent = execRecord?.email || "-";
   coachStatusBadgeEl.innerHTML = '<span class="badge badge-success">อนุมัติแล้ว</span>';
   coachRoleBadgeEl.textContent = "ผู้บริหารทีม";
   coachRoleBadgeEl.className = "badge badge-neutral";
-  coachTeamEl.innerHTML = `${teamLogoImg(team)}${team}`;
-  coachAgeGroupsWrap.classList.add("hidden");
-  // ผู้บริหารทีมจริงไปหน้า Dashboard โดยไม่ต้องแนบ ?team= เพราะระบบรู้ทีมจากบัญชีอยู่แล้ว แต่ผู้ดูแลระบบที่
-  // สวมบทบาทไม่มีทีมผูกกับบัญชีจริง จึงต้องแนบทีมที่เลือกไว้ไปกับลิงก์ด้วย ไม่งั้น Dashboard จะไม่รู้ว่าจะโชว์ทีมไหน
-  executiveDashboardLink.href = `/?team=${encodeURIComponent(team)}`;
-  adminReturnSection = returnSection || adminManageTeamSection;
   renderDrawerItems();
-  showExecutiveHome(team);
 }
-
 // หน้าแรกของโหมดผู้บริหารทีม (สรุปภาพรวม) — ใช้ร่วมกันทั้งบัญชีผู้บริหารทีมจริง, ผู้ดูแลระบบที่สวมบทบาท
 // ผ่าน enterExecutiveViewMode และปุ่ม "กลับ" ของหน้ารายชื่อนักกีฬา (openExecutivePlayersSection) ด้านล่าง
 function showExecutiveHome(team) {
@@ -4498,6 +4505,7 @@ async function handleExecutiveNoteMarkRead(e) {
   }
 }
 executiveNotesList.addEventListener("click", handleExecutiveNoteMarkRead);
+staffHomeBody.addEventListener("click", handleExecutiveNoteMarkRead);
 dailyExecutiveNotesList.addEventListener("click", handleExecutiveNoteMarkRead);
 
 adminViewDashboardBtn.addEventListener("click", () => {
@@ -4591,7 +4599,7 @@ const ROUTE_SCREENS = [
   { el: staffAttendanceMenuSection, key: "staff-attendance-menu", kind: "coach" },
   { el: staffToolsSection, key: "staff-tools", kind: "coach" },
   { el: staffDevelopmentSection, key: "development", kind: "admin" },
-  { el: staffDashboardSection, key: "team-dashboard", kind: "admin" },
+  { el: staffDashboardSection, key: "team-dashboard", kind: "coach" },
   { el: staffCoachesSection, key: "staff-coaches", kind: "coach" },
   { el: footelligenceTestSection, key: "footelligence-test", kind: "coach" },
   { el: injuryMenuSection, key: "injury-menu", kind: "coach" },
@@ -4628,7 +4636,7 @@ function currentRouteFromScreen() {
     const route = {
       admin: "team",
       team: myTeam,
-      as: adminViewingAs === "executive" ? "executive" : adminViewingAs === "staff" ? "staff" : adminViewingAs === "admin-space" ? "admin" : "coach",
+      as: adminViewingAs === "executive" || adminViewingAs === "exec-space" ? "executive" : adminViewingAs === "staff" ? "staff" : adminViewingAs === "admin-space" ? "admin" : "coach",
       coach: adminViewingCoachId || undefined,
       ret: adminReturnSection === adminCoachesSection ? "coaches" : "manage-team"
     };
@@ -4643,6 +4651,7 @@ function currentRouteFromScreen() {
     return route;
   }
   if (currentIsAdmin) return active.kind === "admin" ? { admin: active.key } : null;
+  if (execSpace() && active.key === "meetings") return { screen: "staff-meeting" };
   return active.kind === "coach" ? { screen: active.key, date: routeDateForScreen(active.key) } : null;
 }
 
@@ -4829,7 +4838,8 @@ async function restoreAdminTeamContext(route) {
   }
   const returnSection = route.ret === "coaches" ? adminCoachesSection : adminManageTeamSection;
   if (wantedRole === "executive") {
-    await enterExecutiveViewMode(route.team, returnSection, record);
+    const allowedExec = new Set(EXEC_TEAM_MENU.flatMap((m) => m.screens));
+    await enterExecutiveViewMode(route.team, returnSection, record, () => openCoachScreen(allowedExec.has(route.screen) ? route.screen : "staff-home", route.date));
   } else {
     await enterTeamManagementMode(route.team, returnSection, record, () => openCoachScreen(route.screen, route.date));
   }
@@ -4944,17 +4954,15 @@ onAuthStateChanged(auth, async (user) => {
       coachRoleBadgeEl.className = "badge badge-neutral";
       renderCoachProfile(user, data, data.team);
       coachAgeGroupsWrap.classList.add("hidden");
-      myTeam = null;
       myExecutiveTeam = data.team;
-      adminViewingAs = null;
-      // บัญชีผู้บริหารทีมจริงไม่ต้องแนบ ?team= เพราะ Dashboard รู้ทีมจากบัญชีอยู่แล้ว (ต่างจากตอนผู้ดูแล
-      // ระบบสวมบทบาทที่ enterExecutiveViewMode ซึ่งต้องแนบทีมไปกับลิงก์ด้วย)
-      executiveDashboardLink.href = "./index.html";
-      renderDrawerItems();
-      showExecutiveHome(data.team);
+      // หน้าทีมของผู้บริหาร (เมนูเดียวกับทีมหลังบ้าน แต่ทีมเดียว ดูอย่างเดียว) — รีเฟรชแล้วกลับมาหน้าเดิมตาม screen ใน hash
+      const restored = parseRouteHash(window.location.hash);
+      const allowedExec = new Set(EXEC_TEAM_MENU.flatMap((m) => m.screens));
+      await enterTeamSpace(data.team, "executive", () => openCoachScreen(allowedExec.has(restored.screen) ? restored.screen : "staff-home", restored.date));
+      myCoachName = data.name || user.email;
+      enableRouteSync();
       return;
     }
-
     coachRoleBadgeEl.textContent = "โค้ช";
     coachRoleBadgeEl.className = "badge badge-success";
     myTeam = data.team;
@@ -5091,7 +5099,7 @@ function playerDetailRows(p) {
     ["เพศ", escapeHtml(p.sex ?? "-")],
     ["ส่วนสูงพ่อ / แม่", escapeHtml(parents)],
     // ผู้ปกครอง/เบอร์ติดต่อเป็นข้อมูลส่วนบุคคล — หน้าทีมของทีมหลังบ้านไม่แสดง (ซ่อนที่หน้าจอ ยังไม่ใช่การจำกัดที่กฎ Firestore)
-    ...(staffSpace() ? [] : contactExtraRows(p))
+    ...(viewOnlySpace() ? [] : contactExtraRows(p))
   ]
     .map(([label, html]) => `<div class="player-detail-row"><dt>${label}</dt><dd>${html}</dd></div>`)
     .join("");
@@ -5110,7 +5118,7 @@ function openPlayerDetail(id) {
     <div class="player-detail-photo">${playerPhotoHtml(p)}</div>
     <div class="flex-1 min-w-[240px]">
       <h2 class="text-xl font-bold">${escapeHtml(playerDisplayName(p))}${p.number != null ? ` <span class="badge badge-neutral">เบอร์ ${escapeHtml(p.number)}</span>` : ""}</h2>
-      ${staffSpace() ? "" : healthAlertHtml(p)}
+      ${viewOnlySpace() ? "" : healthAlertHtml(p)}
       <dl class="mt-2">${playerDetailRows(p)}</dl>
       <div class="flex gap-2 flex-wrap mt-4">
         <button type="button" class="btn btn-secondary" data-detail-action="edit">${icon("edit")} แก้ไขข้อมูล</button>
