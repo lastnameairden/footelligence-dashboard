@@ -3753,7 +3753,8 @@ const TOOL_OPENERS = {
 function openStaffDashboard() {
   hideAllScreens();
   staffDashboardSection.classList.remove("hidden");
-  showEmbedded(staffDashboardFrame, "index.html", { team: myTeam });
+  // ผู้บริหาร (และแอดมินที่เปิดมุมมองผู้บริหาร) เห็น Dashboard แบบสรุปของผู้บริหาร: view=exec
+  showEmbedded(staffDashboardFrame, "index.html", { team: myTeam, view: execSpace() ? "exec" : "" });
 }
 
 // พัฒนาการนักกีฬา: ฝังหน้า development.html ไว้ในหน้าทีม ใช้ทีมและรุ่นอายุจากตัวกรองด้านบน (เปลี่ยนตัวกรอง = เปิดหน้านี้ซ้ำด้วยค่าใหม่)

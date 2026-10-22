@@ -13,6 +13,7 @@ import { injuryStatsHtml, injuryTrendHtml } from "./injury-stats-view.js";
 import { normalizePermissions, staffCan } from "./staff-perms.js";
 import { applyTeamTheme } from "./team-theme.js";
 import { buildInjuryStats } from "./injury-form.js";
+import { showExecDashboard } from "./exec-dashboard-ui.js";
 import {
   PERIOD_MODES,
   currentPeriodKey,
@@ -90,6 +91,7 @@ const statusEl = document.getElementById("status-message");
 const loginGate = document.getElementById("login-gate");
 const loginGateMessage = document.getElementById("login-gate-message");
 const dashboardContent = document.getElementById("dashboard-content");
+const execDashboardEl = document.getElementById("exec-dashboard");
 const teamPickerSection = document.getElementById("team-picker-section");
 const teamPickerBg = document.getElementById("team-picker-bg");
 const teamPickerGreeting = document.getElementById("team-picker-greeting");
@@ -1848,6 +1850,24 @@ onAuthStateChanged(auth, async (user) => {
     renderDrawerItems();
 
     const isAdmin = data.role === "admin";
+    // Dashboard ของผู้บริหารทีม: ผู้บริหารตัวจริงเห็นแบบนี้เสมอ · แอดมิน/ทีมหลังบ้านที่เปิดมุมมองผู้บริหารจากหน้าทีม (#view=exec&team=) ก็เห็นแบบเดียวกัน
+    const viewAsExec = (isAdmin || data.role === "staff") && hashParams.get("view") === "exec" && TEAMS.includes(urlTeam());
+    if (data.role === "executive" || viewAsExec) {
+      const execTeam = data.role === "executive" ? data.team : urlTeam();
+      adminSearchBtn.classList.add("hidden");
+      headerAttendanceLink.classList.remove("hidden");
+      dashboardBackLink.classList.add("hidden");
+      teamPickerSection.classList.add("hidden");
+      dashboardContent.classList.add("hidden");
+      applyTeamTheme(execTeam);
+      execDashboardEl.classList.remove("hidden");
+      setStatus("");
+      showExecDashboard(execDashboardEl, execTeam).catch((err) => {
+        console.error(err);
+        setStatus("โหลดข้อมูลไม่สำเร็จ: " + err.message, true);
+      });
+      return;
+    }
     // ทีมหลังบ้าน (ที่ผ่านด่านสิทธิ์ดูด้านบนแล้ว) เห็นภาพรวมทุกทีมเหมือนแอดมิน แต่ปุ่มส่งข้อความ/แจ้งเตือน/ค้นหาเป็นของแอดมินหลักเท่านั้น
     const seesAllTeams = isAdmin || data.role === "staff";
     if (data.role === "staff") notificationBellBtn.classList.add("hidden");

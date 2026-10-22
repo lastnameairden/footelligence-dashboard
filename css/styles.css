@@ -791,6 +791,23 @@ button.admin-home-tile:hover { outline: 1px solid var(--accent); }
 .admin-bar-track { flex: 1; height: 0.65rem; border-radius: 999px; background: var(--surface-2); overflow: hidden; display: block; }
 .admin-bar-fill { display: block; height: 100%; border-radius: 999px; background: var(--accent); opacity: 0.8; }
 .admin-bar-value { width: 3rem; text-align: right; }
+/* Dashboard ของผู้บริหาร (exec-dashboard.js) */
+.exec-dash-head { display: flex; align-items: center; gap: 0.75rem; }
+.admin-home-tile-sub { font-size: 0.75rem; color: var(--text-2); }
+.admin-home-tile-value small { font-size: 0.8rem; font-weight: 400; color: var(--text-2); }
+.exec-delta-good { color: #15803d; }
+.exec-delta-bad { color: #b91c1c; }
+.exec-trend-grid { stroke: var(--border); stroke-width: 1; }
+.exec-trend-att { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.exec-trend-score { fill: none; stroke: #475569; stroke-width: 2; stroke-dasharray: 5 4; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.exec-trend-dot-att { fill: var(--accent); }
+.exec-trend-dot-score { fill: #475569; }
+.exec-legend { display: flex; flex-wrap: wrap; gap: 1rem; margin: 0; font-size: 0.75rem; color: var(--text-2); }
+.exec-legend-att::before, .exec-legend-score::before { content: ""; display: inline-block; width: 0.65rem; height: 0.65rem; border-radius: 2px; margin-right: 0.3rem; background: var(--accent); }
+.exec-legend-score::before { background: #475569; }
+.exec-bar-cell { min-width: 7rem; }
+.exec-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.45rem 0; border-top: 1px solid var(--border); font-size: 0.875rem; }
+.exec-row:first-of-type { border-top: 0; }
 /* โลโก้ทุกไฟล์พื้นหลังโปร่งใส: ไม่มีกล่องขาวรอง (หัวหน้าสีเข้มใช้เงาขาวบางๆ รอบโลโก้ให้เห็นชัดแทน) */
 .team-logo-badge { background: transparent; box-shadow: none; }
 .app-header img { background: transparent; padding: 0; border-radius: 0; filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.95)) drop-shadow(0 0 4px rgba(255, 255, 255, 0.55)); }
