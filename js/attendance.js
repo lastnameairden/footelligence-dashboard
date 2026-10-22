@@ -286,26 +286,10 @@ const registerAgeGroupCheckboxes = document.querySelectorAll(".register-age-grou
 const registerAgeGroupHint = document.getElementById("register-age-group-hint");
 const pendingSection = document.getElementById("pending-section");
 const pendingLogoutBtn = document.getElementById("pending-logout-btn");
-const executiveSection = document.getElementById("executive-section");
-const executiveDashboardLink = document.getElementById("executive-dashboard-link");
-const executiveStatusEl = document.getElementById("executive-status");
-const executiveStatCards = document.getElementById("executive-stat-cards");
-const executiveLateWarning = document.getElementById("executive-late-warning");
-const executiveLateCountEl = document.getElementById("executive-late-count");
-const executiveLateDetailEl = document.getElementById("executive-late-detail");
-const executiveCoachSummary = document.getElementById("executive-coach-summary");
-const executiveAttendanceAgeGroupSelect = document.getElementById("executive-attendance-age-group-select");
-const executiveAttendanceStatusEl = document.getElementById("executive-attendance-status");
-const executiveAttendanceGridWrap = document.getElementById("executive-attendance-grid-wrap");
-const executiveAttendanceCoachLabel = document.getElementById("executive-attendance-coach-label");
 const coachPlanDetailOverlay = document.getElementById("coach-plan-detail-overlay");
 const coachPlanDetailTitleEl = document.getElementById("coach-plan-detail-title");
 const coachPlanDetailBody = document.getElementById("coach-plan-detail-body");
 const coachPlanDetailCloseBtn = document.getElementById("coach-plan-detail-close-btn");
-const executiveNotesList = document.getElementById("executive-notes-list");
-const executivePlayersSection = document.getElementById("executive-players-section");
-const executivePlayersBackBtn = document.getElementById("executive-players-back-btn");
-const executivePlayersGroupsEl = document.getElementById("executive-players-groups");
 const coachNameEl = document.getElementById("coach-name");
 const coachEmailEl = document.getElementById("coach-email");
 const coachTeamEl = document.getElementById("coach-team");
@@ -436,7 +420,7 @@ let myTeam = null;
 // ทีมของบัญชีผู้บริหารทีมจริง (ไม่ใช่การสวมบทบาทของผู้ดูแลระบบ) — เก็บแยกจาก myTeam เพราะ myTeam ต้องเป็น
 // null สำหรับผู้บริหารทีมจริงเสมอ (renderDrawerItems ใช้ myTeam ที่มีค่าเป็นสัญญาณว่า "มีเครื่องมือจัดการทีมเต็มรูปแบบ"
 // ถ้าตั้ง myTeam ให้ผู้บริหารทีมจริงจะได้เมนูของโค้ชผิดๆ ไปด้วย) ใช้เฉพาะเปิดหน้ารายชื่อนักกีฬาแบบดูอย่างเดียว
-let myExecutiveTeam = null;
+
 // ชื่อ/อีเมลของบัญชีผู้ดูแลระบบเอง เก็บไว้ตอนล็อกอิน เพื่อใช้คืนค่ากลับตอนออกจากโหมดสวมบทบาท (โค้ช/ผู้บริหารทีม)
 // เพราะระหว่างสวมบทบาทจะเขียนทับ coachNameEl/coachEmailEl ด้วยข้อมูลของโค้ช/ผู้บริหารทีมที่สวมบทบาทอยู่
 let adminOwnName = null;
@@ -690,8 +674,6 @@ registerForm.addEventListener("submit", async (e) => {
 
 function hideAllScreens() {
   pendingSection.classList.add("hidden");
-  executiveSection.classList.add("hidden");
-  executivePlayersSection.classList.add("hidden");
   adminCoachesSection.classList.add("hidden");
   adminProgressSection.classList.add("hidden");
   adminApprovalsSection.classList.add("hidden");
@@ -1096,15 +1078,7 @@ function renderDrawerItemsInner() {
   navDrawerItems.innerHTML = "";
 
   if (currentIsAdmin) {
-    if (myTeam && adminViewingAs === "executive") {
-      // สวมบทบาทเป็นผู้บริหารทีม (ดูอย่างเดียว) — เมนูเหมือนที่ผู้บริหารทีมจริงเห็นทุกประการ (มีแค่ทาง
-      // ไป Dashboard) บวกทางกลับแผงควบคุมผู้ดูแลระบบเพิ่มมาให้ (ผู้บริหารทีมจริงไม่มีปุ่มนี้)
-      navDrawerItems.appendChild(drawerSectionLabel(`ผู้บริหารทีม: ${teamLogoImg(myTeam)}${myTeam}`));
-      navDrawerItems.appendChild(drawerItem(icon("users"), "รายชื่อนักกีฬาในทีม", () => openExecutivePlayersSection(myTeam)));
-      navDrawerItems.appendChild(drawerItem(icon("bar-chart"), "Dashboard", goToDashboard));
-      navDrawerItems.appendChild(drawerDivider());
-      navDrawerItems.appendChild(drawerItem(icon("shield"), returnToTeamSpace ? "กลับหน้าทีม" : "กลับแผงควบคุมผู้ดูแลระบบ", exitTeamManagementToAdminPanel));
-    } else if (teamSpace()) {
+    if (teamSpace()) {
       navDrawerItems.appendChild(drawerSectionLabel(`ทีม: ${teamLogoImg(myTeam)}${myTeam}`));
       // หน้าทีมของทีมหลังบ้านมีแค่เมนู 9 รายการแบบใหม่ (แถบเมนูบนคอมพิวเตอร์ / รายการนี้บนมือถือ) — เครื่องมือแผงผู้ดูแลเดิมไม่แสดงที่นี่
       // เข้าถึงได้จากลิ้นชัก ☰ ของหน้าเลือกทีม (กด "เปลี่ยนทีม")
@@ -1166,13 +1140,8 @@ function renderDrawerItemsInner() {
 
   }
 
-  // ผู้บริหารทีม (ดูข้อมูลอย่างเดียว ไม่มีเครื่องมือจัดการทีม) หรือกรณีอื่นที่ยังไม่ทราบทีม
+  // กรณีที่ยังไม่ทราบทีม (ผู้บริหารทีมมีทีมเสมอ จึงใช้เมนูหน้าทีมด้านบน)
   navDrawerItems.appendChild(drawerSectionLabel("เมนู"));
-  if (myExecutiveTeam) {
-    navDrawerItems.appendChild(
-      drawerItem(icon("users"), "รายชื่อนักกีฬาในทีม", () => openExecutivePlayersSection(myExecutiveTeam))
-    );
-  }
   navDrawerItems.appendChild(drawerItem(icon("bar-chart"), "Dashboard", goToDashboard));
 }
 
@@ -1243,7 +1212,7 @@ const activeMenu = () => (staffSpace() ? staffMenuFor(currentStaffPerms) : execS
 
 // เมนูของโค้ชใช้ตอนมีทีมที่ดูแลอยู่ (โค้ชจริง หรือผู้ดูแลระบบ/ทีมหลังบ้านที่สวมบทบาทโค้ช) — โหมดผู้บริหารทีมไม่ใช้
 function coachNavVisible() {
-  return !!myTeam && !(currentIsAdmin && adminViewingAs === "executive");
+  return !!myTeam;
 }
 
 function currentScreenKey() {
@@ -3004,68 +2973,6 @@ coachPlanDetailOverlay.addEventListener("click", (e) => {
   if (e.target === coachPlanDetailOverlay) coachPlanDetailOverlay.classList.add("hidden");
 });
 
-// ตารางสรุปการทำงานของโค้ชแต่ละคน — คลิกที่แถวเพื่อขยายดูรายละเอียด (สถิติละเอียด/กราฟแนวโน้ม/รายการแผนที่ส่ง)
-function renderCoachActivitySummaryTable(containerEl, rows) {
-  if (rows.length === 0) {
-    containerEl.innerHTML = '<p class="text-sm text-slate-400">ยังไม่มีโค้ชในทีมนี้</p>';
-    return;
-  }
-  containerEl.innerHTML = `
-    <div class="card table-wrap">
-      <table class="pro-table">
-        <thead>
-          <tr>
-            <th>โค้ช</th>
-            <th>ตำแหน่ง/รุ่นอายุ</th>
-            <th title="จำนวนวันที่เช็คชื่อเดือนนี้ (%ตรงเวลาก่อน 23:59 น.)">เช็คชื่อเดือนนี้</th>
-            <th>รายงานการฝึกซ้อม</th>
-            <th>แผนการฝึกซ้อม</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
-  `;
-  const tbody = containerEl.querySelector("tbody");
-  for (const r of rows) {
-    const onTimePercent = r.checkinDays > 0 ? Math.round((r.onTimeCount / r.checkinDays) * 100) : null;
-    const checkinText = r.checkinDays > 0 ? `${r.checkinDays} วัน (${onTimePercent}% ตรงเวลา)` : "ยังไม่ได้เช็คชื่อ";
-    const planText =
-      r.planCount > 0 ? `${r.planCount} ครั้ง${r.planLateCount > 0 ? ` (สาย ${r.planLateCount})` : ""}` : "ยังไม่ได้ส่ง";
-
-    const mainRow = document.createElement("tr");
-    mainRow.className = "cursor-pointer";
-    mainRow.innerHTML = `
-      <td class="emphasis"><span class="inline-block w-3 text-slate-400" data-toggle-arrow>▸</span> ${escapeHtml(r.coachName)}</td>
-      <td>${coachPositionLabel(r.coachPosition)} (${r.ageGroups.join(", ") || "-"})</td>
-      <td>${checkinText}</td>
-      <td>${r.reportCount > 0 ? `${r.reportCount} วัน` : "ยังไม่ได้ส่ง"}</td>
-      <td>${planText}</td>
-    `;
-
-    const detailRow = document.createElement("tr");
-    detailRow.className = "hidden";
-    const detailTd = document.createElement("td");
-    detailTd.colSpan = 5;
-    detailTd.className = "bg-slate-50 px-4 py-4";
-    detailRow.appendChild(detailTd);
-
-    let expanded = false;
-    mainRow.addEventListener("click", () => {
-      expanded = !expanded;
-      mainRow.querySelector("[data-toggle-arrow]").textContent = expanded ? "▾" : "▸";
-      detailRow.classList.toggle("hidden", !expanded);
-      if (expanded && detailTd.children.length === 0) {
-        detailTd.appendChild(renderCoachDetailContent(r));
-      }
-    });
-
-    tbody.appendChild(mainRow);
-    tbody.appendChild(detailRow);
-  }
-  applyDataLabels(tbody);
-}
-
 function formatCoachActivitySummaryText(team, rows) {
   const monthLabel = new Date().toLocaleDateString("th-TH", { year: "numeric", month: "long", timeZone: "Asia/Bangkok" });
   const lines = [`สรุปการทำงานของโค้ชทีม ${team} ประจำเดือน${monthLabel}:`, ""];
@@ -3082,18 +2989,6 @@ function formatCoachActivitySummaryText(team, rows) {
     );
   }
   return lines.join("\n");
-}
-
-// เรียกจากหน้าสรุปของผู้บริหารทีมเอง (real executive หรือผู้ดูแลระบบที่สวมบทบาท) — ดูได้เองแบบ passive
-async function loadCoachActivitySummary(team) {
-  executiveCoachSummary.innerHTML = '<p class="text-sm text-slate-400">กำลังโหลด...</p>';
-  try {
-    const rows = await computeCoachMonthlySummaryRows(team);
-    renderCoachActivitySummaryTable(executiveCoachSummary, rows);
-  } catch (err) {
-    console.error(err);
-    executiveCoachSummary.innerHTML = `<p class="text-sm text-red-600">โหลดข้อมูลไม่สำเร็จ: ${escapeHtml(err.message)}</p>`;
-  }
 }
 
 // เรียกจากปุ่ม "ส่งสรุปการทำงานโค้ชให้ผู้บริหารทีม" ในหน้ารายชื่อโค้ชของผู้ดูแลระบบ — แบบ push แจ้งเตือนไปที่
@@ -3996,447 +3891,6 @@ async function enterExecutiveViewMode(team, returnSection, execRecordOverride, l
   coachRoleBadgeEl.className = "badge badge-neutral";
   renderDrawerItems();
 }
-// หน้าแรกของโหมดผู้บริหารทีม (สรุปภาพรวม) — ใช้ร่วมกันทั้งบัญชีผู้บริหารทีมจริง, ผู้ดูแลระบบที่สวมบทบาท
-// ผ่าน enterExecutiveViewMode และปุ่ม "กลับ" ของหน้ารายชื่อนักกีฬา (openExecutivePlayersSection) ด้านล่าง
-function showExecutiveHome(team) {
-  hideAllScreens();
-  executiveSection.classList.remove("hidden");
-  loadExecutiveSummary(team);
-  loadCoachActivitySummary(team);
-  loadExecutiveNotes(team, executiveNotesList);
-  loadExecutiveDailyAttendance(team);
-}
-
-// รายชื่อนักกีฬาในทีม สำหรับโหมดผู้บริหารทีม (ดูอย่างเดียว ไม่มีปุ่มแก้ไข/ลบเหมือนหน้าของโค้ช) — เขียน
-// query แยกจาก loadPlayers()/players ทั่วไป เพราะ loadPlayers() อิงตัวแปร myTeam ซึ่งบัญชีผู้บริหารทีมจริง
-// ตั้งใจปล่อยเป็น null ไว้เสมอ (ดูหมายเหตุที่ myExecutiveTeam) จึงรับทีมที่จะดูเป็นพารามิเตอร์ตรงๆ แทน
-const EXECUTIVE_UNASSIGNED_AGE_GROUP = "ไม่ระบุรุ่นอายุ";
-
-// จัดกลุ่มตำแหน่งเล่น (รหัสละเอียดตามที่กรอกตอนเพิ่มนักกีฬา) เป็น 4 หมวดกว้างๆ แบบที่คุ้นตาในวงการฟุตบอล
-// (GK/กองหลัง/กองกลาง/กองหน้า) ใช้กำหนดสี badge ให้แยกแยะตำแหน่งได้ไวขึ้นด้วยสายตา ไม่ต้องอ่านตัวย่อทีละคน
-const POSITION_GROUPS = {
-  GK: "gk",
-  CB: "df", RB: "df", LB: "df", RWB: "df", LWB: "df", SW: "df",
-  CDM: "mf", CM: "mf", CAM: "mf", RM: "mf", LM: "mf",
-  RW: "fw", LW: "fw", SS: "fw", CF: "fw", ST: "fw"
-};
-const POSITION_GROUP_BADGE = { gk: "badge-warning", df: "badge-info", mf: "badge-success", fw: "badge-danger" };
-
-async function openExecutivePlayersSection(team) {
-  executivePlayersReturnTeam = team;
-  hideAllScreens();
-  executivePlayersSection.classList.remove("hidden");
-  executivePlayersGroupsEl.innerHTML = '<p class="text-slate-400 text-sm">กำลังโหลด...</p>';
-  try {
-    // ไม่มี limit/pagination ใดๆ ในนี้ — ดึงนักกีฬาทุกคนของทีมนี้มาแสดงทั้งหมดในครั้งเดียวเสมอ
-    const snapshot = await getDocs(query(collection(db, "players"), where("team", "==", team)));
-    const teamPlayers = [];
-    snapshot.forEach((docSnap) => teamPlayers.push({ id: docSnap.id, ...docSnap.data() }));
-    renderExecutivePlayerList(teamPlayers);
-  } catch (err) {
-    console.error(err);
-    executivePlayersGroupsEl.innerHTML = `<p class="text-red-600 text-sm">โหลดรายชื่อนักกีฬาไม่สำเร็จ: ${escapeHtml(err.message)}</p>`;
-  }
-}
-
-// การ์ดวงกลมรูปนักกีฬา (รูปจริงถ้ามี ไม่มีก็ไอคอนคนแทน) ให้หน้าตาเป็นทาวเนอร์รายชื่อแบบมืออาชีพ ไม่ใช่ตารางตัวหนังสือล้วน
-function executiveAvatarHtml(p) {
-  const photo = p.photoUrl
-    ? `<img src="${safeHttpUrl(p.photoUrl)}" alt="" class="w-full h-full object-cover" />`
-    : teamLogoFallbackHtml(p.team) || icon("user");
-  return `<div class="w-9 h-9 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center overflow-hidden flex-shrink-0">${photo}</div>`;
-}
-
-// สรุปจำนวนรวม + แยกตามหมวดตำแหน่งไว้บนสุด ให้เห็นตัวเลขยืนยันว่าครบทุกคนในทีมได้ทันทีโดยไม่ต้องนับเอง
-function executiveRosterSummaryHtml(teamPlayers) {
-  const counts = { gk: 0, df: 0, mf: 0, fw: 0, other: 0 };
-  for (const p of teamPlayers) {
-    const group = POSITION_GROUPS[p.position] || "other";
-    counts[group] += 1;
-  }
-  const chip = (label, value, badgeClass) =>
-    `<span class="badge ${badgeClass}">${label} ${value}</span>`;
-  return `
-    <div class="card card-pad flex flex-wrap items-center gap-x-6 gap-y-3 mb-4">
-      <div>
-        <p class="text-xs text-slate-400 uppercase tracking-wide">นักกีฬาทั้งหมดในทีม</p>
-        <p class="text-2xl font-semibold text-slate-900" style="font-family:'Mitr',sans-serif;">${teamPlayers.length} คน</p>
-      </div>
-      <div class="flex flex-wrap gap-2">
-        ${chip("GK", counts.gk, POSITION_GROUP_BADGE.gk)}
-        ${chip("กองหลัง", counts.df, POSITION_GROUP_BADGE.df)}
-        ${chip("กองกลาง", counts.mf, POSITION_GROUP_BADGE.mf)}
-        ${chip("กองหน้า", counts.fw, POSITION_GROUP_BADGE.fw)}
-        ${counts.other > 0 ? chip("ไม่ระบุตำแหน่ง", counts.other, "badge-neutral") : ""}
-      </div>
-    </div>
-  `;
-}
-
-// แบ่งรายชื่อเป็นการ์ดแยกตามรุ่นอายุ (ทีมหนึ่งมักมีหลายรุ่นอายุคละกัน) เรียงรุ่นน้อยไปมากด้วย ageGroupNumber
-// เหมือนหน้า Dashboard ของผู้ดูแลระบบ (renderPlayersGroups ใน app.js) เพื่อให้ดูง่ายกว่าตารางเดียวรวมทุกรุ่น —
-// ไม่มี limit/pagination ที่ไหนเลยในฟังก์ชันนี้ ทุกคนที่ query กลับมาจะถูกแสดงครบ ไม่มีการตัดรายการทิ้ง
-function renderExecutivePlayerList(teamPlayers) {
-  executivePlayersGroupsEl.innerHTML = "";
-  if (teamPlayers.length === 0) {
-    executivePlayersGroupsEl.innerHTML = '<p class="text-slate-400 text-sm">ยังไม่มีนักกีฬาในทีมนี้</p>';
-    return;
-  }
-  const ageGroupMap = new Map();
-  for (const p of teamPlayers) {
-    const ageGroup = p.ageGroup || EXECUTIVE_UNASSIGNED_AGE_GROUP;
-    if (!ageGroupMap.has(ageGroup)) ageGroupMap.set(ageGroup, []);
-    ageGroupMap.get(ageGroup).push(p);
-  }
-  const sortedAgeGroups = [...ageGroupMap.keys()].sort((a, b) => ageGroupNumber(a) - ageGroupNumber(b));
-
-  executivePlayersGroupsEl.insertAdjacentHTML("beforeend", executiveRosterSummaryHtml(teamPlayers));
-
-  for (const ageGroup of sortedAgeGroups) {
-    // เบอร์เสื้อที่ไม่ได้กรอกไว้ (undefined/null) ให้ไปอยู่ท้ายกลุ่มเสมอ ไม่ใช่ดันขึ้นบนสุดเหมือนเบอร์ 0
-    const groupPlayers = ageGroupMap
-      .get(ageGroup)
-      .slice()
-      .sort((a, b) => (a.number ?? Infinity) - (b.number ?? Infinity));
-    const wrapper = document.createElement("div");
-    wrapper.innerHTML = `
-      <h3 class="section-title text-sm mb-2">${escapeHtml(ageGroup)} <span class="text-slate-400 font-normal">(${groupPlayers.length} คน)</span></h3>
-      <div class="card table-wrap">
-        <table class="pro-table">
-          <thead>
-            <tr>
-              <th>เบอร์</th>
-              <th>นักกีฬา</th>
-              <th>ชื่อ-นามสกุล</th>
-              <th>อายุ</th>
-              <th>วันเกิด</th>
-              <th>ตำแหน่ง</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${groupPlayers
-              .map((p) => {
-                const age = calcAge(p.birthday);
-                const posGroup = POSITION_GROUPS[p.position];
-                const posBadgeClass = posGroup ? POSITION_GROUP_BADGE[posGroup] : "badge-neutral";
-                return `
-              <tr>
-                <td class="text-slate-400 font-medium">${p.number != null ? escapeHtml(p.number) : "-"}</td>
-                <td class="emphasis">
-                  <a href="./player.html#id=${p.id}" class="flex items-center gap-3 text-blue-600 hover:underline">
-                    ${executiveAvatarHtml(p)}
-                    <span>${escapeHtml(p.nickname ?? "-")}</span>
-                  </a>
-                </td>
-                <td>${escapeHtml(p.fullName ?? "-")}</td>
-                <td>${age != null ? `${age} ปี` : "-"}</td>
-                <td>${escapeHtml(p.birthday ?? "-")}</td>
-                <td>${p.position ? `<span class="badge ${posBadgeClass}">${escapeHtml(p.position)}</span>` : `<span class="text-slate-300">-</span>`}</td>
-              </tr>`;
-              })
-              .join("")}
-          </tbody>
-        </table>
-      </div>
-    `;
-    applyDataLabels(wrapper.querySelector("tbody"));
-    executivePlayersGroupsEl.appendChild(wrapper);
-  }
-}
-
-// จำทีมที่กำลังดูอยู่ไว้ ให้ปุ่ม "กลับ" ของหน้ารายชื่อนักกีฬาย้อนกลับไปหน้าสรุปภาพรวมของทีมเดิมได้ถูกต้อง
-// (ต่างจากปุ่ม [data-back] ทั่วไปที่ผูกกับ showDaily() ซึ่งใช้ไม่ได้กับโหมดผู้บริหารทีมที่ไม่มีหน้า Daily)
-let executivePlayersReturnTeam = null;
-executivePlayersBackBtn.addEventListener("click", () => showExecutiveHome(executivePlayersReturnTeam));
-
-// สรุปภาพรวมทีมสั้นๆ ที่ผู้บริหารทีมควรเห็นทันทีที่เข้าระบบ (ไม่ต้องคลิกไปหน้า Dashboard ก่อนถึงจะเห็นอะไร)
-// ใช้ร่วมกันทั้งบัญชีผู้บริหารทีมจริง และผู้ดูแลระบบที่สวมบทบาทผ่าน enterExecutiveViewMode
-async function loadExecutiveSummary(team) {
-  executiveStatusEl.textContent = "กำลังโหลดข้อมูล...";
-  executiveStatCards.innerHTML = "";
-  executiveLateWarning.classList.add("hidden");
-  try {
-    const thisMonth = thisMonthBangkok(); // "YYYY-MM"
-    const { start: monthStart, end: monthEnd } = monthDateRange(thisMonth);
-    const [playersSnap, attendanceSnap, trainingPlansSnap] = await Promise.all([
-      getDocs(query(collection(db, "players"), where("team", "==", team))),
-      getDocs(teamDateRangeQuery("attendance", team, monthStart, monthEnd)),
-      getDocs(teamDateRangeQuery("trainingPlans", team, monthStart, monthEnd))
-    ]);
-
-    const totalPlayers = playersSnap.size;
-
-    const attendanceRecords = [];
-    attendanceSnap.forEach((d) => attendanceRecords.push(d.data()));
-    const monthAttendance = attendanceRecords.filter((r) => (r.date || "").startsWith(thisMonth));
-    const attendedCount = monthAttendance.filter((r) => r.status === "A").length;
-    const attendPercent = monthAttendance.length > 0 ? Math.round((attendedCount / monthAttendance.length) * 100) : 0;
-    const scoredRecords = monthAttendance.filter((r) => computeAvgScore(r.scores) !== null);
-    const avgScore =
-      scoredRecords.length > 0
-        ? (scoredRecords.reduce((sum, r) => sum + computeAvgScore(r.scores), 0) / scoredRecords.length).toFixed(2)
-        : "-";
-
-    const trainingPlans = [];
-    trainingPlansSnap.forEach((d) => trainingPlans.push(d.data()));
-    const monthPlans = trainingPlans.filter((p) => (p.date || "").startsWith(thisMonth));
-
-    // นับจำนวนครั้งที่ส่งสายแยกเป็นรายโค้ช ไม่ใช่รวมทั้งทีม เพราะโค้ชแต่ละคนดูแลคนละรุ่นอายุ การรวมกันจะ
-    // แจ้งเตือนทั้งทีมทั้งที่มีแค่โค้ชบางคนที่ส่งสายบ่อย (ใช้ตรรกะเดียวกับ loadAdminNotifications ใน ui-utils.js)
-    const coachGroups = new Map();
-    for (const p of monthPlans) {
-      const coachName = p.coachName ?? "-";
-      if (!coachGroups.has(coachName)) {
-        coachGroups.set(coachName, { coachName, total: 0, late: 0 });
-      }
-      const g = coachGroups.get(coachName);
-      g.total += 1;
-      if (isTrainingPlanLate(p)) g.late += 1;
-    }
-    const lateCoaches = Array.from(coachGroups.values()).filter((g) => g.late > TRAINING_PLAN_LATE_WARNING_THRESHOLD);
-
-    executiveStatCards.innerHTML =
-      statCard("นักกีฬาทั้งหมด", totalPlayers) +
-      statCard("% เข้าร่วมฝึกซ้อมเดือนนี้", `${attendPercent}%`) +
-      statCard("คะแนนประเมินเฉลี่ยเดือนนี้", avgScore) +
-      statCard("แผนฝึกซ้อมที่ส่งเดือนนี้", monthPlans.length);
-
-    executiveLateWarning.classList.toggle("hidden", lateCoaches.length === 0);
-    executiveLateCountEl.textContent = lateCoaches.length;
-    executiveLateDetailEl.textContent = lateCoaches.map((g) => `${g.coachName} (สาย ${g.late}/${g.total} ครั้ง) ควรพูดคุยเรื่องมาตรฐานการส่งแผน`).join(" • ");
-
-    executiveStatusEl.textContent = `อัปเดตข้อมูลล่าสุด • ทีม ${team}`;
-  } catch (err) {
-    console.error(err);
-    executiveStatusEl.textContent = "โหลดข้อมูลไม่สำเร็จ: " + err.message;
-  }
-}
-
-// ---------- การเช็คชื่อ+ให้คะแนนรายวัน แยกตามรุ่นอายุ (โหมดผู้บริหารทีม) ----------
-// ตารางแบบ "นักกีฬา × ทุกวันในเดือน" (คนละอย่างกับสรุปแบบรายวันเดิมที่เคยทำ) อิงฟอร์ม ATTENDANCE REGISTER ของ
-// FA Thailand ที่ผู้ใช้ส่งมา — คอลัมน์สรุป A/Missed/AV/% อยู่หน้าตาราง ตามด้วยช่องของแต่ละวันในเดือน ทีมหนึ่งมีหลาย
-// รุ่นอายุคละกัน ดูพร้อมกันหมดจะแน่นเกินไป จึงให้เลือกดูได้ทีละรุ่นอายุผ่าน dropdown — ดึงข้อมูลเดือนนี้มาครั้งเดียว
-// เก็บไว้ในตัวแปรปิดสโคป แล้วกรองใหม่ตามรุ่นอายุที่เลือกตอนสลับ dropdown โดยไม่ query ซ้ำ
-const EXECUTIVE_STATUS_META = { I: "บาดเจ็บ", P: "ลา", R: "พักฟื้น" };
-let executiveAttendancePlayersByAgeGroup = new Map(); // ageGroup -> [{id, number, nickname}] เรียงเบอร์แล้ว
-let executiveAttendanceRecordByPlayerDate = new Map(); // "playerId|date" -> attendance record ล่าสุด (เผื่อมีบันทึกซ้ำ)
-let executiveAttendanceTrainingDates = []; // วันที่ (YYYY-MM-DD) ที่มีวันฝึกซ้อมจริงในเดือนนี้ เรียงจากน้อยไปมาก
-let executiveAttendanceMonth = ""; // "YYYY-MM" ของรอบข้อมูลที่โหลดไว้ล่าสุด
-let executiveAttendanceCoachesByAgeGroup = new Map(); // ageGroup -> [{name, coachPosition}] โค้ชที่รับผิดชอบรุ่นนั้น
-
-async function loadExecutiveDailyAttendance(team) {
-  executiveAttendanceStatusEl.textContent = "กำลังโหลด...";
-  executiveAttendanceGridWrap.innerHTML = '<p class="px-4 py-6 text-center text-slate-400 text-sm">กำลังโหลด...</p>';
-  try {
-    const thisMonth = thisMonthBangkok();
-    executiveAttendanceMonth = thisMonth;
-    const { start: monthStart, end: monthEnd } = monthDateRange(thisMonth);
-    const [playersSnap, sessionSnap, attendanceSnap, coachSnap] = await Promise.all([
-      getDocs(query(collection(db, "players"), where("team", "==", team))),
-      getDocs(teamDateRangeQuery("sessions", team, monthStart, monthEnd)),
-      getDocs(teamDateRangeQuery("attendance", team, monthStart, monthEnd)),
-      getDocs(query(collection(db, "coaches"), where("team", "==", team), where("role", "==", "coach")))
-    ]);
-
-    // โค้ชแต่ละคนรับผิดชอบได้หลายรุ่นอายุพร้อมกัน (ageGroups เป็น array) จึงอาจมีโค้ชมากกว่า 1 คนต่อ 1 รุ่น
-    // (เช่น Head Coach + GK Coach ดูแลรุ่นเดียวกัน) เก็บไว้ทุกคนที่ตรงรุ่นนั้น ไม่ใช่แค่คนแรกที่เจอ
-    executiveAttendanceCoachesByAgeGroup = new Map();
-    coachSnap.forEach((d) => {
-      const data = d.data();
-      for (const ag of data.ageGroups || []) {
-        if (!executiveAttendanceCoachesByAgeGroup.has(ag)) executiveAttendanceCoachesByAgeGroup.set(ag, []);
-        executiveAttendanceCoachesByAgeGroup.get(ag).push({ name: data.name || "-", coachPosition: data.coachPosition });
-      }
-    });
-
-    executiveAttendancePlayersByAgeGroup = new Map();
-    for (const d of playersSnap.docs) {
-      const data = d.data();
-      const ageGroup = data.ageGroup || "ไม่ระบุรุ่นอายุ";
-      if (!executiveAttendancePlayersByAgeGroup.has(ageGroup)) executiveAttendancePlayersByAgeGroup.set(ageGroup, []);
-      executiveAttendancePlayersByAgeGroup.get(ageGroup).push({ id: d.id, number: data.number ?? null, nickname: data.nickname ?? "-" });
-    }
-    for (const list of executiveAttendancePlayersByAgeGroup.values()) {
-      list.sort((a, b) => (a.number ?? Infinity) - (b.number ?? Infinity));
-    }
-
-    // วันฝึกซ้อม "ควรจะมี" อิงตารางฝึกซ้อมปกติประจำสัปดาห์ของแต่ละทีม (TEAM_TRAINING_WEEKDAYS เดียวกับที่ใช้คำนวณ
-    // เกณฑ์ในหน้าพิมพ์สรุปผลงานโค้ช) ไม่ใช่แค่ดูว่ามี session doc จริงหรือเปล่า — เพราะถ้าโค้ชลืมสร้าง session เลย
-    // (ไม่เช็คชื่ออะไรทั้งนั้น) วันนั้นจะไม่มี session ให้เจอ ถ้าอิง session อย่างเดียวจะกลายเป็น "ไม่มีซ้อม" (เทา)
-    // ทั้งที่จริงควรเป็น "มีซ้อมแต่ไม่เช็คชื่อ" (ส้ม) ซึ่งเป็นปัญหาที่ต้องติดตาม — ส่วน session doc ที่มีจริงยังใช้
-    // ช่วยปรับสองกรณี: 1) noTraining=true วันนั้นทำเครื่องหมายว่าไม่ซ้อมจริง (เช่น วันหยุดพิเศษ) ให้ตัดออกแม้จะตรง
-    // ตารางปกติ 2) มี session จริงในวันที่ไม่ตรงตารางปกติ (เช่น ซ้อมพิเศษวันเสาร์ของทีมที่ปกติซ้อมจันทร์-ศุกร์)
-    // ให้นับเพิ่มเข้าไปด้วย
-    const noTrainingDates = new Set();
-    const extraSessionDates = new Set();
-    sessionSnap.forEach((d) => {
-      const data = d.data();
-      if (!data.date) return;
-      if (data.noTraining) noTrainingDates.add(data.date);
-      else extraSessionDates.add(data.date);
-    });
-
-    const weekdays = TEAM_TRAINING_WEEKDAYS[team] || [1, 2, 3, 4, 5];
-    const [schedYear, schedMonth] = thisMonth.split("-").map(Number);
-    const daysInSchedMonth = new Date(Date.UTC(schedYear, schedMonth, 0)).getUTCDate();
-    const trainingDateSet = new Set();
-    for (let day = 1; day <= daysInSchedMonth; day++) {
-      const dateStr = `${thisMonth}-${String(day).padStart(2, "0")}`;
-      const dow = new Date(Date.UTC(schedYear, schedMonth - 1, day)).getUTCDay();
-      if (weekdays.includes(dow)) trainingDateSet.add(dateStr);
-    }
-    for (const date of extraSessionDates) trainingDateSet.add(date);
-    for (const date of noTrainingDates) trainingDateSet.delete(date);
-    executiveAttendanceTrainingDates = [...trainingDateSet].sort();
-
-    // เก็บ "บันทึกล่าสุด" ต่อคนต่อวัน (ถ้ามีมากกว่า 1 ใบในวันเดียวกันจริงๆ ใช้ใบที่ updatedAt ล่าสุด) กัน
-    // ข้อมูลเพี้ยนถ้าเกิดกรณีบันทึกซ้ำ
-    executiveAttendanceRecordByPlayerDate = new Map();
-    attendanceSnap.forEach((d) => {
-      const data = d.data();
-      if (!data.playerId || !data.date) return;
-      const key = `${data.playerId}|${data.date}`;
-      const existing = executiveAttendanceRecordByPlayerDate.get(key);
-      const existingTime = existing?.updatedAt && typeof existing.updatedAt.toDate === "function" ? existing.updatedAt.toDate().getTime() : 0;
-      const newTime = data.updatedAt && typeof data.updatedAt.toDate === "function" ? data.updatedAt.toDate().getTime() : 0;
-      if (!existing || newTime >= existingTime) executiveAttendanceRecordByPlayerDate.set(key, data);
-    });
-
-    const ageGroups = [...executiveAttendancePlayersByAgeGroup.keys()].sort((a, b) => ageGroupNumber(a) - ageGroupNumber(b));
-    if (ageGroups.length === 0) {
-      executiveAttendanceStatusEl.textContent = "ยังไม่มีนักกีฬาในทีมนี้";
-      executiveAttendanceGridWrap.innerHTML = '<p class="px-4 py-6 text-center text-slate-400 text-sm">ยังไม่มีนักกีฬาในทีมนี้</p>';
-      executiveAttendanceAgeGroupSelect.innerHTML = "";
-      return;
-    }
-    const keepSelected = ageGroups.includes(executiveAttendanceAgeGroupSelect.value) ? executiveAttendanceAgeGroupSelect.value : ageGroups[0];
-    executiveAttendanceAgeGroupSelect.innerHTML = ageGroups.map((ag) => `<option value="${escapeHtml(ag)}">${escapeHtml(ag)}</option>`).join("");
-    executiveAttendanceAgeGroupSelect.value = keepSelected;
-    executiveAttendanceStatusEl.textContent = `อัปเดตข้อมูลล่าสุด • เดือนนี้`;
-    renderExecutiveDailyAttendanceForAgeGroup(executiveAttendanceAgeGroupSelect.value);
-  } catch (err) {
-    console.error(err);
-    executiveAttendanceStatusEl.textContent = "โหลดข้อมูลไม่สำเร็จ: " + err.message;
-    executiveAttendanceGridWrap.innerHTML = `<p class="px-4 py-6 text-center text-red-600 text-sm">โหลดข้อมูลไม่สำเร็จ: ${escapeHtml(err.message)}</p>`;
-  }
-}
-
-const EXEC_WEEKDAY_TH = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
-
-// ตารางเมทริกซ์นักกีฬา × ทุกวันของเดือนนี้ (ไม่ใช่แค่วันที่มีข้อมูล) — แต่ละช่องบอกทั้งสถานะเช็คชื่อและคะแนนพร้อมกัน:
-// เขียว+ตัวเลข = มาซ้อม+ให้คะแนน (ตัวเลขคือคะแนนเฉลี่ยจริงของวันนั้น), ส้ม = มีวันฝึกซ้อมจริงแต่ไม่มีการเช็คชื่อเลย,
-// แดง+I/P/R = บาดเจ็บ/ลา/พักฟื้นตามสถานะจริงในระบบ, ช่องเทาว่าง = วันที่ไม่มีการฝึกซ้อม, ช่องขาวล้วน = ยังไม่มีบันทึก
-// แต่ยังไม่ถือเป็นปัญหา (วันนี้ที่ยังไม่จบ หรืออนาคต) — ขึ้นเป็นส้ม (ปัญหาจริง) ก็ต่อเมื่อ "พ้นวันนั้นไปแล้ว" เท่านั้น
-// (วันนี้เองแม้ยังไม่เช็คชื่อก็ยังเป็นขาวไว้ก่อน เผื่อยังไม่ถึงเวลาซ้อม/โค้ชยังไม่ได้กรอก) — คอลัมน์สรุป A/Missed/AV/%
-// นับเฉพาะวันฝึกซ้อมจริงที่มีบันทึกแล้ว (ไม่รวมช่องส้ม/ขาว) ตามฟอร์ม ATTENDANCE REGISTER ต้นแบบ
-function renderExecutiveDailyAttendanceForAgeGroup(ageGroup) {
-  const coaches = executiveAttendanceCoachesByAgeGroup.get(ageGroup) || [];
-  executiveAttendanceCoachLabel.textContent =
-    coaches.length > 0
-      ? `โค้ชผู้รับผิดชอบ: ${coaches.map((c) => `${c.name} (${coachPositionLabel(c.coachPosition)})`).join(", ")}`
-      : "ยังไม่มีโค้ชที่รับผิดชอบรุ่นนี้";
-
-  const players = executiveAttendancePlayersByAgeGroup.get(ageGroup) || [];
-  if (players.length === 0) {
-    executiveAttendanceGridWrap.innerHTML = '<p class="px-4 py-6 text-center text-slate-400 text-sm">ยังไม่มีนักกีฬาในรุ่นนี้</p>';
-    return;
-  }
-
-  const today = todayBangkok();
-  const [year, month] = executiveAttendanceMonth.split("-").map(Number);
-  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
-  const trainingDateSet = new Set(executiveAttendanceTrainingDates);
-  const allDates = Array.from({ length: daysInMonth }, (_, i) => `${executiveAttendanceMonth}-${String(i + 1).padStart(2, "0")}`);
-
-  const headerCells = allDates
-    .map((date, i) => {
-      const day = i + 1;
-      const dow = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
-      const isTraining = trainingDateSet.has(date);
-      const isToday = date === today;
-      const bg = isTraining ? "" : "background:#F8FAFC;";
-      const ring = isToday ? "box-shadow:inset 0 0 0 2px #10b981;" : "";
-      return `<th style="padding:0.5rem 0.3rem;text-align:center;font-size:0.65rem;white-space:nowrap;${bg}${ring}">${day}<br><span class="text-slate-400 font-normal">${EXEC_WEEKDAY_TH[dow]}</span></th>`;
-    })
-    .join("");
-
-  const bodyRows = players
-    .map((p) => {
-      let attendedCount = 0;
-      let missedCount = 0;
-      let scoreSum = 0;
-      let scoreCount = 0;
-
-      const dayCells = allDates
-        .map((date) => {
-          const isTraining = trainingDateSet.has(date);
-          if (!isTraining) return '<td style="padding:0.3rem;text-align:center;background:#F8FAFC;"></td>';
-
-          const record = executiveAttendanceRecordByPlayerDate.get(`${p.id}|${date}`);
-          if (!record) {
-            // ยังไม่ขึ้นเป็น "ไม่มีการเช็คชื่อ" (ส้ม) จนกว่าจะพ้นวันนั้นไปแล้วจริงๆ — วันนี้เองแม้ยังไม่เช็คชื่อก็ถือว่า
-            // ยังไม่ถึงกำหนด (ขาว) เผื่อโค้ชยังไม่ได้ซ้อม/ยังไม่มีเวลากรอก ไม่ใช่ปัญหาจนกว่าจะข้ามวันไปแล้ว
-            if (date >= today) return '<td style="padding:0.3rem;text-align:center;background:#fff;"></td>';
-            return `<td style="padding:0.3rem;text-align:center;"><span class="inline-flex items-center justify-center w-7 h-7 rounded-full text-white text-[10px] font-bold" style="background:#C2680C;" title="มีวันฝึกซ้อมจริงแต่ไม่มีการเช็คชื่อ">–</span></td>`;
-          }
-          if (record.status === "A") {
-            attendedCount += 1;
-            const avg = computeAvgScore(record.scores);
-            if (avg !== null) {
-              scoreSum += avg;
-              scoreCount += 1;
-            }
-            const label = avg !== null ? avg.toFixed(1) : "-";
-            return `<td style="padding:0.3rem;text-align:center;"><span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-emerald-700 text-white text-[10px] font-bold" title="มาซ้อม คะแนนเฉลี่ย ${avg !== null ? avg.toFixed(2) : "ยังไม่ให้คะแนน"}">${label}</span></td>`;
-          }
-          if (EXECUTIVE_STATUS_META[record.status]) {
-            missedCount += 1;
-            return `<td style="padding:0.3rem;text-align:center;"><span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-red-700 text-white text-[10px] font-bold" title="${EXECUTIVE_STATUS_META[record.status]}">${escapeHtml(record.status)}</span></td>`;
-          }
-          // สถานะอื่นที่ไม่รู้จัก (กันโค้ดพังถ้าข้อมูลเพี้ยน) — แสดงตัวย่อสถานะดิบๆ ไว้เทาๆ ไม่นับเข้าสรุปฝั่งไหน
-          return `<td style="padding:0.3rem;text-align:center;"><span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-300 text-slate-600 text-[10px] font-bold">${escapeHtml(record.status ?? "?")}</span></td>`;
-        })
-        .join("");
-
-      const totalReported = attendedCount + missedCount;
-      const percent = totalReported > 0 ? Math.round((attendedCount / totalReported) * 100) : null;
-      const avgScore = scoreCount > 0 ? (scoreSum / scoreCount).toFixed(1) : "-";
-      const percentText = percent === null ? "-" : `${percent}%`;
-      const percentColor = percent === null ? "text-slate-400" : percent >= 80 ? "text-emerald-700" : percent >= 50 ? "text-amber-700" : "text-red-700";
-
-      return `
-        <tr>
-          <td class="emphasis" style="position:sticky;left:0;background:#fff;white-space:nowrap;padding:0.5rem 0.75rem;">${p.number != null ? escapeHtml(p.number) + " · " : ""}${escapeHtml(p.nickname)}</td>
-          <td style="text-align:center;background:#F8FAFC;font-weight:600;">${attendedCount}</td>
-          <td style="text-align:center;background:#F8FAFC;">${missedCount}</td>
-          <td style="text-align:center;background:#F8FAFC;">${avgScore}</td>
-          <td style="text-align:center;background:#F8FAFC;border-right:2px solid #E1E4DE;font-weight:600;" class="${percentColor}">${percentText}</td>
-          ${dayCells}
-        </tr>`;
-    })
-    .join("");
-
-  executiveAttendanceGridWrap.innerHTML = `
-    <table class="pro-table grid-table" style="font-size:0.75rem;">
-      <thead>
-        <tr>
-          <th style="position:sticky;left:0;background:#EEF0EC;text-align:left;min-width:9rem;">นักกีฬา</th>
-          <th style="text-align:center;" title="Attendance — จำนวนครั้งที่มาซ้อม">A</th>
-          <th style="text-align:center;" title="Missed — รวมบาดเจ็บ/ลา/พักฟื้น">Missed</th>
-          <th style="text-align:center;" title="Average — คะแนนเฉลี่ยรวม">AV</th>
-          <th style="text-align:center;border-right:2px solid #E1E4DE;" title="% เข้าร่วม">%</th>
-          ${headerCells}
-        </tr>
-      </thead>
-      <tbody>${bodyRows}</tbody>
-    </table>
-  `;
-}
-
-executiveAttendanceAgeGroupSelect.addEventListener("change", () => {
-  renderExecutiveDailyAttendanceForAgeGroup(executiveAttendanceAgeGroupSelect.value);
-});
-
 // ข้อความที่ผู้ดูแลระบบส่งถึงทีมนี้โดยตรง (เช่น แจ้งนักกีฬาที่มีพัฒนาการดี หรือแจ้งปัญหาของโค้ช) — ใช้ร่วมกันทั้ง
 // บัญชีผู้บริหารทีมจริง (executiveNotesList ในหน้าสรุปภาพรวม), โค้ชจริง (dailyExecutiveNotesList ในหน้า Daily
 // ซึ่งเป็นผู้รับผิดชอบตัวจริงที่ควรเห็นข้อความนี้ด้วย ไม่ใช่แค่ผู้บริหารทีม), และผู้ดูแลระบบที่สวมบทบาทเป็นทั้งสองแบบ
@@ -4504,7 +3958,6 @@ async function handleExecutiveNoteMarkRead(e) {
     alert("อัปเดตไม่สำเร็จ: " + err.message);
   }
 }
-executiveNotesList.addEventListener("click", handleExecutiveNoteMarkRead);
 staffHomeBody.addEventListener("click", handleExecutiveNoteMarkRead);
 dailyExecutiveNotesList.addEventListener("click", handleExecutiveNoteMarkRead);
 
@@ -4604,8 +4057,6 @@ const ROUTE_SCREENS = [
   { el: footelligenceTestSection, key: "footelligence-test", kind: "coach" },
   { el: injuryMenuSection, key: "injury-menu", kind: "coach" },
   { el: injuryResultsSection, key: "injury-results", kind: "coach" },
-  { el: executiveSection, key: "executive", kind: "executive" },
-  { el: executivePlayersSection, key: "executive-players", kind: "executive" },
   { el: adminCoachesSection, key: "coaches", kind: "admin" },
   { el: adminPlayerAuditSection, key: "player-audit", kind: "admin" },
   { el: adminProgressSection, key: "progress", kind: "admin" },
@@ -4954,7 +4405,6 @@ onAuthStateChanged(auth, async (user) => {
       coachRoleBadgeEl.className = "badge badge-neutral";
       renderCoachProfile(user, data, data.team);
       coachAgeGroupsWrap.classList.add("hidden");
-      myExecutiveTeam = data.team;
       // หน้าทีมของผู้บริหาร (เมนูเดียวกับทีมหลังบ้าน แต่ทีมเดียว ดูอย่างเดียว) — รีเฟรชแล้วกลับมาหน้าเดิมตาม screen ใน hash
       const restored = parseRouteHash(window.location.hash);
       const allowedExec = new Set(EXEC_TEAM_MENU.flatMap((m) => m.screens));
