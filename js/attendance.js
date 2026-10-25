@@ -96,6 +96,7 @@ import { clearEmbedded, showEmbedded } from "./embed-frame.js";
 import { athleteResultsNotification, fitnessRoundNotification, unreadNotesNotification } from "./coach-notifications.js";
 import { initResults, showResults } from "./injury-results-ui.js";
 import { initTeamEvents, showTeamEvents } from "./team-events-ui.js";
+import { bangkokStamp, deadlineLabel, eventReminder, monthLabel as eventMonthLabel } from "./team-events.js";
 import { ageGroupsOf, birthYearLabel, birthdayLabel, filterAndSortPlayers, playerDisplayName } from "./player-gallery.js";
 import { STAFF_PERMISSIONS, canAccessAdminFeature, normalizePermissions, permissionsSummary, staffCan, staffLandingFeature } from "./staff-perms.js";
 import { isEvaluationComplete } from "./masc-data.js";
@@ -250,6 +251,7 @@ const injuryMenuSection = document.getElementById("injury-menu-section");
 const injuryResultsSection = document.getElementById("injury-results-section");
 const teamEventsSection = document.getElementById("team-events-section");
 const dailyReminderBanner = document.getElementById("daily-reminder-banner");
+const dailyEventBanner = document.getElementById("daily-event-banner");
 const homeDateLine = document.getElementById("home-date-line");
 const homeAllDone = document.getElementById("home-all-done");
 const dailyMeetingCard = document.getElementById("daily-meeting-card");
@@ -814,6 +816,7 @@ function showDaily() {
   dailySection.classList.remove("hidden");
   homeDateLine.textContent = formatThaiDate(todayBangkok());
   checkTodayReminders();
+  checkEventReminder();
 
   renderCoachMeetingCard(dailyMeetingCard, myTeam, meetingCoachId(), {
     position: myCoachPosition,
@@ -884,6 +887,31 @@ async function checkTodayReminders() {
   } catch (err) {
     console.error(err);
     // ไม่ต้องแสดง error ให้กวนใจ เพราะเป็นแค่ตัวเตือนเสริม ไม่ใช่ข้อมูลหลักของหน้านี้
+  }
+}
+// เตือนแจ้ง Event ประจำเดือนถัดไปที่หน้า Home (ก่อนกำหนดส่ง 7 วัน — ดู eventReminder) ส่งแล้วหรือยังไม่ถึงช่วงเตือนก็ไม่แสดง
+async function checkEventReminder() {
+  dailyEventBanner.classList.add("hidden");
+  dailyEventBanner.innerHTML = "";
+  if (!myTeam) return;
+  try {
+    const now = bangkokStamp();
+    // เดือนที่ต้องแจ้งคือเดือนถัดไปเสมอ — ถามก่อนว่าถึงช่วงเตือนหรือยัง จะได้ไม่ต้องอ่านข้อมูลเมื่อยังไม่ถึงช่วง
+    const probe = eventReminder({ now, submitted: false });
+    if (!probe) return;
+    const snap = await getDocs(query(collection(db, "monthlyEvents"), where("team", "==", myTeam), where("month", "==", probe.month)));
+    if (!eventReminder({ now, submitted: !snap.empty })) return;
+    const left = probe.state === "overdue" ? `<span class="text-red-600 font-semibold">เลยกำหนดแล้ว</span>` : probe.daysLeft > 0 ? `เหลืออีก ${probe.daysLeft} วัน` : "ครบกำหนดวันนี้";
+    dailyEventBanner.innerHTML = `<div><p class="text-sm font-semibold text-amber-800">${icon("trophy")} ยังไม่ได้แจ้ง Event ของเดือน${escapeHtml(eventMonthLabel(probe.month))}</p><p class="text-sm text-amber-700">กรอกภายใน ${escapeHtml(deadlineLabel(probe.month))} · ${left}</p></div>`;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn btn-secondary btn-sm";
+    btn.textContent = "ไปกรอกเลย →";
+    btn.addEventListener("click", openTeamEvents);
+    dailyEventBanner.appendChild(btn);
+    dailyEventBanner.classList.remove("hidden");
+  } catch (err) {
+    console.error(err); // ตัวเตือนเสริม ไม่แสดง error ให้กวนใจ
   }
 }
 // ---------- เมนูนำทางแบบเลื่อน (Hamburger Drawer) ----------

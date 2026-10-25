@@ -3,7 +3,11 @@ import assert from "node:assert/strict";
 import {
   ageGroupForLevel,
   ageGroupsForExamLevels,
+  bangkokStamp,
+  deadlineFor,
+  deadlineLabel,
   defaultMonth,
+  eventReminder,
   dueDateFor,
   dueInfo,
   emptyEvent,
@@ -24,15 +28,43 @@ test("months: default switches to next month from the 15th, due date is the 25th
   assert.equal(defaultMonth("2026-10-25"), "2026-11");
   assert.equal(defaultMonth("2026-12-20"), "2027-01");
   assert.deepEqual(monthOptions("2026-12-03"), ["2026-11", "2026-12", "2027-01", "2027-02"]);
-  assert.equal(dueDateFor("2026-11"), "2026-10-25");
   assert.equal(dueDateFor("2027-01"), "2026-12-25");
+  assert.deepEqual(deadlineFor("2027-01"), { date: "2026-12-25", time: "23:59" });
+  assert.equal(deadlineLabel("2027-01"), "25 ธ.ค.");
   assert.equal(eventDocId("THAWEE SC", "2026-11"), "THAWEE SC__2026-11");
 });
 
-test("due state: submitted wins, otherwise overdue only after the 25th", () => {
-  assert.equal(dueInfo({ month: "2026-11", today: "2026-10-25", submitted: false }).state, "due");
-  assert.equal(dueInfo({ month: "2026-11", today: "2026-10-26", submitted: false }).state, "overdue");
-  assert.equal(dueInfo({ month: "2026-11", today: "2026-11-02", submitted: true }).state, "submitted");
+test("due state: submitted wins, otherwise overdue only after the deadline (default 25th 23:59)", () => {
+  assert.equal(dueInfo({ month: "2026-12", now: "2026-11-25 23:59", submitted: false }).state, "due");
+  assert.equal(dueInfo({ month: "2026-12", now: "2026-11-26 00:00", submitted: false }).state, "overdue");
+  assert.equal(dueInfo({ month: "2026-12", now: "2026-12-02 09:00", submitted: true }).state, "submitted");
+});
+
+test("November 2026 is extended to 28 Oct 14:00", () => {
+  assert.deepEqual(deadlineFor("2026-11"), { date: "2026-10-28", time: "14:00" });
+  assert.equal(deadlineLabel("2026-11"), "28 ต.ค. 14:00 น.");
+  assert.equal(dueInfo({ month: "2026-11", now: "2026-10-26 10:00", submitted: false }).state, "due", "was overdue under the normal 25th rule");
+  assert.equal(dueInfo({ month: "2026-11", now: "2026-10-28 14:00", submitted: false }).state, "due");
+  assert.equal(dueInfo({ month: "2026-11", now: "2026-10-28 14:01", submitted: false }).state, "overdue");
+});
+
+test("Bangkok stamp uses UTC+7", () => {
+  assert.equal(bangkokStamp(new Date("2026-10-25T18:30:00Z")), "2026-10-26 01:30");
+});
+
+test("Home reminder: next month, from 7 days before the deadline until the month ends, only while unsent", () => {
+  // เดือนพฤศจิกายน: กำหนดพิเศษ 28 ต.ค. 14:00 → เริ่มเตือน 21 ต.ค.
+  assert.equal(eventReminder({ now: "2026-10-20 09:00", submitted: false }), null);
+  assert.deepEqual(eventReminder({ now: "2026-10-21 09:00", submitted: false }), { month: "2026-11", state: "due", daysLeft: 7 });
+  assert.deepEqual(eventReminder({ now: "2026-10-25 09:00", submitted: false }), { month: "2026-11", state: "due", daysLeft: 3 });
+  assert.equal(eventReminder({ now: "2026-10-28 13:59", submitted: false }).daysLeft, 0);
+  assert.equal(eventReminder({ now: "2026-10-28 14:01", submitted: false }).state, "overdue");
+  assert.equal(eventReminder({ now: "2026-10-31 20:00", submitted: false }).state, "overdue");
+  assert.equal(eventReminder({ now: "2026-10-25 09:00", submitted: true }), null);
+  // เข้าเดือนแล้ว เดือนที่ต้องแจ้งขยับเป็นเดือนถัดไป (ธันวาคม: กำหนด 25 พ.ย. เริ่มเตือน 18 พ.ย.)
+  assert.equal(eventReminder({ now: "2026-11-02 09:00", submitted: false }), null);
+  assert.deepEqual(eventReminder({ now: "2026-11-18 09:00", submitted: false }), { month: "2026-12", state: "due", daysLeft: 7 });
+  assert.equal(eventReminder({ now: "2026-11-26 09:00", submitted: false }).state, "overdue");
 });
 
 test("exam levels map to age groups (ป.n -> U(n+6), ม.n -> U(n+12)), sorted and unique", () => {

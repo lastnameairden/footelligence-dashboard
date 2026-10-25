@@ -13,7 +13,9 @@ import {
   PERIODS,
   VENUES,
   ageGroupsForExamLevels,
+  bangkokStamp,
   dateLabel,
+  deadlineLabel,
   defaultMonth,
   dueInfo,
   emptyEvent,
@@ -83,8 +85,8 @@ function eventHtml(e, i) {
 }
 
 function dueBadge() {
-  const info = dueInfo({ month, today: todayBangkok(), submitted: !!saved });
-  const when = dateLabel(info.due);
+  const info = dueInfo({ month, now: bangkokStamp(), submitted: !!saved });
+  const when = deadlineLabel(month);
   if (info.state === "submitted") return `<span class="badge badge-success">ส่งแล้ว${saved.submittedDate ? ` ${escapeHtml(dateLabel(saved.submittedDate))}` : ""}</span>`;
   return info.state === "overdue" ? `<span class="badge badge-danger">เลยกำหนด ${escapeHtml(when)}</span>` : `<span class="badge badge-warning">ครบกำหนด ${escapeHtml(when)}</span>`;
 }

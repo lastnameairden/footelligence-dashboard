@@ -1979,6 +1979,8 @@
       <!-- เตือนงานประจำวันที่ยังไม่ได้ทำของ "วันนี้" (เช็คชื่อ/ส่งแผน/ส่งรายงานการฝึกซ้อม) เพื่อลดปัญหาโค้ชลืมทำ/ส่งสาย -->
       <div id="daily-reminder-banner" class="hidden card card-warning card-pad space-y-2"></div>
       <p id="home-all-done" class="hidden card card-pad text-sm text-emerald-700 font-medium">วันนี้ทำครบแล้ว ไม่มีงานค้าง</p>
+      <!-- เตือนแจ้ง Event ประจำเดือนถัดไป (ก่อนกำหนด 7 วัน ถึงสิ้นเดือน ถ้ายังไม่ส่ง) — ดู eventReminder ใน team-events.js -->
+      <div id="daily-event-banner" class="hidden card card-warning card-pad flex items-center justify-between gap-3 flex-wrap"></div>
 
       <!-- นัดประชุมโค้ชครั้งถัดไป + งานหลังประชุมของโค้ชคนนี้ (ซ้อนไว้จนกว่าจะมีนัด/งาน) -->
       <div id="daily-meeting-card" class="hidden"></div>

@@ -1,11 +1,15 @@
 // Event ประจำเดือนของแต่ละทีม/โรงเรียน (ตรรกะล้วนๆ + HTML เป็นสตริง ไม่พึ่ง DOM/Firebase เพื่อเทสต์ใน Node ได้)
 // โค้ชกรอกเดือนละครั้ง (ภายในวันที่ 25 ของเดือนก่อนหน้า) 1 เอกสารต่อทีมต่อเดือน: monthlyEvents/{ทีม}__{YYYY-MM}
 // ช่อง "เดือนนี้ไม่มี Event" แยก "ไม่มี Event" ออกจาก "ลืมกรอก" — ทีมหลังบ้าน/แอดมินดูสถานะของทุกทีมได้ในหน้าเดียว
-import { addMonthsToMonth } from "./coach-meetings.js";
+import { addDaysToDate, addMonthsToMonth } from "./coach-meetings.js";
 import { escapeHtml } from "./ui-utils.js";
 import { formatPhone, normalizePhone } from "./player-profile-fields.js";
 
 export const DUE_DAY = 25;
+export const DEFAULT_DUE_TIME = "23:59";
+export const REMINDER_DAYS = 7; // เริ่มเตือนที่หน้า Home ก่อนกำหนดกี่วัน
+// เดือนที่แจ้ง → กำหนดส่งที่ไม่ใช่ค่าปกติ (วันที่ 25 ของเดือนก่อนหน้า เวลา 23:59) — เดือนพฤศจิกายน 2569 ขยายเวลาให้ถึง 28 ต.ค. 14:00
+export const DEADLINE_OVERRIDES = { "2026-11": { date: "2026-10-28", time: "14:00" } };
 export const MAX_EVENTS = 30;
 export const TITLE_MAX = 80;
 export const NOTE_MAX = 200;
@@ -90,14 +94,40 @@ export function defaultMonth(today) {
 }
 export const eventDocId = (team, month) => `${team}__${month}`;
 
-// กำหนดส่งของเดือนที่แจ้ง = วันที่ 25 ของเดือนก่อนหน้า
-export const dueDateFor = (month) => `${addMonthsToMonth(month, -1)}-${DUE_DAY}`;
+// กำหนดส่งของเดือนที่แจ้ง = วันที่ 25 ของเดือนก่อนหน้า (ถึง 23:59) เว้นแต่เดือนนั้นมีกำหนดพิเศษใน DEADLINE_OVERRIDES
+export function deadlineFor(month) {
+  return DEADLINE_OVERRIDES[month] ?? { date: `${addMonthsToMonth(month, -1)}-${DUE_DAY}`, time: DEFAULT_DUE_TIME };
+}
+export const dueDateFor = (month) => deadlineFor(month).date;
+// "28 ต.ค." หรือ "28 ต.ค. 14:00" (แสดงเวลาเฉพาะกำหนดพิเศษ)
+export function deadlineLabel(month) {
+  const d = deadlineFor(month);
+  return d.time === DEFAULT_DUE_TIME ? dateLabel(d.date) : `${dateLabel(d.date)} ${d.time} น.`;
+}
+// เวลาปัจจุบันตามเวลาไทย "YYYY-MM-DD HH:MM" (เทียบเป็นสตริงกับกำหนดส่งได้ตรงๆ)
+export const bangkokStamp = (now = new Date()) => new Date(now.getTime() + 7 * 3600000).toISOString().slice(0, 16).replace("T", " ");
+const deadlineStamp = (month) => {
+  const d = deadlineFor(month);
+  return `${d.date} ${d.time}`;
+};
 
 // ป้ายสถานะการส่งในหน้าโค้ช: submitted = ส่งแล้ว · overdue = เลยกำหนดแล้วยังไม่ส่ง · due = ยังไม่ส่ง (ยังไม่เลยกำหนด)
-export function dueInfo({ month, today, submitted }) {
+export function dueInfo({ month, now, submitted }) {
   const due = dueDateFor(month);
   if (submitted) return { state: "submitted", due };
-  return { state: today > due ? "overdue" : "due", due };
+  return { state: now > deadlineStamp(month) ? "overdue" : "due", due };
+}
+
+// เตือนที่หน้า Home ของโค้ช: เดือนถัดไปที่ยังไม่ได้แจ้ง — เริ่มเตือนก่อนกำหนด REMINDER_DAYS วัน เตือนต่อจนเลยกำหนดไปแล้วจนสิ้นเดือน (เริ่มเดือนที่แจ้งแล้วหยุดเตือน)
+// คืน null = ไม่ต้องเตือน · { month, state: "due" | "overdue", daysLeft } (daysLeft = จำนวนวันถึงวันกำหนด ติดลบ/0 เมื่อเลย/ตรงวัน)
+export function eventReminder({ now, submitted }) {
+  const date = now.slice(0, 10);
+  const month = addMonthsToMonth(date.slice(0, 7), 1);
+  if (submitted) return null;
+  const { date: dueDay } = deadlineFor(month);
+  if (date < addDaysToDate(dueDay, -REMINDER_DAYS)) return null;
+  const daysLeft = Math.round((Date.parse(dueDay) - Date.parse(date)) / 86400000);
+  return { month, state: now > deadlineStamp(month) ? "overdue" : "due", daysLeft };
 }
 
 // ---------- ฟอร์ม ----------
