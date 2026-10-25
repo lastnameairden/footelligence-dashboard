@@ -148,7 +148,7 @@ export function eventReminder({ now, submitted }) {
 // ---------- ฟอร์ม ----------
 export function emptyEvent() {
   return {
-    type: "", title: "", ageGroups: [], start: "", end: "", impact: "", awayMode: "none", awayCount: "", awayPlayers: [], matches: [], practiceStart: "", practiceEnd: "", examLevels: [], note: "",
+    type: "", title: "", ageGroups: [], start: "", end: "", impact: "", awayMode: "none", awayCount: "", awayPlayers: [], matches: [], practiceNormal: false, practiceStart: "", practiceEnd: "", examLevels: [], note: "",
     reason: "", oldDate: "", newDate: "", oldStart: "", oldEnd: "", newStart: "", newEnd: "", coachId: "", coachName: "", substitute: "none", substituteName: "", changes: [], changeDetail: ""
   };
 }
@@ -263,10 +263,11 @@ function normalizeEvent(e, label, errors) {
   let impact = "";
   let practiceStart = "";
   let practiceEnd = "";
+  const practiceNormal = !schedule && e.impact === "partial" && e.practiceNormal === true; // ซ้อมได้ตามเวลาปกติ ไม่ต้องระบุช่วงเวลา
   if (!schedule) {
     impact = IMPACTS.some((i) => i.key === e.impact) ? e.impact : "";
     if (!impact) fail("เลือกผลต่อการซ้อม");
-    if (impact === "partial") {
+    if (impact === "partial" && !practiceNormal) {
       practiceStart = text(e.practiceStart);
       practiceEnd = text(e.practiceEnd);
       timeRange("ช่วงเวลาที่ซ้อม", practiceStart, practiceEnd, fail);
@@ -303,7 +304,7 @@ function normalizeEvent(e, label, errors) {
       kind === "change-day" ? `เปลี่ยนวันซ้อม ${dateLabel(oldDate)} → ${dateLabel(newDate)}` : kind === "change-time" ? `เปลี่ยนเวลาซ้อม ${oldStart}–${oldEnd} → ${newStart}–${newEnd}` : `${coachName} ไม่อยู่ซ้อม`;
   }
   return {
-    type: type?.key ?? "", title, ageGroups, start, end, impact, awayMode, awayCount, awayPlayers, matches, practiceStart, practiceEnd, examLevels, note,
+    type: type?.key ?? "", title, ageGroups, start, end, impact, awayMode, awayCount, awayPlayers, matches, practiceNormal, practiceStart, practiceEnd, examLevels, note,
     reason, oldDate, newDate, oldStart, oldEnd, newStart, newEnd, coachId, coachName, substitute, substituteName, changes, changeDetail
   };
 }
@@ -362,7 +363,7 @@ function awayText(e) {
   if (e.awayMode === "some") return `${e.awayCount ?? "-"} คน`;
   return "-";
 }
-const trainRange = (e) => (e.practiceStart && e.practiceEnd ? `ซ้อม ${e.practiceStart}–${e.practiceEnd} น.` : e.practiceMinutes ? `ซ้อมได้ ${e.practiceMinutes} นาที (${e.practicePeriod ?? "-"})` : "");
+const trainRange = (e) => (e.practiceNormal ? "ซ้อมตามเวลาปกติ" : e.practiceStart && e.practiceEnd ? `ซ้อม ${e.practiceStart}–${e.practiceEnd} น.` : e.practiceMinutes ? `ซ้อมได้ ${e.practiceMinutes} นาที (${e.practicePeriod ?? "-"})` : "");
 function detailText(e) {
   const parts = [];
   if (e.matches?.length) parts.push(`${e.matches.length} นัด: ${e.matches.map((m) => `${dateLabel(m.date)} ${m.venue}${m.time ? ` ${m.time}` : ""}`).join(" · ")}`);

@@ -799,6 +799,7 @@ button.admin-home-tile:hover { outline: 1px solid var(--accent); }
 .event-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; }
 .event-chip { font: inherit; font-size: 0.8125rem; padding: 0.2rem 0.65rem; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: var(--text-1); cursor: pointer; }
 .event-chip-on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.event-check { align-self: end; min-height: 2.5rem; }
 .event-matches { display: flex; flex-direction: column; gap: 0.5rem; }
 .event-match-row { display: grid; grid-template-columns: 3.2rem repeat(3, minmax(7rem, 1fr)); gap: 0.5rem; align-items: center; }
 .event-match-no { font-size: 0.8125rem; color: var(--text-2); }

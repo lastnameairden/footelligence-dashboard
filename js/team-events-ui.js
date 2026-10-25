@@ -158,7 +158,7 @@ function eventHtml(e, i) {
     ${ages}
     <div class="event-grid">
       ${field("ผลต่อการซ้อม", `<select class="field-input" ${at} data-f="impact">${options(IMPACTS, e.impact, (x) => x.key, (x) => x.label, "เลือกผลต่อการซ้อม")}</select>`)}
-      ${e.impact === "partial" ? field("ช่วงเวลาที่ซ้อม · เวลาเริ่ม", input(at, "practiceStart", "time", e.practiceStart)) + field("ช่วงเวลาที่ซ้อม · เวลาจบ", input(at, "practiceEnd", "time", e.practiceEnd)) : ""}
+      ${e.impact === "partial" ? `<label class="flex items-center gap-2 text-sm event-check"><input type="checkbox" ${at} data-f="practiceNormal"${e.practiceNormal ? " checked" : ""} /> ซ้อมตามเวลาปกติ</label>` + (e.practiceNormal ? "" : field("ช่วงเวลาที่ซ้อม · เวลาเริ่ม", input(at, "practiceStart", "time", e.practiceStart)) + field("ช่วงเวลาที่ซ้อม · เวลาจบ", input(at, "practiceEnd", "time", e.practiceEnd))) : ""}
       ${field("นักเตะที่ไม่อยู่", `<select class="field-input" ${at} data-f="awayMode">${options(AWAY_MODES, e.awayMode, (x) => x.key, (x) => x.label)}</select>`)}
     </div>
     ${e.awayMode === "some" ? field("เลือกชื่อนักเตะที่ไม่อยู่", awayPickerHtml(i, e)) : ""}
@@ -372,6 +372,12 @@ function onField(e) {
   if (f === "matchCount") {
     if (e.type !== "change") return;
     setMatchCount(ev, t.value);
+    statusHtml = "";
+    renderFill();
+    return;
+  }
+  if (f === "practiceNormal") {
+    ev.practiceNormal = t.checked;
     statusHtml = "";
     renderFill();
     return;

@@ -202,6 +202,17 @@ test("coach leave: with a substitute only the name is needed, without one a requ
   assert.ok(validateEventForm(form({ events: [base("coach-leave", { ...noSub, coachName: "" })] })).errors.some((m) => m.includes("เลือกโค้ช")));
 });
 
+test("partial training can be at the normal time: no start/end needed, and the time range is ignored", () => {
+  const normal = { ...goodMatch(), practiceNormal: true, practiceStart: "", practiceEnd: "" };
+  const r = validateEventForm(form({ events: [normal] }));
+  assert.deepEqual(r.errors, []);
+  assert.deepEqual([r.value.events[0].practiceNormal, r.value.events[0].practiceStart, r.value.events[0].practiceEnd], [true, "", ""]);
+  assert.equal(validateEventForm(form({ events: [{ ...normal, practiceNormal: false }] })).errors.some((m) => m.includes("ช่วงเวลาที่ซ้อม")), true, "unchecked again means a range is required");
+  assert.equal(validateEventForm(form({ events: [{ ...goodMatch(), impact: "no-training", practiceNormal: true }] })).value.events[0].practiceNormal, false, "only meaningful for partial training");
+  const html = overviewHtml(overviewModel({ teams: ["T"], month: "2026-11", docs: [{ team: "T", month: "2026-11", contactName: "x", events: [r.value.events[0]] }] }));
+  assert.ok(html.includes("ซ้อมตามเวลาปกติ"));
+});
+
 test("matches: the number of matches decides the rows, each needs a date; partial practice shows a time range", () => {
   assert.ok(validateEventForm(form({ events: [{ ...goodMatch(), matches: [] }] })).errors.some((m) => m.includes("จำนวนนัด")));
   assert.ok(validateEventForm(form({ events: [{ ...goodMatch(), matches: [{ date: "", venue: "เหย้า", time: "" }] }] })).errors.some((m) => m.includes("วันแข่ง")));
