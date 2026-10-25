@@ -6,6 +6,17 @@
   <title>FOOTELLIGENCE DATA — พัฒนาการนักกีฬา</title>
   <link rel="icon" href="./assets/logo.png" />
   <link rel="stylesheet" href="./css/styles.css" />
+  <!-- modulepreload:start (สร้างด้วย node tools/modulepreload.mjs ห้ามแก้ด้วยมือ) -->
+  <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js" />
+  <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js" />
+  <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js" />
+  <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.13.0/firebase-storage.js" />
+  <link rel="modulepreload" href="./js/development.js" />
+  <link rel="modulepreload" href="./js/firebase-init.js" />
+  <link rel="modulepreload" href="./js/firebase-config.js" />
+  <link rel="modulepreload" href="./js/icons.js" />
+  <link rel="modulepreload" href="./js/ui-utils.js" />
+  <!-- modulepreload:end -->
   <!-- Tailwind สร้างเป็นไฟล์ static (ดูวิธีสร้างที่ tailwind.config.js) — ต้องอยู่ท้ายสุดของ <head> (หลังทั้ง styles.css และ <style> ในหน้า)
        เพื่อให้ cascade เหมือนตอนใช้ CDN ซึ่งฉีด <style> ต่อท้ายสุดของ head เสมอ (utility เช่น px-0 ต้องทับ .btn ได้) -->
   <link rel="stylesheet" href="./css/tailwind.css" />
