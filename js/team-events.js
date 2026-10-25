@@ -15,7 +15,8 @@ export const TITLE_MAX = 80;
 export const NOTE_MAX = 200;
 export const NAME_MAX = 80;
 
-// kind: match = มีวันแข่ง/เหย้า-เยือน/เวลา · exam = ระบุชั้นที่สอบ (ระบบ map เป็นรุ่นให้)
+// kind: match = มีจำนวนนัด/วันแข่ง/เหย้า-เยือน/เวลา · exam = ระบุชั้นที่สอบ (ระบบ map เป็นรุ่นให้)
+//       change-day / change-time / coach-leave = แจ้งขอเปลี่ยนตารางซ้อม (ไม่มีชื่อรายการ/ผลต่อการซ้อม/นักเตะที่ไม่อยู่ — ชื่อสร้างให้อัตโนมัติ)
 export const EVENT_TYPES = [
   { key: "official", label: "แข่งทางการ", kind: "match" },
   { key: "friendly", label: "กระชับมิตร", kind: "match" },
@@ -26,8 +27,21 @@ export const EVENT_TYPES = [
   { key: "camp", label: "ค่าย-ทัศนศึกษา" },
   { key: "school-activity", label: "กิจกรรมโรงเรียน" },
   { key: "venue-busy", label: "สนามไม่ว่าง" },
+  { key: "change-day", label: "เปลี่ยนวันซ้อม", kind: "change-day" },
+  { key: "change-time", label: "เปลี่ยนเวลาซ้อม", kind: "change-time" },
+  { key: "coach-leave", label: "โค้ชลา / ไม่อยู่ซ้อม", kind: "coach-leave" },
   { key: "other", label: "อื่นๆ" }
 ];
+const SCHEDULE_KINDS = ["change-day", "change-time", "coach-leave"];
+export const CHANGE_REASONS = ["สนามไม่ว่าง", "ติดกิจกรรมโรงเรียน", "สภาพอากาศ", "โค้ชไม่ว่าง", "อื่นๆ"];
+export const LEAVE_CHANGES = ["งดซ้อม", "เลื่อนวันซ้อม", "เปลี่ยนเวลาซ้อม", "ให้รุ่นอื่นซ้อมรวม"];
+export const SUBSTITUTE_OPTIONS = [
+  { key: "none", label: "ไม่มี" },
+  { key: "yes", label: "มี" }
+];
+export const MAX_MATCHES = 20;
+export const MAX_AWAY_PLAYERS = 60;
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 export const IMPACTS = [
   { key: "no-training", label: "งดซ้อม" },
   { key: "partial", label: "ซ้อมได้บางส่วน" },
@@ -39,7 +53,6 @@ export const AWAY_MODES = [
   { key: "some", label: "บางคน" }
 ];
 export const VENUES = ["เหย้า", "เยือน"];
-export const PERIODS = ["เช้า", "กลางวัน", "บ่าย", "เย็น"];
 export const AGE_OPTIONS = Array.from({ length: 13 }, (_, i) => `U${i + 6}`); // U6 … U18
 export const ALL_AGES = "ทุกรุ่น";
 
@@ -60,6 +73,8 @@ export const typeLabel = (key) => typeOf(key)?.label ?? "-";
 export const impactLabel = (key) => IMPACTS.find((i) => i.key === key)?.label ?? "-";
 export const isMatchType = (key) => typeOf(key)?.kind === "match";
 export const isExamType = (key) => typeOf(key)?.kind === "exam";
+export const kindOfType = (key) => typeOf(key)?.kind ?? "";
+export const isScheduleChange = (key) => SCHEDULE_KINDS.includes(kindOfType(key));
 
 // ---------- เดือน / กำหนดส่ง ----------
 const THAI_MONTHS = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
@@ -132,7 +147,10 @@ export function eventReminder({ now, submitted }) {
 
 // ---------- ฟอร์ม ----------
 export function emptyEvent() {
-  return { type: "", title: "", ageGroups: [], start: "", end: "", impact: "", awayMode: "none", awayCount: "", matches: [], practiceMinutes: "", practicePeriod: "", examLevels: [], note: "" };
+  return {
+    type: "", title: "", ageGroups: [], start: "", end: "", impact: "", awayMode: "none", awayCount: "", awayPlayers: [], matches: [], practiceStart: "", practiceEnd: "", examLevels: [], note: "",
+    reason: "", oldDate: "", newDate: "", oldStart: "", oldEnd: "", newStart: "", newEnd: "", coachId: "", coachName: "", substitute: "none", substituteName: "", changes: [], changeDetail: ""
+  };
 }
 export const emptyMatchRow = () => ({ date: "", venue: "เหย้า", time: "" });
 
@@ -162,62 +180,133 @@ export function validateEventForm(form) {
   };
 }
 
+function timeRange(label, start, end, fail) {
+  if (!TIME_RE.test(start) || !TIME_RE.test(end)) fail(`ระบุ${label}ให้ครบ (เวลาเริ่มและเวลาจบ เช่น 16:00)`);
+  else if (end <= start) fail(`${label}: เวลาจบต้องหลังเวลาเริ่ม`);
+}
+
 function normalizeEvent(e, label, errors) {
   const fail = (msg) => errors.push(`${label}: ${msg}`);
   const type = typeOf(e.type);
   if (!type) fail("เลือกประเภท");
-  const title = text(e.title);
-  if (!title) fail("กรอกชื่อรายการ / กิจกรรม");
-  else if (title.length > TITLE_MAX || hasBadChar(title)) fail(`ชื่อรายการต้องไม่เกิน ${TITLE_MAX} ตัวอักษรและห้ามมี < >`);
+  const kind = type?.kind;
+  const schedule = SCHEDULE_KINDS.includes(kind);
+  let title = text(e.title);
+  if (!schedule) {
+    if (!title) fail("กรอกชื่อรายการ / กิจกรรม");
+    else if (title.length > TITLE_MAX || hasBadChar(title)) fail(`ชื่อรายการต้องไม่เกิน ${TITLE_MAX} ตัวอักษรและห้ามมี < >`);
+  }
 
-  const examLevels = type?.kind === "exam" ? [...new Set((e.examLevels || []).filter((l) => EXAM_LEVELS.includes(l)))] : [];
-  if (type?.kind === "exam" && examLevels.length === 0) fail("เลือกชั้นที่สอบอย่างน้อย 1 ชั้น");
+  const examLevels = kind === "exam" ? [...new Set((e.examLevels || []).filter((l) => EXAM_LEVELS.includes(l)))] : [];
+  if (kind === "exam" && examLevels.length === 0) fail("เลือกชั้นที่สอบอย่างน้อย 1 ชั้น");
   // สอบ: รุ่นที่เกี่ยวข้อง = map จากชั้นที่สอบ · ประเภทอื่น: เลือกเอง (ทุกรุ่น = เลือกครบ U6–U18)
-  let ageGroups = type?.kind === "exam" ? ageGroupsForExamLevels(examLevels) : [];
-  if (type?.kind !== "exam") {
+  let ageGroups = kind === "exam" ? ageGroupsForExamLevels(examLevels) : [];
+  if (kind !== "exam") {
     const picked = (e.ageGroups || []).includes(ALL_AGES) ? AGE_OPTIONS : AGE_OPTIONS.filter((g) => (e.ageGroups || []).includes(g));
     ageGroups = picked;
     if (picked.length === 0) fail("เลือกรุ่นที่เกี่ยวข้อง");
   }
 
-  const start = text(e.start);
-  const end = text(e.end) || start;
-  if (!isDate(start)) fail("เลือกวันที่เริ่ม");
+  let start = text(e.start);
+  let end = text(e.end) || start;
+  let oldDate = "";
+  let newDate = "";
+  let reason = "";
+  if (kind === "change-day") {
+    oldDate = text(e.oldDate);
+    newDate = text(e.newDate);
+    if (!isDate(oldDate)) fail("เลือกวันซ้อมเดิม");
+    else if (!isDate(newDate)) fail("เลือกวันที่เปลี่ยนเป็น");
+    else if (newDate === oldDate) fail("วันที่ใหม่ต้องไม่ใช่วันซ้อมเดิม");
+    reason = CHANGE_REASONS.includes(e.reason) ? e.reason : "";
+    if (!reason) fail("เลือกเหตุผล");
+    start = oldDate;
+    end = oldDate;
+  } else if (!isDate(start)) fail("เลือกวันที่เริ่ม");
   else if (!isDate(end) || end < start) fail("วันที่จบต้องไม่ก่อนวันที่เริ่ม");
 
-  if (!IMPACTS.some((i) => i.key === e.impact)) fail("เลือกผลต่อการซ้อม");
-  let practiceMinutes = null;
-  let practicePeriod = null;
-  if (e.impact === "partial") {
-    const minutes = Number(e.practiceMinutes);
-    if (!Number.isInteger(minutes) || minutes < 1 || minutes > 600) fail("ระบุจำนวนนาทีที่ซ้อมได้ (1–600)");
-    else practiceMinutes = minutes;
-    if (!PERIODS.includes(e.practicePeriod)) fail("เลือกช่วงเวลาที่ซ้อมได้");
-    else practicePeriod = e.practicePeriod;
+  let oldStart = "";
+  let oldEnd = "";
+  let newStart = "";
+  let newEnd = "";
+  if (kind === "change-time") {
+    [oldStart, oldEnd, newStart, newEnd] = [e.oldStart, e.oldEnd, e.newStart, e.newEnd].map(text);
+    timeRange("เวลาซ้อมเดิม", oldStart, oldEnd, fail);
+    timeRange("เวลาซ้อมใหม่", newStart, newEnd, fail);
   }
 
-  const awayMode = AWAY_MODES.some((m) => m.key === e.awayMode) ? e.awayMode : "none";
+  let coachId = "";
+  let coachName = "";
+  let substitute = "none";
+  let substituteName = "";
+  let changes = [];
+  let changeDetail = "";
+  if (kind === "coach-leave") {
+    coachId = text(e.coachId);
+    coachName = text(e.coachName);
+    if (!coachName) fail("เลือกโค้ชที่ไม่อยู่");
+    else if (coachName.length > NAME_MAX || hasBadChar(coachName)) fail("ชื่อโค้ชไม่ถูกต้อง");
+    substitute = e.substitute === "yes" ? "yes" : "none";
+    if (substitute === "yes") {
+      substituteName = text(e.substituteName);
+      if (!substituteName) fail("กรอกชื่อผู้ฝึกสอนแทน");
+      else if (substituteName.length > NAME_MAX || hasBadChar(substituteName)) fail("ชื่อผู้ฝึกสอนแทนไม่ถูกต้อง");
+    } else {
+      changes = LEAVE_CHANGES.filter((c) => (e.changes || []).includes(c));
+      if (changes.length === 0) fail("เลือกสิ่งที่ต้องการเปลี่ยนแปลงอย่างน้อย 1 อย่าง");
+      changeDetail = text(e.changeDetail);
+      if (!changeDetail) fail("กรอกรายละเอียดวันและเวลาที่ขอเปลี่ยน");
+      else if (changeDetail.length > NOTE_MAX || hasBadChar(changeDetail)) fail(`รายละเอียดต้องไม่เกิน ${NOTE_MAX} ตัวอักษรและห้ามมี < >`);
+    }
+  }
+
+  let impact = "";
+  let practiceStart = "";
+  let practiceEnd = "";
+  if (!schedule) {
+    impact = IMPACTS.some((i) => i.key === e.impact) ? e.impact : "";
+    if (!impact) fail("เลือกผลต่อการซ้อม");
+    if (impact === "partial") {
+      practiceStart = text(e.practiceStart);
+      practiceEnd = text(e.practiceEnd);
+      timeRange("ช่วงเวลาที่ซ้อม", practiceStart, practiceEnd, fail);
+    }
+  }
+
+  const awayMode = !schedule && AWAY_MODES.some((m) => m.key === e.awayMode) ? e.awayMode : "none";
   let awayCount = null;
+  let awayPlayers = [];
   if (awayMode === "some") {
-    const n = Number(e.awayCount);
-    if (!Number.isInteger(n) || n < 1 || n > 99) fail("ระบุจำนวนนักเตะที่ไม่อยู่ (1–99)");
-    else awayCount = n;
+    const seen = new Set();
+    awayPlayers = (e.awayPlayers || [])
+      .map((p) => ({ id: text(p.id), name: text(p.name), ageGroup: text(p.ageGroup) }))
+      .filter((p) => p.name && !seen.has(p.id || p.name) && seen.add(p.id || p.name))
+      .slice(0, MAX_AWAY_PLAYERS);
+    if (awayPlayers.length > 0) awayCount = awayPlayers.length;
+    else if (Number.isInteger(Number(e.awayCount)) && Number(e.awayCount) >= 1 && Number(e.awayCount) <= 99) awayCount = Number(e.awayCount); // ข้อมูลเดิมที่ระบุเป็นจำนวน
+    else fail("เลือกชื่อนักเตะที่ไม่อยู่อย่างน้อย 1 คน");
   }
 
   let matches = [];
-  if (type?.kind === "match") {
-    matches = (e.matches || []).map((m) => ({ date: text(m.date), venue: VENUES.includes(m.venue) ? m.venue : "เหย้า", time: text(m.time) }));
-    if (matches.length === 0) fail("เพิ่มวันแข่งอย่างน้อย 1 นัด");
+  if (kind === "match") {
+    matches = (e.matches || []).slice(0, MAX_MATCHES).map((m) => ({ date: text(m.date), venue: VENUES.includes(m.venue) ? m.venue : "เหย้า", time: text(m.time) }));
+    if (matches.length === 0) fail("ระบุจำนวนนัดที่แข่งอย่างน้อย 1 นัด");
     else if (matches.some((m) => !isDate(m.date))) fail("เลือกวันแข่งให้ครบทุกนัด");
-    else if (matches.some((m) => m.time && !/^([01]\d|2[0-3]):[0-5]\d$/.test(m.time))) fail("เวลาแข่งไม่ถูกต้อง");
+    else if (matches.some((m) => m.time && !TIME_RE.test(m.time))) fail("เวลาแข่งไม่ถูกต้อง");
   }
 
   const note = text(e.note);
   if (note.length > NOTE_MAX || hasBadChar(note)) fail(`หมายเหตุต้องไม่เกิน ${NOTE_MAX} ตัวอักษรและห้ามมี < >`);
 
-  return { type: type?.key ?? "", title, ageGroups, start, end, impact: e.impact ?? "", awayMode, awayCount, matches, practiceMinutes, practicePeriod, examLevels, note };
+  if (schedule) {
+    title =
+      kind === "change-day" ? `เปลี่ยนวันซ้อม ${dateLabel(oldDate)} → ${dateLabel(newDate)}` : kind === "change-time" ? `เปลี่ยนเวลาซ้อม ${oldStart}–${oldEnd} → ${newStart}–${newEnd}` : `${coachName} ไม่อยู่ซ้อม`;
+  }
+  return {
+    type: type?.key ?? "", title, ageGroups, start, end, impact, awayMode, awayCount, awayPlayers, matches, practiceStart, practiceEnd, examLevels, note,
+    reason, oldDate, newDate, oldStart, oldEnd, newStart, newEnd, coachId, coachName, substitute, substituteName, changes, changeDetail
+  };
 }
-
 // เอกสารที่เก็บไว้ → ค่าตั้งต้นของฟอร์ม (เติมให้ครบทุกฟิลด์ที่ฟอร์มใช้)
 export function formFromDoc(doc) {
   return {
@@ -228,14 +317,13 @@ export function formFromDoc(doc) {
       ...emptyEvent(),
       ...e,
       awayCount: e.awayCount ?? "",
-      practiceMinutes: e.practiceMinutes ?? "",
-      practicePeriod: e.practicePeriod ?? "",
+      awayPlayers: (e.awayPlayers || []).map((p) => ({ ...p })),
       matches: (e.matches || []).map((m) => ({ ...emptyMatchRow(), ...m })),
-      examLevels: e.examLevels || []
+      examLevels: e.examLevels || [],
+      changes: e.changes || []
     }))
   };
 }
-
 // ---------- ภาพรวมของทุกทีม (ทีมหลังบ้าน/แอดมิน) ----------
 export const eventStatus = (doc) => (!doc ? "none" : doc.noEvent ? "no-event" : "submitted");
 
@@ -245,7 +333,7 @@ export function overviewModel({ teams, month, docs = [] }) {
   const rows = teams.map((team) => {
     const doc = byTeam.get(team) ?? null;
     const events = [...(doc?.events || [])].sort((a, b) => String(a.start).localeCompare(String(b.start)));
-    return { team, status: eventStatus(doc), contactName: doc?.contactName ?? "", contactPhone: doc?.contactPhone ?? "", submittedDate: doc?.submittedDate ?? "", events };
+    return { team, status: eventStatus(doc), contactName: doc?.contactName ?? "", contactPhone: doc?.contactPhone ?? "", submittedDate: doc?.submittedDate ?? "", firstSubmittedDate: doc?.firstSubmittedDate ?? doc?.submittedDate ?? "", events };
   });
   const count = (s) => rows.filter((r) => r.status === s).length;
   return { month, rows, summary: { submitted: count("submitted"), noEvent: count("no-event"), missing: count("none"), total: rows.length } };
@@ -254,20 +342,41 @@ export function overviewModel({ teams, month, docs = [] }) {
 const STATUS_BADGE = { submitted: ["badge-success", "ส่งแล้ว"], "no-event": ["badge-info", "ไม่มี Event"], none: ["badge-danger", "ยังไม่กรอก"] };
 const IMPACT_BADGE = { "no-training": "badge-danger", partial: "badge-warning", none: "badge-neutral" };
 
+// ป้ายคอลัมน์ "ผลต่อการซ้อม": ประเภทปกติใช้ค่าที่เลือก · แจ้งเปลี่ยนตารางซ้อมใช้ป้ายตามประเภท
+function effectBadge(e) {
+  switch (kindOfType(e.type)) {
+    case "change-day":
+      return ["badge-warning", "เปลี่ยนวันซ้อม"];
+    case "change-time":
+      return ["badge-warning", "เปลี่ยนเวลาซ้อม"];
+    case "coach-leave":
+      if (e.substitute === "yes") return ["badge-neutral", "มีผู้ฝึกสอนแทน"];
+      return (e.changes || []).includes("งดซ้อม") ? ["badge-danger", "งดซ้อม"] : ["badge-warning", "ขอเปลี่ยน"];
+    default:
+      return [IMPACT_BADGE[e.impact] || "badge-neutral", impactLabel(e.impact)];
+  }
+}
+
 function awayText(e) {
   if (e.awayMode === "all") return "ทั้งรุ่น";
   if (e.awayMode === "some") return `${e.awayCount ?? "-"} คน`;
   return "-";
 }
+const trainRange = (e) => (e.practiceStart && e.practiceEnd ? `ซ้อม ${e.practiceStart}–${e.practiceEnd} น.` : e.practiceMinutes ? `ซ้อมได้ ${e.practiceMinutes} นาที (${e.practicePeriod ?? "-"})` : "");
 function detailText(e) {
   const parts = [];
-  if (e.matches?.length) parts.push(e.matches.map((m) => `${dateLabel(m.date)} ${m.venue}${m.time ? ` ${m.time}` : ""}`).join(" · "));
-  if (e.impact === "partial" && e.practiceMinutes) parts.push(`ซ้อมได้ ${e.practiceMinutes} นาที (${e.practicePeriod ?? "-"})`);
+  if (e.matches?.length) parts.push(`${e.matches.length} นัด: ${e.matches.map((m) => `${dateLabel(m.date)} ${m.venue}${m.time ? ` ${m.time}` : ""}`).join(" · ")}`);
+  if (e.impact === "partial" && trainRange(e)) parts.push(trainRange(e));
   if (e.examLevels?.length) parts.push(`ชั้นที่สอบ ${e.examLevels.join(", ")}`);
+  if (e.awayMode === "some" && e.awayPlayers?.length) parts.push(`นักเตะที่ไม่อยู่: ${e.awayPlayers.map((p) => p.name).join(", ")}`);
+  if (kindOfType(e.type) === "change-day" && e.reason) parts.push(`เหตุผล: ${e.reason}`);
+  if (kindOfType(e.type) === "coach-leave") {
+    if (e.substitute === "yes") parts.push(`ผู้ฝึกสอนแทน: ${e.substituteName}`);
+    else parts.push(`ไม่มีผู้ฝึกสอนแทน · ขอ: ${(e.changes || []).join(", ")}${e.changeDetail ? ` (${e.changeDetail})` : ""}`);
+  }
   if (e.note) parts.push(e.note);
   return parts.join(" · ");
 }
-
 export function eventRowsHtml(events) {
   if (!events.length) return '<p class="text-sm text-slate-500">ไม่มีรายการ</p>';
   const rows = events
@@ -278,12 +387,19 @@ export function eventRowsHtml(events) {
         <td>${escapeHtml(rangeLabel(e.start, e.end))}</td>
         <td><span class="emphasis">${escapeHtml(typeLabel(e.type))}</span> · ${escapeHtml(e.title)}${detail ? `<div class="text-xs text-slate-500">${escapeHtml(detail)}</div>` : ""}</td>
         <td>${escapeHtml(ages || "-")}</td>
-        <td><span class="badge ${IMPACT_BADGE[e.impact] || "badge-neutral"}">${escapeHtml(impactLabel(e.impact))}</span></td>
-        <td>${escapeHtml(awayText(e))}</td>
+        <td><span class="badge ${effectBadge(e)[0]}">${escapeHtml(effectBadge(e)[1])}</span></td>
+        <td>${escapeHtml(isScheduleChange(e.type) ? "-" : awayText(e))}</td>
       </tr>`;
     })
     .join("");
   return `<div class="table-wrap"><table class="pro-table"><thead><tr><th>วันที่</th><th>ประเภท · ชื่อ</th><th>รุ่น</th><th>ผลต่อการซ้อม</th><th>นักเตะไม่อยู่</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+// วันที่ส่ง (และวันที่แก้ไขล่าสุด ถ้าโค้ชแก้หลังส่งไปแล้ว)
+function whenHtml(r) {
+  if (r.status === "none" || !r.submittedDate) return "";
+  const edited = r.firstSubmittedDate && r.firstSubmittedDate !== r.submittedDate;
+  return ` <span class="text-xs text-slate-500">${escapeHtml(edited ? `ส่ง ${dateLabel(r.firstSubmittedDate)} · แก้ไขล่าสุด ${dateLabel(r.submittedDate)}` : dateLabel(r.submittedDate))}</span>`;
 }
 
 const tile = (label, value, tone = "") =>
@@ -294,7 +410,7 @@ const SINGLE_NOTE = { none: "โรงเรียนนี้ยังไม่
 function singleTeamHtml(model) {
   const r = model.rows[0];
   const [cls, label] = STATUS_BADGE[r.status];
-  const when = r.status === "none" || !r.submittedDate ? "" : ` <span class="text-xs text-slate-500">${escapeHtml(dateLabel(r.submittedDate))}</span>`;
+  const when = whenHtml(r);
   const who = r.contactName ? `<p class="text-sm text-slate-500">ผู้กรอก: ${escapeHtml(r.contactName)}${r.contactPhone ? ` · ${escapeHtml(formatPhone(r.contactPhone))}` : ""}</p>` : "";
   const body = r.status === "submitted" ? eventRowsHtml(r.events) : `<p class="text-sm text-slate-500">${SINGLE_NOTE[r.status]}</p>`;
   return `<div class="card card-pad space-y-3">
@@ -310,7 +426,7 @@ export function overviewHtml(model) {
   const table = rows
     .map((r) => {
       const [cls, label] = STATUS_BADGE[r.status];
-      const when = r.status === "none" || !r.submittedDate ? "" : ` <span class="text-xs text-slate-500">${escapeHtml(dateLabel(r.submittedDate))}</span>`;
+      const when = whenHtml(r);
       const who = r.contactName ? `${escapeHtml(r.contactName)}${r.contactPhone ? ` · ${escapeHtml(formatPhone(r.contactPhone))}` : ""}` : "-";
       return `<tr><td class="emphasis">${escapeHtml(r.team)}</td><td><span class="badge ${cls}">${label}</span>${when}</td><td>${r.events.length ? `${r.events.length} รายการ` : "-"}</td><td>${who}</td></tr>`;
     })

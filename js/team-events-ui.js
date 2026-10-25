@@ -1,16 +1,19 @@
-// หน้า Event ประจำเดือน: โค้ชกรอกของทีมตัวเอง (โหมดกรอก) · ทีมหลังบ้าน/แอดมินดูสถานะและรายการของทุกทีม (โหมดดู) — ตรรกะอยู่ที่ team-events.js
+// หน้า Event ประจำเดือน: โค้ชกรอกของทีมตัวเอง (โหมดกรอก) · ทีมหลังบ้าน/แอดมินดูสถานะและรายการของโรงเรียนที่เลือก (โหมดดู) — ตรรกะอยู่ที่ team-events.js
 // ฟอร์มสร้างด้วย JS จึงอ้างอิง element ผ่าน data-* ใน container ไม่ใช้ id
 import { collection, doc, getDocs, query, serverTimestamp, setDoc, where } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 import { db } from "./firebase-init.js";
-import { escapeHtml, todayBangkok } from "./ui-utils.js";
+import { coachPositionLabel, escapeHtml, todayBangkok } from "./ui-utils.js";
 import {
   AGE_OPTIONS,
   ALL_AGES,
   AWAY_MODES,
+  CHANGE_REASONS,
   EVENT_TYPES,
   EXAM_LEVELS,
   IMPACTS,
-  PERIODS,
+  LEAVE_CHANGES,
+  MAX_MATCHES,
+  SUBSTITUTE_OPTIONS,
   VENUES,
   ageGroupsForExamLevels,
   bangkokStamp,
@@ -22,8 +25,7 @@ import {
   emptyMatchRow,
   eventDocId,
   formFromDoc,
-  isExamType,
-  isMatchType,
+  kindOfType,
   monthLabel,
   monthOptions,
   overviewHtml,
@@ -37,6 +39,8 @@ let box = null;
 let month = "";
 let draft = null;
 let saved = null; // เอกสารที่เก็บไว้ของเดือนที่เลือก (null = ยังไม่เคยส่ง)
+let players = []; // นักกีฬาของทีม (ไว้เลือกชื่อนักเตะที่ไม่อยู่)
+let coaches = []; // โค้ชของทีม (ไว้เลือกโค้ชที่ลา)
 let statusHtml = "";
 let loadToken = 0;
 
@@ -46,41 +50,120 @@ const options = (list, selected, valueOf = (x) => x, labelOf = (x) => x, placeho
 
 const field = (label, control) => `<div class="event-field"><label class="field-label">${escapeHtml(label)}</label>${control}</div>`;
 const chip = (on, attrs, label) => `<button type="button" class="event-chip${on ? " event-chip-on" : ""}" aria-pressed="${on}" ${attrs}>${escapeHtml(label)}</button>`;
+const input = (at, f, type, value, extra = "") => `<input type="${type}" class="field-input" ${at} data-f="${f}" value="${escapeHtml(value)}" ${extra} />`;
+
+const playerName = (p) => p.nickname || p.fullName || p.id;
+const byAgeThenName = (a, b) => String(a.ageGroup).localeCompare(String(b.ageGroup), "en", { numeric: true }) || String(playerName(a)).localeCompare(String(playerName(b)), "th");
 
 function matchRowHtml(ei, mi, m) {
   const at = `data-ev="${ei}" data-m="${mi}"`;
   return `<div class="event-match-row">
-    <input type="date" class="field-input" ${at} data-f="date" value="${escapeHtml(m.date)}" aria-label="วันแข่ง" />
-    <select class="field-input" ${at} data-f="venue" aria-label="เหย้า/เยือน">${options(VENUES, m.venue)}</select>
-    <input type="time" class="field-input" ${at} data-f="time" value="${escapeHtml(m.time)}" aria-label="เวลาแข่ง" />
-    <button type="button" class="btn btn-ghost-danger btn-sm" data-action="remove-match" data-ev="${ei}" data-m="${mi}">ลบนัด</button>
+    <span class="event-match-no">นัด ${mi + 1}</span>
+    ${input(at, "date", "date", m.date, 'aria-label="วันแข่ง"')}
+    <select class="field-input" ${at} data-f="venue" aria-label="ทีมเป็นเหย้า/เยือน">${options(VENUES, m.venue)}</select>
+    ${input(at, "time", "time", m.time, 'aria-label="เวลาแข่งขัน"')}
   </div>`;
+}
+
+function awayChipsHtml(i, e) {
+  if (!e.awayPlayers.length) return `<p class="text-xs text-slate-500">${e.awayCount ? `ข้อมูลเดิมระบุไว้ ${escapeHtml(e.awayCount)} คน — เลือกชื่อใหม่เพื่อแทนที่` : "ยังไม่ได้เลือกชื่อ"}</p>`;
+  return `<div class="event-chips">${e.awayPlayers.map((p) => chip(true, `data-ev="${i}" data-action="remove-away" data-pid="${escapeHtml(p.id)}"`, `${p.name}${p.ageGroup ? ` · ${p.ageGroup}` : ""} ✕`)).join("")}</div><p class="text-xs text-slate-500">เลือกแล้ว ${e.awayPlayers.length} คน</p>`;
+}
+
+// รายชื่อนักกีฬาให้เลือก: เฉพาะรุ่นที่เลือกไว้ใน Event นี้ (ค้นหาด้วยการซ่อน/แสดงแถว ไม่วาดใหม่ระหว่างพิมพ์)
+function awayPickerHtml(i, e) {
+  const picked = new Set(e.awayPlayers.map((p) => p.id));
+  const list = players.filter((p) => e.ageGroups.includes(p.ageGroup)).sort(byAgeThenName);
+  const rows = list
+    .map((p) => `<label class="event-player" data-search="${escapeHtml(`${playerName(p)} ${p.fullName ?? ""} ${p.ageGroup}`.toLowerCase())}"><input type="checkbox" data-ev="${i}" data-f="awayPlayer" data-pid="${escapeHtml(p.id)}"${picked.has(p.id) ? " checked" : ""} /> ${escapeHtml(playerName(p))} <span class="text-slate-500">· ${escapeHtml(p.ageGroup)}${p.fullName && p.fullName !== playerName(p) ? ` · ${escapeHtml(p.fullName)}` : ""}</span></label>`)
+    .join("");
+  const body = e.ageGroups.length === 0 ? '<p class="text-xs text-slate-500">เลือกรุ่นที่เกี่ยวข้องก่อน แล้วรายชื่อนักกีฬาของรุ่นนั้นจะขึ้นที่นี่</p>' : list.length === 0 ? '<p class="text-xs text-slate-500">ไม่พบนักกีฬาในรุ่นที่เลือก</p>' : `<input type="text" class="field-input" data-ev="${i}" data-f="awaySearch" placeholder="ค้นหาชื่อเล่นหรือชื่อจริง" /><div class="event-player-list" data-player-list="${i}">${rows}</div>`;
+  return `<div data-away-chips="${i}">${awayChipsHtml(i, e)}</div>${body}`;
+}
+
+function ageChipsHtml(e, at) {
+  if (kindOfType(e.type) === "exam") {
+    return `<div class="event-chips">${EXAM_LEVELS.map((l) => chip(e.examLevels.includes(l), `${at} data-action="toggle-level" data-level="${l}"`, l)).join("")}</div>
+       <p class="text-xs text-slate-500">รุ่นที่เกี่ยวข้อง (ระบบแปลงจากชั้นที่สอบ): ${escapeHtml(ageGroupsForExamLevels(e.examLevels).join(", ") || "-")}</p>`;
+  }
+  return `<div class="event-chips">${AGE_OPTIONS.map((g) => chip(e.ageGroups.includes(g), `${at} data-action="toggle-age" data-age="${g}"`, g)).join("")}${chip(AGE_OPTIONS.every((g) => e.ageGroups.includes(g)), `${at} data-action="toggle-age" data-age="${ALL_AGES}"`, ALL_AGES)}</div>`;
+}
+
+function coachOptions(e) {
+  const list = coaches.map((c) => ({ id: c.id, label: `${c.name ?? c.email ?? "-"}${c.coachPosition ? ` (${coachPositionLabel(c.coachPosition)})` : ""}` }));
+  if (e.coachId && !list.some((c) => c.id === e.coachId)) list.push({ id: e.coachId, label: e.coachName });
+  return options(list, e.coachId, (c) => c.id, (c) => c.label, "เลือกโค้ช");
+}
+
+// ส่วนที่เฉพาะแต่ละประเภทของ "แจ้งเปลี่ยนตารางซ้อม"
+function scheduleFieldsHtml(e, at) {
+  switch (kindOfType(e.type)) {
+    case "change-day":
+      return `<div class="event-grid">
+        ${field("เหตุผล", `<select class="field-input" ${at} data-f="reason">${options(CHANGE_REASONS, e.reason, (x) => x, (x) => x, "เลือกเหตุผล")}</select>`)}
+        ${field("วันซ้อมเดิม", input(at, "oldDate", "date", e.oldDate))}
+        ${field("เปลี่ยนเป็นวันที่", input(at, "newDate", "date", e.newDate))}
+      </div>`;
+    case "change-time":
+      return `<div class="event-grid">
+        ${field("วันที่เริ่ม", input(at, "start", "date", e.start))}
+        ${field("วันที่จบ", input(at, "end", "date", e.end))}
+        ${field("เวลาเดิม · เริ่ม", input(at, "oldStart", "time", e.oldStart))}
+        ${field("เวลาเดิม · จบ", input(at, "oldEnd", "time", e.oldEnd))}
+        ${field("เวลาใหม่ · เริ่ม", input(at, "newStart", "time", e.newStart))}
+        ${field("เวลาใหม่ · จบ", input(at, "newEnd", "time", e.newEnd))}
+      </div>`;
+    case "coach-leave":
+      return `<div class="event-grid">
+        ${field("โค้ชที่ไม่อยู่", `<select class="field-input" ${at} data-f="coachId">${coachOptions(e)}</select>`)}
+        ${field("วันที่เริ่ม", input(at, "start", "date", e.start))}
+        ${field("วันที่จบ", input(at, "end", "date", e.end))}
+        ${field("มีผู้ฝึกสอนแทนหรือไม่", `<select class="field-input" ${at} data-f="substitute">${options(SUBSTITUTE_OPTIONS, e.substitute, (x) => x.key, (x) => x.label)}</select>`)}
+      </div>
+      ${
+        e.substitute === "yes"
+          ? field("ชื่อผู้ฝึกสอนแทน", input(at, "substituteName", "text", e.substituteName, 'maxlength="80"'))
+          : `<div class="event-sub-box">
+              ${field("ไม่มีผู้ฝึกสอนแทน — ต้องการเปลี่ยนแปลงอย่างไร (เลือกได้หลายข้อ)", `<div class="event-chips">${LEAVE_CHANGES.map((c) => chip(e.changes.includes(c), `${at} data-action="toggle-change" data-change="${c}"`, c)).join("")}</div>`)}
+              ${field("รายละเอียด / วันและเวลาที่ขอเปลี่ยน", input(at, "changeDetail", "text", e.changeDetail, 'maxlength="200"'))}
+            </div>`
+      }`;
+    default:
+      return "";
+  }
 }
 
 function eventHtml(e, i) {
   const at = `data-ev="${i}"`;
-  const exam = isExamType(e.type);
-  const ageChips = exam
-    ? `<div class="event-chips">${EXAM_LEVELS.map((l) => chip(e.examLevels.includes(l), `${at} data-action="toggle-level" data-level="${l}"`, l)).join("")}</div>
-       <p class="text-xs text-slate-500">รุ่นที่เกี่ยวข้อง (ระบบแปลงจากชั้นที่สอบ): ${escapeHtml(ageGroupsForExamLevels(e.examLevels).join(", ") || "-")}</p>`
-    : `<div class="event-chips">${AGE_OPTIONS.map((g) => chip(e.ageGroups.includes(g), `${at} data-action="toggle-age" data-age="${g}"`, g)).join("")}${chip(AGE_OPTIONS.every((g) => e.ageGroups.includes(g)), `${at} data-action="toggle-age" data-age="${ALL_AGES}"`, ALL_AGES)}</div>`;
-  return `<div class="event-card">
-    <div class="event-card-head"><strong>Event ${i + 1}</strong><button type="button" class="btn btn-ghost-danger btn-sm" data-action="remove-event" ${at}>ลบรายการ</button></div>
+  const kind = kindOfType(e.type);
+  const schedule = kind === "change-day" || kind === "change-time" || kind === "coach-leave";
+  const typeSelect = field("ประเภท", `<select class="field-input" ${at} data-f="type">${options(EVENT_TYPES, e.type, (t) => t.key, (t) => t.label, "เลือกประเภท")}</select>`);
+  const ages = field(kind === "exam" ? "ชั้นที่สอบ (เลือกได้หลายชั้น)" : kind === "coach-leave" ? "รุ่นที่ได้รับผลกระทบ" : "รุ่นที่เกี่ยวข้อง (เลือกได้หลายข้อ)", ageChipsHtml(e, at));
+  const note = field("หมายเหตุ (ไม่บังคับ)", input(at, "note", "text", e.note, 'maxlength="200"'));
+  const head = `<div class="event-card-head"><strong>Event ${i + 1}</strong><button type="button" class="btn btn-ghost-danger btn-sm" data-action="remove-event" ${at}>ลบรายการ</button></div>`;
+  if (schedule) return `<div class="event-card">${head}${typeSelect}${ages}${scheduleFieldsHtml(e, at)}${note}</div>`;
+
+  const matchBlock =
+    kind === "match"
+      ? `${field("จำนวนนัดที่แข่ง", input(at, "matchCount", "number", e.matches.length || "", `min="1" max="${MAX_MATCHES}"`))}
+         ${e.matches.length ? field("วันแข่งแต่ละนัด · ทีมเป็นเหย้า/เยือน · เวลาแข่งขัน", `<div class="event-matches">${e.matches.map((m, mi) => matchRowHtml(i, mi, m)).join("")}</div>`) : ""}`
+      : "";
+  return `<div class="event-card">${head}
+    ${typeSelect}
+    ${field("ชื่อรายการ / กิจกรรม", input(at, "title", "text", e.title, 'maxlength="80"'))}
     <div class="event-grid">
-      ${field("ประเภท", `<select class="field-input" ${at} data-f="type">${options(EVENT_TYPES, e.type, (t) => t.key, (t) => t.label, "เลือกประเภท")}</select>`)}
-      ${field("ชื่อรายการ / กิจกรรม", `<input type="text" class="field-input" ${at} data-f="title" maxlength="80" value="${escapeHtml(e.title)}" />`)}
-      ${field("วันที่เริ่ม", `<input type="date" class="field-input" ${at} data-f="start" value="${escapeHtml(e.start)}" />`)}
-      ${field("วันที่จบ", `<input type="date" class="field-input" ${at} data-f="end" value="${escapeHtml(e.end)}" />`)}
+      ${field("วันที่เริ่ม", input(at, "start", "date", e.start))}
+      ${field("วันที่จบ", input(at, "end", "date", e.end))}
     </div>
-    ${field(exam ? "ชั้นที่สอบ (เลือกได้หลายชั้น)" : "รุ่นที่เกี่ยวข้อง (เลือกได้หลายข้อ)", ageChips)}
+    ${ages}
     <div class="event-grid">
       ${field("ผลต่อการซ้อม", `<select class="field-input" ${at} data-f="impact">${options(IMPACTS, e.impact, (x) => x.key, (x) => x.label, "เลือกผลต่อการซ้อม")}</select>`)}
-      ${e.impact === "partial" ? field("ซ้อมได้กี่นาที", `<input type="number" min="1" max="600" class="field-input" ${at} data-f="practiceMinutes" value="${escapeHtml(e.practiceMinutes)}" />`) + field("ช่วงเวลาไหน", `<select class="field-input" ${at} data-f="practicePeriod">${options(PERIODS, e.practicePeriod, (x) => x, (x) => x, "เลือกช่วงเวลา")}</select>`) : ""}
+      ${e.impact === "partial" ? field("ช่วงเวลาที่ซ้อม · เวลาเริ่ม", input(at, "practiceStart", "time", e.practiceStart)) + field("ช่วงเวลาที่ซ้อม · เวลาจบ", input(at, "practiceEnd", "time", e.practiceEnd)) : ""}
       ${field("นักเตะที่ไม่อยู่", `<select class="field-input" ${at} data-f="awayMode">${options(AWAY_MODES, e.awayMode, (x) => x.key, (x) => x.label)}</select>`)}
-      ${e.awayMode === "some" ? field("จำนวน (คน)", `<input type="number" min="1" max="99" class="field-input" ${at} data-f="awayCount" value="${escapeHtml(e.awayCount)}" />`) : ""}
     </div>
-    ${isMatchType(e.type) ? field("วันแข่งแต่ละนัด · เหย้า / เยือน · เวลาแข่ง", `<div class="event-matches">${e.matches.map((m, mi) => matchRowHtml(i, mi, m)).join("")}<div><button type="button" class="btn btn-secondary btn-sm" data-action="add-match" ${at}>+ เพิ่มนัดแข่ง</button></div></div>`) : ""}
-    ${field("หมายเหตุ (ไม่บังคับ)", `<input type="text" class="field-input" ${at} data-f="note" maxlength="200" value="${escapeHtml(e.note)}" />`)}
+    ${e.awayMode === "some" ? field("เลือกชื่อนักเตะที่ไม่อยู่", awayPickerHtml(i, e)) : ""}
+    ${matchBlock}
+    ${note}
   </div>`;
 }
 
@@ -108,7 +191,7 @@ function renderFill() {
       <button type="button" class="btn btn-primary" data-action="save">บันทึกและส่ง</button>
     </div>
     <div class="text-sm" data-status>${statusHtml}</div>
-    <p class="text-xs text-slate-500">กรอกแล้วแก้ไขได้ภายหลัง ส่งซ้ำจะทับของเดิมของเดือนนี้ — ทีมหลังบ้านและผู้ดูแลระบบเห็นสถานะของทุกทีมในเมนู Event</p>
+    <p class="text-xs text-slate-500">กรอกแล้วแก้ไขได้ตลอดเดือน (เช่น เพิ่มโค้ชลาหรือเปลี่ยนเวลาซ้อม) ส่งซ้ำจะทับของเดิม — ทีมหลังบ้านและผู้ดูแลระบบเห็นวันที่แก้ไขล่าสุดในเมนู Event</p>
   </div>`;
 }
 
@@ -121,12 +204,27 @@ function renderView(model) {
 }
 
 const msg = (text, error = false) => `<span class="${error ? "text-red-600" : "text-slate-500"}">${text}</span>`;
+const docsOf = (snap) => snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+// นักกีฬา/โค้ชของทีม (โหลดครั้งเดียวต่อทีม) — ดึงไม่สำเร็จก็ฟอร์มยังกรอกได้ แค่ไม่มีรายชื่อให้เลือก
+let rosterTeam = "";
+async function loadRoster() {
+  const team = api.team();
+  if (rosterTeam === team) return;
+  const [p, c] = await Promise.all([
+    getDocs(query(collection(db, "players"), where("team", "==", team))).then(docsOf).catch((err) => (console.error(err), [])),
+    getDocs(query(collection(db, "coaches"), where("team", "==", team))).then(docsOf).catch((err) => (console.error(err), []))
+  ]);
+  players = p;
+  coaches = c.filter((x) => x.role === "coach" && x.status === "approved").sort((a, b) => String(a.name).localeCompare(String(b.name), "th"));
+  rosterTeam = team;
+}
 
 async function loadFill() {
   const token = ++loadToken;
   box.innerHTML = '<p class="text-sm text-slate-400">กำลังโหลด...</p>';
   try {
-    const snap = await getDocs(query(collection(db, "monthlyEvents"), where("team", "==", api.team()), where("month", "==", month)));
+    const [snap] = await Promise.all([getDocs(query(collection(db, "monthlyEvents"), where("team", "==", api.team()), where("month", "==", month))), loadRoster()]);
     if (token !== loadToken) return;
     saved = snap.docs[0]?.data() ?? null;
   } catch (err) {
@@ -165,8 +263,10 @@ async function save() {
   try {
     const team = api.team();
     const submittedDate = todayBangkok();
-    await setDoc(doc(db, "monthlyEvents", eventDocId(team, month)), { team, month, ...value, submittedDate, updatedAt: serverTimestamp(), updatedBy: api.uid() });
-    saved = { team, month, ...value, submittedDate };
+    const firstSubmittedDate = saved?.firstSubmittedDate ?? saved?.submittedDate ?? submittedDate; // แก้หลังส่ง = วันที่ส่งครั้งแรกยังคงเดิม ทีมหลังบ้านเห็นวันที่แก้ไขล่าสุด
+    const payload = { team, month, ...value, submittedDate, firstSubmittedDate };
+    await setDoc(doc(db, "monthlyEvents", eventDocId(team, month)), { ...payload, updatedAt: serverTimestamp(), updatedBy: api.uid() });
+    saved = payload;
     draft = formFromDoc(saved);
     statusHtml = msg("บันทึกและส่งแล้ว");
     renderFill();
@@ -178,6 +278,10 @@ async function save() {
 }
 
 const toggle = (list, v) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
+const refreshAwayChips = (i) => {
+  const el = box.querySelector(`[data-away-chips="${i}"]`);
+  if (el) el.innerHTML = awayChipsHtml(i, draft.events[i]);
+};
 
 function onClick(e) {
   const btn = e.target.closest("[data-action]");
@@ -190,18 +294,25 @@ function onClick(e) {
     case "remove-event":
       draft.events.splice(Number(btn.dataset.ev), 1);
       break;
-    case "add-match":
-      ev.matches.push(emptyMatchRow());
-      break;
-    case "remove-match":
-      ev.matches.splice(Number(btn.dataset.m), 1);
-      break;
     case "toggle-age":
       ev.ageGroups = btn.dataset.age === ALL_AGES ? (AGE_OPTIONS.every((g) => ev.ageGroups.includes(g)) ? [] : [...AGE_OPTIONS]) : toggle(ev.ageGroups, btn.dataset.age);
+      ev.awayPlayers = ev.awayPlayers.filter((p) => !p.ageGroup || ev.ageGroups.includes(p.ageGroup)); // รุ่นที่เอาออกแล้ว ไม่เก็บชื่อนักกีฬาของรุ่นนั้น
       break;
     case "toggle-level":
       ev.examLevels = toggle(ev.examLevels, btn.dataset.level);
+      ev.ageGroups = ageGroupsForExamLevels(ev.examLevels);
       break;
+    case "toggle-change":
+      ev.changes = toggle(ev.changes, btn.dataset.change);
+      break;
+    case "remove-away": {
+      ev.awayPlayers = ev.awayPlayers.filter((p) => p.id !== btn.dataset.pid);
+      ev.awayCount = ev.awayPlayers.length || "";
+      refreshAwayChips(Number(btn.dataset.ev));
+      const cb = [...box.querySelectorAll('[data-f="awayPlayer"]')].find((c) => c.dataset.ev === btn.dataset.ev && c.dataset.pid === btn.dataset.pid);
+      if (cb) cb.checked = false;
+      return;
+    }
     case "save":
       save();
       return;
@@ -212,7 +323,14 @@ function onClick(e) {
   renderFill();
 }
 
-// ช่องกรอกอัปเดต draft ทันที (ไม่วาดใหม่ระหว่างพิมพ์) — วาดใหม่เฉพาะเมื่อฟอร์มเปลี่ยนรูป (ประเภท/ผลต่อการซ้อม/นักเตะไม่อยู่/ไม่มี Event)
+function setMatchCount(ev, raw) {
+  const n = Math.max(0, Math.min(MAX_MATCHES, Math.floor(Number(raw)) || 0));
+  while (ev.matches.length < n) ev.matches.push(emptyMatchRow());
+  ev.matches.length = n;
+}
+
+// ช่องกรอกอัปเดต draft ทันที (ไม่วาดใหม่ระหว่างพิมพ์) — วาดใหม่เฉพาะเมื่อฟอร์มเปลี่ยนรูป (ประเภท/ผลต่อการซ้อม/นักเตะไม่อยู่/ผู้ฝึกสอนแทน/จำนวนนัด/ไม่มี Event)
+const RESHAPE = new Set(["type", "impact", "awayMode", "substitute"]);
 function onField(e) {
   const t = e.target;
   const f = t.dataset.f;
@@ -225,6 +343,11 @@ function onField(e) {
     return;
   }
   if (api.mode() !== "fill") return;
+  if (f === "awaySearch") {
+    const q = t.value.trim().toLowerCase();
+    for (const row of box.querySelectorAll(`[data-player-list="${t.dataset.ev}"] .event-player`)) row.hidden = q !== "" && !row.dataset.search.includes(q);
+    return;
+  }
   if (f === "noEvent") {
     draft.noEvent = t.checked;
     renderFill();
@@ -235,14 +358,37 @@ function onField(e) {
     return;
   }
   const ev = draft.events[Number(t.dataset.ev)];
+  if (f === "awayPlayer") {
+    const p = players.find((x) => x.id === t.dataset.pid);
+    ev.awayPlayers = t.checked ? [...ev.awayPlayers.filter((x) => x.id !== t.dataset.pid), { id: p.id, name: playerName(p), ageGroup: p.ageGroup }] : ev.awayPlayers.filter((x) => x.id !== t.dataset.pid);
+    ev.awayCount = ev.awayPlayers.length || "";
+    refreshAwayChips(Number(t.dataset.ev));
+    return;
+  }
   if (t.dataset.m !== undefined) {
     ev.matches[Number(t.dataset.m)][f] = t.value;
     return;
   }
+  if (f === "matchCount") {
+    if (e.type !== "change") return;
+    setMatchCount(ev, t.value);
+    statusHtml = "";
+    renderFill();
+    return;
+  }
+  if (f === "coachId") {
+    ev.coachId = t.value;
+    ev.coachName = coaches.find((c) => c.id === t.value)?.name ?? ev.coachName;
+    return;
+  }
   ev[f] = t.value;
-  if (e.type === "change" && (f === "type" || f === "impact" || f === "awayMode")) {
-    if (f === "type" && isExamType(t.value)) ev.ageGroups = [];
-    if (f === "type" && isMatchType(t.value) && ev.matches.length === 0) ev.matches.push(emptyMatchRow());
+  if (e.type === "change" && RESHAPE.has(f)) {
+    if (f === "type") {
+      const kind = kindOfType(t.value);
+      if (kind === "exam") ev.ageGroups = [];
+      if (kind === "match" && ev.matches.length === 0) ev.matches.push(emptyMatchRow());
+      if (kind !== "coach-leave") ev.coachId = ev.coachName = "";
+    }
     statusHtml = "";
     renderFill();
   }

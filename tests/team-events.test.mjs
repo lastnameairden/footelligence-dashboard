@@ -20,7 +20,7 @@ import {
   validateEventForm
 } from "../js/team-events.js";
 
-const goodMatch = () => ({ ...emptyEvent(), type: "official", title: "ฟุตบอลเยาวชนจังหวัด", ageGroups: ["U15", "U16"], start: "2026-11-08", end: "2026-11-09", impact: "partial", practiceMinutes: "60", practicePeriod: "เย็น", awayMode: "some", awayCount: "12", matches: [{ date: "2026-11-08", venue: "เหย้า", time: "15:00" }] });
+const goodMatch = () => ({ ...emptyEvent(), type: "official", title: "ฟุตบอลเยาวชนจังหวัด", ageGroups: ["U15", "U16"], start: "2026-11-08", end: "2026-11-09", impact: "partial", practiceStart: "16:00", practiceEnd: "17:30", awayMode: "some", awayPlayers: [{ id: "p1", name: "ต้นกล้า", ageGroup: "U15" }, { id: "p2", name: "ภูมิ", ageGroup: "U16" }], matches: [{ date: "2026-11-08", venue: "เหย้า", time: "15:00" }, { date: "2026-11-09", venue: "เยือน", time: "09:30" }] });
 const form = (over = {}) => ({ noEvent: false, contactName: "โค้ชบอม", contactPhone: "081-234-5678", events: [goodMatch()], ...over });
 
 test("months: default switches to next month from the 15th, due date is the 25th of the month before", () => {
@@ -80,7 +80,9 @@ test("validate: a complete match event passes and is normalised", () => {
   assert.deepEqual(errors, []);
   assert.equal(value.contactPhone, "0812345678");
   const e = value.events[0];
-  assert.deepEqual([e.practiceMinutes, e.practicePeriod, e.awayCount, e.awayMode], [60, "เย็น", 12, "some"]);
+  assert.deepEqual([e.practiceStart, e.practiceEnd, e.awayCount, e.awayMode], ["16:00", "17:30", 2, "some"]);
+  assert.deepEqual(e.awayPlayers.map((p) => p.name), ["ต้นกล้า", "ภูมิ"]);
+  assert.equal(e.matches.length, 2);
   assert.deepEqual(e.ageGroups, ["U15", "U16"]);
   assert.equal(JSON.stringify(value).includes("undefined"), false);
 });
@@ -100,8 +102,11 @@ test("validate: header and event problems are reported with the event number", (
   const errors = validateEventForm(form({ events: [goodMatch(), bad] })).errors;
   assert.ok(errors.length >= 4 && errors.every((e) => e.startsWith("Event 2")), errors.join("|"));
   assert.ok(validateEventForm(form({ events: [{ ...goodMatch(), end: "2026-11-01" }] })).errors.some((e) => e.includes("วันที่จบ")));
-  assert.ok(validateEventForm(form({ events: [{ ...goodMatch(), practiceMinutes: "" }] })).errors.some((e) => e.includes("นาที")));
-  assert.ok(validateEventForm(form({ events: [{ ...goodMatch(), awayCount: "0" }] })).errors.some((e) => e.includes("จำนวน")));
+  assert.ok(validateEventForm(form({ events: [{ ...goodMatch(), practiceEnd: "15:00" }] })).errors.some((e) => e.includes("เวลาจบต้องหลังเวลาเริ่ม")));
+  assert.ok(validateEventForm(form({ events: [{ ...goodMatch(), practiceStart: "" }] })).errors.some((e) => e.includes("ช่วงเวลาที่ซ้อม")));
+  assert.ok(validateEventForm(form({ events: [{ ...goodMatch(), awayPlayers: [], awayCount: "" }] })).errors.some((e) => e.includes("เลือกชื่อนักเตะ")));
+  // ข้อมูลเดิมที่ระบุเป็นจำนวน ยังบันทึกซ้ำได้
+  assert.equal(validateEventForm(form({ events: [{ ...goodMatch(), awayPlayers: [], awayCount: "5" }] })).value.events[0].awayCount, 5);
   assert.ok(validateEventForm(form({ events: [{ ...goodMatch(), title: "<b>x</b>" }] })).errors.some((e) => e.includes("<")));
   assert.ok(validateEventForm(form({ events: [{ ...goodMatch(), matches: [{ date: "2026-11-08", venue: "เหย้า", time: "25:00" }] }] })).errors.some((e) => e.includes("เวลา")));
 });
@@ -156,4 +161,62 @@ test("overview html escapes team/event text", () => {
   const html = overviewHtml(overviewModel({ teams: ["T"], month: "2026-11", docs }));
   assert.equal(html.includes("<script>"), false);
   assert.equal(html.includes("<img src=x"), false);
+});
+
+const base = (type, over = {}) => ({ ...emptyEvent(), type, ageGroups: ["U15", "U16"], ...over });
+
+test("change day: needs old and new date and a reason; title is generated; no impact/title required", () => {
+  const ok = { oldDate: "2026-11-12", newDate: "2026-11-13", reason: "สนามไม่ว่าง" };
+  const r = validateEventForm(form({ events: [base("change-day", ok)] }));
+  assert.deepEqual(r.errors, []);
+  const e = r.value.events[0];
+  assert.deepEqual([e.start, e.end, e.impact, e.awayMode], ["2026-11-12", "2026-11-12", "", "none"]);
+  assert.equal(e.title, "เปลี่ยนวันซ้อม 12 พ.ย. → 13 พ.ย.");
+  assert.ok(validateEventForm(form({ events: [base("change-day", { ...ok, newDate: "2026-11-12" })] })).errors.some((m) => m.includes("ไม่ใช่วันซ้อมเดิม")));
+  assert.ok(validateEventForm(form({ events: [base("change-day", { ...ok, reason: "" })] })).errors.some((m) => m.includes("เหตุผล")));
+  assert.ok(validateEventForm(form({ events: [base("change-day", { ...ok, oldDate: "" })] })).errors.some((m) => m.includes("วันซ้อมเดิม")));
+});
+
+test("change time: both time ranges must be valid with end after start", () => {
+  const ok = { start: "2026-11-17", end: "2026-11-21", oldStart: "16:00", oldEnd: "18:00", newStart: "15:00", newEnd: "16:30" };
+  const r = validateEventForm(form({ events: [base("change-time", ok)] }));
+  assert.deepEqual(r.errors, []);
+  assert.equal(r.value.events[0].title, "เปลี่ยนเวลาซ้อม 16:00–18:00 → 15:00–16:30");
+  assert.ok(validateEventForm(form({ events: [base("change-time", { ...ok, newEnd: "14:00" })] })).errors.some((m) => m.includes("เวลาซ้อมใหม่")));
+  assert.ok(validateEventForm(form({ events: [base("change-time", { ...ok, oldStart: "" })] })).errors.some((m) => m.includes("เวลาซ้อมเดิม")));
+});
+
+test("coach leave: with a substitute only the name is needed, without one a requested change and detail are", () => {
+  const leave = { coachId: "c1", coachName: "โค้ชบอม", start: "2026-11-24", end: "2026-11-25" };
+  const withSub = validateEventForm(form({ events: [base("coach-leave", { ...leave, substitute: "yes", substituteName: "โค้ชต้น" })] }));
+  assert.deepEqual(withSub.errors, []);
+  assert.deepEqual([withSub.value.events[0].changes, withSub.value.events[0].changeDetail], [[], ""]);
+  assert.equal(withSub.value.events[0].title, "โค้ชบอม ไม่อยู่ซ้อม");
+  assert.ok(validateEventForm(form({ events: [base("coach-leave", { ...leave, substitute: "yes", substituteName: "" })] })).errors.some((m) => m.includes("ผู้ฝึกสอนแทน")));
+  const noSub = { ...leave, substitute: "none", changes: ["งดซ้อม", "bad"], changeDetail: "งดซ้อม 2 วัน" };
+  const r = validateEventForm(form({ events: [base("coach-leave", noSub)] }));
+  assert.deepEqual(r.errors, []);
+  assert.deepEqual(r.value.events[0].changes, ["งดซ้อม"]);
+  assert.ok(validateEventForm(form({ events: [base("coach-leave", { ...noSub, changes: [] })] })).errors.some((m) => m.includes("สิ่งที่ต้องการเปลี่ยนแปลง")));
+  assert.ok(validateEventForm(form({ events: [base("coach-leave", { ...noSub, changeDetail: "" })] })).errors.some((m) => m.includes("รายละเอียด")));
+  assert.ok(validateEventForm(form({ events: [base("coach-leave", { ...noSub, coachName: "" })] })).errors.some((m) => m.includes("เลือกโค้ช")));
+});
+
+test("matches: the number of matches decides the rows, each needs a date; partial practice shows a time range", () => {
+  assert.ok(validateEventForm(form({ events: [{ ...goodMatch(), matches: [] }] })).errors.some((m) => m.includes("จำนวนนัด")));
+  assert.ok(validateEventForm(form({ events: [{ ...goodMatch(), matches: [{ date: "", venue: "เหย้า", time: "" }] }] })).errors.some((m) => m.includes("วันแข่ง")));
+  const html = overviewHtml(overviewModel({ teams: ["T"], month: "2026-11", docs: [{ team: "T", month: "2026-11", contactName: "x", events: [validateEventForm(form()).value.events[0]] }] }));
+  assert.ok(html.includes("2 นัด") && html.includes("ซ้อม 16:00–17:30 น.") && html.includes("นักเตะที่ไม่อยู่: ต้นกล้า, ภูมิ"));
+});
+
+test("overview shows the badge per change type and the last edited date after a re-send", () => {
+  const events = [
+    validateEventForm(form({ events: [base("coach-leave", { coachName: "โค้ชบอม", start: "2026-11-24", end: "2026-11-24", substitute: "none", changes: ["งดซ้อม"], changeDetail: "งดซ้อม" })] })).value.events[0],
+    validateEventForm(form({ events: [base("change-day", { oldDate: "2026-11-12", newDate: "2026-11-13", reason: "สนามไม่ว่าง" })] })).value.events[0]
+  ];
+  const html = overviewHtml(overviewModel({ teams: ["T"], month: "2026-11", docs: [{ team: "T", month: "2026-11", contactName: "x", submittedDate: "2026-11-05", firstSubmittedDate: "2026-10-24", events }] }));
+  assert.ok(html.includes("งดซ้อม") && html.includes("เปลี่ยนวันซ้อม") && html.includes("ไม่มีผู้ฝึกสอนแทน"));
+  assert.ok(html.includes("ส่ง 24 ต.ค. · แก้ไขล่าสุด 5 พ.ย."));
+  const once = overviewHtml(overviewModel({ teams: ["T"], month: "2026-11", docs: [{ team: "T", month: "2026-11", contactName: "x", submittedDate: "2026-10-24", firstSubmittedDate: "2026-10-24", events }] }));
+  assert.equal(once.includes("แก้ไขล่าสุด"), false);
 });
