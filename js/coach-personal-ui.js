@@ -2,9 +2,11 @@
 // โค้ชแก้ได้เฉพาะ 5 ฟิลด์นี้ในเอกสารของตัวเอง (กฎ Firestore coaches update) แอดมินที่สวมบทบาทโค้ชคนนั้นแก้ให้ได้เหมือนกัน
 // ฟอร์มสร้างด้วย JS จึงอ้างอิง element ผ่าน querySelector ใน container ไม่ใช้ id
 import { doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
-import { deleteObject, getDownloadURL, ref as storageRef, uploadBytes } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-storage.js";
+import { deleteObject, ref as storageRef } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-storage.js";
 import { db, storage } from "./firebase-init.js";
 import { escapeHtml, safeHttpUrl, teamLogoFallbackHtml } from "./ui-utils.js";
+import { photoPathsOf } from "./photo-src.js";
+import { uploadPhotoWithThumb } from "./photo-upload.js";
 import { COACH_CERTIFICATES, COACH_FULLNAME_MAX, COACH_OTHER_CERT_MAX, parseCoachPersonal, splitCertificates } from "./coach-card.js";
 
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024; // ต้องตรงกับ storage.rules (coachPhotos)
@@ -55,18 +57,16 @@ function setStatus(text, isError = false) {
 
 async function uploadPhoto(file, coachId) {
   const safeName = file.name.replace(/[^\w.\-]/g, "_");
-  const path = `coachPhotos/${coachId}/${Date.now()}_${safeName}`;
-  const fileRef = storageRef(storage, path);
-  await uploadBytes(fileRef, file);
-  return { url: await getDownloadURL(fileRef), path };
+  return uploadPhotoWithThumb(file, `coachPhotos/${coachId}/${Date.now()}_${safeName}`); // รูปต้นฉบับครบ + รูปย่อไว้ใช้ในการ์ด
 }
 
-async function deleteOldPhoto(path) {
-  if (!path) return;
-  try {
-    await deleteObject(storageRef(storage, path));
-  } catch (err) {
-    console.warn("ลบรูปเดิมใน Storage ไม่สำเร็จ (ไม่บล็อกการบันทึก):", err);
+async function deleteOldPhoto(paths) {
+  for (const path of paths) {
+    try {
+      await deleteObject(storageRef(storage, path));
+    } catch (err) {
+      console.warn("ลบรูปเดิมใน Storage ไม่สำเร็จ (ไม่บล็อกการบันทึก):", err);
+    }
   }
 }
 
@@ -86,7 +86,7 @@ async function save() {
   if (file && !file.type.startsWith("image/")) return setStatus("รองรับเฉพาะไฟล์รูปภาพเท่านั้น", true);
   const saveBtn = container.querySelector("[data-save]");
   saveBtn.disabled = true;
-  const oldPath = coach.photoPath ?? null;
+  const oldPaths = photoPathsOf(coach);
   try {
     const payload = { ...value };
     if (file) {
@@ -94,14 +94,18 @@ async function save() {
       const uploaded = await uploadPhoto(file, coach.id);
       payload.photoUrl = uploaded.url;
       payload.photoPath = uploaded.path;
+      payload.photoThumbUrl = uploaded.thumbUrl;
+      payload.photoThumbPath = uploaded.thumbPath;
     } else if (removePhoto) {
       payload.photoUrl = null;
       payload.photoPath = null;
+      payload.photoThumbUrl = null;
+      payload.photoThumbPath = null;
     }
     setStatus("กำลังบันทึก...");
     await updateDoc(doc(db, "coaches", coach.id), payload);
     Object.assign(coach, payload);
-    if (file || removePhoto) await deleteOldPhoto(oldPath);
+    if (file || removePhoto) await deleteOldPhoto(oldPaths);
     removePhoto = false;
     render();
     setStatus("บันทึกแล้ว");

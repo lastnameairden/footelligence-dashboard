@@ -79,10 +79,13 @@ service cloud.firestore {
                         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['permissions', 'email']))
                     || (request.auth.uid == coachId
                         && isApproved()
-                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fullName', 'phone', 'certificates', 'photoUrl', 'photoPath'])
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fullName', 'phone', 'certificates', 'photoUrl', 'photoPath', 'photoThumbUrl', 'photoThumbPath'])
                         && optText('fullName', 80)
                         && optText('phone', 15)
                         && optText('photoPath', 200)
+                        && optText('photoThumbPath', 200)
+                        && (!('photoThumbUrl' in request.resource.data) || request.resource.data.photoThumbUrl == null
+                            || (request.resource.data.photoThumbUrl is string && request.resource.data.photoThumbUrl.size() <= 600 && request.resource.data.photoThumbUrl.matches('https://.*')))
                         && (!('certificates' in request.resource.data) || request.resource.data.certificates == null
                             || (request.resource.data.certificates is list && request.resource.data.certificates.size() <= 8))
                         && (!('photoUrl' in request.resource.data) || request.resource.data.photoUrl == null

@@ -96,6 +96,8 @@ import { clearEmbedded, showEmbedded } from "./embed-frame.js";
 import { athleteResultsNotification, fitnessRoundNotification, unreadNotesNotification } from "./coach-notifications.js";
 import { initResults, showResults } from "./injury-results-ui.js";
 import { initTeamEvents, showTeamEvents } from "./team-events-ui.js";
+import { photoPathsOf, photoSrc } from "./photo-src.js";
+import { uploadPhotoWithThumb } from "./photo-upload.js";
 import { bangkokStamp, deadlineLabel, eventReminder, monthLabel as eventMonthLabel } from "./team-events.js";
 import { ageGroupsOf, birthYearLabel, birthdayLabel, filterAndSortPlayers, playerDisplayName } from "./player-gallery.js";
 import { STAFF_PERMISSIONS, canAccessAdminFeature, normalizePermissions, permissionsSummary, staffCan, staffLandingFeature } from "./staff-perms.js";
@@ -461,6 +463,7 @@ const MAX_PLAYER_PHOTO_SIZE = 5 * 1024 * 1024; // ต้องตรงกับ
 // ของเดิมคืออะไร (โชว์รูปเดิมไว้จนกว่าจะอัปโหลดรูปใหม่ทับหรือกดลบ) เหมือนแพทเทิร์นไฟล์แนบแผนการฝึกซ้อม
 let playerExistingPhotoUrl = null;
 let playerExistingPhotoPath = null;
+let playerExistingThumbPath = null;
 let playerRemoveExistingPhoto = false;
 
 // อัปโหลดรูปนักกีฬาขึ้น Storage แล้วคืน {url, path} — path ใช้ team+timestamp กันชื่อไฟล์ชนกัน ไม่ใช้ playerId
@@ -468,10 +471,7 @@ let playerRemoveExistingPhoto = false;
 async function uploadPlayerPhoto(file, team) {
   const safeName = file.name.replace(/[^\w.\-ก-๙]/g, "_");
   const filePath = `players/${team}/${Date.now()}_${safeName}`;
-  const fileRef = storageRef(storage, filePath);
-  await uploadBytes(fileRef, file);
-  const url = await getDownloadURL(fileRef);
-  return { url, path: filePath };
+  return uploadPhotoWithThumb(file, filePath); // เก็บรูปต้นฉบับครบ + รูปย่อไว้ใช้แสดงในการ์ด
 }
 
 // แสดงสถานะรูปนักกีฬาปัจจุบันใต้ช่องเลือกไฟล์ — ของเดิม (ถ้ามีและยังไม่ถูกลบ) จะมีรูปตัวอย่าง + ปุ่ม "ลบรูป"
@@ -4507,14 +4507,18 @@ async function loadPlayers() {
 // ---------- Player Data (เมนู 2): แกลเลอรี → รายละเอียดรายคน → เพิ่ม/แก้ไข/ลบ ----------
 // โค้ชเห็นเฉพาะนักกีฬาที่ loadPlayers() กรองให้แล้ว (รุ่นอายุ + ตำแหน่งตามที่รับผิดชอบ)
 let galleryAgeGroup = "all";
+// แกลเลอรีแสดงทีละ 24 คน แล้วกด "แสดงเพิ่ม" — ไม่ขอรูปของทั้งทีมพร้อมกัน (ทีมหนึ่งมีนักกีฬาหลายสิบคน)
+const GALLERY_PAGE_SIZE = 24;
+let galleryShown = GALLERY_PAGE_SIZE;
 let detailPlayerId = null;
 
 function playerPhotoHtml(p) {
-  const src = safeHttpUrl(p.photoUrl);
-  return src ? `<img src="${src}" alt="" loading="lazy" />` : teamLogoFallbackHtml(p.team) || icon("user");
+  const src = photoSrc(p); // รูปย่อถ้ามี (รูปเก่าก่อนมีรูปย่อใช้รูปเต็ม)
+  return src ? `<img src="${src}" alt="" loading="lazy" decoding="async" />` : teamLogoFallbackHtml(p.team) || icon("user");
 }
 
 function openPlayerGallery(message = "") {
+  galleryShown = GALLERY_PAGE_SIZE;
   hideAllScreens();
   playerGallerySection.classList.remove("hidden");
   playerGalleryStatus.textContent = message;
@@ -4553,9 +4557,11 @@ function renderPlayerGallery() {
       : "";
   const list = filterAndSortPlayers(players, { ageGroup: galleryAgeGroup, query: playerGallerySearch.value, sort: playerGallerySort.value });
   playerGalleryCount.textContent = `${groups.length > 0 ? `${groups.join(" · ")} · ` : ""}${list.length} คน`;
+  const more = list.length - galleryShown;
   playerGalleryGrid.innerHTML =
     list.length > 0
-      ? list.map(playerCardHtml).join("")
+      ? list.slice(0, galleryShown).map(playerCardHtml).join("") +
+        (more > 0 ? `<div style="grid-column:1/-1" class="text-center"><button type="button" class="btn btn-secondary" data-gallery-more>แสดงเพิ่ม (เหลืออีก ${more} คน)</button></div>` : "")
       : `<div class="card card-pad text-center text-slate-500" style="grid-column:1/-1">${players.length === 0 ? "ยังไม่มีนักกีฬาในความดูแล — กด \"+ เพิ่มนักกีฬา\" เพื่อเริ่มต้น" : "ไม่พบนักกีฬาตามเงื่อนไขที่เลือก"}</div>`;
 }
 
@@ -4563,11 +4569,21 @@ playerGalleryChips.addEventListener("click", (e) => {
   const btn = e.target.closest("[data-gallery-group]");
   if (!btn) return;
   galleryAgeGroup = btn.dataset.galleryGroup;
+  galleryShown = GALLERY_PAGE_SIZE;
   renderPlayerGallery();
 });
-playerGallerySearch.addEventListener("input", renderPlayerGallery);
-playerGallerySort.addEventListener("change", renderPlayerGallery);
+const restartGallery = () => {
+  galleryShown = GALLERY_PAGE_SIZE;
+  renderPlayerGallery();
+};
+playerGallerySearch.addEventListener("input", restartGallery);
+playerGallerySort.addEventListener("change", restartGallery);
 playerGalleryGrid.addEventListener("click", (e) => {
+  if (e.target.closest("[data-gallery-more]")) {
+    galleryShown += GALLERY_PAGE_SIZE;
+    renderPlayerGallery();
+    return;
+  }
   const card = e.target.closest("[data-player-id]");
   if (card) openPlayerDetail(card.dataset.playerId);
 });
@@ -4707,6 +4723,7 @@ function startEditPlayer(p) {
   playerPhotoInput.value = "";
   playerExistingPhotoUrl = p.photoUrl ?? null;
   playerExistingPhotoPath = p.photoPath ?? null;
+  playerExistingThumbPath = p.photoThumbPath ?? null;
   playerRemoveExistingPhoto = false;
   renderPlayerPhotoStatus();
   addPlayerSubmitBtn.textContent = "บันทึกการแก้ไข";
@@ -4723,6 +4740,7 @@ function stopEditPlayer() {
   applyAgeGroupLock();
   playerExistingPhotoUrl = null;
   playerExistingPhotoPath = null;
+  playerExistingThumbPath = null;
   playerRemoveExistingPhoto = false;
   renderPlayerPhotoStatus();
   addPlayerSubmitBtn.textContent = "เพิ่มนักกีฬา";
@@ -4737,7 +4755,7 @@ async function deletePlayer(p) {
   try {
     await deleteDoc(doc(db, "players", p.id));
     // ลบรูปนักกีฬาใน Storage ทิ้งด้วยแบบ best-effort กันไฟล์ค้าง (ไม่บล็อกการลบเอกสารหลักถ้าลบรูปไม่สำเร็จ)
-    await deleteStorageFileBestEffort(p.photoPath);
+    for (const path of photoPathsOf(p)) await deleteStorageFileBestEffort(path);
     if (editingPlayerId === p.id) stopEditPlayer();
     await loadPlayers();
     openPlayerGallery(`ลบ "${p.nickname ?? p.fullName}" แล้ว`);
@@ -4855,6 +4873,7 @@ addPlayerForm.addEventListener("submit", async (e) => {
 
   addPlayerSubmitBtn.disabled = true;
   const oldPhotoPath = playerExistingPhotoPath;
+  const oldThumbPath = playerExistingThumbPath;
   try {
     if (selectedPhoto) {
       addPlayerStatus.textContent = "กำลังอัปโหลดรูป...";
@@ -4862,9 +4881,13 @@ addPlayerForm.addEventListener("submit", async (e) => {
       const uploaded = await uploadPlayerPhoto(selectedPhoto, myTeam);
       payload.photoUrl = uploaded.url;
       payload.photoPath = uploaded.path;
+      payload.photoThumbUrl = uploaded.thumbUrl;
+      payload.photoThumbPath = uploaded.thumbPath;
     } else if (playerRemoveExistingPhoto) {
       payload.photoUrl = null;
       payload.photoPath = null;
+      payload.photoThumbUrl = null;
+      payload.photoThumbPath = null;
     }
     // ถ้าไม่ได้เลือกรูปใหม่และไม่ได้กดลบรูปเดิม จะไม่ใส่ photoUrl/photoPath ใน payload เลย — updateDoc เป็น
     // partial update จึงไม่แตะฟิลด์เดิม รูปที่เพิ่มไว้ก่อนหน้ายังอยู่ครบตามเดิม
@@ -4884,6 +4907,7 @@ addPlayerForm.addEventListener("submit", async (e) => {
       applyAgeGroupLock();
       playerExistingPhotoUrl = null;
       playerExistingPhotoPath = null;
+      playerExistingThumbPath = null;
       playerRemoveExistingPhoto = false;
       renderPlayerPhotoStatus();
       addPlayerStatus.innerHTML = `เพิ่ม "${escapeHtml(nickname)}" สำเร็จ ${icon("check")}${escapeHtml(birthdayCorrectedNote)}`;
@@ -4891,8 +4915,8 @@ addPlayerForm.addEventListener("submit", async (e) => {
     }
 
     // ลบรูปเก่าทิ้งแบบ best-effort หลังบันทึกสำเร็จแล้วเท่านั้น (เฉพาะตอนถูกแทนที่ด้วยรูปใหม่ หรือถูกลบทิ้ง)
-    if (oldPhotoPath && (selectedPhoto || payload.photoPath === null)) {
-      await deleteStorageFileBestEffort(oldPhotoPath);
+    if (selectedPhoto || payload.photoPath === null) {
+      for (const path of [oldPhotoPath, oldThumbPath]) if (path) await deleteStorageFileBestEffort(path);
     }
 
     await loadPlayers();
