@@ -1115,9 +1115,6 @@ function renderDrawerItemsInner() {
       // เข้าถึงได้จากลิ้นชัก ☰ ของหน้าเลือกทีม (กด "เปลี่ยนทีม")
       appendCoachMenuToDrawer();
       navDrawerItems.appendChild(drawerDivider());
-      if (adminSpace()) {
-        navDrawerItems.appendChild(drawerItem(icon("bar-chart"), "Dashboard ของทีม", () => TOOL_OPENERS["team-dashboard"]()));
-      }
       // แอดมินที่ดูในมุมมองผู้บริหาร: ทางกลับ (หน้าทีมเดิมถ้ามาจากหน้าทีม ไม่งั้นแผงผู้ดูแล)
       if (execSpace()) {
         navDrawerItems.appendChild(drawerItem(icon("shield"), returnToTeamSpace ? "กลับหน้าทีม" : "กลับแผงควบคุมผู้ดูแลระบบ", exitTeamManagementToAdminPanel));
