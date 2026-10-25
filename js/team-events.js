@@ -259,7 +259,22 @@ export function eventRowsHtml(events) {
 const tile = (label, value, tone = "") =>
   `<div class="admin-home-tile${tone ? ` admin-home-tile-${tone}` : ""}"><span class="admin-home-tile-label">${escapeHtml(label)}</span><span class="admin-home-tile-value">${value}</span></div>`;
 
+// โรงเรียนเดียว (หน้าทีมของทีมหลังบ้าน/แอดมิน): แสดงเฉพาะข้อมูลของโรงเรียนที่เลือก ไม่มีสรุปรวมทุกทีม
+const SINGLE_NOTE = { none: "โรงเรียนนี้ยังไม่ส่ง Event ของเดือนนี้", "no-event": "โรงเรียนนี้แจ้งว่าเดือนนี้ไม่มี Event" };
+function singleTeamHtml(model) {
+  const r = model.rows[0];
+  const [cls, label] = STATUS_BADGE[r.status];
+  const when = r.status === "none" || !r.submittedDate ? "" : ` <span class="text-xs text-slate-500">${escapeHtml(dateLabel(r.submittedDate))}</span>`;
+  const who = r.contactName ? `<p class="text-sm text-slate-500">ผู้กรอก: ${escapeHtml(r.contactName)}${r.contactPhone ? ` · ${escapeHtml(formatPhone(r.contactPhone))}` : ""}</p>` : "";
+  const body = r.status === "submitted" ? eventRowsHtml(r.events) : `<p class="text-sm text-slate-500">${SINGLE_NOTE[r.status]}</p>`;
+  return `<div class="card card-pad space-y-3">
+    <div class="flex items-center justify-between flex-wrap gap-2"><h3 class="section-title">${escapeHtml(r.team)} · Event ประจำเดือน${escapeHtml(monthLabel(model.month))}</h3><span><span class="badge ${cls}">${label}</span>${when}</span></div>
+    ${who}${body}
+  </div>`;
+}
+
 export function overviewHtml(model) {
+  if (model.rows.length === 1) return singleTeamHtml(model);
   const { rows, summary: s } = model;
   const tiles = `<div class="admin-home-tiles">${tile("ส่งแล้ว", `${s.submitted} / ${s.total}`, s.submitted === s.total ? "ok" : "")}${tile("ไม่มี Event", String(s.noEvent))}${tile("ยังไม่กรอก", String(s.missing), s.missing > 0 ? "bad" : "ok")}</div>`;
   const table = rows

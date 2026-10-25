@@ -29,7 +29,7 @@ import {
   validateEventForm
 } from "./team-events.js";
 
-// api = { mode() = "fill" | "view", team() = ทีมของโค้ช, teams() = ทุกทีมที่ต้องแสดงในโหมดดู, coach() = { name, phone } ค่าตั้งต้นของผู้กรอก, uid() }
+// api = { mode() = "fill" | "view", team() = ทีมของโค้ช / ทีมที่เปิดดูอยู่ (โหมดดูแสดงเฉพาะโรงเรียนนี้), coach() = { name, phone } ค่าตั้งต้นของผู้กรอก, uid() }
 let api = null;
 let box = null;
 let month = "";
@@ -114,7 +114,7 @@ function renderView(model) {
   box.innerHTML = `<div class="card card-pad flex items-center gap-3 flex-wrap">
       <label class="field-label mb-0">เดือน</label>
       <select class="field-input" style="width:auto" data-f="month">${options(monthOptions(todayBangkok()), month, (m) => m, monthLabel)}</select>
-      <p class="text-sm text-slate-500">ดูอย่างเดียว · โค้ชของแต่ละโรงเรียนเป็นผู้กรอก</p>
+      <p class="text-sm text-slate-500">ดูอย่างเดียว · โค้ชของโรงเรียนเป็นผู้กรอก</p>
     </div>${overviewHtml(model)}`;
 }
 
@@ -142,9 +142,9 @@ async function loadView() {
   const token = ++loadToken;
   box.innerHTML = '<p class="text-sm text-slate-400">กำลังโหลด...</p>';
   try {
-    const snap = await getDocs(query(collection(db, "monthlyEvents"), where("month", "==", month)));
+    const snap = await getDocs(query(collection(db, "monthlyEvents"), where("team", "==", api.team()), where("month", "==", month)));
     if (token !== loadToken) return;
-    renderView(overviewModel({ teams: api.teams(), month, docs: snap.docs.map((d) => d.data()) }));
+    renderView(overviewModel({ teams: [api.team()], month, docs: snap.docs.map((d) => d.data()) }));
   } catch (err) {
     console.error(err);
     if (token === loadToken) box.innerHTML = `<div class="card card-pad text-sm text-red-600">โหลดข้อมูล Event ไม่สำเร็จ: ${escapeHtml(err.message)}</div>`;

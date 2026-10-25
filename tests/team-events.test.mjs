@@ -1,4 +1,4 @@
-﻿import { test } from "node:test";
+import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   ageGroupForLevel,
@@ -104,6 +104,19 @@ test("overview: every team listed, missing teams are visible, other months ignor
   const html = overviewHtml(m);
   assert.ok(html.includes("ยังไม่กรอก") && html.includes("ไม่มี Event") && html.includes("ส่งแล้ว"));
   assert.equal(/NaN|undefined|null/.test(html), false);
+});
+
+test("single-team overview shows only that school: status, contact, its events, no all-team tiles", () => {
+  const docs = [
+    { team: "THAWEE SC", month: "2026-11", noEvent: false, contactName: "โค้ชบอม", contactPhone: "0812345678", submittedDate: "2026-10-24", events: [goodMatch()] },
+    { team: "THAMMASATHIT", month: "2026-11", noEvent: false, contactName: "คนอื่น", events: [{ ...goodMatch(), title: "ของทีมอื่น" }] }
+  ];
+  const own = overviewHtml(overviewModel({ teams: ["THAWEE SC"], month: "2026-11", docs }));
+  assert.ok(own.includes("THAWEE SC") && own.includes("ฟุตบอลเยาวชนจังหวัด") && own.includes("โค้ชบอม"));
+  assert.equal(own.includes("THAMMASATHIT") || own.includes("ของทีมอื่น") || own.includes("admin-home-tiles"), false);
+  assert.ok(overviewHtml(overviewModel({ teams: ["KHAMPHEE FOOTBALL"], month: "2026-11", docs })).includes("ยังไม่ส่ง Event"));
+  const none = [{ team: "THAWEE SC", month: "2026-11", noEvent: true, contactName: "x", events: [] }];
+  assert.ok(overviewHtml(overviewModel({ teams: ["THAWEE SC"], month: "2026-11", docs: none })).includes("ไม่มี Event"));
 });
 
 test("overview html escapes team/event text", () => {

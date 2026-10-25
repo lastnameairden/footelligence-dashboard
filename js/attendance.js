@@ -63,7 +63,6 @@ import {
   monthsAgoBangkok,
   trainingPlanHasAttachment,
   TEAM_TRAINING_WEEKDAYS,
-  TEAM_COLORS,
   isRecordOfCoach
 } from "./ui-utils.js";
 import { openAdminMeetings, renderCoachMeetingCard, renderCoachMeetingTasks, renderCoachNextMeeting, renderCoachMeetingHistory, loadCoachMeetingNotifications, loadCoachMeetingOverview } from "./coach-meetings-ui.js";
@@ -6395,7 +6394,6 @@ initResults({
 initTeamEvents(document.getElementById("team-events-body"), {
   mode: () => (teamSpace() ? "view" : "fill"),
   team: () => myTeam,
-  teams: () => Object.keys(TEAM_COLORS),
   coach: () => ({ name: currentCoachRecord?.fullName || currentCoachRecord?.name || "", phone: currentCoachRecord?.phone || "" }),
   uid: () => auth.currentUser.uid
 });
