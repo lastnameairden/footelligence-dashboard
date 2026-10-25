@@ -89,7 +89,7 @@ const STATE_BADGE = {
 };
 
 // ตารางฝั่งแอดมิน — ปุ่ม data-window-close / data-window-reopen / data-window-delete
-export function windowsTableHtml(windows, todayStr) {
+export function windowsTableHtml(windows, todayStr, { readOnly = () => false } = {}) {
   if (windows.length === 0) return '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">ยังไม่เคยเปิดสมุดพกให้โค้ช</td></tr>';
   return [...windows]
     .sort((a, b) => String(b.openDate).localeCompare(String(a.openDate)))
@@ -109,7 +109,7 @@ export function windowsTableHtml(windows, todayStr) {
         <td>${escapeHtml(windowLabel(w))}</td>
         <td>${escapeHtml(dateLabel(w.openDate))} – ${escapeHtml(dateLabel(w.closeDate))}</td>
         <td><span class="badge ${cls}">${manual && state === "closed" ? "ปิดโดยแอดมิน" : text}</span></td>
-        <td class="whitespace-nowrap">${toggle} <button type="button" class="btn btn-danger-soft btn-sm" data-window-delete="${id}">ลบ</button></td>
+        <td class="whitespace-nowrap">${readOnly(w) ? '<span class="text-xs text-slate-500">ตั้งค่าส่วนกลาง</span>' : `${toggle} <button type="button" class="btn btn-danger-soft btn-sm" data-window-delete="${id}">ลบ</button>`}</td>
       </tr>`;
     })
     .join("");

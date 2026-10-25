@@ -10,6 +10,7 @@ const el = (id) => document.getElementById(id);
 let windows = [];
 let initialized = false;
 let teams = [];
+let onlyTeam = null; // หน้าทีม: เห็น/เปิดช่วงสมุดพกเฉพาะทีมนี้ (ช่วงของ "ทุกทีม" ที่ตั้งไว้ส่วนกลางแสดงให้ดูอย่างเดียว)
 
 function setStatus(text, isError = false) {
   el("athlete-window-status").textContent = text;
@@ -17,14 +18,14 @@ function setStatus(text, isError = false) {
 }
 
 function renderList() {
-  el("athlete-window-list-body").innerHTML = windowsTableHtml(windows, todayBangkok());
+  el("athlete-window-list-body").innerHTML = windowsTableHtml(windows, todayBangkok(), { readOnly: (w) => !!onlyTeam && w.team !== onlyTeam });
 }
 
 async function loadWindows() {
   el("athlete-window-list-body").innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>';
   try {
     const snap = await getDocs(collection(db, "athleteResultsWindows"));
-    windows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    windows = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((w) => !onlyTeam || w.team === onlyTeam || w.team === ALL_TEAMS);
     renderList();
   } catch (err) {
     console.error(err);
@@ -32,10 +33,14 @@ async function loadWindows() {
   }
 }
 
+// ตัวเลือกทีมในฟอร์ม: ปกติ "ทุกทีม" + ทุกทีม · หน้าทีมมีเฉพาะทีมที่เลือก (ไม่เปิดช่วงของทุกทีมจากหน้าทีมเดียว)
+function renderTeamOptions() {
+  const list = onlyTeam ? [onlyTeam] : teams;
+  el("athlete-window-team").innerHTML = (onlyTeam ? "" : `<option value="${ALL_TEAMS}">ทุกทีม</option>`) + list.map((t) => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join("");
+}
+
 function init() {
   initialized = true;
-  el("athlete-window-team").innerHTML =
-    `<option value="${ALL_TEAMS}">ทุกทีม</option>` + teams.map((t) => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join("");
   const thisMonth = thisMonthBangkok();
   // เดือนย้อนหลัง 18 เดือนถึงเดือนนี้ — ค่าเริ่มต้นสมุดพกย้อนหลัง 3 เดือนนับถึงเดือนนี้ (เหมือนหน้าสร้างสมุดพกของแอดมิน)
   const options = monthsBack(thisMonth, 18).map((m) => `<option value="${m}">${escapeHtml(thaiMonthLabel(m))}</option>`).join("");
@@ -91,10 +96,12 @@ function init() {
   });
 }
 
-// c = { teams: [ชื่อทีม] }
+// c = { teams: [ชื่อทีม], onlyTeam?: ทีมเดียวที่ให้เห็น/เปิดได้ }
 export function openAdminAthleteWindows(c) {
   teams = c.teams;
+  onlyTeam = c.onlyTeam ?? null;
   if (!initialized) init();
+  renderTeamOptions();
   setStatus("");
   return loadWindows();
 }

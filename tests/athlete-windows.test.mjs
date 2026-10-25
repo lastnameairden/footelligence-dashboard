@@ -97,3 +97,16 @@ test("windowsTableHtml: newest first, labels, status badges, actions, escaped te
   assert.ok(!html.includes("<b>t</b>"));
   assert.match(windowsTableHtml([], "2026-11-05"), /ยังไม่เคยเปิด/);
 });
+
+test("windowsTableHtml: read-only rows (central settings viewed from one team) have no close/delete buttons", () => {
+  const rows = [
+    { id: "a", team: "ทุกทีม", startMonth: "2026-08", endMonth: "2026-10", openDate: "2026-10-01", closeDate: "2026-10-31", status: "open" },
+    { id: "b", team: "THAWEE SC", startMonth: "2026-08", endMonth: "2026-10", openDate: "2026-10-01", closeDate: "2026-10-31", status: "open" }
+  ];
+  const html = windowsTableHtml(rows, "2026-10-10", { readOnly: (w) => w.team !== "THAWEE SC" });
+  assert.equal(html.includes('data-window-delete="a"'), false);
+  assert.equal(html.includes('data-window-close="a"'), false);
+  assert.ok(html.includes("ตั้งค่าส่วนกลาง"));
+  assert.ok(html.includes('data-window-delete="b"') && html.includes('data-window-close="b"'));
+  assert.ok(windowsTableHtml(rows, "2026-10-10").includes('data-window-delete="a"'), "default stays editable");
+});

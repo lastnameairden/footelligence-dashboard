@@ -1857,7 +1857,7 @@ function openAdminStaffAnnouncementsSection() {
 function openAdminAthleteWindowsSection() {
   hideAllScreens();
   adminAthleteWindowsSection.classList.remove("hidden");
-  openAdminAthleteWindows({ teams: TEAMS });
+  openAdminAthleteWindows({ teams: TEAMS, onlyTeam: teamSpace() ? myTeam : null });
 }
 
 function openAdminFitnessRoundsSection() {
@@ -1928,9 +1928,9 @@ mascProgressRoundSelect.addEventListener("change", loadMascProgressBreakdown);
 // ดึงรายชื่อนักกีฬาทั้งหมด + สถานะการประเมิน (complete/partial/none) สำหรับ assessmentPeriod หนึ่ง — ใช้ร่วมกัน
 // ทั้งตัวแสดงความคืบหน้ารายทีม (loadMascProgressBreakdown) และตัวสรุปรุ่นที่ยังค้างตอนสร้างรอบแก้ไข
 // (computeIncompleteGroupsForLabel) กันเขียน query + logic คำนวณสถานะซ้ำสองที่
-async function fetchPlayerEvaluationStatusForLabel(label) {
+async function fetchPlayerEvaluationStatusForLabel(label, team = null) {
   const [playersSnap, evalSnap] = await Promise.all([
-    getDocs(collection(db, "players")),
+    getDocs(team ? query(collection(db, "players"), where("team", "==", team)) : collection(db, "players")),
     // กรองด้วย assessmentPeriod (ค่าเป็น label ของรอบ ไม่ใช่ id) ตามโครงสร้างข้อมูลเดิมของ playerEvaluations —
     // ถ้าเคยตั้ง label ซ้ำกันข้ามรอบ (เช่นปีถัดไปใช้ "ช่วงที่ 1" ซ้ำ) การประเมินจากรอบเก่าจะปนมาด้วย เป็น
     // ข้อจำกัดเดิมของระบบเพราะ playerEvaluations ผูกกับ label ไม่ได้ผูกกับ id ของรอบโดยตรง
@@ -1978,7 +1978,8 @@ async function loadMascProgressBreakdown() {
   mascProgressTeamTabs.innerHTML = "";
   mascProgressBody.innerHTML = '<p class="text-sm text-slate-400 py-4 text-center">กำลังโหลด...</p>';
   try {
-    const { players, statusByPlayerId } = await fetchPlayerEvaluationStatusForLabel(round.label);
+    // หน้าทีม: ดูความคืบหน้าเฉพาะนักกีฬาของทีมที่เลือก
+    const { players, statusByPlayerId } = await fetchPlayerEvaluationStatusForLabel(round.label, teamSpace() ? myTeam : null);
 
     const byTeam = new Map();
     for (const p of players) {
@@ -2526,11 +2527,14 @@ async function loadCoachDirectory() {
   coachDirectoryGroups.innerHTML = '<p class="text-slate-400 text-sm">กำลังโหลด...</p>';
   // ทีมหลังบ้านที่มีแค่สิทธิ์ coaches อ่านข้อมูลนักกีฬา/เช็คชื่อไม่ได้ — โหลดไม่ได้ก็ยังเห็นรายชื่อโค้ช แค่คอลัมน์ % ตรงเวลาเป็น "-"
   const optional = (promise) => (isStaffSession() ? promise.catch(() => null) : promise);
+  // หน้าทีม: ดึงและแสดงเฉพาะของทีมที่เลือก (บัญชีที่ไม่ผูกทีม เช่น ทีมหลังบ้าน ดูได้จากปุ่มด้านล่าง)
+  const scoped = teamSpace();
+  const ofTeam = (name) => (scoped ? query(collection(db, name), where("team", "==", myTeam)) : collection(db, name));
   const [coachSnap, sessionSnap, attendanceSnap, playerSnap] = await Promise.all([
-    getDocs(collection(db, "coaches")),
-    optional(getDocs(collection(db, "sessions"))),
-    optional(getDocs(collection(db, "attendance"))),
-    optional(getDocs(collection(db, "players")))
+    getDocs(ofTeam("coaches")),
+    optional(getDocs(ofTeam("sessions"))),
+    optional(getDocs(ofTeam("attendance"))),
+    optional(getDocs(ofTeam("players")))
   ]);
 
   const coaches = [];
@@ -2543,7 +2547,8 @@ async function loadCoachDirectory() {
   playerSnap?.forEach((d) => players.push({ id: d.id, ...d.data() }));
 
   if (coaches.length === 0) {
-    coachDirectoryGroups.innerHTML = '<p class="text-slate-400 text-sm">ยังไม่มีโค้ชในระบบ</p>';
+    coachDirectoryGroups.innerHTML = `<p class="text-slate-400 text-sm">${scoped ? "ยังไม่มีโค้ชในทีมนี้" : "ยังไม่มีโค้ชในระบบ"}</p>`;
+    if (scoped) appendNonTeamAccountsButton();
     return;
   }
 
@@ -2607,6 +2612,12 @@ async function loadCoachDirectory() {
     coachDirectoryGroups.appendChild(buildCoachGroupTable(teamCoaches, sessions, attendanceRecords, players));
   }
 
+  renderNonTeamGroups(staffGroup, unassignedGroup, sessions, attendanceRecords, players);
+  if (scoped) appendNonTeamAccountsButton();
+}
+
+// บัญชีที่ไม่ผูกกับทีมใด: ทีมหลังบ้าน และบัญชีที่ยังไม่มีทีม (ผู้ดูแลระบบ/รอกำหนดทีม)
+function renderNonTeamGroups(staffGroup, unassignedGroup, sessions, attendanceRecords, players) {
   if (staffGroup.length > 0) {
     staffGroup.sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
     const staffHeading = document.createElement("h3");
@@ -2624,6 +2635,37 @@ async function loadCoachDirectory() {
     coachDirectoryGroups.appendChild(heading);
     coachDirectoryGroups.appendChild(buildCoachGroupTable(unassignedGroup, sessions, attendanceRecords, players));
   }
+}
+
+// หน้าทีมแสดงเฉพาะโค้ชของทีมที่เลือก — ปุ่มนี้โหลดบัญชีที่ไม่ผูกทีม (ทีมหลังบ้าน/รอกำหนดทีม) มาแสดงต่อท้ายเมื่อต้องแก้สิทธิ์
+function appendNonTeamAccountsButton() {
+  const wrap = document.createElement("div");
+  wrap.className = "mt-4";
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "btn btn-secondary btn-sm";
+  btn.textContent = "แสดงบัญชีที่ไม่ผูกกับทีม (ทีมหลังบ้าน / รอกำหนดทีม)";
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    try {
+      const snap = await getDocs(collection(db, "coaches"));
+      const staff = [];
+      const unassigned = [];
+      snap.forEach((d) => {
+        const c = { id: d.id, ...d.data() };
+        if (c.role === "staff") staff.push(c);
+        else if (!c.team || !TEAMS.includes(c.team)) unassigned.push(c);
+      });
+      wrap.remove();
+      renderNonTeamGroups(staff, unassigned, [], [], []);
+    } catch (err) {
+      console.error(err);
+      btn.disabled = false;
+      btn.textContent = "โหลดไม่สำเร็จ: " + err.message;
+    }
+  });
+  wrap.appendChild(btn);
+  coachDirectoryGroups.appendChild(wrap);
 }
 
 // ---------- สรุปการทำงานของโค้ชแต่ละคนประจำเดือนนี้ (เช็คชื่อ/รายงานการฝึกซ้อม/แผนการฝึกซ้อม) ----------

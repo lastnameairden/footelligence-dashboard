@@ -11,16 +11,16 @@ export const ADMIN_TOOL_GROUPS = [
     key: "accounts",
     label: "บัญชีและสิทธิ์",
     tools: [
-      { feature: "approvals", label: "คำขอลงทะเบียนรออนุมัติ", hint: "อนุมัติโค้ช ผู้บริหารทีม ทีมหลังบ้าน", icon: "file-text" },
-      { feature: "coaches", label: "รายชื่อโค้ชในระบบ", hint: "แก้ไขบัญชีและสิทธิ์ทุกทีม", icon: "users" },
-      { feature: "staff-announcements", label: "ประกาศถึงทีมหลังบ้าน", hint: "เขียนประกาศที่ Home", icon: "bell" }
+      { feature: "approvals", label: "คำขอลงทะเบียนรออนุมัติ", hint: "คำขอที่ยังไม่ผูกทีม (ทุกทีม)", icon: "file-text" },
+      { feature: "coaches", label: "รายชื่อโค้ชในระบบ", hint: "แก้ไขบัญชีและสิทธิ์ของทีมนี้", icon: "users" },
+      { feature: "staff-announcements", label: "ประกาศถึงทีมหลังบ้าน", hint: "ถึงทีมหลังบ้านทุกคน", icon: "bell" }
     ]
   },
   {
     key: "monitoring",
     label: "ติดตามงาน",
     tools: [
-      { feature: "progress", label: "ความคืบหน้าเช็คชื่อรายวัน", hint: "ดูทุกทีมพร้อมกัน", icon: "trending-up" },
+      { feature: "progress", label: "ความคืบหน้าเช็คชื่อรายวัน", hint: "ของทีมนี้ ตามรุ่นที่เลือก", icon: "trending-up" },
       { feature: "print", label: "พิมพ์สรุปผลงานโค้ช", hint: "รายเดือน", icon: "printer" },
       { feature: "player-audit", label: "ตรวจสอบข้อมูลนักกีฬาที่ผิดปกติ", hint: "รุ่นอายุ วันเกิด", icon: "search" }
     ]
@@ -29,9 +29,9 @@ export const ADMIN_TOOL_GROUPS = [
     key: "evaluation",
     label: "รอบการประเมิน",
     tools: [
-      { feature: "masc-rounds", label: "รอบการประเมิน MASC", hint: "กำหนดรอบ แก้รอบเดิม", icon: "dna" },
-      { feature: "fitness-rounds", label: "รอบทดสอบสมรรถภาพ", hint: "เปิด/ปิดรอบ", icon: "trending-up" },
-      { feature: "athlete-windows", label: "เปิดสมุดพกให้โค้ช", hint: "ช่วงที่โค้ชเปิดดูได้", icon: "book" }
+      { feature: "masc-rounds", label: "รอบการประเมิน MASC", hint: "กำหนดรอบ (ใช้กับทุกทีม)", icon: "dna" },
+      { feature: "fitness-rounds", label: "รอบทดสอบสมรรถภาพ", hint: "เปิด/ปิดรอบ (ใช้กับทุกทีม)", icon: "trending-up" },
+      { feature: "athlete-windows", label: "เปิดสมุดพกให้โค้ช", hint: "ช่วงที่โค้ชทีมนี้เปิดดูได้", icon: "book" }
     ]
   },
   {
