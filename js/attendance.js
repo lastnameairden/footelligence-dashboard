@@ -5,12 +5,19 @@ import {
   doc,
   query,
   where,
-  addDoc,
-  setDoc,
-  updateDoc,
-  deleteDoc,
+  addDoc as fsAddDoc,
+  setDoc as fsSetDoc,
+  updateDoc as fsUpdateDoc,
+  deleteDoc as fsDeleteDoc,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+import { has as cacheHas, invalidate as invalidateCache, swr } from "./swr-cache.js";
+
+// การเขียนข้อมูลทุกครั้งในหน้านี้ล้างแคชของรายการที่เปิดซ้ำ (swr-cache.js) ก่อน — เปิดเมนูหลังบันทึกจึงไม่เห็นของเดิมวูบหนึ่ง
+const addDoc = (...args) => (invalidateCache(), fsAddDoc(...args));
+const setDoc = (...args) => (invalidateCache(), fsSetDoc(...args));
+const updateDoc = (...args) => (invalidateCache(), fsUpdateDoc(...args));
+const deleteDoc = (...args) => (invalidateCache(), fsDeleteDoc(...args));
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -1403,24 +1410,38 @@ function renderAttendanceGridView() {
 
 async function loadAttendanceGrid() {
   attendanceGridMonthLabel.textContent = thaiMonthLabel(attendanceGridMonth);
-  attendanceGridStatus.textContent = "กำลังโหลด...";
-  attendanceGridWrap.innerHTML = '<p class="px-4 py-6 text-center text-slate-400 text-sm">กำลังโหลด...</p>';
+  const team = myTeam;
+  const month = attendanceGridMonth;
+  const key = `att-grid:${team}:${month}`;
+  if (!cacheHas(key)) {
+    attendanceGridStatus.textContent = "กำลังโหลด...";
+    attendanceGridWrap.innerHTML = '<p class="px-4 py-6 text-center text-slate-400 text-sm">กำลังโหลด...</p>';
+  }
   try {
-    const { start, end } = monthDateRange(attendanceGridMonth);
-    const [attSnap, sessionSnap, matchSnap, coachSnap] = await Promise.all([
-      getDocs(teamDateRangeQuery("attendance", myTeam, start, end)),
-      getDocs(teamDateRangeQuery("sessions", myTeam, start, end)),
-      getDocs(teamDateRangeQuery("matchReports", myTeam, start, end)),
-      getDocs(query(collection(db, "coaches"), where("team", "==", myTeam), where("role", "==", "coach")))
-    ]);
-    attendanceGridData = {
-      attendanceRecords: attSnap.docs.map((d) => d.data()),
-      sessions: sessionSnap.docs.map((d) => d.data()),
-      matchReports: matchSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
-      coaches: coachSnap.docs.map((d) => d.data())
-    };
-    attendanceGridStatus.textContent = "";
-    renderAttendanceGridView();
+    const { start, end } = monthDateRange(month);
+    await swr(
+      key,
+      async () => {
+        const [attSnap, sessionSnap, matchSnap, coachSnap] = await Promise.all([
+          getDocs(teamDateRangeQuery("attendance", team, start, end)),
+          getDocs(teamDateRangeQuery("sessions", team, start, end)),
+          getDocs(teamDateRangeQuery("matchReports", team, start, end)),
+          getDocs(query(collection(db, "coaches"), where("team", "==", team), where("role", "==", "coach")))
+        ]);
+        return {
+          attendanceRecords: attSnap.docs.map((d) => d.data()),
+          sessions: sessionSnap.docs.map((d) => d.data()),
+          matchReports: matchSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
+          coaches: coachSnap.docs.map((d) => d.data())
+        };
+      },
+      (data) => {
+        if (team !== myTeam || month !== attendanceGridMonth) return; // สลับทีม/เดือนไปแล้ว
+        attendanceGridData = data;
+        attendanceGridStatus.textContent = "";
+        renderAttendanceGridView();
+      }
+    );
   } catch (err) {
     console.error(err);
     attendanceGridStatus.textContent = "";
@@ -3863,17 +3884,20 @@ async function openStaffCoaches() {
   staffCoachesSection.classList.remove("hidden");
   showStaffCoachGrid();
   staffCoachesSubtitle.textContent = `${myTeam} · ${staffAgeFilter ? `รุ่น ${staffAgeFilter}` : "ทุกรุ่น"} · ดูอย่างเดียว`;
-  staffCoachesGrid.innerHTML = '<p class="text-sm text-slate-400">กำลังโหลด...</p>';
   const team = myTeam;
+  const key = `coach-rows:${team}:${thisMonthBangkok()}`;
+  if (!cacheHas(key)) staffCoachesGrid.innerHTML = '<p class="text-sm text-slate-400">กำลังโหลด...</p>';
   try {
-    const rows = (await computeCoachMonthlySummaryRows(team)).filter((r) => matchesAgeFilter(r.ageGroups, staffAgeFilter));
-    if (team !== myTeam) return;
-    staffCoachRows = rows;
-    if (rows.length === 0) {
-      staffCoachesGrid.innerHTML = `<p class="text-sm text-slate-400">${staffAgeFilter ? `ไม่มีโค้ชที่ดูแลรุ่น ${escapeHtml(staffAgeFilter)} ในทีมนี้` : "ยังไม่มีโค้ชในทีมนี้"}</p>`;
-      return;
-    }
-    staffCoachesGrid.innerHTML = rows.map((r) => coachCardHtml(r.coach, { showPhone: true })).join("");
+    await swr(key, () => computeCoachMonthlySummaryRows(team), (all) => {
+      if (team !== myTeam) return;
+      const rows = all.filter((r) => matchesAgeFilter(r.ageGroups, staffAgeFilter));
+      staffCoachRows = rows;
+      if (rows.length === 0) {
+        staffCoachesGrid.innerHTML = `<p class="text-sm text-slate-400">${staffAgeFilter ? `ไม่มีโค้ชที่ดูแลรุ่น ${escapeHtml(staffAgeFilter)} ในทีมนี้` : "ยังไม่มีโค้ชในทีมนี้"}</p>`;
+        return;
+      }
+      staffCoachesGrid.innerHTML = rows.map((r) => coachCardHtml(r.coach, { showPhone: true })).join("");
+    });
   } catch (err) {
     console.error(err);
     staffCoachesGrid.innerHTML = `<p class="text-sm text-red-600">โหลดข้อมูลโค้ชไม่สำเร็จ: ${escapeHtml(err.message)}</p>`;
@@ -6922,18 +6946,33 @@ function countLateTrainingPlansThisMonth(plans) {
 let trainingPlansCache = [];
 
 async function renderTrainingPlanList() {
-  planDataStatus.textContent = "กำลังโหลด...";
-  planDataStatus.className = "text-sm text-slate-500";
-  let allPlans = [];
+  const team = myTeam;
+  const key = `plans:${team}`;
+  if (!cacheHas(key)) {
+    planDataStatus.textContent = "กำลังโหลด...";
+    planDataStatus.className = "text-sm text-slate-500";
+  }
   try {
-    const snap = await getDocs(query(collection(db, "trainingPlans"), where("team", "==", myTeam)));
-    snap.forEach((d) => allPlans.push({ id: d.id, ...d.data() }));
+    await swr(
+      key,
+      async () => {
+        const rows = [];
+        const snap = await getDocs(query(collection(db, "trainingPlans"), where("team", "==", team)));
+        snap.forEach((d) => rows.push({ id: d.id, ...d.data() }));
+        return rows;
+      },
+      (rows) => {
+        if (team === myTeam) showTrainingPlanList(rows);
+      }
+    );
   } catch (err) {
     console.error(err);
     planDataStatus.textContent = "โหลดแผนไม่สำเร็จ: " + err.message;
     planDataStatus.className = "text-sm text-red-600";
-    return;
   }
+}
+
+function showTrainingPlanList(allPlans) {
 
   // แสดงเฉพาะแผนของรุ่นอายุที่ตัวเองรับผิดชอบ (ถ้ารู้ตัวโค้ชแน่ชัด — myAgeGroups ไม่ว่าง เช่นโค้ชจริงล็อกอินเอง
   // หรือผู้ดูแลระบบสวมบทบาทเป็นโค้ชคนใดคนหนึ่งเจาะจง) ไม่ปนกับแผนของโค้ชรุ่นอื่นในทีมเดียวกัน — trainingPlans
