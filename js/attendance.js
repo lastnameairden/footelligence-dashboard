@@ -63,6 +63,7 @@ import {
   monthsAgoBangkok,
   trainingPlanHasAttachment,
   TEAM_TRAINING_WEEKDAYS,
+  TEAM_COLORS,
   isRecordOfCoach
 } from "./ui-utils.js";
 import { openAdminMeetings, renderCoachMeetingCard, renderCoachMeetingTasks, renderCoachNextMeeting, renderCoachMeetingHistory, loadCoachMeetingNotifications, loadCoachMeetingOverview } from "./coach-meetings-ui.js";
@@ -95,6 +96,7 @@ import { PLAYER_FEET, PLAYER_POSITIONS, contactExtraRows, healthAlertHtml, parse
 import { clearEmbedded, showEmbedded } from "./embed-frame.js";
 import { athleteResultsNotification, fitnessRoundNotification, unreadNotesNotification } from "./coach-notifications.js";
 import { initResults, showResults } from "./injury-results-ui.js";
+import { initTeamEvents, showTeamEvents } from "./team-events-ui.js";
 import { ageGroupsOf, birthYearLabel, birthdayLabel, filterAndSortPlayers, playerDisplayName } from "./player-gallery.js";
 import { STAFF_PERMISSIONS, canAccessAdminFeature, normalizePermissions, permissionsSummary, staffCan, staffLandingFeature } from "./staff-perms.js";
 import { isEvaluationComplete } from "./masc-data.js";
@@ -247,6 +249,7 @@ const footelligenceTestFrame = document.getElementById("footelligence-test-frame
 const athleteResultsFrame = document.getElementById("athlete-results-frame");
 const injuryMenuSection = document.getElementById("injury-menu-section");
 const injuryResultsSection = document.getElementById("injury-results-section");
+const teamEventsSection = document.getElementById("team-events-section");
 const dailyReminderBanner = document.getElementById("daily-reminder-banner");
 const homeDateLine = document.getElementById("home-date-line");
 const homeAllDone = document.getElementById("home-all-done");
@@ -724,6 +727,7 @@ function hideAllScreens() {
   footelligenceTestSection.classList.add("hidden");
   injuryMenuSection.classList.add("hidden");
   injuryResultsSection.classList.add("hidden");
+  teamEventsSection.classList.add("hidden");
   playerGallerySection.classList.add("hidden");
   playerDetailSection.classList.add("hidden");
 }
@@ -1172,6 +1176,7 @@ const COACH_SCREEN_OPENERS = {
   profile: () => openProfileSection(),
   "injury-menu": () => openInjuryMenu(),
   "injury-results": () => openInjuryResults(),
+  "team-events": () => openTeamEvents(),
   "footelligence-test": () => openFootelligenceTest(),
   "meeting-menu": () => openMeetingMenu(),
   "meeting-next": () => openMeetingNext(),
@@ -2192,6 +2197,12 @@ function openInjuryResults() {
   hideAllScreens();
   injuryResultsSection.classList.remove("hidden");
   showResults();
+}
+// Event ประจำเดือน: โค้ช (และแอดมินที่สวมบทบาทโค้ช) กรอกของทีมตัวเอง · หน้าทีมของทีมหลังบ้าน/แอดมิน = ดูสถานะของทุกทีม
+function openTeamEvents() {
+  hideAllScreens();
+  teamEventsSection.classList.remove("hidden");
+  showTeamEvents();
 }
 for (const btn of document.querySelectorAll("[data-injury-nav]")) btn.addEventListener("click", () => COACH_SCREEN_OPENERS[btn.dataset.injuryNav]?.());
 for (const btn of document.querySelectorAll("[data-injury-back]")) btn.addEventListener("click", openInjuryMenu);
@@ -3702,7 +3713,7 @@ async function enterTeamSpace(team, mode, landing = () => openStaffHome()) {
 
 function renderStaffFilter() {
   // Home ของแอดมินมีกราฟตามรุ่นอายุ จึงแสดงตัวกรองด้วย (Home ของทีมหลังบ้านเป็นประกาศ ไม่แยกรุ่น)
-  const show = teamSpace() && staffTeamAgeGroups.length > 0 && (adminSpace() || execSpace() || !STAFF_UNFILTERED_SCREENS.includes(currentScreenKey()));
+  const show = teamSpace() && staffTeamAgeGroups.length > 0 && currentScreenKey() !== "team-events" && (adminSpace() || execSpace() || !STAFF_UNFILTERED_SCREENS.includes(currentScreenKey()));
   staffFilterNav.classList.toggle("hidden", !show);
   if (!show) {
     staffFilterInner.innerHTML = "";
@@ -4058,6 +4069,7 @@ const ROUTE_SCREENS = [
   { el: footelligenceTestSection, key: "footelligence-test", kind: "coach" },
   { el: injuryMenuSection, key: "injury-menu", kind: "coach" },
   { el: injuryResultsSection, key: "injury-results", kind: "coach" },
+  { el: teamEventsSection, key: "team-events", kind: "coach" },
   { el: adminCoachesSection, key: "coaches", kind: "admin" },
   { el: adminPlayerAuditSection, key: "player-audit", kind: "admin" },
   { el: adminProgressSection, key: "progress", kind: "admin" },
@@ -4223,6 +4235,9 @@ function openCoachScreen(screen, date) {
       break;
     case "injury-results":
       openInjuryResults();
+      break;
+    case "team-events":
+      openTeamEvents();
       break;
     case "meeting-menu":
       openMeetingMenu();
@@ -6375,6 +6390,14 @@ initResults({
     await deleteInjuryReport(report);
     await showResults();
   }
+});
+
+initTeamEvents(document.getElementById("team-events-body"), {
+  mode: () => (teamSpace() ? "view" : "fill"),
+  team: () => myTeam,
+  teams: () => Object.keys(TEAM_COLORS),
+  coach: () => ({ name: currentCoachRecord?.fullName || currentCoachRecord?.name || "", phone: currentCoachRecord?.phone || "" }),
+  uid: () => auth.currentUser.uid
 });
 
 function stopEditInjury() {

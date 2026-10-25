@@ -89,6 +89,7 @@ export const COACH_MENU = [
       { label: "History", screen: "meeting-history" }
     ]
   },
+  { key: "events", label: "Event", hint: "แจ้ง Event ประจำเดือน", icon: "trophy", screen: "team-events", screens: ["team-events"] },
   { key: "profile", label: "Profile", hint: "โปรไฟล์ของฉัน", icon: "user", screen: "profile", screens: ["profile"] }
 ];
 

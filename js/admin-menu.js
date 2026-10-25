@@ -28,6 +28,7 @@ export const ADMIN_TEAM_MENU = [
   fromCoach("evaluation"),
   fromCoach("injury-sick"),
   { key: "meeting", label: "Meeting", hint: "นัดประชุมและคำตอบจากโค้ช", icon: "book", screen: "staff-meeting", screens: ["staff-meeting"] },
-  // เมนูที่ 10: เครื่องมือผู้ดูแลระบบทั้งหมด (admin-tools.js)
+  { key: "events", label: "Event", hint: "Event ประจำเดือนของแต่ละทีม", icon: "trophy", screen: "team-events", screens: ["team-events"] },
+  // เมนูสุดท้าย: เครื่องมือผู้ดูแลระบบทั้งหมด (admin-tools.js)
   toolsMenuItem(true)
 ];

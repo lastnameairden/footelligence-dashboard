@@ -8,21 +8,22 @@ import { ADMIN_TEAM_MENU } from "../js/admin-menu.js";
 import { hasAdminTools, toolGroupsFor, toolsMenuItem } from "../js/admin-tools.js";
 import { EXEC_TEAM_MENU } from "../js/exec-menu.js";
 
-test("staff menu: the nine agreed items in order", () => {
-  assert.deepEqual(STAFF_MENU.map((m) => m.label), ["Home", "Coach Data", "Player Data", "Attendance", "Training", "Match Data", "Evaluation", "Injury/Sick", "Meeting"]);
-  assert.equal(new Set(STAFF_MENU.map((m) => m.key)).size, 9);
+test("staff menu: the nine agreed items in order, plus Event", () => {
+  assert.deepEqual(STAFF_MENU.map((m) => m.label), ["Home", "Coach Data", "Player Data", "Attendance", "Training", "Match Data", "Evaluation", "Injury/Sick", "Meeting", "Event"]);
+  assert.equal(new Set(STAFF_MENU.map((m) => m.key)).size, 10);
 });
 
-test("staff menu: view permission sees the eight data menus + Tools, Meeting needs the meetings permission", () => {
+test("staff menu: view permission sees the eight data menus + Event + Tools, Meeting needs the meetings permission", () => {
   const view = staffMenuFor(["view"]).map((m) => m.key);
   assert.equal(view.includes("meeting"), false);
-  assert.equal(view.length, 9);
+  assert.equal(view.length, 10);
   assert.equal(view[view.length - 1], "admin-tools");
-  assert.equal(staffMenuFor(["view", "meetings"]).length, 10);
+  assert.ok(view.includes("events"));
+  assert.equal(staffMenuFor(["view", "meetings"]).length, 11);
   assert.deepEqual(staffMenuFor(["meetings"]).map((m) => m.key), ["meeting"], "meetings alone has no admin tool, so no Tools menu");
   assert.deepEqual(staffMenuFor([]), []);
   // manageTeams ให้ view ในตัว
-  assert.equal(staffMenuFor(["manageTeams"]).length, 9);
+  assert.equal(staffMenuFor(["manageTeams"]).length, 10);
   // coaches อย่างเดียว: ไม่มีเมนูข้อมูล มีแต่ Tools (อนุมัติ/รายชื่อโค้ช)
   assert.deepEqual(staffMenuFor(["coaches"]).map((m) => m.key), ["admin-tools"]);
 });
@@ -52,7 +53,7 @@ test("menuKeyForScreen / menuItem take an explicit menu and still default to the
   assert.equal(menuKeyForScreen("staff-coaches", COACH_MENU), null);
   assert.equal(menuItem("meeting", STAFF_MENU).screen, "staff-meeting");
   assert.equal(menuItem("meeting").screen, "meeting-menu");
-  assert.deepEqual(STAFF_UNFILTERED_SCREENS, ["staff-home"]);
+  assert.deepEqual(STAFF_UNFILTERED_SCREENS, ["staff-home", "team-events"]);
 });
 
 test("age filter: '' means all groups, a group maps to the coach-side myAgeGroups shape", () => {
@@ -77,8 +78,8 @@ test("every staff-* route key belongs to the staff menu, and every staff menu sc
   }
 });
 test("admin team menu: nine items + Admin, full coach submenus, shared staff pages for Home / Coach Data / Meeting", () => {
-  assert.deepEqual(ADMIN_TEAM_MENU.map((m) => m.label), ["Home", "Coach Data", "Player Data", "Attendance", "Training", "Match Data", "Evaluation", "Injury/Sick", "Meeting", "Admin"]);
-  assert.equal(new Set(ADMIN_TEAM_MENU.map((m) => m.key)).size, 10);
+  assert.deepEqual(ADMIN_TEAM_MENU.map((m) => m.label), ["Home", "Coach Data", "Player Data", "Attendance", "Training", "Match Data", "Evaluation", "Injury/Sick", "Meeting", "Event", "Admin"]);
+  assert.equal(new Set(ADMIN_TEAM_MENU.map((m) => m.key)).size, 11);
   assert.deepEqual(ADMIN_TEAM_MENU.find((m) => m.key === "home").screens, ["staff-home"]);
   assert.equal(ADMIN_TEAM_MENU.find((m) => m.key === "meeting").screen, "staff-meeting");
   const training = ADMIN_TEAM_MENU.find((m) => m.key === "training");

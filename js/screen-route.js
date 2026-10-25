@@ -9,7 +9,7 @@
 //   ทีมหลังบ้านเข้าหน้าทีม (ดูอย่างเดียว): admin=team&team=<ทีม>&as=staff[&screen=..]
 //   แอดมินหลักเข้าหน้าทีมแบบใหม่ (เมนูครบ ดู/แก้ได้):    admin=team&team=<ทีม>&as=admin[&screen=..]
 
-export const COACH_SCREEN_KEYS = ["daily", "checkin", "report", "match", "injury", "plan", "players", "fitness", "meeting-tasks", "instruction", "player-detail", "player-form", "attendance-grid", "match-data", "match-form", "match-history", "match-sheet", "training-plan", "plan-data", "report-data", "evaluation", "physical-test", "physical-instruction", "physical-form", "athlete-results", "profile", "injury-menu", "injury-results", "meeting-menu", "meeting-next", "meeting-history", "footelligence-test", "staff-home", "staff-coaches", "staff-meeting", "staff-attendance-menu", "staff-tools"];
+export const COACH_SCREEN_KEYS = ["daily", "checkin", "report", "match", "injury", "plan", "players", "fitness", "meeting-tasks", "instruction", "player-detail", "player-form", "attendance-grid", "match-data", "match-form", "match-history", "match-sheet", "training-plan", "plan-data", "report-data", "evaluation", "physical-test", "physical-instruction", "physical-form", "athlete-results", "profile", "injury-menu", "injury-results", "meeting-menu", "meeting-next", "meeting-history", "footelligence-test", "staff-home", "staff-coaches", "staff-meeting", "staff-attendance-menu", "staff-tools", "team-events"];
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 

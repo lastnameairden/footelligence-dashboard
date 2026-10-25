@@ -44,12 +44,12 @@ test("applyTeamTheme sets then clears the CSS variables and the data attribute",
   assert.equal(attrs.size, 0);
 });
 
-test("coach menu: exactly the eleven requested items, in order, English labels", () => {
+test("coach menu: the eleven requested items plus Event, in order, English labels", () => {
   assert.deepEqual(
     COACH_MENU.map((m) => m.label),
-    ["Home", "Instruction", "Player Data", "Attendance Check", "Attendance", "Training Plan", "Match Data", "Evaluation", "Injury/Sick", "Meeting", "Profile"]
+    ["Home", "Instruction", "Player Data", "Attendance Check", "Attendance", "Training Plan", "Match Data", "Evaluation", "Injury/Sick", "Meeting", "Event", "Profile"]
   );
-  assert.equal(new Set(COACH_MENU.map((m) => m.key)).size, 11);
+  assert.equal(new Set(COACH_MENU.map((m) => m.key)).size, 12);
 });
 
 test("coach menu only points at screens that exist, and every coach screen belongs to one menu", () => {

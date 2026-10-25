@@ -27,7 +27,9 @@ export const STAFF_MENU = [
   // Evaluation ของทีมหลังบ้านมีแค่ Athlete Results (สมุดพกนักกีฬา) — เปิดดูได้ทุกช่วงเวลาโดยไม่ติดช่วงเปิดของโค้ช (physical-ui.js canBypass)
   // Footelligence Test / Physical Test (หน้ากรอกและแบบฟอร์มของโค้ช) ไม่อยู่ในเมนูนี้ ผลทดสอบดูได้ในสมุดพกและหน้านักกีฬารายบุคคล
   { key: "evaluation", label: "Evaluation", hint: "สมุดพกนักกีฬา", icon: "target", screen: "athlete-results", screens: ["athlete-results", "evaluation"], perm: "view" },  { key: "injury-sick", label: "Injury/Sick", hint: "ประวัติบาดเจ็บ / เจ็บป่วย", icon: "heart-pulse", screen: "injury-results", screens: ["injury-results"], perm: "view" },
-  { key: "meeting", label: "Meeting", hint: "นัดประชุมและคำตอบจากโค้ช", icon: "book", screen: "staff-meeting", screens: ["staff-meeting"], perm: "meetings" }
+  { key: "meeting", label: "Meeting", hint: "นัดประชุมและคำตอบจากโค้ช", icon: "book", screen: "staff-meeting", screens: ["staff-meeting"], perm: "meetings" },
+  // Event ประจำเดือนที่โค้ชแต่ละโรงเรียนกรอก — ทีมหลังบ้านดูสถานะและรายการของทุกทีม (ดูอย่างเดียว)
+  { key: "events", label: "Event", hint: "Event ประจำเดือนของแต่ละทีม", icon: "trophy", screen: "team-events", screens: ["team-events"], perm: "view" }
 ];
 
 // เมนูที่บัญชีนี้เห็น (perms = รายการสิทธิ์ของบัญชี ยังไม่ normalize ก็ได้)
@@ -38,4 +40,4 @@ export function staffMenuFor(perms) {
 }
 
 // หน้าจอที่ไม่นับว่าเป็น "ข้อมูลรายรุ่น" — ไม่แสดงตัวกรองรุ่นอายุ
-export const STAFF_UNFILTERED_SCREENS = ["staff-home"];
+export const STAFF_UNFILTERED_SCREENS = ["staff-home", "team-events"];
