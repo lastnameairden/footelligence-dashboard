@@ -105,6 +105,7 @@ import { initResults, showResults } from "./injury-results-ui.js";
 import { initTeamEvents, showTeamEvents } from "./team-events-ui.js";
 import { photoPathsOf, photoSrc } from "./photo-src.js";
 import { uploadPhotoWithThumb } from "./photo-upload.js";
+import { initPerfPanel } from "./perf-panel.js";
 import { bangkokStamp, deadlineLabel, eventReminder, monthLabel as eventMonthLabel } from "./team-events.js";
 import { ageGroupsOf, birthYearLabel, birthdayLabel, filterAndSortPlayers, playerDisplayName } from "./player-gallery.js";
 import { STAFF_PERMISSIONS, canAccessAdminFeature, normalizePermissions, permissionsSummary, staffCan, staffLandingFeature } from "./staff-perms.js";
@@ -6464,6 +6465,7 @@ initResults({
   }
 });
 
+initPerfPanel(); // ?perf=1 = แสดงเวลาเปิดเมนูแต่ละหน้า (ปิดด้วย ?perf=0)
 initTeamEvents(document.getElementById("team-events-body"), {
   mode: () => (teamSpace() ? "view" : "fill"),
   team: () => myTeam,
