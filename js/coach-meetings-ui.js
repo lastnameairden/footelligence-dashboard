@@ -109,7 +109,7 @@ async function reload() {
     // เปิดจากหน้าทีม (scopeTeam) ดึงเฉพาะของทีมนั้น — จำเป็นสำหรับผู้บริหารที่กฎ Firestore ให้อ่านได้เฉพาะเอกสารของทีมตัวเอง
     const scope = scopeTeam ? [where("team", "==", scopeTeam)] : [];
     const [coachSnap, meetingSnap, recapSnap, commentSnap] = await Promise.all([
-      getDocs(query(collection(db, "coaches"), where("role", "==", "coach"))),
+      getDocs(query(collection(db, "coaches"), where("role", "==", "coach"), ...scope)),
       getDocs(query(collection(db, "coachMeetings"), ...scope, where("month", "==", viewMonth))),
       getDocs(query(collection(db, "coachMeetingRecaps"), ...scope, where("month", "==", viewMonth))),
       readOnly ? Promise.resolve({ forEach: () => {} }) : getDocs(query(collection(db, "coachMeetingComments"), ...scope, where("month", "==", viewMonth)))
@@ -157,10 +157,10 @@ function dateOfWeek(week) {
   return meetingDate(viewMonth, week, DEFAULT_MEETING_WEEKDAYS[week - 1]);
 }
 
-// โค้ชที่อนุมัติแล้วแต่ยังไม่อยู่ในนัดใดของเดือนนี้ (เช่น เพิ่งได้รับอนุมัติหลังสร้างตาราง)
+// โค้ชที่อนุมัติแล้วแต่ยังไม่อยู่ในนัดใดของเดือนนี้ (เช่น เพิ่งได้รับอนุมัติหลังสร้างตาราง) — หน้าทีมนับเฉพาะทีมที่เลือก
 function unassignedCoaches() {
   const out = [];
-  for (const s of MEETING_TEAM_SLOTS) {
+  for (const s of scopedSlots()) {
     const assigned = new Set();
     for (let w = 1; w <= MEETING_WEEKS_PER_MONTH; w++) {
       (meetings.get(meetingKey(s.team, w))?.coachIds || []).forEach((id) => assigned.add(id));
