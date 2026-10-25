@@ -4405,7 +4405,17 @@ async function restoreAdminTeamContext(route) {
 }
 
 // ---------- ล็อกอิน: แยกเส้นทางตามบทบาท (ผู้ดูแลระบบ / โค้ชที่อนุมัติแล้ว / รอการอนุมัติ) ----------
-onAuthStateChanged(auth, async (user) => {
+// เปิดเนื้อหาหน้า (เอา html.booting ออก) เมื่อการตรวจล็อกอินครั้งแรกและการกู้หน้าจอเดิมจาก URL เสร็จแล้ว ไม่ว่าจะสำเร็จหรือไม่
+const onAuthChanged = (handler) =>
+  onAuthStateChanged(auth, async (user) => {
+    try {
+      await handler(user);
+    } finally {
+      document.documentElement.classList.remove("booting");
+    }
+  });
+
+onAuthChanged(async (user) => {
   const isCoachSession = !!user && !user.isAnonymous;
   loginSection.classList.toggle("hidden", isCoachSession);
   brandHero.classList.toggle("hidden", isCoachSession);
