@@ -1,6 +1,7 @@
 import { addDoc, collection, doc, getDocs, query, serverTimestamp, setDoc, where } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 import { db } from "./firebase-init.js";
 import { icon } from "./icons.js";
+import { buildAdminNotifications } from "./admin-notifications.js";
 
 // ---------- วันที่/เวลาตามเขตเวลาไทย (Asia/Bangkok, UTC+7 ไม่มี DST) ----------
 // เดิมหลายหน้าหา "วันนี้" ด้วย new Date().toISOString().slice(0, 10) ซึ่งเป็นวันที่ตาม UTC — ช่วง 00:00–07:00 น. เวลาไทย
@@ -683,54 +684,20 @@ export async function loadAdminNotifications() {
     getDocs(query(collection(db, "sessions"), where("date", ">=", windowStart), where("date", "<=", todayStr)))
   ]);
 
-  // 1) บัญชีรออนุมัติ
+  // รวมข้อมูลของทุกทีมไว้ในกระดิ่งเดียว แต่ละรายการแยกตามทีม (ตรรกะสร้างรายการอยู่ที่ admin-notifications.js)
+  // 1) บัญชีรออนุมัติ (ไม่ผูกทีม)
   const pendingNames = [];
   coachSnap.forEach((d) => {
     const c = d.data();
     if (c.status === "pending") pendingNames.push(c.name || c.email || "ไม่ระบุชื่อ");
   });
-  if (pendingNames.length > 0) {
-    notifications.push({
-      key: "pending_accounts",
-      icon: icon("star"),
-      level: "urgent",
-      count: pendingNames.length,
-      title: `คำขอลงทะเบียนรออนุมัติ ${pendingNames.length} รายการ`,
-      detail: pendingNames.slice(0, 5).join(", ") + (pendingNames.length > 5 ? " และอื่นๆ" : ""),
-      link: "attendance.html#admin=approvals"
-    });
-  }
 
-  // 2) อาการบาดเจ็บที่ยังไม่หาย (แยกระดับรุนแรงเป็นรายการเร่งด่วน)
+  // 2) อาการบาดเจ็บที่ยังไม่หาย
   const activeInjuries = [];
   injurySnap.forEach((d) => {
     const inj = d.data();
     if (inj.status !== "หายแล้ว") activeInjuries.push(inj);
   });
-  const severeInjuries = activeInjuries.filter((inj) => inj.severity === "รุนแรง");
-  if (severeInjuries.length > 0) {
-    notifications.push({
-      key: "severe_injuries",
-      icon: icon("heart-pulse"),
-      level: "urgent",
-      count: severeInjuries.length,
-      title: `นักกีฬาบาดเจ็บระดับรุนแรงที่ยังไม่หาย ${severeInjuries.length} คน`,
-      detail: severeInjuries.map((inj) => `${inj.playerName ?? "-"} (${inj.team ?? "-"})`).join(", "),
-      link: "attendance.html#admin=injuries"
-    });
-  }
-  const otherActiveCount = activeInjuries.length - severeInjuries.length;
-  if (otherActiveCount > 0) {
-    notifications.push({
-      key: "other_injuries",
-      icon: icon("heart-pulse"),
-      level: "info",
-      count: otherActiveCount,
-      title: `นักกีฬาบาดเจ็บที่ยังไม่หาย ${otherActiveCount} คน`,
-      detail: "ระดับปานกลาง/กำลังพักฟื้น — ไม่เร่งด่วนเท่าระดับรุนแรง",
-      link: "attendance.html#admin=injuries"
-    });
-  }
 
   // 3) แผนการฝึกซ้อมที่ยังไม่ส่ง ย้อนหลัง 14 วัน — นับเฉพาะวันที่ทีมนั้นมีวันซ้อมจริง (มี sessions และไม่ได้ติ๊ก
   // "วันนี้ไม่มีฝึกซ้อม") ไม่ใช่ทุกวันตามปฏิทิน ของวันนี้เองยังไม่นับว่าขาดจนกว่าจะเลยเวลาเส้นตาย
@@ -743,21 +710,8 @@ export async function loadAdminNotifications() {
     deadlineHour: TRAINING_PLAN_DEADLINE_HOUR,
     currentHour: bangkokHour()
   });
-  if (missingPlanDaysByTeam.size > 0) {
-    notifications.push({
-      key: "missing_plans_recent",
-      icon: icon("clock"),
-      level: "action",
-      count: missingPlanDaysByTeam.size,
-      title: `ทีมที่มีวันขาดส่งแผนการฝึกซ้อมใน 14 วันที่ผ่านมา ${missingPlanDaysByTeam.size} ทีม`,
-      detail: Array.from(missingPlanDaysByTeam.entries()).map(([t, count]) => `${t} (ขาด ${count} วัน)`).join(", "),
-      // เปิด Dashboard ของทีมแรกที่ขาดส่งแผน (Dashboard ไม่มีภาพรวมหลายทีมแล้ว ทีมอื่นเลือกดูต่อด้วยปุ่ม "เปลี่ยนทีม") และ
-      // #training-plan-summary-section ให้เลื่อนไปที่ตารางสรุปแผนการฝึกซ้อมโดยตรง
-      link: `index.html?team=${encodeURIComponent(missingPlanDaysByTeam.keys().next().value)}#training-plan-summary-section`
-    });
-  }
 
-  // 4) โค้ชที่ส่งแผนการฝึกซ้อมสายเกินเกณฑ์ในเดือนนี้ (ใช้เกณฑ์เดียวกับหน้าสรุปแผนการฝึกซ้อมใน Dashboard)
+  // 4) โค้ชที่ส่งแผนการฝึกซ้อมสายเกินเกณฑ์ในเดือนนี้ (ใช้เกณฑ์เดียวกับหน้าสรุปแผนการฝึกซ้อม)
   const monthPlans = plans.filter((p) => (p.date || "").startsWith(thisMonth));
   const coachGroups = new Map();
   for (const p of monthPlans) {
@@ -770,17 +724,6 @@ export async function loadAdminNotifications() {
     if (isTrainingPlanLate(p)) g.late += 1;
   }
   const lateCoaches = Array.from(coachGroups.values()).filter((g) => g.late > TRAINING_PLAN_LATE_WARNING_THRESHOLD);
-  if (lateCoaches.length > 0) {
-    notifications.push({
-      key: "late_coaches_month",
-      icon: icon("trending-down"),
-      level: "action",
-      count: lateCoaches.length,
-      title: `โค้ชที่ส่งแผนการฝึกซ้อมสายเกินเกณฑ์เดือนนี้ ${lateCoaches.length} คน`,
-      detail: lateCoaches.map((g) => `${g.coachName} (สาย ${g.late}/${g.total} ครั้ง)`).join(", "),
-      link: `index.html?team=${encodeURIComponent(lateCoaches[0].team)}#training-plan-summary-section`
-    });
-  }
 
   // 5) การประเมินนักกีฬาที่ยังไม่ครบ ย้อนหลัง 14 วัน (ตรวจเฉพาะวันที่มีการฝึกซ้อมจริงของแต่ละทีม — ใช้ sessions
   // ชุดเดียวกับข้อ 3 ด้านบน) — ดึงจำนวนนักกีฬาต่อทีมครั้งเดียวต่อทีม (ไม่ใช่ต่อวันซ้อม) แล้วเช็ค attendance ของ
@@ -808,20 +751,7 @@ export async function loadAdminNotifications() {
     if (!team) continue;
     incompleteDaysByTeam.set(team, (incompleteDaysByTeam.get(team) || 0) + 1);
   }
-  if (incompleteDaysByTeam.size > 0) {
-    // แนบชื่อทีมแรกที่ยังไม่ครบไปกับลิงก์ ให้หน้าความคืบหน้าเปิดทีมนั้นให้ทันที (ไม่ต้องไล่หาเอง) — ถ้ามีหลาย
-    // ทีมค้างอยู่ ทีมอื่นๆ ยังเลือกดูต่อได้จากปุ่มเลือกทีมในหน้านั้นตามปกติ
-    notifications.push({
-      key: "incomplete_evaluations_recent",
-      icon: icon("clipboard-list"),
-      level: "info",
-      count: incompleteDaysByTeam.size,
-      title: `ทีมที่มีวันประเมินนักกีฬาไม่ครบใน 14 วันที่ผ่านมา ${incompleteDaysByTeam.size} ทีม`,
-      detail: Array.from(incompleteDaysByTeam.entries()).map(([t, count]) => `${t} (${count} วัน)`).join(", "),
-      link: `attendance.html#admin=progress&team=${encodeURIComponent(incompleteDaysByTeam.keys().next().value)}`
-    });
-  }
-
+  notifications.push(...buildAdminNotifications({ pendingNames, fallbackTeam: Object.keys(TEAM_COLORS)[0], activeInjuries, missingPlanDaysByTeam, lateCoaches, incompleteDaysByTeam }));
   // อ่านสถานะ "อ่านแล้ว" ต่อรายการ — เทียบ contentHash (ใช้ detail ตรงๆ) กับครั้งล่าสุดที่กดอ่าน ถ้าเนื้อหา
   // เปลี่ยนไป (เช่น มีคนเพิ่มเข้ามาอีก) ถือว่า "ยังไม่อ่าน" ใหม่โดยอัตโนมัติ ไม่ต้องรอผู้ดูแลระบบมากดอ่านซ้ำเอง
   const readSnap = await getDocs(collection(db, "adminNotificationReads"));
@@ -878,7 +808,7 @@ export function renderAdminNotifications(listEl, notifications) {
         : `<button type="button" class="btn-icon flex-shrink-0" data-mark-read-index="${i}" title="ทำเครื่องหมายว่าอ่านแล้ว" aria-label="ทำเครื่องหมายว่าอ่านแล้ว">${icon("check")}</button>`;
       return `
     <div class="flex items-start gap-1 rounded-lg hover:bg-slate-50 ${NOTIFICATION_LEVEL_CLASS[n.level] || ""} ${unreadClass}">
-      <a href="${n.link}" class="flex-1 min-w-0 p-3">
+      <a href="${n.link}"${n.screen ? ` data-notif-screen="${escapeHtml(n.screen)}" data-notif-team="${escapeHtml(n.team ?? "")}"` : ""} class="flex-1 min-w-0 p-3">
         <p class="text-sm font-medium text-slate-900">${n.read ? "" : '<span class="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 mr-1 align-middle"></span>'}${n.icon} ${n.title}</p>
         <p class="text-xs text-slate-500 mt-0.5">${n.detail}</p>
       </a>

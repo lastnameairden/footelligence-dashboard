@@ -1008,9 +1008,25 @@ notificationMarkAllReadBtn.addEventListener("click", async () => {
   }
 });
 
+// การแจ้งเตือนของแอดมินแยกตามทีม: กดรายการของทีมไหนก็เข้าหน้าทีมนั้นตรงหน้าที่เกี่ยวข้องเลย (ไม่โหลดหน้าใหม่)
+// รายการที่ไม่ผูกทีม (เช่น คำขอลงทะเบียน) เปิดในทีมที่ดูอยู่ ถ้าไม่ได้อยู่ในทีมใช้ทีมในลิงก์
+async function openNotificationTarget(team, screen) {
+  if (!TEAMS.includes(team)) return;
+  if (adminSpace() && team === myTeam) return openCoachScreen(screen);
+  await enterTeamSpace(team, "admin", () => openCoachScreen(screen));
+}
+
 // คลิกปุ่ม "✓" ในรายการเพื่อทำเครื่องหมายว่าอ่านแล้วทีละรายการ (event delegation เพราะรายการถูกสร้างใหม่
 // ทุกครั้งที่โหลดข้อมูล) กันไม่ให้คลิกไปโดนลิงก์ที่ห่ออยู่ด้วย (preventDefault + stopPropagation)
 notificationList.addEventListener("click", async (e) => {
+  const teamLink = e.target.closest("a[data-notif-screen]");
+  if (teamLink && !e.target.closest("[data-mark-read-index]") && currentIsAdmin && !isStaffSession()) {
+    e.preventDefault();
+    notificationPanel.classList.add("hidden");
+    const linkTeam = new URLSearchParams(teamLink.getAttribute("href").split("#")[1] || "").get("team");
+    await openNotificationTarget(teamLink.dataset.notifTeam || (adminSpace() ? myTeam : linkTeam), teamLink.dataset.notifScreen);
+    return;
+  }
   // รายการของโค้ชที่ลิงก์ไปหน้าจอในเมนู (#screen=...) เปิดในหน้าเดิมเลย ไม่โหลดหน้าใหม่ (และไม่ทำให้แอดมินที่สวมบทบาทโค้ชหลุดบริบท)
   const link = e.target.closest("a[href]");
   if (link && !e.target.closest("[data-mark-read-index]") && coachNavVisible()) {
