@@ -2,7 +2,7 @@
 // โค้ชกรอกเดือนละครั้ง (ภายในวันที่ 25 ของเดือนก่อนหน้า) 1 เอกสารต่อทีมต่อเดือน: monthlyEvents/{ทีม}__{YYYY-MM}
 // ช่อง "เดือนนี้ไม่มี Event" แยก "ไม่มี Event" ออกจาก "ลืมกรอก" — ทีมหลังบ้าน/แอดมินดูสถานะของทุกทีมได้ในหน้าเดียว
 import { addDaysToDate, addMonthsToMonth } from "./coach-meetings.js";
-import { escapeHtml } from "./ui-utils.js";
+import { ageGroupSortKey, escapeHtml } from "./ui-utils.js";
 import { formatPhone, normalizePhone } from "./player-profile-fields.js";
 
 export const DUE_DAY = 25;
@@ -107,7 +107,8 @@ export function defaultMonth(today) {
   const cur = today.slice(0, 7);
   return Number(today.slice(8, 10)) >= 15 ? addMonthsToMonth(cur, 1) : cur;
 }
-export const eventDocId = (team, month) => `${team}__${month}`;
+// 1 เอกสารต่อโค้ช 1 คนต่อเดือน (โค้ชหลายคนในทีมกรอกได้ไม่ทับกัน) — เอกสารแบบเดิมที่กรอกทั้งทีมมี id {ทีม}__{เดือน} และไม่มี coachId
+export const eventDocId = (team, month, coachId) => `${team}__${month}__${coachId}`;
 
 // กำหนดส่งของเดือนที่แจ้ง = วันที่ 25 ของเดือนก่อนหน้า (ถึง 23:59) เว้นแต่เดือนนั้นมีกำหนดพิเศษใน DEADLINE_OVERRIDES
 export function deadlineFor(month) {
@@ -158,7 +159,8 @@ const hasBadChar = (s) => /[<>]/.test(s);
 const text = (v) => String(v ?? "").trim();
 
 // ฟอร์ม (ค่าที่อ่านจากหน้าจอ) → { value, errors } — value คือเอกสารที่จะเก็บ (ไม่มีฟิลด์ undefined)
-export function validateEventForm(form) {
+// opts.allowedAgeGroups = รุ่นที่โค้ชคนนี้รับผิดชอบ (ตัวเลือกรุ่นและชั้นที่สอบต้องอยู่ในนี้) — ไม่ระบุ = ไม่จำกัด
+export function validateEventForm(form, { allowedAgeGroups = null } = {}) {
   const errors = [];
   const contactName = text(form.contactName);
   if (!contactName) errors.push("กรอกชื่อผู้กรอก");
@@ -173,7 +175,8 @@ export function validateEventForm(form) {
   if (!noEvent && raw.length === 0) errors.push("เพิ่ม Event อย่างน้อย 1 รายการ หรือติ๊ก \"เดือนนี้ไม่มี Event\"");
   if (raw.length > MAX_EVENTS) errors.push(`เพิ่ม Event ได้ไม่เกิน ${MAX_EVENTS} รายการ`);
 
-  const events = noEvent ? [] : raw.slice(0, MAX_EVENTS).map((e, i) => normalizeEvent(e, `Event ${i + 1}`, errors));
+  const allowed = allowedAgeGroups?.length ? allowedAgeGroups : null;
+  const events = noEvent ? [] : raw.slice(0, MAX_EVENTS).map((e, i) => normalizeEvent(e, `Event ${i + 1}`, errors, allowed));
   return {
     errors,
     value: errors.length ? null : { noEvent, contactName, contactPhone: phone, events }
@@ -185,7 +188,7 @@ function timeRange(label, start, end, fail) {
   else if (end <= start) fail(`${label}: เวลาจบต้องหลังเวลาเริ่ม`);
 }
 
-function normalizeEvent(e, label, errors) {
+function normalizeEvent(e, label, errors, allowed = null) {
   const fail = (msg) => errors.push(`${label}: ${msg}`);
   const type = typeOf(e.type);
   if (!type) fail("เลือกประเภท");
@@ -201,8 +204,13 @@ function normalizeEvent(e, label, errors) {
   if (kind === "exam" && examLevels.length === 0) fail("เลือกชั้นที่สอบอย่างน้อย 1 ชั้น");
   // สอบ: รุ่นที่เกี่ยวข้อง = map จากชั้นที่สอบ · ประเภทอื่น: เลือกเอง (ทุกรุ่น = เลือกครบ U6–U18)
   let ageGroups = kind === "exam" ? ageGroupsForExamLevels(examLevels) : [];
+  if (kind === "exam" && allowed && ageGroups.some((g) => !allowed.includes(g))) fail(`ชั้นที่สอบต้องตรงกับรุ่นที่คุณรับผิดชอบ (${allowed.join(", ")})`);
   if (kind !== "exam") {
-    const picked = (e.ageGroups || []).includes(ALL_AGES) ? AGE_OPTIONS : AGE_OPTIONS.filter((g) => (e.ageGroups || []).includes(g));
+    const options = allowed ?? AGE_OPTIONS; // โค้ชกรอกได้เฉพาะรุ่นของตัวเอง
+    const chosen = (e.ageGroups || []).filter((g) => g !== ALL_AGES);
+    const outside = allowed ? chosen.filter((g) => !allowed.includes(g)) : [];
+    if (outside.length > 0) fail(`รุ่น ${outside.join(", ")} ไม่ใช่รุ่นที่คุณรับผิดชอบ`);
+    const picked = (e.ageGroups || []).includes(ALL_AGES) ? options : options.filter((g) => chosen.includes(g));
     ageGroups = picked;
     if (picked.length === 0) fail("เลือกรุ่นที่เกี่ยวข้อง");
   }
@@ -325,19 +333,42 @@ export function formFromDoc(doc) {
     }))
   };
 }
-// ---------- ภาพรวมของทุกทีม (ทีมหลังบ้าน/แอดมิน) ----------
+// ---------- ผลการกรอกของโค้ชทุกคนในทีม (หน้าโค้ช = ของคนอื่น · หน้าทีมงาน/แอดมิน = ทั้งทีม) ----------
 export const eventStatus = (doc) => (!doc ? "none" : doc.noEvent ? "no-event" : "submitted");
 
-// docs = เอกสารของเดือนที่เลือก (ทุกทีม) · teams = ลำดับทีมที่ต้องแสดงเสมอ แม้ยังไม่มีเอกสาร (เพื่อให้เห็นทีมที่ยังไม่กรอก)
-export function overviewModel({ teams, month, docs = [] }) {
-  const byTeam = new Map(docs.filter((d) => d.month === month).map((d) => [d.team, d]));
-  const rows = teams.map((team) => {
-    const doc = byTeam.get(team) ?? null;
-    const events = [...(doc?.events || [])].sort((a, b) => String(a.start).localeCompare(String(b.start)));
-    return { team, status: eventStatus(doc), contactName: doc?.contactName ?? "", contactPhone: doc?.contactPhone ?? "", submittedDate: doc?.submittedDate ?? "", firstSubmittedDate: doc?.firstSubmittedDate ?? doc?.submittedDate ?? "", events };
-  });
+const LEGACY_NAME = "ข้อมูลเดิมที่กรอกทั้งทีม";
+const byEarliestGroup = (a, b) => ageGroupSortKey(a.ageGroups || []) - ageGroupSortKey(b.ageGroups || []) || String(a.name).localeCompare(String(b.name), "th");
+
+function rowOf(coach, doc) {
+  const events = [...(doc?.events || [])].sort((a, b) => String(a.start).localeCompare(String(b.start)));
+  return {
+    coachId: coach.id ?? "",
+    name: coach.name ?? doc?.coachName ?? "-",
+    ageGroups: coach.ageGroups ?? doc?.coachAgeGroups ?? [],
+    status: eventStatus(doc),
+    contactName: doc?.contactName ?? "",
+    contactPhone: doc?.contactPhone ?? "",
+    submittedDate: doc?.submittedDate ?? "",
+    firstSubmittedDate: doc?.firstSubmittedDate ?? doc?.submittedDate ?? "",
+    events
+  };
+}
+
+// docs = monthlyEvents ของทีมนี้ (เดือนที่เลือก) · coaches = โค้ชที่อนุมัติแล้วของทีม [{ id, name, ageGroups }] (แสดงทุกคน แม้ยังไม่กรอก)
+// เอกสารแบบเดิมที่กรอกทั้งทีม (ไม่มี coachId) แสดงเป็นแถว legacy ดูอย่างเดียว ไม่นับในจำนวนโค้ชที่ส่ง
+export function teamEventsModel({ team, month, docs = [], coaches = [] }) {
+  const mine = docs.filter((d) => d.team === team && d.month === month);
+  const byCoach = new Map(mine.filter((d) => d.coachId).map((d) => [d.coachId, d]));
+  const rows = coaches.map((c) => rowOf(c, byCoach.get(c.id)));
+  for (const d of byCoach.values()) if (!coaches.some((c) => c.id === d.coachId)) rows.push(rowOf({ id: d.coachId }, d)); // เจ้าของเอกสารที่ไม่อยู่ในรายชื่อโค้ชที่อนุมัติแล้ว ยังต้องเห็นข้อมูลที่กรอกไว้
+  rows.sort(byEarliestGroup);
+  const legacyDoc = mine.find((d) => !d.coachId) ?? null;
+  const legacy = legacyDoc ? { ...rowOf({ id: "", name: LEGACY_NAME, ageGroups: [] }, legacyDoc), legacy: true } : null;
+  const allEvents = [...rows, ...(legacy ? [legacy] : [])]
+    .flatMap((r) => r.events.map((e) => ({ ...e, coachName: r.name })))
+    .sort((a, b) => String(a.start).localeCompare(String(b.start)));
   const count = (s) => rows.filter((r) => r.status === s).length;
-  return { month, rows, summary: { submitted: count("submitted"), noEvent: count("no-event"), missing: count("none"), total: rows.length } };
+  return { team, month, rows, legacy, allEvents, summary: { submitted: count("submitted"), noEvent: count("no-event"), missing: count("none"), total: rows.length } };
 }
 
 const STATUS_BADGE = { submitted: ["badge-success", "ส่งแล้ว"], "no-event": ["badge-info", "ไม่มี Event"], none: ["badge-danger", "ยังไม่กรอก"] };
@@ -378,7 +409,9 @@ function detailText(e) {
   if (e.note) parts.push(e.note);
   return parts.join(" · ");
 }
-export function eventRowsHtml(events) {
+
+// showCoach = เพิ่มคอลัมน์ชื่อโค้ชผู้กรอก (รายการรวมทั้งทีม — แต่ละ event ต้องมี coachName)
+export function eventRowsHtml(events, { showCoach = false } = {}) {
   if (!events.length) return '<p class="text-sm text-slate-500">ไม่มีรายการ</p>';
   const rows = events
     .map((e) => {
@@ -387,13 +420,14 @@ export function eventRowsHtml(events) {
       return `<tr>
         <td>${escapeHtml(rangeLabel(e.start, e.end))}</td>
         <td><span class="emphasis">${escapeHtml(typeLabel(e.type))}</span> · ${escapeHtml(e.title)}${detail ? `<div class="text-xs text-slate-500">${escapeHtml(detail)}</div>` : ""}</td>
+        ${showCoach ? `<td>${escapeHtml(e.coachName ?? "-")}</td>` : ""}
         <td>${escapeHtml(ages || "-")}</td>
         <td><span class="badge ${effectBadge(e)[0]}">${escapeHtml(effectBadge(e)[1])}</span></td>
         <td>${escapeHtml(isScheduleChange(e.type) ? "-" : awayText(e))}</td>
       </tr>`;
     })
     .join("");
-  return `<div class="table-wrap"><table class="pro-table"><thead><tr><th>วันที่</th><th>ประเภท · ชื่อ</th><th>รุ่น</th><th>ผลต่อการซ้อม</th><th>นักเตะไม่อยู่</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  return `<div class="table-wrap"><table class="pro-table"><thead><tr><th>วันที่</th><th>ประเภท · ชื่อ</th>${showCoach ? "<th>โค้ช</th>" : ""}<th>รุ่น</th><th>ผลต่อการซ้อม</th><th>นักเตะไม่อยู่</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 // วันที่ส่ง (และวันที่แก้ไขล่าสุด ถ้าโค้ชแก้หลังส่งไปแล้ว)
@@ -406,39 +440,39 @@ function whenHtml(r) {
 const tile = (label, value, tone = "") =>
   `<div class="admin-home-tile${tone ? ` admin-home-tile-${tone}` : ""}"><span class="admin-home-tile-label">${escapeHtml(label)}</span><span class="admin-home-tile-value">${value}</span></div>`;
 
-// โรงเรียนเดียว (หน้าทีมของทีมหลังบ้าน/แอดมิน): แสดงเฉพาะข้อมูลของโรงเรียนที่เลือก ไม่มีสรุปรวมทุกทีม
-const SINGLE_NOTE = { none: "โรงเรียนนี้ยังไม่ส่ง Event ของเดือนนี้", "no-event": "โรงเรียนนี้แจ้งว่าเดือนนี้ไม่มี Event" };
-function singleTeamHtml(model) {
-  const r = model.rows[0];
-  const [cls, label] = STATUS_BADGE[r.status];
-  const when = whenHtml(r);
-  const who = r.contactName ? `<p class="text-sm text-slate-500">ผู้กรอก: ${escapeHtml(r.contactName)}${r.contactPhone ? ` · ${escapeHtml(formatPhone(r.contactPhone))}` : ""}</p>` : "";
-  const body = r.status === "submitted" ? eventRowsHtml(r.events) : `<p class="text-sm text-slate-500">${SINGLE_NOTE[r.status]}</p>`;
-  return `<div class="card card-pad space-y-3">
-    <div class="flex items-center justify-between flex-wrap gap-2"><h3 class="section-title">${escapeHtml(r.team)} · Event ประจำเดือน${escapeHtml(monthLabel(model.month))}</h3><span><span class="badge ${cls}">${label}</span>${when}</span></div>
-    ${who}${body}
-  </div>`;
-}
+const agesText = (r) => (r.ageGroups?.length ? r.ageGroups.join(", ") : "");
+const whoText = (r) => (r.contactName ? `${escapeHtml(r.contactName)}${r.contactPhone ? ` · ${escapeHtml(formatPhone(r.contactPhone))}` : ""}` : "-");
 
-export function overviewHtml(model) {
-  if (model.rows.length === 1) return singleTeamHtml(model);
-  const { rows, summary: s } = model;
-  const tiles = `<div class="admin-home-tiles">${tile("ส่งแล้ว", `${s.submitted} / ${s.total}`, s.submitted === s.total ? "ok" : "")}${tile("ไม่มี Event", String(s.noEvent))}${tile("ยังไม่กรอก", String(s.missing), s.missing > 0 ? "bad" : "ok")}</div>`;
-  const table = rows
+// การ์ดต่อโค้ช (หน้าโค้ช: ผลการกรอกของโค้ชคนอื่นในทีม ดูอย่างเดียว) — excludeCoachId = ไม่แสดงของตัวเอง (อยู่ในฟอร์มด้านบนแล้ว)
+export function coachEntriesHtml(model, { excludeCoachId = "" } = {}) {
+  const list = [...model.rows.filter((r) => !excludeCoachId || r.coachId !== excludeCoachId), ...(model.legacy ? [model.legacy] : [])];
+  if (list.length === 0) return '<p class="text-sm text-slate-500">ยังไม่มีโค้ชคนอื่นในทีมนี้</p>';
+  return list
     .map((r) => {
       const [cls, label] = STATUS_BADGE[r.status];
-      const when = whenHtml(r);
-      const who = r.contactName ? `${escapeHtml(r.contactName)}${r.contactPhone ? ` · ${escapeHtml(formatPhone(r.contactPhone))}` : ""}` : "-";
-      return `<tr><td class="emphasis">${escapeHtml(r.team)}</td><td><span class="badge ${cls}">${label}</span>${when}</td><td>${r.events.length ? `${r.events.length} รายการ` : "-"}</td><td>${who}</td></tr>`;
+      const body = r.status === "submitted" ? eventRowsHtml(r.events) : r.status === "no-event" ? '<p class="text-sm text-slate-500">แจ้งว่าเดือนนี้ไม่มี Event</p>' : '<p class="text-sm text-slate-500">ยังไม่ได้กรอก</p>';
+      return `<div class="event-entry">
+        <div class="flex items-center justify-between flex-wrap gap-2"><strong>${escapeHtml(r.name)}${agesText(r) ? ` <span class="text-sm text-slate-500 font-normal">· ${escapeHtml(agesText(r))}</span>` : ""}</strong><span><span class="badge ${cls}">${label}</span>${whenHtml(r)}</span></div>
+        ${body}
+      </div>`;
     })
     .join("");
-  const details = rows
-    .filter((r) => r.events.length)
-    .map((r) => `<div class="space-y-2"><h4 class="admin-chart-title">${escapeHtml(r.team)} · รายการ Event</h4>${eventRowsHtml(r.events)}</div>`)
+}
+
+// หน้าทีมงาน/แอดมิน: สรุปจำนวนโค้ชที่ส่ง + ตารางสถานะรายโค้ช + รายการ Event รวมทั้งทีมเรียงตามวัน (มีคอลัมน์โค้ช)
+export function teamOverviewHtml(model) {
+  const s = model.summary;
+  const tiles = `<div class="admin-home-tiles">${tile("โค้ชที่ส่งแล้ว", `${s.submitted + s.noEvent} / ${s.total}`, s.missing === 0 && s.total > 0 ? "ok" : "")}${tile("แจ้งว่าไม่มี Event", String(s.noEvent))}${tile("ยังไม่กรอก", String(s.missing), s.missing > 0 ? "bad" : "ok")}</div>`;
+  const rows = [...model.rows, ...(model.legacy ? [model.legacy] : [])]
+    .map((r) => {
+      const [cls, label] = STATUS_BADGE[r.status];
+      return `<tr><td class="emphasis">${escapeHtml(r.name)}</td><td>${escapeHtml(agesText(r) || "-")}</td><td><span class="badge ${cls}">${label}</span>${whenHtml(r)}</td><td>${r.events.length ? `${r.events.length} รายการ` : "-"}</td><td>${whoText(r)}</td></tr>`;
+    })
     .join("");
+  const table = rows ? `<div class="table-wrap"><table class="pro-table"><thead><tr><th>โค้ช</th><th>รุ่น</th><th>สถานะ</th><th>Event</th><th>ผู้กรอก</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p class="text-sm text-slate-500">ยังไม่มีโค้ชในทีมนี้</p>';
   return `<div class="card card-pad space-y-3">
-    <h3 class="section-title">Event ประจำเดือน${escapeHtml(monthLabel(model.month))}</h3>
+    <h3 class="section-title">${escapeHtml(model.team)} · Event ประจำเดือน${escapeHtml(monthLabel(model.month))}</h3>
     ${tiles}
-    <div class="table-wrap"><table class="pro-table"><thead><tr><th>โรงเรียน</th><th>สถานะ</th><th>Event</th><th>ผู้กรอก</th></tr></thead><tbody>${table}</tbody></table></div>
-  </div>${details ? `<div class="card card-pad space-y-4">${details}</div>` : ""}`;
+    ${table}
+  </div>${model.allEvents.length ? `<div class="card card-pad space-y-2"><h4 class="admin-chart-title">รายการ Event ทั้งทีม (เรียงตามวัน)</h4>${eventRowsHtml(model.allEvents, { showCoach: true })}</div>` : ""}`;
 }

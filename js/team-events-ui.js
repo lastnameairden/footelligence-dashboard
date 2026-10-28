@@ -4,7 +4,6 @@ import { collection, doc, getDocs, query, serverTimestamp, setDoc, where } from 
 import { db } from "./firebase-init.js";
 import { coachPositionLabel, escapeHtml, todayBangkok } from "./ui-utils.js";
 import {
-  AGE_OPTIONS,
   ALL_AGES,
   AWAY_MODES,
   CHANGE_REASONS,
@@ -15,6 +14,7 @@ import {
   MAX_MATCHES,
   SUBSTITUTE_OPTIONS,
   VENUES,
+  ageGroupForLevel,
   ageGroupsForExamLevels,
   bangkokStamp,
   dateLabel,
@@ -28,17 +28,20 @@ import {
   kindOfType,
   monthLabel,
   monthOptions,
-  overviewHtml,
-  overviewModel,
+  coachEntriesHtml,
+  teamEventsModel,
+  teamOverviewHtml,
   validateEventForm
 } from "./team-events.js";
 
-// api = { mode() = "fill" | "view", team() = ทีมของโค้ช / ทีมที่เปิดดูอยู่ (โหมดดูแสดงเฉพาะโรงเรียนนี้), coach() = { name, phone } ค่าตั้งต้นของผู้กรอก, uid() }
+// api = { mode() = "fill" | "view", team() = ทีมของโค้ช / ทีมที่เปิดดูอยู่ (โหมดดูแสดงเฉพาะโรงเรียนนี้), coach() = { name, phone } ค่าตั้งต้นของผู้กรอก, uid(),
+//         coachId() = โค้ชเจ้าของฟอร์ม, ageGroups() = รุ่นที่โค้ชคนนี้รับผิดชอบ (กรอกได้เฉพาะรุ่นเหล่านี้) }
 let api = null;
 let box = null;
 let month = "";
 let draft = null;
-let saved = null; // เอกสารที่เก็บไว้ของเดือนที่เลือก (null = ยังไม่เคยส่ง)
+let saved = null; // เอกสารของโค้ชคนนี้ในเดือนที่เลือก (null = ยังไม่เคยส่ง)
+let teamDocs = []; // เอกสารของทุกคนในทีมในเดือนที่เลือก (แสดงผลการกรอกของโค้ชคนอื่น)
 let players = []; // นักกีฬาของทีม (ไว้เลือกชื่อนักเตะที่ไม่อยู่)
 let coaches = []; // โค้ชของทีม (ไว้เลือกโค้ชที่ลา)
 let statusHtml = "";
@@ -51,6 +54,9 @@ const options = (list, selected, valueOf = (x) => x, labelOf = (x) => x, placeho
 const field = (label, control) => `<div class="event-field"><label class="field-label">${escapeHtml(label)}</label>${control}</div>`;
 const chip = (on, attrs, label) => `<button type="button" class="event-chip${on ? " event-chip-on" : ""}" aria-pressed="${on}" ${attrs}>${escapeHtml(label)}</button>`;
 const input = (at, f, type, value, extra = "") => `<input type="${type}" class="field-input" ${at} data-f="${f}" value="${escapeHtml(value)}" ${extra} />`;
+
+// รุ่นที่โค้ชคนนี้กรอกได้ (เรียงจากน้อยไปมาก) — ไม่มีรุ่น = กรอกไม่ได้
+const myGroups = () => [...api.ageGroups()].sort((a, b) => Number(String(a).replace(/\D/g, "")) - Number(String(b).replace(/\D/g, "")));
 
 const playerName = (p) => p.nickname || p.fullName || p.id;
 const byAgeThenName = (a, b) => String(a.ageGroup).localeCompare(String(b.ageGroup), "en", { numeric: true }) || String(playerName(a)).localeCompare(String(playerName(b)), "th");
@@ -83,14 +89,17 @@ function awayPickerHtml(i, e) {
 
 function ageChipsHtml(e, at) {
   if (kindOfType(e.type) === "exam") {
-    return `<div class="event-chips">${EXAM_LEVELS.map((l) => chip(e.examLevels.includes(l), `${at} data-action="toggle-level" data-level="${l}"`, l)).join("")}</div>
+    const mine = myGroups();
+  return `<div class="event-chips">${EXAM_LEVELS.filter((l) => mine.includes(ageGroupForLevel(l))).map((l) => chip(e.examLevels.includes(l), `${at} data-action="toggle-level" data-level="${l}"`, l)).join("")}</div>
        <p class="text-xs text-slate-500">รุ่นที่เกี่ยวข้อง (ระบบแปลงจากชั้นที่สอบ): ${escapeHtml(ageGroupsForExamLevels(e.examLevels).join(", ") || "-")}</p>`;
   }
-  return `<div class="event-chips">${AGE_OPTIONS.map((g) => chip(e.ageGroups.includes(g), `${at} data-action="toggle-age" data-age="${g}"`, g)).join("")}${chip(AGE_OPTIONS.every((g) => e.ageGroups.includes(g)), `${at} data-action="toggle-age" data-age="${ALL_AGES}"`, ALL_AGES)}</div>`;
+  const mine = myGroups();
+  return `<div class="event-chips">${mine.map((g) => chip(e.ageGroups.includes(g), `${at} data-action="toggle-age" data-age="${g}"`, g)).join("")}${mine.length > 1 ? chip(mine.every((g) => e.ageGroups.includes(g)), `${at} data-action="toggle-age" data-age="${ALL_AGES}"`, "ทุกรุ่นของฉัน") : ""}</div>`;
 }
 
 function coachOptions(e) {
-  const list = coaches.map((c) => ({ id: c.id, label: `${c.name ?? c.email ?? "-"}${c.coachPosition ? ` (${coachPositionLabel(c.coachPosition)})` : ""}` }));
+  const mine = myGroups();
+  const list = coaches.filter((c) => c.id === api.coachId() || (c.ageGroups || []).some((g) => mine.includes(g))).map((c) => ({ id: c.id, label: `${c.name ?? c.email ?? "-"}${c.coachPosition ? ` (${coachPositionLabel(c.coachPosition)})` : ""}` }));
   if (e.coachId && !list.some((c) => c.id === e.coachId)) list.push({ id: e.coachId, label: e.coachName });
   return options(list, e.coachId, (c) => c.id, (c) => c.label, "เลือกโค้ช");
 }
@@ -170,17 +179,20 @@ function eventHtml(e, i) {
 function dueBadge() {
   const info = dueInfo({ month, now: bangkokStamp(), submitted: !!saved });
   const when = deadlineLabel(month);
+  if (!saved && teamDocs.some((d) => !d.coachId)) return `<span class="badge badge-neutral">มีข้อมูลเดิมที่กรอกทั้งทีม · กรอกของคุณเพิ่ม</span>`;
   if (info.state === "submitted") return `<span class="badge badge-success">ส่งแล้ว${saved.submittedDate ? ` ${escapeHtml(dateLabel(saved.submittedDate))}` : ""}</span>`;
   return info.state === "overdue" ? `<span class="badge badge-danger">เลยกำหนด ${escapeHtml(when)}</span>` : `<span class="badge badge-warning">ครบกำหนด ${escapeHtml(when)}</span>`;
 }
 
 function renderFill() {
   const team = api.team();
+  const model = teamEventsModel({ team, month, docs: teamDocs, coaches });
   box.innerHTML = `<div class="card card-pad space-y-4">
     <div class="flex items-center justify-between flex-wrap gap-2"><h3 class="section-title">แจ้ง Event ประจำเดือน</h3>${dueBadge()}</div>
     <div class="event-grid">
       ${field("โรงเรียน", `<select class="field-input" disabled><option>${escapeHtml(team)}</option></select>`)}
       ${field("แจ้งสำหรับเดือน", `<select class="field-input" data-f="month">${options(monthOptions(todayBangkok()), month, (m) => m, monthLabel)}</select>`)}
+      ${field("รุ่นที่คุณกรอกได้", `<input type="text" class="field-input" disabled value="${escapeHtml(myGroups().join(", "))}" />`)}
       ${field("ผู้กรอก", `<input type="text" class="field-input" data-f="contactName" maxlength="80" value="${escapeHtml(draft.contactName)}" />`)}
       ${field("เบอร์ติดต่อ", `<input type="tel" inputmode="tel" class="field-input" data-f="contactPhone" placeholder="08x-xxx-xxxx" value="${escapeHtml(draft.contactPhone)}" />`)}
     </div>
@@ -191,7 +203,12 @@ function renderFill() {
       <button type="button" class="btn btn-primary" data-action="save">บันทึกและส่ง</button>
     </div>
     <div class="text-sm" data-status>${statusHtml}</div>
-    <p class="text-xs text-slate-500">กรอกแล้วแก้ไขได้ตลอดเดือน (เช่น เพิ่มโค้ชลาหรือเปลี่ยนเวลาซ้อม) ส่งซ้ำจะทับของเดิม — ทีมหลังบ้านและผู้ดูแลระบบเห็นวันที่แก้ไขล่าสุดในเมนู Event</p>
+    <p class="text-xs text-slate-500">กรอกได้เฉพาะรุ่นที่คุณดูแล แก้ไขได้ตลอดเดือน (เช่น เพิ่มโค้ชลาหรือเปลี่ยนเวลาซ้อม) ส่งซ้ำจะทับของเดิมของคุณ ไม่กระทบของโค้ชคนอื่น — ทีมหลังบ้านและผู้ดูแลระบบเห็นผลของทุกคนและวันที่แก้ไขล่าสุดในเมนู Event</p>
+  </div>
+  <div class="card card-pad space-y-3">
+    <h3 class="section-title">การกรอกของโค้ชคนอื่นในทีม · ${escapeHtml(monthLabel(month))}</h3>
+    <p class="text-xs text-slate-500">ดูอย่างเดียว — โค้ชแต่ละคนแก้ได้เฉพาะของตัวเอง</p>
+    ${coachEntriesHtml(model, { excludeCoachId: api.coachId() })}
   </div>`;
 }
 
@@ -199,8 +216,8 @@ function renderView(model) {
   box.innerHTML = `<div class="card card-pad flex items-center gap-3 flex-wrap">
       <label class="field-label mb-0">เดือน</label>
       <select class="field-input" style="width:auto" data-f="month">${options(monthOptions(todayBangkok()), month, (m) => m, monthLabel)}</select>
-      <p class="text-sm text-slate-500">ดูอย่างเดียว · โค้ชของโรงเรียนเป็นผู้กรอก</p>
-    </div>${overviewHtml(model)}`;
+      <p class="text-sm text-slate-500">ดูอย่างเดียว · โค้ชแต่ละคนกรอกเฉพาะรุ่นของตัวเอง</p>
+    </div>${teamOverviewHtml(model)}`;
 }
 
 const msg = (text, error = false) => `<span class="${error ? "text-red-600" : "text-slate-500"}">${text}</span>`;
@@ -226,7 +243,8 @@ async function loadFill() {
   try {
     const [snap] = await Promise.all([getDocs(query(collection(db, "monthlyEvents"), where("team", "==", api.team()), where("month", "==", month))), loadRoster()]);
     if (token !== loadToken) return;
-    saved = snap.docs[0]?.data() ?? null;
+    teamDocs = snap.docs.map((d) => d.data());
+    saved = teamDocs.find((d) => d.coachId && d.coachId === api.coachId()) ?? null;
   } catch (err) {
     console.error(err);
     if (token === loadToken) box.innerHTML = `<div class="card card-pad text-sm text-red-600">โหลดข้อมูล Event ไม่สำเร็จ: ${escapeHtml(err.message)}</div>`;
@@ -242,9 +260,13 @@ async function loadView() {
   const token = ++loadToken;
   box.innerHTML = '<p class="text-sm text-slate-400">กำลังโหลด...</p>';
   try {
-    const snap = await getDocs(query(collection(db, "monthlyEvents"), where("team", "==", api.team()), where("month", "==", month)));
+    const [snap, coachSnap] = await Promise.all([
+      getDocs(query(collection(db, "monthlyEvents"), where("team", "==", api.team()), where("month", "==", month))),
+      getDocs(query(collection(db, "coaches"), where("team", "==", api.team()))).catch((err) => (console.error(err), null))
+    ]);
     if (token !== loadToken) return;
-    renderView(overviewModel({ teams: [api.team()], month, docs: snap.docs.map((d) => d.data()) }));
+    const teamCoaches = (coachSnap ? docsOf(coachSnap) : []).filter((x) => x.role === "coach" && x.status === "approved");
+    renderView(teamEventsModel({ team: api.team(), month, docs: snap.docs.map((d) => d.data()), coaches: teamCoaches }));
   } catch (err) {
     console.error(err);
     if (token === loadToken) box.innerHTML = `<div class="card card-pad text-sm text-red-600">โหลดข้อมูล Event ไม่สำเร็จ: ${escapeHtml(err.message)}</div>`;
@@ -252,7 +274,7 @@ async function loadView() {
 }
 
 async function save() {
-  const { value, errors } = validateEventForm(draft);
+  const { value, errors } = validateEventForm(draft, { allowedAgeGroups: myGroups() });
   if (errors.length) {
     box.querySelector("[data-status]").innerHTML = msg(errors.map(escapeHtml).join("<br>"), true);
     return;
@@ -264,9 +286,11 @@ async function save() {
     const team = api.team();
     const submittedDate = todayBangkok();
     const firstSubmittedDate = saved?.firstSubmittedDate ?? saved?.submittedDate ?? submittedDate; // แก้หลังส่ง = วันที่ส่งครั้งแรกยังคงเดิม ทีมหลังบ้านเห็นวันที่แก้ไขล่าสุด
-    const payload = { team, month, ...value, submittedDate, firstSubmittedDate };
-    await setDoc(doc(db, "monthlyEvents", eventDocId(team, month)), { ...payload, updatedAt: serverTimestamp(), updatedBy: api.uid() });
+    const coachId = api.coachId();
+    const payload = { team, month, coachId, coachName: api.coachName() || "-", coachAgeGroups: myGroups(), ...value, submittedDate, firstSubmittedDate };
+    await setDoc(doc(db, "monthlyEvents", eventDocId(team, month, coachId)), { ...payload, updatedAt: serverTimestamp(), updatedBy: api.uid() });
     saved = payload;
+    teamDocs = [...teamDocs.filter((d) => d.coachId !== coachId), payload];
     draft = formFromDoc(saved);
     statusHtml = msg("บันทึกและส่งแล้ว");
     renderFill();
@@ -295,7 +319,7 @@ function onClick(e) {
       draft.events.splice(Number(btn.dataset.ev), 1);
       break;
     case "toggle-age":
-      ev.ageGroups = btn.dataset.age === ALL_AGES ? (AGE_OPTIONS.every((g) => ev.ageGroups.includes(g)) ? [] : [...AGE_OPTIONS]) : toggle(ev.ageGroups, btn.dataset.age);
+      ev.ageGroups = btn.dataset.age === ALL_AGES ? (myGroups().every((g) => ev.ageGroups.includes(g)) ? [] : [...myGroups()]) : toggle(ev.ageGroups, btn.dataset.age);
       ev.awayPlayers = ev.awayPlayers.filter((p) => !p.ageGroup || ev.ageGroups.includes(p.ageGroup)); // รุ่นที่เอาออกแล้ว ไม่เก็บชื่อนักกีฬาของรุ่นนั้น
       break;
     case "toggle-level":

@@ -908,7 +908,10 @@ async function checkEventReminder() {
     const probe = eventReminder({ now, submitted: false });
     if (!probe) return;
     const snap = await getDocs(query(collection(db, "monthlyEvents"), where("team", "==", myTeam), where("month", "==", probe.month)));
-    if (!eventReminder({ now, submitted: !snap.empty })) return;
+    // เตือนเป็นรายบุคคล: ส่งแล้วถ้ามีเอกสารของโค้ชคนนี้ (หรือเอกสารแบบเดิมที่กรอกทั้งทีม ซึ่งไม่ผูกโค้ช)
+    const meId = meetingCoachId();
+    const submitted = snap.docs.some((d) => !d.data().coachId || d.data().coachId === meId);
+    if (!eventReminder({ now, submitted })) return;
     const left = probe.state === "overdue" ? `<span class="text-red-600 font-semibold">เลยกำหนดแล้ว</span>` : probe.daysLeft > 0 ? `เหลืออีก ${probe.daysLeft} วัน` : "ครบกำหนดวันนี้";
     dailyEventBanner.innerHTML = `<div><p class="text-sm font-semibold text-amber-800">${icon("trophy")} ยังไม่ได้แจ้ง Event ของเดือน${escapeHtml(eventMonthLabel(probe.month))}</p><p class="text-sm text-amber-700">กรอกภายใน ${escapeHtml(deadlineLabel(probe.month))} · ${left}</p></div>`;
     const btn = document.createElement("button");
@@ -6535,8 +6538,12 @@ initResults({
 
 initPerfPanel(); // ?perf=1 = แสดงเวลาเปิดเมนูแต่ละหน้า (ปิดด้วย ?perf=0)
 initTeamEvents(document.getElementById("team-events-body"), {
-  mode: () => (teamSpace() ? "view" : "fill"),
+  // โค้ช (หรือแอดมินที่สวมบทบาทโค้ชคนใดคนหนึ่ง) กรอกของตัวเองเฉพาะรุ่นที่ดูแล · หน้าทีมและโหมดจัดการทีมแบบกว้าง (ไม่ระบุโค้ช) ดูผลของทุกคน
+  mode: () => (teamSpace() || !meetingCoachId() || myAgeGroups.length === 0 ? "view" : "fill"),
   team: () => myTeam,
+  coachId: () => meetingCoachId(),
+  ageGroups: () => myAgeGroups,
+  coachName: () => myCoachName,
   coach: () => ({ name: currentCoachRecord?.fullName || currentCoachRecord?.name || "", phone: currentCoachRecord?.phone || "" }),
   uid: () => auth.currentUser.uid
 });

@@ -139,20 +139,22 @@ service cloud.firestore {
       allow delete: if canManageAll() || (canManageTeam() && ownsTeam());
     }
 
-    // Event ประจำเดือนของแต่ละทีม/โรงเรียน (1 เอกสาร = 1 ทีม × 1 เดือน id = {ทีม}__{YYYY-MM}) — โค้ชกรอก/แก้ได้เฉพาะของทีมตัวเอง
+    // Event ประจำเดือน 1 เอกสาร = 1 โค้ช × 1 เดือน id = {ทีม}__{YYYY-MM}__{coachId} — โค้ชเขียน/แก้ได้เฉพาะเอกสารของตัวเอง (coachId = uid) อ่านได้ทุกเอกสารของทีมตัวเอง
+    // (เอกสารแบบเดิมที่กรอกทั้งทีม id = {ทีม}__{YYYY-MM} ไม่มี coachId: อ่านได้ แก้ไม่ได้) รุ่นอายุที่โค้ชเลือกในแต่ละรายการตรวจที่หน้าเว็บ (กฎตรวจรายการในลิสต์ไม่ได้)
+    // เดิม: 1 เอกสาร = 1 ทีม × 1 เดือน — โค้ชกรอก/แก้ได้เฉพาะของทีมตัวเอง
     // (แอดมิน/ทีมหลังบ้านสิทธิ์ manageTeams กรอกแทนได้) ทีมหลังบ้านที่มีสิทธิ์ view ดูได้ทุกทีม ผู้บริหารทีมไม่เกี่ยว ลบได้เฉพาะแอดมินหลัก
     // โค้ชต้อง query ด้วย where team == ทีมตัวเอง (ตามหมายเหตุด้านบน) ไม่อ่านเอกสารตรงๆ เพราะเอกสารที่ยังไม่มีจะถูกปฏิเสธแทนที่จะคืนว่าง
     function validMonthlyEvent(id) {
       let d = request.resource.data;
       return d.team is string && d.month is string && d.month.matches('^[0-9]{4}-(0[1-9]|1[0-2])$')
-             && id == d.team + '__' + d.month
+             && d.coachId is string && id == d.team + '__' + d.month + '__' + d.coachId
              && d.noEvent is bool && d.events is list && d.events.size() <= 30
              && d.contactName is string && d.contactName.size() > 0 && d.contactName.size() <= 80;
     }
     match /monthlyEvents/{id} {
       allow read: if canViewAll() || (canManageTeam() && ownsTeam());
-      allow create: if (canManageAll() || (canManageTeam() && request.resource.data.team == myTeam())) && validMonthlyEvent(id);
-      allow update: if (canManageAll() || (canManageTeam() && ownsTeam() && request.resource.data.team == myTeam())) && validMonthlyEvent(id);
+      allow create: if (canManageAll() || (canManageTeam() && request.resource.data.team == myTeam() && request.resource.data.coachId == request.auth.uid)) && validMonthlyEvent(id);
+      allow update: if (canManageAll() || (canManageTeam() && ownsTeam() && resource.data.coachId == request.auth.uid && request.resource.data.team == myTeam() && request.resource.data.coachId == request.auth.uid)) && validMonthlyEvent(id);
       allow delete: if isAdmin();
     }
 

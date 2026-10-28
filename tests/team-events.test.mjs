@@ -15,8 +15,9 @@ import {
   eventStatus,
   formFromDoc,
   monthOptions,
-  overviewHtml,
-  overviewModel,
+  coachEntriesHtml,
+  teamEventsModel,
+  teamOverviewHtml,
   validateEventForm
 } from "../js/team-events.js";
 
@@ -31,7 +32,7 @@ test("months: default switches to next month from the 15th, due date is the 25th
   assert.equal(dueDateFor("2027-01"), "2026-12-25");
   assert.deepEqual(deadlineFor("2027-01"), { date: "2026-12-25", time: "23:59" });
   assert.equal(deadlineLabel("2027-01"), "25 ธ.ค.");
-  assert.equal(eventDocId("THAWEE SC", "2026-11"), "THAWEE SC__2026-11");
+  assert.equal(eventDocId("THAWEE SC", "2026-11", "c1"), "THAWEE SC__2026-11__c1");
 });
 
 test("due state: submitted wins, otherwise overdue only after the deadline (default 25th 23:59)", () => {
@@ -127,35 +128,62 @@ test("form round trip: stored doc -> form -> validate gives the same events", ()
   assert.deepEqual(again, first);
 });
 
-test("overview: every team listed, missing teams are visible, other months ignored", () => {
+const coachRow = (id, name, ageGroups) => ({ id, name, ageGroups });
+const doc = (coachId, coachName, over = {}) => ({ team: "THAWEE SC", month: "2026-11", coachId, coachName, noEvent: false, contactName: coachName, contactPhone: "0812345678", submittedDate: "2026-10-24", firstSubmittedDate: "2026-10-24", events: [goodMatch()], ...over });
+
+test("eventDocId: one document per coach per month", () => {
+  assert.equal(eventDocId("THAWEE SC", "2026-11", "c1"), "THAWEE SC__2026-11__c1");
+  assert.notEqual(eventDocId("THAWEE SC", "2026-11", "c1"), eventDocId("THAWEE SC", "2026-11", "c2"));
+});
+
+test("a coach can only fill his own age groups: outside groups, 'all' and exam levels are limited to them", () => {
+  const mine = { allowedAgeGroups: ["U15", "U16"] };
+  assert.deepEqual(validateEventForm(form({ events: [{ ...goodMatch(), ageGroups: ["U15"] }] }), mine).errors, []);
+  assert.ok(validateEventForm(form({ events: [{ ...goodMatch(), ageGroups: ["U15", "U17"] }] }), mine).errors.some((m) => m.includes("U17") && m.includes("ไม่ใช่รุ่นที่คุณรับผิดชอบ")));
+  const all = validateEventForm(form({ events: [{ ...goodMatch(), ageGroups: ["ทุกรุ่น"] }] }), mine);
+  assert.deepEqual(all.value.events[0].ageGroups, ["U15", "U16"], "'all' means all of my groups, not U6-U18");
+  const exam = { ...emptyEvent(), type: "exam", title: "สอบ", start: "2026-11-10", end: "2026-11-10", impact: "no-training", examLevels: ["ม.1"] };
+  assert.ok(validateEventForm(form({ events: [exam] }), mine).errors.some((m) => m.includes("ชั้นที่สอบต้องตรงกับรุ่น")), "ม.1 is U13, not mine");
+  assert.deepEqual(validateEventForm(form({ events: [{ ...exam, examLevels: ["ม.3"] }] }), mine).errors, [], "ม.3 is U15");
+  assert.deepEqual(validateEventForm(form({ events: [{ ...goodMatch(), ageGroups: ["U13"] }] })).errors, [], "no restriction when none is given");
+});
+
+test("team overview: every coach is listed (missing ones too), several coaches never overwrite each other", () => {
+  const coaches = [coachRow("c1", "โค้ชบอม", ["U15", "U16"]), coachRow("c2", "โค้ชต้น", ["U17"]), coachRow("c3", "โค้ชบี", ["U13"])];
   const docs = [
-    { team: "THAWEE SC", month: "2026-11", noEvent: false, contactName: "โค้ชบอม", contactPhone: "0812345678", submittedDate: "2026-10-24", events: [{ ...goodMatch(), start: "2026-11-20", title: "หยุด" }, goodMatch()] },
-    { team: "KHAMPHEE FOOTBALL", month: "2026-11", noEvent: true, contactName: "โค้ชต้น", contactPhone: "0891112222", events: [] },
-    { team: "THAMMASATHIT", month: "2026-10", noEvent: true, contactName: "x", events: [] }
+    doc("c1", "โค้ชบอม", { events: [goodMatch(), { ...goodMatch(), title: "งานที่สอง", start: "2026-11-20", end: "2026-11-20" }] }),
+    doc("c2", "โค้ชต้น", { noEvent: true, events: [] }),
+    { ...doc("c9", "คนอื่นทีม", {}), team: "KHAMPHEE FOOTBALL" },
+    { ...doc("c1", "โค้ชบอม", {}), month: "2026-10" }
   ];
-  const m = overviewModel({ teams: ["KHAMPHEE FOOTBALL", "THAWEE SC", "THAMMASATHIT"], month: "2026-11", docs });
-  assert.deepEqual(m.rows.map((r) => r.status), ["no-event", "submitted", "none"]);
+  const m = teamEventsModel({ team: "THAWEE SC", month: "2026-11", docs, coaches });
+  assert.deepEqual(m.rows.map((r) => [r.name, r.status]), [["โค้ชบี", "none"], ["โค้ชบอม", "submitted"], ["โค้ชต้น", "no-event"]], "sorted by age group, one row per coach");
   assert.deepEqual(m.summary, { submitted: 1, noEvent: 1, missing: 1, total: 3 });
-  assert.deepEqual(m.rows[1].events.map((e) => e.start), ["2026-11-08", "2026-11-20"], "events sorted by start date");
-  assert.equal(eventStatus(null), "none");
-  const html = overviewHtml(m);
-  assert.ok(html.includes("ยังไม่กรอก") && html.includes("ไม่มี Event") && html.includes("ส่งแล้ว"));
+  assert.deepEqual(m.allEvents.map((e) => [e.coachName, e.start]), [["โค้ชบอม", "2026-11-08"], ["โค้ชบอม", "2026-11-20"]], "events of every coach in one list, newest data only for this team and month");
+  const html = teamOverviewHtml(m);
+  assert.ok(html.includes("โค้ชที่ส่งแล้ว") && html.includes("2 / 3") && html.includes("ยังไม่กรอก") && html.includes("<th>โค้ช</th>"));
+  assert.equal(html.includes("KHAMPHEE") || html.includes("คนอื่นทีม"), false, "no other team's data");
   assert.equal(/NaN|undefined|null/.test(html), false);
 });
 
-test("single-team overview shows only that school: status, contact, its events, no all-team tiles", () => {
-  const docs = [
-    { team: "THAWEE SC", month: "2026-11", noEvent: false, contactName: "โค้ชบอม", contactPhone: "0812345678", submittedDate: "2026-10-24", events: [goodMatch()] },
-    { team: "THAMMASATHIT", month: "2026-11", noEvent: false, contactName: "คนอื่น", events: [{ ...goodMatch(), title: "ของทีมอื่น" }] }
-  ];
-  const own = overviewHtml(overviewModel({ teams: ["THAWEE SC"], month: "2026-11", docs }));
-  assert.ok(own.includes("THAWEE SC") && own.includes("ฟุตบอลเยาวชนจังหวัด") && own.includes("โค้ชบอม"));
-  assert.equal(own.includes("THAMMASATHIT") || own.includes("ของทีมอื่น") || own.includes("admin-home-tiles"), false);
-  assert.ok(overviewHtml(overviewModel({ teams: ["KHAMPHEE FOOTBALL"], month: "2026-11", docs })).includes("ยังไม่ส่ง Event"));
-  const none = [{ team: "THAWEE SC", month: "2026-11", noEvent: true, contactName: "x", events: [] }];
-  assert.ok(overviewHtml(overviewModel({ teams: ["THAWEE SC"], month: "2026-11", docs: none })).includes("ไม่มี Event"));
+test("legacy whole-team document stays visible as read-only 'old data' and does not count as a coach", () => {
+  const legacy = { team: "THAWEE SC", month: "2026-11", noEvent: false, contactName: "โค้ชบอม", events: [goodMatch()], submittedDate: "2026-10-24" };
+  const m = teamEventsModel({ team: "THAWEE SC", month: "2026-11", docs: [legacy], coaches: [coachRow("c1", "โค้ชบอม", ["U15"])] });
+  assert.equal(m.summary.total, 1);
+  assert.equal(m.summary.missing, 1, "the coach still has to fill his own entry");
+  assert.ok(m.legacy && m.legacy.legacy === true);
+  assert.equal(m.allEvents.length, 1);
+  assert.ok(teamOverviewHtml(m).includes("ข้อมูลเดิมที่กรอกทั้งทีม"));
 });
 
+test("coach page: other coaches' entries are shown read-only, mine is excluded", () => {
+  const coaches = [coachRow("c1", "โค้ชบอม", ["U15"]), coachRow("c2", "โค้ชต้น", ["U17"]), coachRow("c3", "โค้ชบี", ["U13"])];
+  const m = teamEventsModel({ team: "THAWEE SC", month: "2026-11", docs: [doc("c1", "โค้ชบอม"), doc("c2", "โค้ชต้น", { events: [{ ...goodMatch(), title: "ของโค้ชต้น" }] })], coaches });
+  const html = coachEntriesHtml(m, { excludeCoachId: "c1" });
+  assert.ok(html.includes("โค้ชต้น") && html.includes("ของโค้ชต้น") && html.includes("โค้ชบี") && html.includes("ยังไม่ได้กรอก"));
+  assert.equal(html.includes("โค้ชบอม"), false);
+  assert.ok(coachEntriesHtml(teamEventsModel({ team: "THAWEE SC", month: "2026-11", docs: [], coaches: [coachRow("c1", "คนเดียว", ["U15"])] }), { excludeCoachId: "c1" }).includes("ยังไม่มีโค้ชคนอื่น"));
+});
 test("overview html escapes team/event text", () => {
   const docs = [{ team: "T", month: "2026-11", noEvent: false, contactName: "<script>x</script>", events: [{ ...goodMatch(), title: "<img src=x onerror=1>", note: "<b>" }] }];
   const html = overviewHtml(overviewModel({ teams: ["T"], month: "2026-11", docs }));
@@ -163,6 +191,8 @@ test("overview html escapes team/event text", () => {
   assert.equal(html.includes("<img src=x"), false);
 });
 
+const overviewModel = ({ teams, month, docs }) => teamEventsModel({ team: teams[0], month, docs });
+const overviewHtml = (m) => teamOverviewHtml(m);
 const base = (type, over = {}) => ({ ...emptyEvent(), type, ageGroups: ["U15", "U16"], ...over });
 
 test("change day: needs old and new date and a reason; title is generated; no impact/title required", () => {
