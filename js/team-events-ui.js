@@ -315,7 +315,7 @@ const refreshAwayChips = (i) => {
 
 function onClick(e) {
   const btn = e.target.closest("[data-action]");
-  if (btn?.dataset.action === "print-events") return printSheet("size: A4 portrait; margin: 10mm;");
+  if (btn?.dataset.action === "print-events") return printSheet("size: A4 landscape; margin: 8mm;");
   if (!btn || api.mode() !== "fill") return;
   const ev = draft.events[Number(btn.dataset.ev)];
   switch (btn.dataset.action) {

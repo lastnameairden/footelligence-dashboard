@@ -802,9 +802,14 @@ html.booting main::before { content: "กำลังโหลด..."; display: 
 .print-only { display: none; }
 @media print {
   body.printing-sheet .print-only { display: block !important; }
-  body.printing-sheet .sheet-events { font-size: 8.5pt; }
+  /* A4 แนวนอน: ตารางกว้างเต็มพื้นที่พิมพ์ คอลัมน์ตามสัดส่วนใน colgroup ข้อความยาวตัดขึ้นบรรทัดใหม่ ไม่ล้นกรอบ แถวไม่ถูกตัดกลางหน้า หัวตารางซ้ำทุกหน้า */
+  body.printing-sheet .sheet-events { width: 100%; max-width: none; overflow: visible; font-size: 8.5pt; }
+  body.printing-sheet .sheet-events .sheet-table { width: 100%; table-layout: fixed; }
+  body.printing-sheet .sheet-events .sheet-table th, body.printing-sheet .sheet-events .sheet-table td { overflow-wrap: anywhere; word-break: break-word; }
   body.printing-sheet .sheet-events .sheet-table th { font-size: 7.5pt; }
+  body.printing-sheet .sheet-events .sheet-table tr { break-inside: avoid; page-break-inside: avoid; }
   body.printing-sheet .sheet-events .sheet-note { margin: 0.5mm 0 0; }
+  body.printing-sheet .sheet-events h4 { break-after: avoid; }
 }
 .event-entry { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 0.75rem; background: var(--surface-2); }
 .event-card-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }

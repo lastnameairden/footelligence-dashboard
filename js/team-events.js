@@ -477,7 +477,7 @@ export function teamOverviewHtml(model) {
   </div>${model.allEvents.length ? `<div class="card card-pad space-y-2"><h4 class="admin-chart-title">รายการ Event ทั้งทีม (เรียงตามวัน)</h4>${eventRowsHtml(model.allEvents, { showCoach: true })}</div>` : ""}`;
 }
 
-// ใบพิมพ์สรุปการแจ้ง Event ของทีมในเดือนที่เลือก (A4 แนวตั้ง) — สถานะรายโค้ช + รายการ Event ทั้งทีมเรียงตามวัน
+// ใบพิมพ์สรุปการแจ้ง Event ของทีมในเดือนที่เลือก (A4 แนวนอน — ตารางกว้างเต็มหน้า คอลัมน์กำหนดสัดส่วนไว้ ข้อความยาวตัดขึ้นบรรทัดใหม่ ไม่ล้นกรอบ) — สถานะรายโค้ช + รายการ Event ทั้งทีมเรียงตามวัน
 // logo = HTML รูปโลโก้ทีม (ผู้เรียกใส่ให้ เพื่อให้ฟังก์ชันนี้ไม่พึ่ง DOM) · printedAt = ข้อความวันที่พิมพ์
 export function teamEventsSheetHtml(model, { logo = "", printedAt = "" } = {}) {
   const s = model.summary;
@@ -495,7 +495,7 @@ export function teamEventsSheetHtml(model, { logo = "", printedAt = "" } = {}) {
     .map((e) => {
       const detail = detailText(e);
       const ages = e.ageGroups?.length >= AGE_OPTIONS.length ? ALL_AGES : (e.ageGroups || []).join(", ");
-      return `<tr><td class="nw">${escapeHtml(rangeLabel(e.start, e.end))}</td><td class="l"><b>${escapeHtml(typeLabel(e.type))}</b> · ${escapeHtml(e.title)}${detail ? `<div class="sheet-note">${escapeHtml(detail)}</div>` : ""}</td><td class="l">${escapeHtml(e.coachName ?? "-")}</td><td>${escapeHtml(ages || "-")}</td><td>${escapeHtml(effectBadge(e)[1])}</td><td>${escapeHtml(isScheduleChange(e.type) ? "-" : awayText(e))}</td></tr>`;
+      return `<tr><td>${escapeHtml(rangeLabel(e.start, e.end))}</td><td class="l"><b>${escapeHtml(typeLabel(e.type))}</b> · ${escapeHtml(e.title)}${detail ? `<div class="sheet-note">${escapeHtml(detail)}</div>` : ""}</td><td class="l">${escapeHtml(e.coachName ?? "-")}</td><td>${escapeHtml(ages || "-")}</td><td>${escapeHtml(effectBadge(e)[1])}</td><td>${escapeHtml(isScheduleChange(e.type) ? "-" : awayText(e))}</td></tr>`;
     })
     .join("");
   return `<div class="sheet sheet-events print-sheet">
@@ -505,8 +505,8 @@ export function teamEventsSheetHtml(model, { logo = "", printedAt = "" } = {}) {
     </div>
     <p class="sheet-note">โค้ชที่ส่งแล้ว ${s.submitted + s.noEvent} / ${s.total} คน (แจ้งว่าไม่มี Event ${s.noEvent} · ยังไม่กรอก ${s.missing})</p>
     <h4>สถานะรายโค้ช</h4>
-    ${people.length ? `<table class="sheet-table"><thead><tr><th>โค้ช</th><th>รุ่น</th><th>สถานะ</th><th>Event</th><th>ผู้กรอก</th></tr></thead><tbody>${coachRows}</tbody></table>` : '<p class="sheet-note">ยังไม่มีโค้ชในทีมนี้</p>'}
+    ${people.length ? `<table class="sheet-table"><colgroup><col style="width:20%"><col style="width:12%"><col style="width:28%"><col style="width:8%"><col style="width:32%"></colgroup><thead><tr><th>โค้ช</th><th>รุ่น</th><th>สถานะ</th><th>Event</th><th>ผู้กรอก</th></tr></thead><tbody>${coachRows}</tbody></table>` : '<p class="sheet-note">ยังไม่มีโค้ชในทีมนี้</p>'}
     <h4>รายการ Event ทั้งทีม (เรียงตามวัน)</h4>
-    ${model.allEvents.length ? `<table class="sheet-table"><thead><tr><th>วันที่</th><th>ประเภท · ชื่อ</th><th>โค้ช</th><th>รุ่น</th><th>ผลต่อการซ้อม</th><th>นักเตะไม่อยู่</th></tr></thead><tbody>${eventRows}</tbody></table>` : '<p class="sheet-note">ไม่มีรายการ Event ในเดือนนี้</p>'}
+    ${model.allEvents.length ? `<table class="sheet-table"><colgroup><col style="width:10%"><col style="width:36%"><col style="width:14%"><col style="width:12%"><col style="width:14%"><col style="width:14%"></colgroup><thead><tr><th>วันที่</th><th>ประเภท · ชื่อ</th><th>โค้ช</th><th>รุ่น</th><th>ผลต่อการซ้อม</th><th>นักเตะไม่อยู่</th></tr></thead><tbody>${eventRows}</tbody></table>` : '<p class="sheet-note">ไม่มีรายการ Event ในเดือนนี้</p>'}
   </div>`;
 }
