@@ -17,6 +17,7 @@ import {
   monthOptions,
   coachEntriesHtml,
   teamEventsModel,
+  teamEventsSheetHtml,
   teamOverviewHtml,
   validateEventForm
 } from "../js/team-events.js";
@@ -260,4 +261,25 @@ test("overview shows the badge per change type and the last edited date after a 
   assert.ok(html.includes("ส่ง 24 ต.ค. · แก้ไขล่าสุด 5 พ.ย."));
   const once = overviewHtml(overviewModel({ teams: ["T"], month: "2026-11", docs: [{ team: "T", month: "2026-11", contactName: "x", submittedDate: "2026-10-24", firstSubmittedDate: "2026-10-24", events }] }));
   assert.equal(once.includes("แก้ไขล่าสุด"), false);
+});
+
+test("print sheet: team, month, per-coach status and every coach's events in one A4 table, without buttons", () => {
+  const coaches = [coachRow("c1", "โค้ชบอม", ["U15", "U16"]), coachRow("c2", "โค้ชต้น", ["U17"]), coachRow("c3", "โค้ชบี", ["U13"])];
+  const docs = [
+    doc("c1", "โค้ชบอม", { submittedDate: "2026-11-05", firstSubmittedDate: "2026-10-24" }),
+    doc("c2", "โค้ชต้น", { noEvent: true, events: [] })
+  ];
+  const m = teamEventsModel({ team: "THAWEE SC", month: "2026-11", docs, coaches });
+  const html = teamEventsSheetHtml(m, { logo: '<img class="sheet-logo" src="x.png" alt="">', printedAt: "29 ตุลาคม 2569 10:00" });
+  for (const needle of ["THAWEE SC", "พฤศจิกายน 2569", "โค้ชที่ส่งแล้ว 2 / 3", "ยังไม่กรอก", "แจ้งว่าไม่มี Event", "แก้ไขล่าสุด 5 พ.ย.", "ฟุตบอลเยาวชนจังหวัด", "โค้ชบอม", "พิมพ์เมื่อ 29 ตุลาคม 2569 10:00", "sheet-logo"]) assert.ok(html.includes(needle), needle);
+  assert.equal(html.includes("<button"), false);
+  assert.equal(/NaN|undefined|null/.test(html), false);
+  const empty = teamEventsSheetHtml(teamEventsModel({ team: "T", month: "2026-11", docs: [], coaches: [] }));
+  assert.ok(empty.includes("ยังไม่มีโค้ชในทีมนี้") && empty.includes("ไม่มีรายการ Event ในเดือนนี้"));
+});
+
+test("print sheet escapes names coming from data", () => {
+  const m = teamEventsModel({ team: "T<b>", month: "2026-11", docs: [{ ...doc("c1", "<img src=x onerror=1>", { team: "T<b>", events: [{ ...goodMatch(), title: "<script>x</script>" }] }) }], coaches: [coachRow("c1", "<img src=x onerror=1>", ["U15"])] });
+  const html = teamEventsSheetHtml(m);
+  assert.equal(html.includes("<img src=x") || html.includes("<script>") || html.includes("T<b>"), false);
 });

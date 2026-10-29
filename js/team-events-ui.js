@@ -2,7 +2,9 @@
 // ฟอร์มสร้างด้วย JS จึงอ้างอิง element ผ่าน data-* ใน container ไม่ใช้ id
 import { collection, doc, getDocs, query, serverTimestamp, setDoc, where } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 import { db } from "./firebase-init.js";
-import { coachPositionLabel, escapeHtml, todayBangkok } from "./ui-utils.js";
+import { coachPositionLabel, escapeHtml, teamLogoImg, todayBangkok } from "./ui-utils.js";
+import { printSheet } from "./print-sheet.js";
+import { icon } from "./icons.js";
 import {
   ALL_AGES,
   AWAY_MODES,
@@ -30,6 +32,7 @@ import {
   monthOptions,
   coachEntriesHtml,
   teamEventsModel,
+  teamEventsSheetHtml,
   teamOverviewHtml,
   validateEventForm
 } from "./team-events.js";
@@ -213,11 +216,14 @@ function renderFill() {
 }
 
 function renderView(model) {
-  box.innerHTML = `<div class="card card-pad flex items-center gap-3 flex-wrap">
+  // หน้าจอ: ตัวเลือกเดือน + สรุป · เวลาสั่งพิมพ์: แสดงเฉพาะใบพิมพ์ (.print-only) ที่ซ่อนส่วนอื่น (.no-print) — กลไกเดียวกับ Match Data (print-sheet.js)
+  const sheet = teamEventsSheetHtml(model, { logo: teamLogoImg(model.team, "sheet-logo"), printedAt: new Date().toLocaleString("th-TH", { dateStyle: "long", timeStyle: "short", timeZone: "Asia/Bangkok" }) });
+  box.innerHTML = `<div class="card card-pad flex items-center gap-3 flex-wrap no-print">
       <label class="field-label mb-0">เดือน</label>
       <select class="field-input" style="width:auto" data-f="month">${options(monthOptions(todayBangkok()), month, (m) => m, monthLabel)}</select>
-      <p class="text-sm text-slate-500">ดูอย่างเดียว · โค้ชแต่ละคนกรอกเฉพาะรุ่นของตัวเอง</p>
-    </div>${teamOverviewHtml(model)}`;
+      <p class="text-sm text-slate-500 flex-1">ดูอย่างเดียว · โค้ชแต่ละคนกรอกเฉพาะรุ่นของตัวเอง</p>
+      <button type="button" class="btn btn-secondary" data-action="print-events">${icon("printer")} พิมพ์ผลการแจ้ง Event</button>
+    </div><div class="space-y-4 no-print">${teamOverviewHtml(model)}</div><div class="print-only">${sheet}</div>`;
 }
 
 const msg = (text, error = false) => `<span class="${error ? "text-red-600" : "text-slate-500"}">${text}</span>`;
@@ -309,6 +315,7 @@ const refreshAwayChips = (i) => {
 
 function onClick(e) {
   const btn = e.target.closest("[data-action]");
+  if (btn?.dataset.action === "print-events") return printSheet("size: A4 portrait; margin: 10mm;");
   if (!btn || api.mode() !== "fill") return;
   const ev = draft.events[Number(btn.dataset.ev)];
   switch (btn.dataset.action) {
