@@ -22,6 +22,9 @@
   <link rel="modulepreload" href="./js/injury-form.js" />
   <link rel="modulepreload" href="./js/team-theme.js" />
   <link rel="modulepreload" href="./js/print-coach-summary.js" />
+  <link rel="modulepreload" href="./js/team-events.js" />
+  <link rel="modulepreload" href="./js/coach-meetings.js" />
+  <link rel="modulepreload" href="./js/player-profile-fields.js" />
   <!-- modulepreload:end -->
   <style>
     @media print {
@@ -106,7 +109,9 @@
       <div class="card card-pad no-print">
         <p class="field-label mb-2">เลือกส่วนที่จะพิมพ์</p>
         <div class="print-options">
+          <label class="print-option"><input type="checkbox" id="print-opt-overview" /> ภาพรวมหน้าแรก (ตัวเลขหลัก โค้ชที่ต้องติดตาม)</label>
           <label class="print-option"><input type="checkbox" id="print-opt-coaches" /> ตารางผลงานโค้ช (แผน / เช็คชื่อ / รายงาน)</label>
+          <label class="print-option"><input type="checkbox" id="print-opt-events" /> Event ของเดือนนี้ (งดซ้อม / แข่ง / โค้ชลา)</label>
           <label class="print-option"><input type="checkbox" id="print-opt-trends" /> กราฟแนวโน้มรายวัน</label>
           <label class="print-option"><input type="checkbox" id="print-opt-topics" /> หัวข้อการฝึกซ้อมที่ใช้</label>
           <label class="print-option"><input type="checkbox" id="print-opt-matches" /> ผลการแข่งขัน</label>
@@ -127,8 +132,16 @@
       </div>
 
       <!-- ผลงานโค้ช: การ์ดตัวเลขหลักของทีม + ตารางเดียวแทน 4 ตารางเดิม (แผน / เช็คชื่อ / รายงาน / ความครบถ้วน) — หน้าแรกของใบพิมพ์ -->
-      <div id="print-sec-coaches">
+      <!-- ภาพรวมหน้าแรกสำหรับผู้บริหาร: ตัวเลขหลักของทีม + ตัวเลข Event/แข่ง/บาดเจ็บ + โค้ชที่ต้องติดตาม 3 อันดับแรก — รายละเอียดอยู่หน้าถัดไป -->
+      <div id="print-sec-overview" class="print-keep-together">
         <div id="print-kpi-cards" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-3"></div>
+        <div id="print-overview-extra" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-3"></div>
+        <h2 class="section-title mb-2">โค้ชที่ต้องติดตาม (3 อันดับแรก)</h2>
+        <div id="print-attention" class="space-y-2 mb-2"></div>
+        <p class="text-xs text-slate-500">รายละเอียดทุกคน กราฟแนวโน้ม ผลแข่ง และอาการบาดเจ็บอยู่ในหน้าถัดไป · เรียงตามจำนวนเรื่องที่ต้องติดตาม (ส่งสาย + ยังไม่ส่ง รวมแผน เช็คชื่อ รายงาน)</p>
+      </div>
+
+      <div id="print-sec-coaches">
         <h2 class="section-title mb-2"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c0-4.1 3.4-7 7.5-7s7.5 2.9 7.5 7"/></svg></span> สรุปผลงานโค้ช</h2>
         <p class="text-xs text-slate-500 mb-2">แต่ละช่อง = จำนวนที่ส่งจริง / จำนวนที่ต้องส่งในเดือนนี้ · ป้าย % = ตรงเวลาจากที่ส่งแล้ว · แถบ: เขียว = ตรงเวลา เหลือง = สาย เทา = ยังไม่ส่ง · "ครบทั้ง 3" = วันฝึกซ้อมที่ส่งแผน เช็คชื่อ และรายงานครบทั้งสามอย่าง</p>
         <div class="card table-wrap">
@@ -152,8 +165,15 @@
         </div>
       </div>
 
+      <!-- Event ของเดือนนี้ที่โค้ชแจ้ง: ใช้ประกอบการอ่านเกณฑ์ "ที่ต้องส่ง" (วันงดซ้อม วันแข่ง โค้ชลา) -->
+      <div id="print-sec-events">
+        <h2 class="section-title mb-2">Event ของเดือนนี้ที่โค้ชแจ้ง</h2>
+        <div id="print-event-cards" class="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-3"></div>
+        <div id="print-event-body" class="space-y-2"></div>
+      </div>
+
       <!-- กราฟแนวโน้มรายวัน: สัดส่วนรวมทั้งทีม + แนวโน้มของแผน / เช็คชื่อ / รายงาน -->
-      <div id="print-sec-trends" class="print-page-section">
+      <div id="print-sec-trends">
         <h2 class="section-title mb-3"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M4 20V10M10 20V4M16 20v-7M4 20h16"/></svg></span> แนวโน้มการทำงานของโค้ชรายวัน</h2>
         <div class="card card-pad print-keep-together">
           <h3 class="text-sm font-semibold mb-2">สัดส่วนการส่งแผนภาพรวมทั้งทีม</h3>
@@ -174,7 +194,7 @@
       </div>
 
       <!-- หัวข้อการฝึกซ้อมที่ใช้ในเดือนนี้ (แยกผู้เล่น / ผู้รักษาประตู) — ค่าเริ่มต้นไม่พิมพ์ -->
-      <div id="print-sec-topics" class="print-page-section">
+      <div id="print-sec-topics">
         <div class="card card-pad">
           <h3 class="text-sm font-semibold mb-2">หัวข้อการฝึกซ้อมที่ใช้ในเดือนนี้</h3>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -190,7 +210,7 @@
         </div>
       </div>
       <!-- รายงานผลการแข่งขัน -->
-      <div id="print-sec-matches" class="print-page-section">
+      <div id="print-sec-matches">
         <h2 class="section-title mb-3"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M8 4h8v4a4 4 0 0 1-8 0V4Z"/><path d="M8 5H5a1 1 0 0 0-1 1c0 2 1.5 3.5 3.5 3.8"/><path d="M16 5h3a1 1 0 0 1 1 1c0 2-1.5 3.5-3.5 3.8"/><path d="M12 12v3"/><path d="M8 20h8"/><path d="M9 17h6l1 3H8l1-3Z"/></svg></span> รายงานผลการแข่งขัน</h2>
         <div id="print-match-cards" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-3"></div>
         <div class="mb-3">
@@ -218,7 +238,7 @@
       </div>
 
       <!-- รายงานอาการบาดเจ็บ -->
-      <div id="print-sec-injuries" class="print-page-section">
+      <div id="print-sec-injuries">
         <h2 class="section-title mb-3"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M20 8.5c0 4-4 6.5-8 9.5-4-3-8-5.5-8-9.5A4.5 4.5 0 0 1 8.5 4c1.4 0 2.7.7 3.5 1.8C12.8 4.7 14.1 4 15.5 4A4.5 4.5 0 0 1 20 8.5Z"/><path d="M4.5 10H8l1.5-3L12 12l1.5-4 1 2h4.5"/></svg></span> รายงานอาการบาดเจ็บ</h2>
         <div id="print-injury-cards" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-3"></div>
         <div id="print-injury-stats" class="mb-3"></div>

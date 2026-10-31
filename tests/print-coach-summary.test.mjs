@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DEFAULT_PRINT_OPTIONS, coachFlags, mergeCoachRows, onTimePct, pctTone, readPrintOptions, sortCoachRows, teamKpis } from "../js/print-coach-summary.js";
+import { DEFAULT_PRINT_OPTIONS, coachFlags, mergeCoachRows, onTimePct, pctTone, readPrintOptions, sectionPageBreaks, sortCoachRows, teamKpis, topAttention } from "../js/print-coach-summary.js";
 
 const coach = (id, name, ageGroups) => ({ id, name, ageGroups });
 const A = coach("a", "โค้ชเอ", ["U15", "U16"]);
@@ -62,4 +62,19 @@ test("print options: saved choices are read, broken or partial data falls back t
   assert.equal(readPrintOptions(JSON.stringify({ topics: true, injuries: false })).topics, true);
   assert.equal(readPrintOptions(JSON.stringify({ topics: true, injuries: false })).injuries, false);
   assert.equal(readPrintOptions(JSON.stringify({ coaches: "yes" })).coaches, true, "non-boolean values are ignored");
+});
+test("top attention: only coaches with something outstanding, worst first, at most three", () => {
+  const rows = mergeCoachRows(input);
+  assert.deepEqual(topAttention(rows, 3).map((r) => r.coach.name), ["โค้ชดี", "โค้ชเอ", "โค้ชบี"]);
+  assert.deepEqual(topAttention(rows, 2).map((r) => r.coach.name), ["โค้ชดี", "โค้ชเอ"]);
+  const clean = mergeCoachRows({ coaches: [A], planRows: [{ coach: A, onTime: 22, late: 0, missing: 0 }], checkinRows: [{ coach: A, checkinDays: 22, onTime: 22, late: 0, missing: 0 }], reportRows: [{ coach: A, matchDays: 22, onTime: 22, late: 0, missing: 0 }] });
+  assert.deepEqual(topAttention(clean), [], "nobody to follow up");
+});
+
+test("page breaks: the first visible section stays with the report header, every later one starts a new page", () => {
+  assert.deepEqual(sectionPageBreaks(DEFAULT_PRINT_OPTIONS), { overview: false, coaches: true, events: true, trends: true, topics: false, matches: true, injuries: true });
+  const noOverview = sectionPageBreaks({ ...DEFAULT_PRINT_OPTIONS, overview: false });
+  assert.equal(noOverview.coaches, false, "coach table becomes the first page");
+  assert.equal(noOverview.events, true);
+  assert.deepEqual(sectionPageBreaks({ ...DEFAULT_PRINT_OPTIONS, overview: false, coaches: false, events: false, trends: false, matches: false, injuries: false, topics: false }), Object.fromEntries(Object.keys(sectionPageBreaks(DEFAULT_PRINT_OPTIONS)).map((k) => [k, false])), "nothing selected: nothing breaks");
 });

@@ -80,9 +80,26 @@ export function teamKpis(rows) {
   };
 }
 
+// โค้ชที่ต้องติดตามมากที่สุด n อันดับแรก (เฉพาะคนที่มีเรื่องค้างอย่างน้อย 1 เรื่อง) — ใช้ในหน้าภาพรวมหน้าแรก
+export const topAttention = (rows, n = 3) => sortCoachRows(rows, false).filter((r) => r.issues > 0).slice(0, n);
+
 // หัวข้อที่เลือกพิมพ์ได้ (ค่าเริ่มต้น + อ่านค่าที่จำไว้) — ค่าที่เก็บเสียหายหรือไม่ครบใช้ค่าเริ่มต้นแทน
-export const PRINT_SECTIONS = ["coaches", "trends", "topics", "matches", "injuries"];
-export const DEFAULT_PRINT_OPTIONS = { coaches: true, trends: true, topics: false, matches: true, injuries: true, byAge: false };
+// ลำดับในใบพิมพ์: ภาพรวมหน้าแรก → ตารางโค้ช → Event ของเดือน → กราฟ → หัวข้อฝึกซ้อม → แข่ง → บาดเจ็บ
+export const PRINT_SECTIONS = ["overview", "coaches", "events", "trends", "topics", "matches", "injuries"];
+export const DEFAULT_PRINT_OPTIONS = { overview: true, coaches: true, events: true, trends: true, topics: false, matches: true, injuries: true, byAge: false };
+
+// หัวข้อไหนต้องขึ้นหน้าใหม่: หัวข้อแรกที่แสดงอยู่ต่อจากหัวรายงานในหน้าเดียวกัน (ไม่ขึ้นหน้าใหม่ ไม่งั้นหัวรายงานจะโดดเดี่ยวอยู่หน้าแรก) ที่เหลือขึ้นหน้าใหม่ทุกหัวข้อ
+export function sectionPageBreaks(options) {
+  let first = true;
+  return Object.fromEntries(
+    PRINT_SECTIONS.map((key) => {
+      if (!options[key]) return [key, false];
+      const breakBefore = !first;
+      first = false;
+      return [key, breakBefore];
+    })
+  );
+}
 export function readPrintOptions(raw) {
   let saved = {};
   try {

@@ -31,7 +31,8 @@ import {
 import { staffCan } from "./staff-perms.js";
 import { injuryStatsHtml } from "./injury-stats-view.js";
 import { TEAM_THEMES, applyTeamTheme } from "./team-theme.js";
-import { PRINT_SECTIONS, mergeCoachRows, pctTone, readPrintOptions, sortCoachRows, teamKpis } from "./print-coach-summary.js";
+import { PRINT_SECTIONS, mergeCoachRows, pctTone, readPrintOptions, sectionPageBreaks, sortCoachRows, teamKpis, topAttention } from "./print-coach-summary.js";
+import { eventMonthStats, eventRowsHtml, teamEventsModel } from "./team-events.js";
 
 const statusEl = document.getElementById("status-message");
 const accessGate = document.getElementById("access-gate");
@@ -43,6 +44,10 @@ const printBtn = document.getElementById("print-btn");
 const printMonthSelect = document.getElementById("print-month-select");
 const printMonthLoadBtn = document.getElementById("print-month-load-btn");
 const printKpiCards = document.getElementById("print-kpi-cards");
+const printOverviewExtra = document.getElementById("print-overview-extra");
+const printAttention = document.getElementById("print-attention");
+const printEventCards = document.getElementById("print-event-cards");
+const printEventBody = document.getElementById("print-event-body");
 const printCoachBody = document.getElementById("print-coach-body");
 const printTrainingPlanQuotaBar = document.getElementById("print-training-plan-quota-bar");
 const printTrainingPlanTrend = document.getElementById("print-training-plan-trend");
@@ -75,7 +80,12 @@ function safeStorageGet() {
   }
 }
 function applyPrintOptions() {
-  for (const key of PRINT_SECTIONS) document.getElementById(`print-sec-${key}`)?.classList.toggle("hidden", !printOptions[key]);
+  const breaks = sectionPageBreaks(printOptions);
+  for (const key of PRINT_SECTIONS) {
+    const el = document.getElementById(`print-sec-${key}`);
+    el?.classList.toggle("hidden", !printOptions[key]);
+    el?.classList.toggle("print-page-section", breaks[key]); // หัวข้อแรกที่แสดงอยู่ติดกับหัวรายงาน ที่เหลือขึ้นหน้าใหม่
+  }
   renderCoachSummary();
 }
 for (const key of [...PRINT_SECTIONS, "byAge"]) {
@@ -503,7 +513,7 @@ async function loadPrintExtras(team, ageGroup, month) {
   // ดึงเฉพาะเดือนที่เลือกที่ query เลย (เดิมดึงของทีมทุกเดือนมากรองทีหลัง — attendance โตทุกวันจึงช้าลง/แพงขึ้นเรื่อยๆ)
   // ยกเว้น players/coaches ที่เป็นรายชื่อปัจจุบัน ไม่ผูกกับเดือน
   const { start: monthStart, end: monthEnd } = monthDateRange(month);
-  const [trainingPlanSnap, matchSnap, injurySnap, coachSnap, sessionSnap, attendanceSnap, playersSnap, trainingReportSnap] =
+  const [trainingPlanSnap, matchSnap, injurySnap, coachSnap, sessionSnap, attendanceSnap, playersSnap, trainingReportSnap, eventSnap] =
     await Promise.all([
       getDocs(teamDateRangeQuery("trainingPlans", team, monthStart, monthEnd)),
       getDocs(teamDateRangeQuery("matchReports", team, monthStart, monthEnd)),
@@ -512,7 +522,9 @@ async function loadPrintExtras(team, ageGroup, month) {
       getDocs(teamDateRangeQuery("sessions", team, monthStart, monthEnd)),
       getDocs(teamDateRangeQuery("attendance", team, monthStart, monthEnd)),
       getDocs(query(collection(db, "players"), where("team", "==", team))),
-      getDocs(teamDateRangeQuery("trainingReports", team, monthStart, monthEnd))
+      getDocs(teamDateRangeQuery("trainingReports", team, monthStart, monthEnd)),
+      // Event ที่โค้ชแจ้งไว้ (ดึงไม่สำเร็จ = แสดงหมายเหตุในส่วน Event ไม่ล้มทั้งใบรายงาน)
+      getDocs(query(collection(db, "monthlyEvents"), where("team", "==", team), where("month", "==", month))).catch((err) => (console.error(err), null))
     ]);
 
   let coaches = [];
@@ -827,6 +839,57 @@ async function loadPrintExtras(team, ageGroup, month) {
       .join("");
     applyDataLabels(printInjuryBody);
   }
+
+  renderEventsAndOverview({ eventSnap, coaches, ageGroup, month, matches, injuries });
+}
+
+// ส่วน Event ของเดือน + ภาพรวมหน้าแรก (ต้องรอข้อมูลแข่ง/บาดเจ็บ/ผลงานโค้ชครบก่อน จึงเรียกท้าย loadPrintExtras)
+function renderEventsAndOverview({ eventSnap, coaches, ageGroup, month, matches, injuries }) {
+  // Event: กรองตามรุ่นอายุที่เลือก (ทุกรุ่น = ไม่กรอง) แล้วรวมของโค้ชทุกคนในขอบเขตเป็นรายการเดียว
+  const docs = (eventSnap ? eventSnap.docs.map((d) => d.data()) : []).map((d) => (ageGroup === "__ALL__" ? d : { ...d, events: (d.events || []).filter((e) => (e.ageGroups || []).includes(ageGroup)) }));
+  const scope = coaches.map((c) => ({ id: c.id, name: c.name, ageGroups: c.ageGroups }));
+  const model = teamEventsModel({ team: currentPrintTeam, month, docs, coaches: scope });
+  const stats = eventMonthStats(model.allEvents);
+
+  printEventCards.innerHTML =
+    statCard("Event ที่แจ้ง", stats.total) +
+    statCard("วันที่มี Event งดซ้อม", stats.noTrainingDays) +
+    statCard("นัดแข่งที่แจ้ง", stats.matches) +
+    statCard("โค้ชลา / ไม่อยู่ซ้อม", stats.leaves) +
+    statCard("โค้ชที่ยังไม่แจ้ง Event", eventSnap ? model.summary.missing : "-");
+  const notReported = model.rows.filter((r) => r.status === "none").map((r) => escapeHtml(r.name));
+  printEventBody.innerHTML = `${
+    eventSnap
+      ? model.allEvents.length
+        ? `<div class="card table-wrap">${eventRowsHtml(model.allEvents, { showCoach: true })}</div>`
+        : '<p class="text-sm text-slate-500">ไม่มี Event ที่โค้ชแจ้งไว้ในเดือนนี้</p>'
+      : '<p class="text-sm text-amber-700">โหลดข้อมูล Event ไม่สำเร็จ ตัวเลขส่วนนี้อาจไม่ครบ</p>'
+  }${notReported.length ? `<p class="text-xs text-slate-500">ยังไม่แจ้ง Event: ${notReported.join(", ")}</p>` : ""}
+    <p class="text-xs text-slate-500">หมายเหตุ: วันที่มี Event งดซ้อมนับวันไม่ซ้ำที่มีอย่างน้อยหนึ่ง Event (ผลต่อการซ้อม = งดซ้อม หรือโค้ชลาที่ไม่มีผู้ฝึกสอนแทนและขอให้งดซ้อม) ใช้ประกอบการอ่านตัวเลข "ที่ต้องส่ง" ในตารางผลงานโค้ช — ระบบยังไม่ปรับเกณฑ์ที่ต้องส่งตามวันเหล่านี้โดยอัตโนมัติ</p>`;
+
+  // ภาพรวมหน้าแรก: ตัวเลขเสริม + โค้ชที่ต้องติดตาม 3 อันดับแรก
+  const w = matches.filter((m) => m.result === "ชนะ").length;
+  const d = matches.filter((m) => m.result === "เสมอ").length;
+  const l = matches.filter((m) => m.result === "แพ้").length;
+  printOverviewExtra.innerHTML =
+    statCard("Event ที่โค้ชแจ้ง", eventSnap ? stats.total : "-") +
+    statCard("วันที่มี Event งดซ้อม", eventSnap ? stats.noTrainingDays : "-") +
+    statCard("ผลแข่ง ชนะ-เสมอ-แพ้", matches.length ? `${w}-${d}-${l}` : "-") +
+    statCard("บาดเจ็บที่ยังไม่หาย", injuries.filter((i) => i.status !== "หายแล้ว").length);
+  const top = topAttention(currentCoachRows, 3);
+  printAttention.innerHTML = top.length
+    ? top
+        .map(
+          (r, i) => `
+        <div class="attention-row">
+          <span class="attention-rank">${i + 1}</span>
+          <div class="attention-main"><strong>${escapeHtml(r.coach.name ?? "-")}</strong> <span class="text-slate-500">${escapeHtml((r.coach.ageGroups || []).join(", ") || "-")}</span></div>
+          <div class="attention-flags">${r.flags.map((f) => `<span class="badge badge-${f.tone}">${escapeHtml(f.text)}</span>`).join(" ")}</div>
+          <span class="badge badge-${pctTone(r.completePercent)}" title="วันฝึกซ้อมที่ส่งแผน เช็คชื่อ และรายงานครบทั้ง 3 อย่าง">ครบทั้ง 3 · ${r.completePercent === null ? "-" : `${r.completePercent}%`}</span>
+        </div>`
+        )
+        .join("")
+    : '<p class="text-sm text-emerald-700">เดือนนี้ไม่มีโค้ชที่ต้องติดตาม — ทุกคนส่งงานครบและตรงเวลา</p>';
 }
 
 onAuthStateChanged(auth, async (user) => {

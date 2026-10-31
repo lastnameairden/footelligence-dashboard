@@ -811,6 +811,10 @@ html.booting main::before { content: "กำลังโหลด..."; display: 
 .kpi-neutral { color: #64748b; }
 #print-content .section-title { border-left: 4px solid var(--accent); padding-left: 0.6rem; }
 #print-content table.pro-table thead th { background: var(--header-bg, #14532d); color: var(--header-ink, #ffffff); }
+.attention-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.55rem 0.75rem; border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 0.5rem; background: #ffffff; }
+.attention-rank { flex: 0 0 auto; width: 1.7rem; height: 1.7rem; border-radius: 50%; background: var(--header-bg, #14532d); color: var(--header-ink, #ffffff); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; }
+.attention-main { flex: 0 0 11rem; min-width: 0; }
+.attention-flags { flex: 1 1 auto; display: flex; flex-wrap: wrap; gap: 0.25rem; }
 .coach-summary-table tbody tr:nth-child(even) td { background: #f8fafc; }
 .coach-summary-table td.emphasis { color: var(--header-bg, inherit); font-weight: 700; }
 /* ใบพิมพ์ Event ของทีม (หน้า Event ฝั่งผู้ดูแล) ใช้โทนสีทีมเดียวกัน */

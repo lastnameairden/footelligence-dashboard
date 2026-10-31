@@ -510,3 +510,31 @@ export function teamEventsSheetHtml(model, { logo = "", printedAt = "" } = {}) {
     ${model.allEvents.length ? `<table class="sheet-table"><colgroup><col style="width:10%"><col style="width:36%"><col style="width:14%"><col style="width:12%"><col style="width:14%"><col style="width:14%"></colgroup><thead><tr><th>วันที่</th><th>ประเภท · ชื่อ</th><th>โค้ช</th><th>รุ่น</th><th>ผลต่อการซ้อม</th><th>นักเตะไม่อยู่</th></tr></thead><tbody>${eventRows}</tbody></table>` : '<p class="sheet-note">ไม่มีรายการ Event ในเดือนนี้</p>'}
   </div>`;
 }
+
+// ---------- สถิติ Event ของเดือน (ใช้ในสรุปผลงานโค้ชรายเดือน) ----------
+// วันที่ทั้งหมดตั้งแต่ start ถึง end (รวมสองวัน) — ช่วงยาวเกินปกติตัดที่ 62 วันกันข้อมูลผิดพลาด
+function datesBetween(start, end) {
+  if (!isDate(start)) return [];
+  const last = isDate(end) && end >= start ? end : start;
+  const out = [];
+  for (let d = start; d <= last && out.length < 62; d = addDaysToDate(d, 1)) out.push(d);
+  return out;
+}
+
+// events = รายการ Event (ของทุกโค้ชที่ต้องการนับ) · noTrainingDays = จำนวนวันไม่ซ้ำที่มี Event งดซ้อมอย่างน้อยหนึ่งรายการ
+// (ผลต่อการซ้อม = งดซ้อม หรือโค้ชลาที่ไม่มีผู้ฝึกสอนแทนและขอให้งดซ้อม) — ใช้ประกอบการอ่านเกณฑ์ "ที่ต้องส่ง" ของโค้ช ระบบยังไม่ปรับเกณฑ์ให้เอง
+export function eventMonthStats(events = []) {
+  const noTraining = new Set();
+  let matches = 0;
+  let leaves = 0;
+  let scheduleChanges = 0;
+  for (const e of events) {
+    const kind = kindOfType(e.type);
+    if (kind === "match") matches += (e.matches || []).length;
+    if (kind === "coach-leave") leaves += 1;
+    if (kind === "change-day" || kind === "change-time") scheduleChanges += 1;
+    const stops = e.impact === "no-training" || (kind === "coach-leave" && e.substitute !== "yes" && (e.changes || []).includes("งดซ้อม"));
+    if (stops) for (const d of datesBetween(e.start, e.end)) noTraining.add(d);
+  }
+  return { total: events.length, noTrainingDays: noTraining.size, matches, leaves, scheduleChanges };
+}

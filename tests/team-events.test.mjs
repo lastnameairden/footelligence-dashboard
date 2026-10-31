@@ -16,6 +16,7 @@ import {
   formFromDoc,
   monthOptions,
   coachEntriesHtml,
+  eventMonthStats,
   teamEventsModel,
   teamEventsSheetHtml,
   teamOverviewHtml,
@@ -282,4 +283,23 @@ test("print sheet escapes names coming from data", () => {
   const m = teamEventsModel({ team: "T<b>", month: "2026-11", docs: [{ ...doc("c1", "<img src=x onerror=1>", { team: "T<b>", events: [{ ...goodMatch(), title: "<script>x</script>" }] }) }], coaches: [coachRow("c1", "<img src=x onerror=1>", ["U15"])] });
   const html = teamEventsSheetHtml(m);
   assert.equal(html.includes("<img src=x") || html.includes("<script>") || html.includes("T<b>"), false);
+});
+test("month stats: unique no-training days, matches, coach leaves and schedule changes", () => {
+  const events = [
+    { ...goodMatch(), impact: "no-training", start: "2026-11-08", end: "2026-11-09" },
+    { ...goodMatch(), type: "school-holiday", impact: "no-training", start: "2026-11-09", end: "2026-11-10", matches: [] },
+    { ...goodMatch(), type: "friendly", impact: "none", start: "2026-11-15", end: "2026-11-15", matches: [{ date: "2026-11-15", venue: "เหย้า", time: "" }] },
+    { ...emptyEvent(), type: "coach-leave", substitute: "none", changes: ["งดซ้อม"], start: "2026-11-20", end: "2026-11-20" },
+    { ...emptyEvent(), type: "coach-leave", substitute: "yes", changes: [], start: "2026-11-21", end: "2026-11-21" },
+    { ...emptyEvent(), type: "change-day", start: "2026-11-12", end: "2026-11-12" },
+    { ...emptyEvent(), type: "change-time", start: "2026-11-13", end: "2026-11-14" }
+  ];
+  const s = eventMonthStats(events);
+  assert.equal(s.total, 7);
+  assert.equal(s.noTrainingDays, 4, "8, 9, 10 and the leave on 20; the overlapping 9 counts once; a leave with a substitute stops nothing");
+  assert.equal(s.matches, 2 + 1, "two matches from the first event (goodMatch has 2) plus one friendly");
+  assert.equal(s.leaves, 2);
+  assert.equal(s.scheduleChanges, 2);
+  assert.deepEqual(eventMonthStats([]), { total: 0, noTrainingDays: 0, matches: 0, leaves: 0, scheduleChanges: 0 });
+  assert.equal(eventMonthStats([{ ...goodMatch(), impact: "no-training", start: "bad", end: "" }]).noTrainingDays, 0, "invalid dates do not count");
 });
