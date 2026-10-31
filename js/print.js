@@ -30,6 +30,7 @@ import {
 } from "./ui-utils.js";
 import { staffCan } from "./staff-perms.js";
 import { injuryStatsHtml } from "./injury-stats-view.js";
+import { PRINT_SECTIONS, mergeCoachRows, pctTone, readPrintOptions, sortCoachRows, teamKpis } from "./print-coach-summary.js";
 
 const statusEl = document.getElementById("status-message");
 const accessGate = document.getElementById("access-gate");
@@ -40,19 +41,14 @@ const printGeneratedAt = document.getElementById("print-generated-at");
 const printBtn = document.getElementById("print-btn");
 const printMonthSelect = document.getElementById("print-month-select");
 const printMonthLoadBtn = document.getElementById("print-month-load-btn");
-const printTrainingPlanCards = document.getElementById("print-training-plan-cards");
-const printTrainingPlanBody = document.getElementById("print-training-plan-body");
+const printKpiCards = document.getElementById("print-kpi-cards");
+const printCoachBody = document.getElementById("print-coach-body");
 const printTrainingPlanQuotaBar = document.getElementById("print-training-plan-quota-bar");
 const printTrainingPlanTrend = document.getElementById("print-training-plan-trend");
 const printTrainingPlanTopicsPlayer = document.getElementById("print-training-plan-topics-player");
 const printTrainingPlanTopicsGk = document.getElementById("print-training-plan-topics-gk");
-const printCheckinCards = document.getElementById("print-checkin-cards");
-const printCheckinBody = document.getElementById("print-checkin-body");
 const printCheckinTrend = document.getElementById("print-checkin-trend");
-const printReportCards = document.getElementById("print-report-cards");
-const printReportBody = document.getElementById("print-report-body");
 const printReportTrend = document.getElementById("print-report-trend");
-const printConsistencyBody = document.getElementById("print-consistency-body");
 const printMatchCards = document.getElementById("print-match-cards");
 const printMatchSummaryCards = document.getElementById("print-match-summary-cards");
 const printMatchBody = document.getElementById("print-match-body");
@@ -63,6 +59,36 @@ const printInjuryBody = document.getElementById("print-injury-body");
 
 let currentPrintTeam = null;
 let currentPrintAgeGroup = null;
+let currentCoachRows = []; // แถวผลงานโค้ชที่รวมแล้ว (เรียงใหม่ได้ทันทีเมื่อเปลี่ยนตัวเลือก ไม่ต้องโหลดข้อมูลใหม่)
+let currentQuota = 0;
+
+// ตัวเลือกส่วนที่จะพิมพ์ — จำไว้ในเครื่องนี้ ส่วนที่ไม่ได้ติ๊กซ่อนทั้งบนหน้าจอและในใบพิมพ์ (ซ่อนอย่างเดียว ข้อมูลยังโหลดชุดเดียวกัน)
+const PRINT_OPTIONS_KEY = "footelligence-print-options";
+const optionInput = (key) => document.getElementById(key === "byAge" ? "print-opt-by-age" : `print-opt-${key}`);
+let printOptions = readPrintOptions(safeStorageGet());
+function safeStorageGet() {
+  try {
+    return localStorage.getItem(PRINT_OPTIONS_KEY);
+  } catch {
+    return null;
+  }
+}
+function applyPrintOptions() {
+  for (const key of PRINT_SECTIONS) document.getElementById(`print-sec-${key}`)?.classList.toggle("hidden", !printOptions[key]);
+  renderCoachSummary();
+}
+for (const key of [...PRINT_SECTIONS, "byAge"]) {
+  optionInput(key).checked = printOptions[key];
+  optionInput(key).addEventListener("change", () => {
+    printOptions = { ...printOptions, [key]: optionInput(key).checked };
+    try {
+      localStorage.setItem(PRINT_OPTIONS_KEY, JSON.stringify(printOptions));
+    } catch {
+      // จำค่าไม่ได้ (เช่น โหมดส่วนตัว) ก็ยังใช้ได้ตามปกติในครั้งนี้
+    }
+    applyPrintOptions();
+  });
+}
 
 function setStatus(message, isError = false) {
   statusEl.textContent = message;
@@ -102,6 +128,7 @@ async function loadPrintSummary(team, ageGroup, month) {
   document.title = `FOOTELLIGENCE DATA — สรุป ${scopeText}`;
 
   await loadPrintExtras(team, ageGroup, month);
+  applyPrintOptions();
 
   setStatus("โหลดข้อมูลสำเร็จ");
 }
@@ -436,6 +463,37 @@ function buildInjurySummaryCardsHtml(injuries) {
 
 // สรุปแผนการฝึกซ้อม/ผลการแข่งขัน/อาการบาดเจ็บ ของทีม+เดือน+รุ่นอายุเดียวกับตารางผู้เล่นด้านบน — ให้สรุป
 // สำหรับพิมพ์มีข้อมูลครบรูปแบบเดียวกับหน้า Dashboard
+// ช่องหนึ่งของตารางผลงานโค้ช: ส่งจริง / ที่ต้องส่ง · ป้าย % ตรงเวลา + แถบสัดส่วน (ตรงเวลา/สาย/ยังไม่ส่ง)
+function coachMetricCell(m, quota) {
+  const pct = m.pct === null ? "-" : `${m.pct}%`;
+  return `<div class="coach-metric"><span>${m.submitted} / ${quota}</span> <span class="badge badge-${pctTone(m.pct)}">${pct}</span></div>${buildInlineQuotaBarSvg(m.onTime, m.late, m.missing, quota)}`;
+}
+
+function renderCoachSummary() {
+  if (!printCoachBody) return;
+  if (currentCoachRows.length === 0) {
+    printCoachBody.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-center text-slate-400">ไม่มีโค้ชในขอบเขตที่เลือก</td></tr>';
+    return;
+  }
+  printCoachBody.innerHTML = sortCoachRows(currentCoachRows, printOptions.byAge)
+    .map((r) => {
+      const flags = r.flags.length ? r.flags.map((f) => `<span class="badge badge-${f.tone}">${escapeHtml(f.text)}</span>`).join(" ") : '<span class="badge badge-success">ครบถ้วน</span>';
+      const complete = r.completePercent === null ? "-" : `${r.completePercent}%`;
+      return `
+        <tr>
+          <td class="emphasis">${escapeHtml(r.coach.name ?? "-")}</td>
+          <td>${escapeHtml((r.coach.ageGroups || []).join(", ") || "-")}</td>
+          <td>${coachMetricCell(r.plan, currentQuota)}</td>
+          <td>${coachMetricCell(r.checkin, currentQuota)}</td>
+          <td>${coachMetricCell(r.report, currentQuota)}</td>
+          <td><span class="badge badge-${pctTone(r.completePercent)}">${complete}</span></td>
+          <td>${flags}</td>
+        </tr>`;
+    })
+    .join("");
+  applyDataLabels(printCoachBody);
+}
+
 async function loadPrintExtras(team, ageGroup, month) {
   // ดึงเฉพาะเดือนที่เลือกที่ query เลย (เดิมดึงของทีมทุกเดือนมากรองทีหลัง — attendance โตทุกวันจึงช้าลง/แพงขึ้นเรื่อยๆ)
   // ยกเว้น players/coaches ที่เป็นรายชื่อปัจจุบัน ไม่ผูกกับเดือน
@@ -499,14 +557,6 @@ async function loadPrintExtras(team, ageGroup, month) {
     plans = plans.filter((p) => (p.ageGroups || []).includes(ageGroup));
   }
 
-  const lateCount = plans.filter((p) => isTrainingPlanLate(p)).length;
-  const onTimeCount = plans.length - lateCount;
-  printTrainingPlanCards.innerHTML =
-    statCard("จำนวนแผนที่ส่ง", plans.length) +
-    statCard("ตรงเวลา", onTimeCount) +
-    statCard("สาย", lateCount) +
-    statCard("จำนวนโค้ชทั้งหมด", coaches.length);
-
   const coachRows = coaches.map((c) => {
     const myPlans = plans.filter((p) => isRecordOfCoach(p, c));
     const late = myPlans.filter((p) => isTrainingPlanLate(p)).length;
@@ -523,30 +573,6 @@ async function loadPrintExtras(team, ageGroup, month) {
     coachRows.reduce((sum, r) => sum + r.late, 0),
     coachRows.reduce((sum, r) => sum + r.missing, 0)
   );
-
-  if (coachRows.length === 0) {
-    printTrainingPlanBody.innerHTML =
-      '<tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">ไม่มีโค้ชในขอบเขตที่เลือก</td></tr>';
-  } else {
-    printTrainingPlanBody.innerHTML = coachRows
-      .map(({ coach, onTime, late, missing, onTimePercent }) => {
-        const percentText = onTimePercent === null ? "-" : `${onTimePercent}%`;
-        const percentBadgeClass = onTimePercent === null ? "badge-neutral" : onTimePercent >= 80 ? "badge-success" : onTimePercent >= 50 ? "badge-warning" : "badge-danger";
-        return `
-          <tr>
-            <td class="emphasis">${escapeHtml(coach.name ?? "-")}</td>
-            <td>${(coach.ageGroups || []).join(", ") || "-"}</td>
-            <td>${monthlyQuota}</td>
-            <td>${buildInlineQuotaBarSvg(onTime, late, missing, monthlyQuota)}</td>
-            <td class="text-emerald-600 font-medium">${onTime}</td>
-            <td class="text-red-500 font-medium">${late}</td>
-            <td class="text-slate-500 font-medium">${missing}</td>
-            <td><span class="badge ${percentBadgeClass}">${percentText}</span></td>
-          </tr>`;
-      })
-      .join("");
-    applyDataLabels(printTrainingPlanBody);
-  }
 
   // แผนที่ชื่อโค้ชไม่ตรงกับโค้ชคนใดในทีมเลย (เช่น โค้ชถูกเปลี่ยนชื่อ/ส่งด้วยอีเมล) จะไม่ถูกนับในแถวโค้ชด้านบน —
   // แจ้งให้เห็นชัดใต้ตาราง แทนที่จะหายเงียบจนดูเหมือนโค้ชไม่ได้ส่ง
@@ -565,7 +591,7 @@ async function loadPrintExtras(team, ageGroup, month) {
       byName,
       ([n, k]) => `${n} (${k})`
     ).join(", ")}`;
-    printTrainingPlanBody.closest("table").insertAdjacentElement("afterend", note);
+    printCoachBody.closest("table").insertAdjacentElement("afterend", note);
   }
 
   // กราฟแนวโน้มยังอิงวันฝึกซ้อมจริง (monthSessions) เพื่อให้แกน X ตรงกับกราฟเช็คชื่อด้านล่าง ไม่ใช่ทุกวันปฏิทิน
@@ -621,42 +647,6 @@ async function loadPrintExtras(team, ageGroup, month) {
     return { coach: c, checkinDays, onTime, late, missing, matchPercent };
   });
 
-  const totalCheckinDays = checkinRows.reduce((sum, r) => sum + r.checkinDays, 0);
-  const totalOnTime = checkinRows.reduce((sum, r) => sum + r.onTime, 0);
-  // การ์ดนี้อยู่คู่กับสถิติแบบ "รวม" ของทุกโค้ช (totalCheckinDays ฯลฯ) จึงต้องคูณ coaches.length ด้วย ไม่งั้น
-  // จะเทียบกันไม่ตรง (เช่น 22 vs รวมจริง 118 ของ 7 คน — ดูเหมือนทำเกินเกณฑ์ผิดๆ ทั้งที่คูณแล้วยังไม่ถึงเกณฑ์)
-  // เกณฑ์ต่อโค้ช 1 คนยังเป็น monthlyQuota เท่าเดิม (ดูคอลัมน์ "จำนวนที่ต้องเช็คชื่อ" ในตารางรายโค้ชด้านล่าง)
-  const totalQuota = monthlyQuota * coaches.length;
-  printCheckinCards.innerHTML =
-    statCard("จำนวนที่ต้องเช็คชื่อ (รวม)", totalQuota) +
-    statCard("เช็คชื่อตรงวันฝึกซ้อม (รวม)", totalCheckinDays) +
-    statCard("ตรงเวลา (รวม)", totalOnTime) +
-    statCard("สาย (รวม)", totalCheckinDays - totalOnTime);
-
-  if (checkinRows.length === 0) {
-    printCheckinBody.innerHTML =
-      '<tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">ไม่มีโค้ชในขอบเขตที่เลือก</td></tr>';
-  } else {
-    printCheckinBody.innerHTML = checkinRows
-      .map(({ coach, checkinDays, onTime, late, missing, matchPercent }) => {
-        const percentText = `${matchPercent}%`;
-        const percentBadgeClass = matchPercent >= 80 ? "badge-success" : matchPercent >= 50 ? "badge-warning" : "badge-danger";
-        return `
-          <tr>
-            <td class="emphasis">${escapeHtml(coach.name ?? "-")}</td>
-            <td>${(coach.ageGroups || []).join(", ") || "-"}</td>
-            <td>${monthlyQuota}</td>
-            <td>${buildInlineQuotaBarSvg(onTime, late, missing, monthlyQuota)}</td>
-            <td>${checkinDays}</td>
-            <td class="text-emerald-600 font-medium">${onTime}</td>
-            <td class="text-red-500 font-medium">${late}</td>
-            <td><span class="badge ${percentBadgeClass}">${percentText}</span></td>
-          </tr>`;
-      })
-      .join("");
-    applyDataLabels(printCheckinBody);
-  }
-
   const checkinDailyCounts = monthSessions.map((s) => {
     let dOnTime = 0;
     let dLate = 0;
@@ -701,39 +691,6 @@ async function loadPrintExtras(team, ageGroup, month) {
     const missing = Math.max(monthlyQuota - matchDays, 0);
     return { coach: c, matchDays, onTime, late, missing, matchPercent };
   });
-
-  // การ์ดนี้อยู่คู่กับสถิติแบบ "รวม" ของทุกโค้ช (matchDays ฯลฯ รวมทุกคน) จึงต้องคูณ coaches.length ด้วยเหมือนกับ
-  // การ์ดสรุปการเช็คชื่อด้านบน ไม่งั้นจะเทียบกันไม่ตรง — เกณฑ์ต่อโค้ช 1 คนยังเป็น monthlyQuota เท่าเดิม (ดูคอลัมน์
-  // "วันฝึกซ้อมทั้งหมด" ในตารางรายโค้ชด้านล่าง)
-  printReportCards.innerHTML =
-    statCard("วันฝึกซ้อมทั้งหมด (รวม)", monthlyQuota * coaches.length) +
-    statCard("ส่งตรงวันฝึกซ้อม (รวม)", reportRows.reduce((sum, r) => sum + r.matchDays, 0)) +
-    statCard("ตรงเวลา (รวม)", reportRows.reduce((sum, r) => sum + r.onTime, 0)) +
-    statCard("สาย (รวม)", reportRows.reduce((sum, r) => sum + r.late, 0));
-
-  if (reportRows.length === 0) {
-    printReportBody.innerHTML =
-      '<tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">ไม่มีโค้ชในขอบเขตที่เลือก</td></tr>';
-  } else {
-    printReportBody.innerHTML = reportRows
-      .map(({ coach, matchDays, onTime, late, missing, matchPercent }) => {
-        const percentText = `${matchPercent}%`;
-        const percentBadgeClass = matchPercent >= 80 ? "badge-success" : matchPercent >= 50 ? "badge-warning" : "badge-danger";
-        return `
-          <tr>
-            <td class="emphasis">${escapeHtml(coach.name ?? "-")}</td>
-            <td>${(coach.ageGroups || []).join(", ") || "-"}</td>
-            <td>${monthlyQuota}</td>
-            <td>${buildInlineQuotaBarSvg(onTime, late, missing, monthlyQuota)}</td>
-            <td>${matchDays}</td>
-            <td class="text-emerald-600 font-medium">${onTime}</td>
-            <td class="text-red-500 font-medium">${late}</td>
-            <td><span class="badge ${percentBadgeClass}">${percentText}</span></td>
-          </tr>`;
-      })
-      .join("");
-    applyDataLabels(printReportBody);
-  }
 
   const reportDailyCounts = monthSessions.map((s) => {
     let dOnTime = 0;
@@ -780,28 +737,14 @@ async function loadPrintExtras(team, ageGroup, month) {
     return { coach: c, planCount, checkinCount, reportCount, complete, incomplete, completePercent };
   });
 
-  if (consistencyRows.length === 0) {
-    printConsistencyBody.innerHTML =
-      '<tr><td colspan="7" class="px-4 py-6 text-center text-slate-400">ไม่มีโค้ชในขอบเขตที่เลือก</td></tr>';
-  } else {
-    printConsistencyBody.innerHTML = consistencyRows
-      .map(({ coach, planCount, checkinCount, reportCount, completePercent }) => {
-        const percentText = `${completePercent}%`;
-        const percentBadgeClass = completePercent >= 80 ? "badge-success" : completePercent >= 50 ? "badge-warning" : "badge-danger";
-        return `
-          <tr>
-            <td class="emphasis">${escapeHtml(coach.name ?? "-")}</td>
-            <td>${(coach.ageGroups || []).join(", ") || "-"}</td>
-            <td>${monthlyQuota}</td>
-            <td>${planCount}</td>
-            <td>${checkinCount}</td>
-            <td>${reportCount}</td>
-            <td><span class="badge ${percentBadgeClass}">${percentText}</span></td>
-          </tr>`;
-      })
-      .join("");
-    applyDataLabels(printConsistencyBody);
-  }
+  // ---------- รวมเป็นตารางผลงานโค้ชตารางเดียว + การ์ดตัวเลขหลักของทีม ----------
+  currentCoachRows = mergeCoachRows({ coaches, planRows: coachRows, checkinRows, reportRows, consistencyRows });
+  currentQuota = monthlyQuota;
+  const kpi = teamKpis(currentCoachRows);
+  const pctText = (v) => (v === null ? "-" : `${v}%`);
+  printKpiCards.innerHTML =
+    statCard("โค้ชทั้งหมด", kpi.coaches) + statCard("แผนตรงเวลา", pctText(kpi.planPct)) + statCard("เช็คชื่อตรงเวลา", pctText(kpi.checkinPct)) + statCard("รายงานตรงเวลา", pctText(kpi.reportPct));
+  renderCoachSummary();
 
   // ---------- รายงานผลการแข่งขัน ----------
   let matches = [];

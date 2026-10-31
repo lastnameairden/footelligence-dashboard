@@ -20,6 +20,7 @@
   <link rel="modulepreload" href="./js/staff-perms.js" />
   <link rel="modulepreload" href="./js/injury-stats-view.js" />
   <link rel="modulepreload" href="./js/injury-form.js" />
+  <link rel="modulepreload" href="./js/print-coach-summary.js" />
   <!-- modulepreload:end -->
   <style>
     @media print {
@@ -43,11 +44,16 @@
 
       /* ย่อตารางให้พอดีความกว้าง A4 แนวตั้ง (ลบ margin ออกแล้วเหลือ ~18cm) กันคอลัมน์ล้นขอบกระดาษ โดยเฉพาะ
          ตารางเช็คชื่อหลักที่มีถึง 9 คอลัมน์ */
+      table.pro-table thead { display: table-header-group; }
       table.pro-table thead th { padding: 0.25rem 0.4rem; font-size: 9px; white-space: normal; }
+      /* ตารางผลงานโค้ช: ความกว้างคอลัมน์ตายตัว ข้อความยาวตัดขึ้นบรรทัดใหม่ในช่อง ไม่ล้นกรอบ */
+      table.coach-summary-table { table-layout: fixed; width: 100%; }
+      table.coach-summary-table th, table.coach-summary-table td { overflow-wrap: anywhere; word-break: break-word; }
       table.pro-table tbody td { padding: 0.2rem 0.4rem; font-size: 9px; line-height: 1.3; }
       .badge { font-size: 8px; padding: 0.1rem 0.4rem; }
     }
-    @page { size: A4; margin: 1.5cm; }
+    /* A4 แนวนอน: ตารางโค้ชกว้างพอสำหรับ 7 คอลัมน์ในหน้าเดียว — เลขหน้า "หน้า x / y" ที่มุมล่างขวา (เบราว์เซอร์ที่ไม่รองรับกล่องขอบหน้าจะไม่แสดง ไม่กระทบเนื้อหา) */
+    @page { size: A4 landscape; margin: 10mm 10mm 14mm; @bottom-right { content: "หน้า " counter(page) " / " counter(pages); font-size: 9pt; color: #555; } }
   </style>
   <!-- Tailwind สร้างเป็นไฟล์ static (ดูวิธีสร้างที่ tailwind.config.js) — ต้องอยู่ท้ายสุดของ <head> (หลังทั้ง styles.css และ <style> ในหน้า)
        เพื่อให้ cascade เหมือนตอนใช้ CDN ซึ่งฉีด <style> ต่อท้ายสุดของ head เสมอ (utility เช่น px-0 ต้องทับ .btn ได้) -->
@@ -93,6 +99,19 @@
         <button id="print-month-load-btn" class="btn btn-secondary">โหลดสรุปเดือนนี้</button>
       </div>
 
+      <!-- เลือกส่วนที่จะพิมพ์ (จำค่าไว้ในเครื่องนี้) — ส่วนที่ไม่ได้ติ๊กจะซ่อนทั้งบนหน้าจอและในใบพิมพ์ -->
+      <div class="card card-pad no-print">
+        <p class="field-label mb-2">เลือกส่วนที่จะพิมพ์</p>
+        <div class="print-options">
+          <label class="print-option"><input type="checkbox" id="print-opt-coaches" /> ตารางผลงานโค้ช (แผน / เช็คชื่อ / รายงาน)</label>
+          <label class="print-option"><input type="checkbox" id="print-opt-trends" /> กราฟแนวโน้มรายวัน</label>
+          <label class="print-option"><input type="checkbox" id="print-opt-topics" /> หัวข้อการฝึกซ้อมที่ใช้</label>
+          <label class="print-option"><input type="checkbox" id="print-opt-matches" /> ผลการแข่งขัน</label>
+          <label class="print-option"><input type="checkbox" id="print-opt-injuries" /> อาการบาดเจ็บ</label>
+          <label class="print-option"><input type="checkbox" id="print-opt-by-age" /> เรียงโค้ชตามรุ่นอายุ (ไม่ติ๊ก = โค้ชที่ต้องติดตามขึ้นก่อน)</label>
+        </div>
+        <p class="text-xs text-slate-500 mt-2">กระดาษ A4 แนวนอน · แต่ละหัวข้อขึ้นหน้าใหม่ · หัวตารางซ้ำทุกหน้า</p>
+      </div>
       <div class="card card-pad text-center">
         <img src="./assets/logo.png" alt="Footelligence" class="w-14 h-14 object-contain mx-auto mb-2" />
         <h2 class="text-xl font-bold tracking-tight">FOOTELLIGENCE DATA — สรุปการทำงานของโค้ช</h2>
@@ -100,39 +119,56 @@
         <p id="print-generated-at" class="text-xs text-slate-400 mt-1"></p>
       </div>
 
-      <!-- สรุปการส่งแผนการฝึกซ้อมรายวัน — ไม่มีคลาส print-page-section เพราะหัวการ์ดด้านบนเล็กมากแล้ว (ไม่มีตาราง
-           รายชื่อนักกีฬาให้เต็มหน้าเหมือนเดิม) ให้อยู่หน้าแรกร่วมกับหัวกระดาษไปเลย กันหน้าแรกเหลือพื้นที่ว่างเปล่า -->
-      <div>
-        <h2 class="section-title mb-3"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/><path d="M9 11h6M9 15h6M9 19h3"/></svg></span> สรุปการส่งแผนการฝึกซ้อมรายวัน</h2>
-        <div id="print-training-plan-cards" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-3"></div>
+      <!-- ผลงานโค้ช: การ์ดตัวเลขหลักของทีม + ตารางเดียวแทน 4 ตารางเดิม (แผน / เช็คชื่อ / รายงาน / ความครบถ้วน) — หน้าแรกของใบพิมพ์ -->
+      <div id="print-sec-coaches">
+        <div id="print-kpi-cards" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-3"></div>
+        <h2 class="section-title mb-2"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c0-4.1 3.4-7 7.5-7s7.5 2.9 7.5 7"/></svg></span> สรุปผลงานโค้ช</h2>
+        <p class="text-xs text-slate-500 mb-2">แต่ละช่อง = จำนวนที่ส่งจริง / จำนวนที่ต้องส่งในเดือนนี้ · ป้าย % = ตรงเวลาจากที่ส่งแล้ว · แถบ: เขียว = ตรงเวลา เหลือง = สาย เทา = ยังไม่ส่ง · "ครบทั้ง 3" = วันฝึกซ้อมที่ส่งแผน เช็คชื่อ และรายงานครบทั้งสามอย่าง</p>
         <div class="card table-wrap">
-          <table class="pro-table">
+          <table class="pro-table coach-summary-table">
+            <colgroup><col style="width:12%"><col style="width:8%"><col style="width:18%"><col style="width:18%"><col style="width:18%"><col style="width:8%"><col style="width:18%"></colgroup>
             <thead>
               <tr>
                 <th>โค้ช</th>
-                <th>รุ่นอายุที่ดูแล</th>
-                <th>จำนวนทั้งหมดที่ต้องส่ง</th>
-                <th>สัดส่วนการส่ง</th>
-                <th>ส่งตรงเวลา</th>
-                <th>ส่งสาย</th>
-                <th>ไม่ส่ง</th>
-                <th>% ตรงเวลา</th>
+                <th>รุ่น</th>
+                <th>แผนการฝึกซ้อม</th>
+                <th>เช็คชื่อ + คะแนน</th>
+                <th>รายงานการฝึกซ้อม</th>
+                <th>ครบทั้ง 3</th>
+                <th>ต้องติดตาม</th>
               </tr>
             </thead>
-            <tbody id="print-training-plan-body">
-              <tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
+            <tbody id="print-coach-body">
+              <tr><td colspan="7" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
             </tbody>
           </table>
         </div>
-        <div class="card card-pad mt-3 print-keep-together">
-          <h3 class="text-sm font-semibold mb-2">สัดส่วนการส่งงานภาพรวมทั้งทีม</h3>
+      </div>
+
+      <!-- กราฟแนวโน้มรายวัน: สัดส่วนรวมทั้งทีม + แนวโน้มของแผน / เช็คชื่อ / รายงาน -->
+      <div id="print-sec-trends" class="print-page-section">
+        <h2 class="section-title mb-3"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M4 20V10M10 20V4M16 20v-7M4 20h16"/></svg></span> แนวโน้มการทำงานของโค้ชรายวัน</h2>
+        <div class="card card-pad print-keep-together">
+          <h3 class="text-sm font-semibold mb-2">สัดส่วนการส่งแผนภาพรวมทั้งทีม</h3>
           <div id="print-training-plan-quota-bar"></div>
         </div>
         <div class="card card-pad mt-3">
-          <h3 class="text-sm font-semibold mb-2">แนวโน้มการทำงานของโค้ชรายวัน</h3>
+          <h3 class="text-sm font-semibold mb-2">การส่งแผนการฝึกซ้อม</h3>
           <div id="print-training-plan-trend"></div>
         </div>
         <div class="card card-pad mt-3">
+          <h3 class="text-sm font-semibold mb-2">การเช็คชื่อ + ให้คะแนนของโค้ชรายวันฝึกซ้อม</h3>
+          <div id="print-checkin-trend"></div>
+        </div>
+        <div class="card card-pad mt-3">
+          <h3 class="text-sm font-semibold mb-2">การส่งรายงานการฝึกซ้อมของโค้ชรายวันฝึกซ้อม</h3>
+          <div id="print-report-trend"></div>
+        </div>
+      </div>
+
+      <!-- หัวข้อการฝึกซ้อมที่ใช้ในเดือนนี้ (แยกผู้เล่น / ผู้รักษาประตู) — ค่าเริ่มต้นไม่พิมพ์ -->
+      <div id="print-sec-topics" class="print-page-section">
+        <div class="card card-pad">
           <h3 class="text-sm font-semibold mb-2">หัวข้อการฝึกซ้อมที่ใช้ในเดือนนี้</h3>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
@@ -146,94 +182,8 @@
           </div>
         </div>
       </div>
-
-      <!-- สรุปการเช็คชื่อ + ให้คะแนนนักกีฬารายวัน — เทียบว่าวันที่โค้ชเช็คชื่อ/ให้คะแนนตรงกับวันที่ทีมฝึกซ้อมจริง
-           (มี session ของวันนั้น) หรือไม่ ไม่ใช่แค่ดูอัตราตรงเวลาของที่เช็คชื่อมาแล้วเฉยๆ -->
-      <div class="print-page-section">
-        <h2 class="section-title mb-3"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.3 2.3L16 10"/></svg></span> สรุปการเช็คชื่อ + ให้คะแนนนักกีฬารายวัน</h2>
-        <div id="print-checkin-cards" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-3"></div>
-        <div class="card table-wrap">
-          <table class="pro-table">
-            <thead>
-              <tr>
-                <th>โค้ช</th>
-                <th>รุ่นอายุที่ดูแล</th>
-                <th>จำนวนที่ต้องเช็คชื่อ</th>
-                <th>สัดส่วนการเช็คชื่อ</th>
-                <th>เช็คชื่อตรงวันฝึกซ้อม</th>
-                <th>เช็คชื่อตรงเวลา</th>
-                <th>เช็คชื่อสาย</th>
-                <th>% ตรงตามเกณฑ์</th>
-              </tr>
-            </thead>
-            <tbody id="print-checkin-body">
-              <tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <div class="card card-pad mt-3">
-          <h3 class="text-sm font-semibold mb-2">แนวโน้มการเช็คชื่อของโค้ชรายวันฝึกซ้อม</h3>
-          <div id="print-checkin-trend"></div>
-        </div>
-      </div>
-
-      <!-- รายงานการฝึกซ้อม (trainingReports) — คนละอย่างกับ "แผนการฝึกซ้อม" ด้านบน (ส่งก่อนซ้อม) เป็นรายงานที่ส่ง
-           หลังซ้อมจบ ไม่มีฟิลด์ ageGroups ในตัวเอง (1 รายงานต่อโค้ชต่อวัน) จึงกรองตามรายชื่อโค้ชในขอบเขตแทน -->
-      <div class="print-page-section">
-        <h2 class="section-title mb-3"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M7 3h7l4 4v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M14 3v4h4"/><path d="M8.5 12.5h7M8.5 16h7"/></svg></span> สรุปการส่งรายงานการฝึกซ้อม</h2>
-        <div id="print-report-cards" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-3"></div>
-        <div class="card table-wrap">
-          <table class="pro-table">
-            <thead>
-              <tr>
-                <th>โค้ช</th>
-                <th>รุ่นอายุที่ดูแล</th>
-                <th>วันฝึกซ้อมทั้งหมด</th>
-                <th>สัดส่วนการส่งรายงาน</th>
-                <th>ส่งตรงวันฝึกซ้อม</th>
-                <th>ตรงเวลา</th>
-                <th>สาย</th>
-                <th>% ตรงตามวันฝึกซ้อม</th>
-              </tr>
-            </thead>
-            <tbody id="print-report-body">
-              <tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <div class="card card-pad mt-3">
-          <h3 class="text-sm font-semibold mb-2">แนวโน้มการส่งรายงานของโค้ชรายวันฝึกซ้อม</h3>
-          <div id="print-report-trend"></div>
-        </div>
-      </div>
-
-      <!-- ความสอดคล้องของการทำงานประจำวัน — เทียบว่าวันฝึกซ้อมเดียวกัน โค้ชส่งครบทั้ง 3 อย่างไหม (แผน + เช็คชื่อ +
-           รายงาน) ไม่ใช่ดูแยกส่วนทีละหัวข้อเหมือน 3 ส่วนด้านบน -->
-      <div class="print-page-section">
-        <h2 class="section-title mb-3"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M9 15a4 4 0 0 1 0-6l3-3a4 4 0 0 1 6 6l-1 1"/><path d="M15 9a4 4 0 0 1 0 6l-3 3a4 4 0 0 1-6-6l1-1"/></svg></span> ความสอดคล้องของการทำงานประจำวัน (แผน + เช็คชื่อ + รายงาน)</h2>
-        <p class="text-xs text-slate-400 mb-3">นับเฉพาะวันฝึกซ้อมจริงที่โค้ชส่งครบทั้ง 3 อย่าง (แผนการฝึกซ้อม, เช็คชื่อ+ให้คะแนน, รายงานการฝึกซ้อม) เทียบกับวันฝึกซ้อมทั้งหมด</p>
-        <div class="card table-wrap">
-          <table class="pro-table">
-            <thead>
-              <tr>
-                <th>โค้ช</th>
-                <th>รุ่นอายุที่ดูแล</th>
-                <th>วันฝึกซ้อมทั้งหมด</th>
-                <th>ส่งแผน</th>
-                <th>เช็คชื่อ</th>
-                <th>ส่งรายงาน</th>
-                <th>% ครบถ้วน</th>
-              </tr>
-            </thead>
-            <tbody id="print-consistency-body">
-              <tr><td colspan="7" class="px-4 py-6 text-center text-slate-400">กำลังโหลด...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
       <!-- รายงานผลการแข่งขัน -->
-      <div class="print-page-section">
+      <div id="print-sec-matches" class="print-page-section">
         <h2 class="section-title mb-3"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M8 4h8v4a4 4 0 0 1-8 0V4Z"/><path d="M8 5H5a1 1 0 0 0-1 1c0 2 1.5 3.5 3.5 3.8"/><path d="M16 5h3a1 1 0 0 1 1 1c0 2-1.5 3.5-3.5 3.8"/><path d="M12 12v3"/><path d="M8 20h8"/><path d="M9 17h6l1 3H8l1-3Z"/></svg></span> รายงานผลการแข่งขัน</h2>
         <div id="print-match-cards" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-3"></div>
         <div class="mb-3">
@@ -261,7 +211,7 @@
       </div>
 
       <!-- รายงานอาการบาดเจ็บ -->
-      <div class="print-page-section">
+      <div id="print-sec-injuries" class="print-page-section">
         <h2 class="section-title mb-3"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M20 8.5c0 4-4 6.5-8 9.5-4-3-8-5.5-8-9.5A4.5 4.5 0 0 1 8.5 4c1.4 0 2.7.7 3.5 1.8C12.8 4.7 14.1 4 15.5 4A4.5 4.5 0 0 1 20 8.5Z"/><path d="M4.5 10H8l1.5-3L12 12l1.5-4 1 2h4.5"/></svg></span> รายงานอาการบาดเจ็บ</h2>
         <div id="print-injury-cards" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-3"></div>
         <div id="print-injury-stats" class="mb-3"></div>

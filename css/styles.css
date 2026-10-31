@@ -794,6 +794,11 @@ button.admin-home-tile:hover { outline: 1px solid var(--accent); }
 /* ตอนเริ่มโหลดหน้าเช็คชื่อ (html.booting): ซ่อนเนื้อหาไว้จนตรวจล็อกอินและกู้หน้าจอเดิมจาก URL เสร็จ — ไม่ให้เห็นหน้าเปล่าแบบเก่าวูบหนึ่งตอนรีโหลด (boot-guard.js เปิดให้เองถ้าค้างเกิน 10 วินาที) */
 html.booting main > * { display: none !important; }
 html.booting main::before { content: "กำลังโหลด..."; display: block; text-align: center; padding: 5rem 0; color: var(--text-2); }
+/* สรุปผลงานโค้ช (print.html): ตัวเลือกส่วนที่จะพิมพ์ + ช่องตัวเลขในตารางผลงานโค้ช */
+.print-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0.4rem 1rem; }
+.print-option { display: flex; align-items: center; gap: 0.4rem; font-size: 0.875rem; }
+.coach-summary-table td { vertical-align: middle; }
+.coach-metric { display: flex; align-items: center; gap: 0.4rem; white-space: nowrap; margin-bottom: 0.2rem; }
 /* Event ประจำเดือน (team-events-ui.js) */
 .event-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 0.75rem; }
 .event-field { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
