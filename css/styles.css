@@ -794,6 +794,29 @@ button.admin-home-tile:hover { outline: 1px solid var(--accent); }
 /* ตอนเริ่มโหลดหน้าเช็คชื่อ (html.booting): ซ่อนเนื้อหาไว้จนตรวจล็อกอินและกู้หน้าจอเดิมจาก URL เสร็จ — ไม่ให้เห็นหน้าเปล่าแบบเก่าวูบหนึ่งตอนรีโหลด (boot-guard.js เปิดให้เองถ้าค้างเกิน 10 วินาที) */
 html.booting main > * { display: none !important; }
 html.booting main::before { content: "กำลังโหลด..."; display: block; text-align: center; padding: 5rem 0; color: var(--text-2); }
+/* ใบรายงานสรุปผลงานโค้ช (print.html) — สีประจำทีมจาก team-theme.js: หัวรายงาน การ์ดตัวเลข หัวข้อ และหัวตาราง ใช้สีเดียวกับหัวเว็บของทีม */
+.report-banner { display: flex; align-items: center; gap: 1rem; padding: 1rem 1.25rem; border-radius: 0.75rem; background: var(--header-bg, #14532d); color: var(--header-ink, #ffffff); border-bottom: 5px solid var(--team-highlight, #d4a63a); }
+.report-banner-logo { flex: 0 0 auto; width: 3.75rem; height: 3.75rem; border-radius: 50%; background: #ffffff; display: flex; align-items: center; justify-content: center; padding: 0.35rem; }
+.report-logo-img { width: 100%; height: 100%; object-fit: contain; margin: 0; }
+.report-banner-main { flex: 1 1 auto; min-width: 0; }
+.report-banner-kicker { margin: 0; font-size: 0.72rem; letter-spacing: 0.08em; opacity: 0.85; }
+.report-banner-title { margin: 0.1rem 0 0; font-size: 1.6rem; font-weight: 700; line-height: 1.2; }
+.report-banner-meta { margin: 0.2rem 0 0; font-size: 0.95rem; opacity: 0.95; }
+.report-banner-stamp { margin: 0; font-size: 0.72rem; opacity: 0.85; text-align: right; max-width: 12rem; }
+#print-content .stat-card { border-left: 4px solid var(--accent); }
+#print-content .stat-value { font-size: 1.75rem; line-height: 1.15; }
+.kpi-success { color: #15803d; }
+.kpi-warning { color: #b45309; }
+.kpi-danger { color: #b91c1c; }
+.kpi-neutral { color: #64748b; }
+#print-content .section-title { border-left: 4px solid var(--accent); padding-left: 0.6rem; }
+#print-content table.pro-table thead th { background: var(--header-bg, #14532d); color: var(--header-ink, #ffffff); }
+.coach-summary-table tbody tr:nth-child(even) td { background: #f8fafc; }
+.coach-summary-table td.emphasis { color: var(--header-bg, inherit); font-weight: 700; }
+/* ใบพิมพ์ Event ของทีม (หน้า Event ฝั่งผู้ดูแล) ใช้โทนสีทีมเดียวกัน */
+.sheet-events .sheet-head { border-bottom: 3px solid var(--header-bg, #222); }
+.sheet-events .sheet-table th { background: var(--header-bg, #eee); color: var(--header-ink, #222); }
+.sheet-events h4 { color: var(--header-bg, #222); border-left: 4px solid var(--accent, #222); padding-left: 0.4rem; }
 /* สรุปผลงานโค้ช (print.html): ตัวเลือกส่วนที่จะพิมพ์ + ช่องตัวเลขในตารางผลงานโค้ช */
 .print-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0.4rem 1rem; }
 .print-option { display: flex; align-items: center; gap: 0.4rem; font-size: 0.875rem; }

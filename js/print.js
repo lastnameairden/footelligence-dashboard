@@ -30,6 +30,7 @@ import {
 } from "./ui-utils.js";
 import { staffCan } from "./staff-perms.js";
 import { injuryStatsHtml } from "./injury-stats-view.js";
+import { TEAM_THEMES, applyTeamTheme } from "./team-theme.js";
 import { PRINT_SECTIONS, mergeCoachRows, pctTone, readPrintOptions, sortCoachRows, teamKpis } from "./print-coach-summary.js";
 
 const statusEl = document.getElementById("status-message");
@@ -123,7 +124,11 @@ async function loadPrintSummary(team, ageGroup, month) {
   const monthLabel = new Date(`${month}-01T00:00:00`).toLocaleDateString("th-TH", { year: "numeric", month: "long" });
   const scopeText =
     ageGroup === "__ALL__" ? `ทีม ${team} — ทุกรุ่นอายุ — เดือน${monthLabel}` : `ทีม ${team} — รุ่นอายุ ${ageGroup} — เดือน${monthLabel}`;
-  printScopeLabel.innerHTML = `${teamLogoImg(team, "w-5 h-5 object-contain inline-block align-middle rounded mr-1")}${scopeText}`;
+  // ใบรายงานใช้สีประจำทีม (หัวเว็บ แถบหัวรายงาน หัวตาราง ไฮไลต์) — ทีมที่ไม่รู้จักใช้ธีมเริ่มต้นของระบบ
+  applyTeamTheme(team);
+  document.getElementById("print-team-logo").innerHTML = teamLogoImg(team, "report-logo-img");
+  document.getElementById("print-team-name").textContent = team;
+  printScopeLabel.textContent = `เดือน${monthLabel} · ${ageGroup === "__ALL__" ? "ทุกรุ่นอายุ" : `รุ่นอายุ ${ageGroup}`}`;
   printGeneratedAt.textContent = `สร้างสรุปเมื่อ ${new Date().toLocaleString("th-TH", { dateStyle: "long", timeStyle: "short", timeZone: "Asia/Bangkok" })}`;
   document.title = `FOOTELLIGENCE DATA — สรุป ${scopeText}`;
 
@@ -616,7 +621,7 @@ async function loadPrintExtras(team, ageGroup, month) {
   // เพราะไม่ใช่ทั้งฝั่งผู้เล่นหรือผู้รักษาประตูโดยเฉพาะ
   printTrainingPlanTopicsPlayer.innerHTML = buildTopicBarChartSvg(
     countPlanTopics(plans.filter((p) => p.trainingType === "Player")),
-    "#2563eb"
+    TEAM_THEMES[team]?.accent ?? "#2563eb"
   );
   printTrainingPlanTopicsGk.innerHTML = buildTopicBarChartSvg(
     countPlanTopics(plans.filter((p) => p.trainingType === "Goalkeeper")),
@@ -742,8 +747,9 @@ async function loadPrintExtras(team, ageGroup, month) {
   currentQuota = monthlyQuota;
   const kpi = teamKpis(currentCoachRows);
   const pctText = (v) => (v === null ? "-" : `${v}%`);
-  printKpiCards.innerHTML =
-    statCard("โค้ชทั้งหมด", kpi.coaches) + statCard("แผนตรงเวลา", pctText(kpi.planPct)) + statCard("เช็คชื่อตรงเวลา", pctText(kpi.checkinPct)) + statCard("รายงานตรงเวลา", pctText(kpi.reportPct));
+  // ตัวเลข % ของทีมใช้สีตามเกณฑ์เดียวกับป้ายในตาราง (≥ 80 เขียว · 50–79 เหลือง · ต่ำกว่า 50 แดง)
+  const kpiPct = (v) => `<span class="kpi-${pctTone(v)}">${pctText(v)}</span>`;
+  printKpiCards.innerHTML = statCard("โค้ชทั้งหมด", kpi.coaches) + statCard("แผนตรงเวลา", kpiPct(kpi.planPct)) + statCard("เช็คชื่อตรงเวลา", kpiPct(kpi.checkinPct)) + statCard("รายงานตรงเวลา", kpiPct(kpi.reportPct));
   renderCoachSummary();
 
   // ---------- รายงานผลการแข่งขัน ----------
