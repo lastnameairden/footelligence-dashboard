@@ -109,3 +109,15 @@ export function readPrintOptions(raw) {
   }
   return Object.fromEntries(Object.entries(DEFAULT_PRINT_OPTIONS).map(([k, v]) => [k, typeof saved[k] === "boolean" ? saved[k] : v]));
 }
+
+// สารบัญหน้าแรก "ในรายงานนี้": เฉพาะหัวข้อที่เลือกพิมพ์ ตามลำดับในใบพิมพ์ (เลขลำดับคือลำดับหัวข้อจริงในเอกสาร)
+export const CONTENT_ITEMS = {
+  overview: ["ภาพรวมของทีม", "ตัวเลขหลักของทีม และโค้ชที่ต้องติดตาม"],
+  coaches: ["ผลงานโค้ชรายคน", "การส่งแผน การเช็คชื่อ และรายงานการฝึกซ้อม"],
+  events: ["Event ของเดือน", "วันงดซ้อม นัดแข่ง และโค้ชลา"],
+  trends: ["แนวโน้มรายวัน", "การส่งงานของโค้ชตลอดเดือน"],
+  topics: ["หัวข้อการฝึกซ้อม", "หัวข้อที่ใช้ แยกผู้เล่นและผู้รักษาประตู"],
+  matches: ["ผลการแข่งขัน", "สรุปตามรุ่นอายุ และรายการแข่งขัน"],
+  injuries: ["อาการบาดเจ็บ", "สรุปตามรุ่นอายุ และรายชื่อนักกีฬา"]
+};
+export const contentsFor = (options) => PRINT_SECTIONS.filter((key) => options[key]).map((key) => ({ key, title: CONTENT_ITEMS[key][0], desc: CONTENT_ITEMS[key][1] }));

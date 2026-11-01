@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DEFAULT_PRINT_OPTIONS, coachFlags, mergeCoachRows, onTimePct, pctTone, readPrintOptions, sectionPageBreaks, sortCoachRows, teamKpis, topAttention } from "../js/print-coach-summary.js";
+import { DEFAULT_PRINT_OPTIONS, coachFlags, contentsFor, mergeCoachRows, onTimePct, pctTone, readPrintOptions, sectionPageBreaks, sortCoachRows, teamKpis, topAttention } from "../js/print-coach-summary.js";
 
 const coach = (id, name, ageGroups) => ({ id, name, ageGroups });
 const A = coach("a", "โค้ชเอ", ["U15", "U16"]);
@@ -77,4 +77,12 @@ test("page breaks: the first visible section stays with the report header, every
   assert.equal(noOverview.coaches, false, "coach table becomes the first page");
   assert.equal(noOverview.events, true);
   assert.deepEqual(sectionPageBreaks({ ...DEFAULT_PRINT_OPTIONS, overview: false, coaches: false, events: false, trends: false, matches: false, injuries: false, topics: false }), Object.fromEntries(Object.keys(sectionPageBreaks(DEFAULT_PRINT_OPTIONS)).map((k) => [k, false])), "nothing selected: nothing breaks");
+});
+
+test("contents list: only the sections chosen, in document order, numbered by position", () => {
+  const all = contentsFor(DEFAULT_PRINT_OPTIONS);
+  assert.deepEqual(all.map((c) => c.key), ["overview", "coaches", "events", "trends", "matches", "injuries"], "topics is off by default");
+  assert.ok(all.every((c) => c.title && c.desc));
+  assert.deepEqual(contentsFor({ ...DEFAULT_PRINT_OPTIONS, overview: false, trends: false, topics: true }).map((c) => c.key), ["coaches", "events", "topics", "matches", "injuries"]);
+  assert.deepEqual(contentsFor(Object.fromEntries(Object.keys(DEFAULT_PRINT_OPTIONS).map((k) => [k, false]))), []);
 });

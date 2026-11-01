@@ -31,7 +31,7 @@ import {
 import { staffCan } from "./staff-perms.js";
 import { injuryStatsHtml } from "./injury-stats-view.js";
 import { TEAM_THEMES, applyTeamTheme } from "./team-theme.js";
-import { PRINT_SECTIONS, mergeCoachRows, pctTone, readPrintOptions, sectionPageBreaks, sortCoachRows, teamKpis, topAttention } from "./print-coach-summary.js";
+import { PRINT_SECTIONS, mergeCoachRows, pctTone, readPrintOptions, contentsFor, sectionPageBreaks, sortCoachRows, teamKpis, topAttention } from "./print-coach-summary.js";
 import { eventMonthStats, eventRowsHtml, teamEventsModel } from "./team-events.js";
 
 const statusEl = document.getElementById("status-message");
@@ -87,6 +87,10 @@ function applyPrintOptions() {
     el?.classList.toggle("print-page-section", breaks[key]); // หัวข้อแรกที่แสดงอยู่ติดกับหัวรายงาน ที่เหลือขึ้นหน้าใหม่
   }
   renderCoachSummary();
+  // สารบัญหน้าแรก: เฉพาะหัวข้อที่เลือกพิมพ์
+  document.getElementById("print-contents-list").innerHTML = contentsFor(printOptions)
+    .map((c, i) => `<li><span class="report-contents-no">${i + 1}</span><span><strong>${escapeHtml(c.title)}</strong> <span class="report-contents-desc">— ${escapeHtml(c.desc)}</span></span></li>`)
+    .join("");
 }
 for (const key of [...PRINT_SECTIONS, "byAge"]) {
   optionInput(key).checked = printOptions[key];
@@ -138,7 +142,8 @@ async function loadPrintSummary(team, ageGroup, month) {
   applyTeamTheme(team);
   document.getElementById("print-team-logo").innerHTML = teamLogoImg(team, "report-logo-img");
   document.getElementById("print-team-name").textContent = team;
-  printScopeLabel.textContent = `เดือน${monthLabel} · ${ageGroup === "__ALL__" ? "ทุกรุ่นอายุ" : `รุ่นอายุ ${ageGroup}`}`;
+  document.getElementById("print-report-title").textContent = `รายงานผลประจำเดือน${monthLabel}`;
+  printScopeLabel.textContent = ageGroup === "__ALL__" ? "ทุกรุ่นอายุ" : `รุ่นอายุ ${ageGroup}`;
   printGeneratedAt.textContent = `สร้างสรุปเมื่อ ${new Date().toLocaleString("th-TH", { dateStyle: "long", timeStyle: "short", timeZone: "Asia/Bangkok" })}`;
   document.title = `FOOTELLIGENCE DATA — สรุป ${scopeText}`;
 
@@ -864,8 +869,7 @@ function renderEventsAndOverview({ eventSnap, coaches, ageGroup, month, matches,
         ? `<div class="card table-wrap">${eventRowsHtml(model.allEvents, { showCoach: true })}</div>`
         : '<p class="text-sm text-slate-500">ไม่มี Event ที่โค้ชแจ้งไว้ในเดือนนี้</p>'
       : '<p class="text-sm text-amber-700">โหลดข้อมูล Event ไม่สำเร็จ ตัวเลขส่วนนี้อาจไม่ครบ</p>'
-  }${notReported.length ? `<p class="text-xs text-slate-500">ยังไม่แจ้ง Event: ${notReported.join(", ")}</p>` : ""}
-    <p class="text-xs text-slate-500">หมายเหตุ: วันที่มี Event งดซ้อมนับวันไม่ซ้ำที่มีอย่างน้อยหนึ่ง Event (ผลต่อการซ้อม = งดซ้อม หรือโค้ชลาที่ไม่มีผู้ฝึกสอนแทนและขอให้งดซ้อม) ใช้ประกอบการอ่านตัวเลข "ที่ต้องส่ง" ในตารางผลงานโค้ช — ระบบยังไม่ปรับเกณฑ์ที่ต้องส่งตามวันเหล่านี้โดยอัตโนมัติ</p>`;
+  }${notReported.length ? `<p class="text-xs text-slate-500">ยังไม่แจ้ง Event: ${notReported.join(", ")}</p>` : ""}`;
 
   // ภาพรวมหน้าแรก: ตัวเลขเสริม + โค้ชที่ต้องติดตาม 3 อันดับแรก
   const w = matches.filter((m) => m.result === "ชนะ").length;
@@ -885,7 +889,7 @@ function renderEventsAndOverview({ eventSnap, coaches, ageGroup, month, matches,
           <span class="attention-rank">${i + 1}</span>
           <div class="attention-main"><strong>${escapeHtml(r.coach.name ?? "-")}</strong> <span class="text-slate-500">${escapeHtml((r.coach.ageGroups || []).join(", ") || "-")}</span></div>
           <div class="attention-flags">${r.flags.map((f) => `<span class="badge badge-${f.tone}">${escapeHtml(f.text)}</span>`).join(" ")}</div>
-          <span class="badge badge-${pctTone(r.completePercent)}" title="วันฝึกซ้อมที่ส่งแผน เช็คชื่อ และรายงานครบทั้ง 3 อย่าง">ครบทั้ง 3 · ${r.completePercent === null ? "-" : `${r.completePercent}%`}</span>
+          <span class="badge badge-${pctTone(r.completePercent)}">ครบทั้ง 3 · ${r.completePercent === null ? "-" : `${r.completePercent}%`}</span>
         </div>`
         )
         .join("")

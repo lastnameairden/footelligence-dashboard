@@ -55,6 +55,13 @@
       table.coach-summary-table th, table.coach-summary-table td { overflow-wrap: anywhere; word-break: break-word; }
       table.pro-table tbody td { padding: 0.25rem 0.45rem; font-size: 10px; line-height: 1.35; }
       .badge { font-size: 9px; padding: 0.1rem 0.45rem; }
+      .report-letterhead { padding: 0 0 0.1rem; }
+      .report-letterhead-logo { height: 2.6rem; }
+      .report-letterhead-brand { font-size: 0.68rem; }
+      .report-letterhead-title { font-size: 1.35rem; }
+      .report-contents { padding: 0.5rem 0.85rem; }
+      .report-contents-list { grid-template-columns: 1fr 1fr; gap: 0.25rem 1rem; }
+      .report-contents-list li { font-size: 0.74rem; }
       .report-banner { padding: 0.6rem 0.9rem; gap: 0.7rem; }
       .report-banner-logo { width: 3rem; height: 3rem; }
       .report-banner-title { font-size: 1.25rem; }
@@ -134,15 +141,23 @@
         </div>
         <p class="text-xs text-slate-500 mt-2">กระดาษ A4 แนวตั้ง · แต่ละหัวข้อขึ้นหน้าใหม่ · หัวตารางซ้ำทุกหน้าเมื่อข้ามหน้า</p>
       </div>
-      <!-- หัวใบรายงาน: แถบสีประจำทีม (โทนเดียวกับหัวเว็บของทีม) โลโก้ทีม ชื่อทีม เดือน และเวลาที่สร้าง -->
+      <!-- หัวกระดาษ: โลโก้ Footelligence → "รายงานผลประจำเดือน…" → แถบสีทีมพร้อมโลโก้ทีม ชื่อทีม รุ่นอายุ และเวลาที่สร้าง → สารบัญ "ในรายงานนี้" -->
+      <div class="report-letterhead">
+        <img src="./assets/logo.png" alt="Footelligence" class="report-letterhead-logo" />
+        <p class="report-letterhead-brand">FOOTELLIGENCE DATA</p>
+        <h1 id="print-report-title" class="report-letterhead-title"></h1>
+      </div>
       <div class="report-banner">
         <span id="print-team-logo" class="report-banner-logo"></span>
         <div class="report-banner-main">
-          <p class="report-banner-kicker">FOOTELLIGENCE DATA · สรุปผลงานโค้ช</p>
           <h2 id="print-team-name" class="report-banner-title"></h2>
           <p id="print-scope-label" class="report-banner-meta"></p>
         </div>
         <p id="print-generated-at" class="report-banner-stamp"></p>
+      </div>
+      <div class="report-contents print-keep-together">
+        <h3 class="report-contents-title">ในรายงานนี้</h3>
+        <ol id="print-contents-list" class="report-contents-list"></ol>
       </div>
 
       <!-- ผลงานโค้ช: การ์ดตัวเลขหลักของทีม + ตารางเดียวแทน 4 ตารางเดิม (แผน / เช็คชื่อ / รายงาน / ความครบถ้วน) — หน้าแรกของใบพิมพ์ -->
@@ -152,12 +167,11 @@
         <div id="print-overview-extra" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-3"></div>
         <h2 class="section-title mb-2">โค้ชที่ต้องติดตาม (3 อันดับแรก)</h2>
         <div id="print-attention" class="space-y-2 mb-2"></div>
-        <p class="text-xs text-slate-500">รายละเอียดทุกคน กราฟแนวโน้ม ผลแข่ง และอาการบาดเจ็บอยู่ในหน้าถัดไป · เรียงตามจำนวนเรื่องที่ต้องติดตาม (ส่งสาย + ยังไม่ส่ง รวมแผน เช็คชื่อ รายงาน)</p>
       </div>
 
       <div id="print-sec-coaches">
         <h2 class="section-title mb-2"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c0-4.1 3.4-7 7.5-7s7.5 2.9 7.5 7"/></svg></span> สรุปผลงานโค้ช</h2>
-        <p class="text-xs text-slate-500 mb-2">แต่ละช่อง = จำนวนที่ส่งจริง / จำนวนที่ต้องส่งในเดือนนี้ · ป้าย % = ตรงเวลาจากที่ส่งแล้ว · แถบ: เขียว = ตรงเวลา เหลือง = สาย เทา = ยังไม่ส่ง · "ครบทั้ง 3" = วันฝึกซ้อมที่ส่งแผน เช็คชื่อ และรายงานครบทั้งสามอย่าง</p>
+        <p class="report-key"><span class="report-key-dot" style="background:#10b981"></span>ตรงเวลา <span class="report-key-dot" style="background:#f59e0b"></span>สาย <span class="report-key-dot" style="background:#94a3b8"></span>ยังไม่ส่ง</p>
         <div class="card table-wrap">
           <table class="pro-table coach-summary-table">
             <colgroup><col style="width:12%"><col style="width:8%"><col style="width:18%"><col style="width:18%"><col style="width:18%"><col style="width:8%"><col style="width:18%"></colgroup>
