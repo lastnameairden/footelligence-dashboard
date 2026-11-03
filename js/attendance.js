@@ -79,6 +79,7 @@ import { openAdminAnnouncements } from "./admin-announcements-ui.js";
 import { openFitnessEntry } from "./fitness-entry-ui.js";
 import { parseParentHeights } from "./fitness-calc.js";
 import { applyTeamTheme } from "./team-theme.js";
+import { normalizeEmail, registrationProblem, buildPendingProfile, isEmailInUse, isWrongCredential, WRONG_PASSWORD_FOR_EXISTING_EMAIL } from "./registration.js";
 import { initMatchDay, openMatchDay } from "./match-day-ui.js";
 import { buildAttendanceGrid, gridHtml, legendHtml } from "./attendance-grid.js";
 import { initMatchData, showMatchForm, showMatchHistory } from "./match-data-ui.js";
@@ -299,6 +300,12 @@ const registerCoachPositionSelect = document.getElementById("register-coach-posi
 const registerAgeGroupCheckboxes = document.querySelectorAll(".register-age-group-checkbox");
 const registerAgeGroupHint = document.getElementById("register-age-group-hint");
 const pendingSection = document.getElementById("pending-section");
+const pendingWaiting = document.getElementById("pending-waiting");
+const reapplyForm = document.getElementById("reapply-form");
+const reapplyError = document.getElementById("reapply-error");
+const reapplyCoachWrap = document.getElementById("reapply-coach-wrap");
+const reapplyCoachPositionSelect = document.getElementById("reapply-coach-position");
+const reapplyAgeGroupHint = document.getElementById("reapply-age-group-hint");
 const pendingLogoutBtn = document.getElementById("pending-logout-btn");
 const coachPlanDetailOverlay = document.getElementById("coach-plan-detail-overlay");
 const coachPlanDetailTitleEl = document.getElementById("coach-plan-detail-title");
@@ -595,6 +602,7 @@ tabRegister.addEventListener("click", () => {
 });
 
 // ---------- ลงทะเบียนใหม่ (โค้ช หรือ ผู้บริหารทีม) ----------
+let registrationInFlight = false; // กำลังสมัคร/สร้างคำขอจากฟอร์มลงทะเบียน (ดูเหตุผลที่ submit handler)
 // รุ่นอายุที่รับผิดชอบ ระบุได้เฉพาะตอนลงทะเบียนเป็นโค้ชเท่านั้น (ผู้บริหารทีมดูภาพรวมทั้งทีม ไม่ผูกกับรุ่นใดรุ่นหนึ่ง)
 function updateRegisterAgeGroupVisibility() {
   const role = document.querySelector('input[name="register-role"]:checked').value;
@@ -648,27 +656,29 @@ registerForm.addEventListener("submit", async (e) => {
     return;
   }
 
-  if (role === "coach" && ageGroups.length === 0) {
-    registerError.textContent = "กรุณาเลือกรุ่นอายุที่รับผิดชอบอย่างน้อย 1 รุ่น";
-    return;
-  }
-  if (role === "coach" && !coachPositionAllowsMultipleAgeGroups(coachPosition) && ageGroups.length > 1) {
-    registerError.textContent = `${coachPositionLabel(coachPosition)} เลือกได้เพียงรุ่นอายุเดียว (ถ้าต้องดูแลมากกว่า 1 รุ่น ต้องให้ผู้ดูแลระบบเป็นผู้เพิ่มให้)`;
+  const problem = registrationProblem({ role, coachPosition, ageGroups });
+  if (problem) {
+    registerError.textContent = problem;
     return;
   }
 
+  const profile = { name, email, role, coachPosition, ageGroups };
   let createdCred = null;
+  // onAuthStateChanged ทำงานทันทีที่บัญชีถูกสร้าง/ล็อกอิน ก่อนที่เราจะบันทึกโปรไฟล์เสร็จ — ต้องบอกให้แสดงหน้า "รออนุมัติ"
+  // ไม่ใช่ฟอร์ม "ส่งคำขออีกครั้ง" ของบัญชีที่ไม่มีโปรไฟล์
+  registrationInFlight = true;
   try {
     createdCred = await createUserWithEmailAndPassword(auth, email, password);
-    const payload = { name, email, role, status: "pending", createdAt: serverTimestamp() };
-    if (role === "coach") {
-      payload.ageGroups = ageGroups;
-      payload.coachPosition = coachPosition;
-    }
-    await setDoc(doc(db, "coaches", createdCred.user.uid), payload);
+    await setDoc(doc(db, "coaches", createdCred.user.uid), buildPendingProfile(profile, serverTimestamp()));
     registerForm.reset();
     // onAuthStateChanged จะทำงานต่อเองและแสดงหน้า "รอผู้ดูแลระบบอนุมัติ"
   } catch (err) {
+    // อีเมลนี้มีบัญชีล็อกอินอยู่แล้ว — มักเป็นโค้ชที่ผู้ดูแลระบบลบโปรไฟล์ไป (บัญชี Auth ไม่ถูกลบ) แล้วสมัครซ้ำ
+    // ล็อกอินด้วยรหัสผ่านที่กรอก แล้วสร้างคำขอใหม่จากข้อมูลในฟอร์มนี้
+    if (!createdCred && isEmailInUse(err)) {
+      await resubmitForExistingAccount(profile, password);
+      return;
+    }
     // ถ้าสร้างบัญชี Firebase Auth สำเร็จแล้วแต่บันทึกโปรไฟล์ลง Firestore ไม่สำเร็จ (เช่น เน็ตหลุดกลางทาง)
     // ต้องลบบัญชี Auth ที่เพิ่งสร้างทิ้งด้วย ไม่งั้นจะเหลือ "บัญชีผี" ที่ล็อกอินได้แต่ไม่มีโปรไฟล์ใน Firestore
     // เลย — ผู้ดูแลระบบจะมองไม่เห็นในหน้าอนุมัติ/รายชื่อโค้ชเลยแม้แต่รายการเดียว (ค้นหาไม่เจอเพราะไม่มีเอกสาร
@@ -681,6 +691,98 @@ registerForm.addEventListener("submit", async (e) => {
       }
     }
     registerError.textContent = "ลงทะเบียนไม่สำเร็จ: " + authErrorMessage(err);
+  } finally {
+    registrationInFlight = false;
+  }
+});
+
+// อีเมลซ้ำกับบัญชีล็อกอินเดิม: ล็อกอินด้วยรหัสผ่านที่กรอก — ถ้าไม่มีโปรไฟล์ให้สร้างคำขอ pending ใหม่ ถ้ามีอยู่แล้วก็แค่เข้าสู่ระบบ
+// (ใช้บัญชีที่เป็นของผู้สมัครเองเท่านั้น เพราะต้องรู้รหัสผ่านเดิม)
+async function resubmitForExistingAccount(profile, password) {
+  let cred;
+  try {
+    cred = await signInWithEmailAndPassword(auth, profile.email, password);
+  } catch (err) {
+    registerError.textContent = isWrongCredential(err) ? WRONG_PASSWORD_FOR_EXISTING_EMAIL : "ลงทะเบียนไม่สำเร็จ: " + authErrorMessage(err);
+    return;
+  }
+  try {
+    const existing = await getDoc(doc(db, "coaches", cred.user.uid));
+    if (!existing.exists()) {
+      await setDoc(doc(db, "coaches", cred.user.uid), buildPendingProfile(profile, serverTimestamp()));
+    }
+    registerForm.reset();
+    // onAuthStateChanged ทำงานต่อเอง: มีโปรไฟล์อยู่แล้ว = เข้าสู่ระบบตามสถานะเดิม, สร้างใหม่ = หน้า "รอผู้ดูแลระบบอนุมัติ"
+  } catch (err) {
+    console.error(err);
+    registerError.textContent = "ส่งคำขอไม่สำเร็จ: " + authErrorMessage(err);
+    try {
+      await signOut(auth);
+    } catch (signOutErr) {
+      console.error(signOutErr);
+    }
+  }
+}
+
+// ---------- ล็อกอินได้แต่ไม่มีโปรไฟล์ (ผู้ดูแลระบบเคยลบ) → ฟอร์มส่งคำขอเข้าใช้งานอีกครั้ง ----------
+const REAPPLY_AGE_GROUPS = ["U6", "U7", "U8", "U9", "U10", "U11", "U12", "U13", "U14", "U15", "U16", "U17", "U18"];
+const reapplyAgeGroupBoxes = document.getElementById("reapply-age-group-checkboxes");
+reapplyAgeGroupBoxes.innerHTML = REAPPLY_AGE_GROUPS.map(
+  (ag) => `<label class="flex items-center gap-1.5 text-sm text-slate-700"><input type="checkbox" class="reapply-age-group-checkbox" value="${ag}" /> ${ag}</label>`
+).join("");
+const reapplyAgeGroupCheckboxes = reapplyAgeGroupBoxes.querySelectorAll(".reapply-age-group-checkbox");
+
+function updateReapplyVisibility() {
+  const role = document.querySelector('input[name="reapply-role"]:checked').value;
+  reapplyCoachWrap.classList.toggle("hidden", role !== "coach");
+}
+function enforceReapplyAgeGroupLimit() {
+  const position = reapplyCoachPositionSelect.value;
+  const allowsMultiple = coachPositionAllowsMultipleAgeGroups(position);
+  reapplyAgeGroupHint.textContent = allowsMultiple
+    ? `${coachPositionLabel(position)} เลือกได้หลายรุ่นอายุ`
+    : `${coachPositionLabel(position)} ดูแลได้เพียงรุ่นอายุเดียว (ถ้าต้องดูแลมากกว่า 1 รุ่น ต้องให้ผู้ดูแลระบบเป็นผู้เพิ่มให้)`;
+  if (allowsMultiple) return;
+  const checked = Array.from(reapplyAgeGroupCheckboxes).filter((cb) => cb.checked);
+  for (const cb of checked.slice(0, -1)) cb.checked = false;
+}
+for (const radio of document.querySelectorAll('input[name="reapply-role"]')) radio.addEventListener("change", updateReapplyVisibility);
+reapplyCoachPositionSelect.addEventListener("change", enforceReapplyAgeGroupLimit);
+for (const cb of reapplyAgeGroupCheckboxes) cb.addEventListener("change", enforceReapplyAgeGroupLimit);
+updateReapplyVisibility();
+enforceReapplyAgeGroupLimit();
+
+// สลับเนื้อหาในกล่อง pending: "waiting" = รออนุมัติ, "reapply" = ฟอร์มส่งคำขอใหม่ (บัญชีที่ไม่มีโปรไฟล์)
+function showPendingPanel(mode, user) {
+  const reapply = mode === "reapply";
+  pendingWaiting.classList.toggle("hidden", reapply);
+  reapplyForm.classList.toggle("hidden", !reapply);
+  if (reapply) {
+    document.getElementById("reapply-email").value = user.email || "";
+    reapplyError.textContent = "";
+  }
+}
+
+reapplyForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  reapplyError.textContent = "";
+  const user = auth.currentUser;
+  if (!user) return;
+  const role = document.querySelector('input[name="reapply-role"]:checked').value;
+  const coachPosition = reapplyCoachPositionSelect.value;
+  const ageGroups = Array.from(reapplyAgeGroupCheckboxes).filter((cb) => cb.checked).map((cb) => cb.value);
+  const problem = registrationProblem({ role, coachPosition, ageGroups });
+  if (problem) {
+    reapplyError.textContent = problem;
+    return;
+  }
+  try {
+    const profile = { name: document.getElementById("reapply-name").value, email: normalizeEmail(user.email), role, coachPosition, ageGroups };
+    await setDoc(doc(db, "coaches", user.uid), buildPendingProfile(profile, serverTimestamp()));
+    showPendingPanel("waiting", user);
+  } catch (err) {
+    console.error(err);
+    reapplyError.textContent = "ส่งคำขอไม่สำเร็จ: " + (err.code ? authErrorMessage(err) : err.message);
   }
 });
 
@@ -3469,8 +3571,8 @@ editCoachResetPasswordBtn.addEventListener("click", async () => {
 });
 
 // ลบเฉพาะโปรไฟล์ใน Firestore (coaches/{uid}) — Firebase Auth ไม่อนุญาตให้ลบบัญชีผู้ใช้อื่นจากฝั่ง client
-// เหมือนกัน (ต้องใช้ Admin SDK ฝั่งเซิร์ฟเวอร์) ผลคือบัญชีนั้นจะล็อกอินเข้าเว็บไม่ได้อีก (ระบบมองว่าไม่มีโปรไฟล์
-// จึงค้างที่หน้า "รอผู้ดูแลระบบอนุมัติ" ตลอดไป) เหมือนกับตอนกดปฏิเสธคำขอลงทะเบียนที่ทำแบบนี้อยู่แล้ว
+// เหมือนกัน (ต้องใช้ Admin SDK ฝั่งเซิร์ฟเวอร์) ผลคือบัญชีนั้นเข้าใช้งานไม่ได้ (ระบบมองว่าไม่มีโปรไฟล์) จนกว่าเจ้าของจะส่งคำขอใหม่
+// ผ่านฟอร์ม "ส่งคำขออีกครั้ง" หรือสมัครซ้ำด้วยอีเมลเดิม (resubmitForExistingAccount) แล้วผู้ดูแลระบบอนุมัติ — เหมือนกับตอนกดปฏิเสธคำขอ
 editCoachDeleteBtn.addEventListener("click", async () => {
   if (!editingCoachAccountId) return;
   if (editingCoachAccountId === auth.currentUser?.uid) {
@@ -3478,7 +3580,7 @@ editCoachDeleteBtn.addEventListener("click", async () => {
     return;
   }
   const name = editCoachNameInput.value.trim() || editCoachEmailInput.value.trim() || "บัญชีนี้";
-  const ok = confirm(`ยืนยันลบบัญชี "${name}" ออกจากระบบถาวร? การลบนี้ไม่สามารถย้อนกลับได้ และบัญชีนี้จะเข้าสู่ระบบไม่ได้อีก`);
+  const ok = confirm(`ยืนยันลบบัญชี "${name}" ออกจากระบบถาวร? การลบนี้ไม่สามารถย้อนกลับได้\n\nหมายเหตุ: ลบได้เฉพาะข้อมูลในระบบ บัญชีล็อกอินของอีเมลนี้ยังอยู่ ถ้าเจ้าของสมัครหรือเข้าสู่ระบบอีกครั้ง จะต้องส่งคำขอใหม่และรอให้คุณอนุมัติ`);
   if (!ok) return;
   try {
     editCoachModalStatus.textContent = "กำลังลบ...";
@@ -4448,6 +4550,8 @@ onAuthChanged(async (user) => {
     return;
   }
 
+  // อ่านค่าก่อน await: ถ้ากำลังสมัคร/สร้างคำขออยู่ โปรไฟล์ที่ยังไม่มีคือ "กำลังบันทึก" ไม่ใช่ "ถูกลบ"
+  const registeringNow = registrationInFlight;
   try {
     const coachDoc = await getDoc(doc(db, "coaches", user.uid));
     const data = coachDoc.exists() ? coachDoc.data() : null;
@@ -4455,6 +4559,8 @@ onAuthChanged(async (user) => {
     if (!data || data.status !== "approved") {
       currentIsAdmin = false;
       currentStaffPerms = null;
+      // ล็อกอินได้แต่ไม่มีโปรไฟล์เลย (ผู้ดูแลระบบลบไปแล้ว) → ให้ส่งคำขอใหม่เองได้ ไม่งั้นค้างหน้ารอโดยผู้ดูแลระบบไม่เห็นคำขอ
+      showPendingPanel(!data && !registeringNow ? "reapply" : "waiting", user);
       renderCoachProfile(user, data, (data && data.team) || (data && data.role === "staff" ? "รอผู้ดูแลระบบอนุมัติและกำหนดสิทธิ์" : "รอผู้ดูแลระบบกำหนดทีม"));
       coachAgeGroupsWrap.classList.add("hidden");
       hideAllScreens();
@@ -4529,6 +4635,7 @@ onAuthChanged(async (user) => {
           adminDeepLinks[landing]();
           enableRouteSync();
         } else {
+          showPendingPanel("waiting", user);
           hideAllScreens();
           pendingSection.classList.remove("hidden");
         }

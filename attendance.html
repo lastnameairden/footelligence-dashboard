@@ -30,6 +30,7 @@
   <link rel="modulepreload" href="./js/fitness-entry-ui.js" />
   <link rel="modulepreload" href="./js/attendance-save.js" />
   <link rel="modulepreload" href="./js/team-theme.js" />
+  <link rel="modulepreload" href="./js/registration.js" />
   <link rel="modulepreload" href="./js/match-day-ui.js" />
   <link rel="modulepreload" href="./js/match-lineup.js" />
   <link rel="modulepreload" href="./js/match-day.js" />
@@ -267,8 +268,53 @@
 
     <!-- ข้อความสำหรับผู้ลงทะเบียนแล้วแต่ยังไม่ได้รับการอนุมัติ -->
     <section id="pending-section" class="hidden card card-warning card-pad max-w-sm">
-      <h2 class="text-lg font-semibold mb-2 text-amber-800">รอผู้ดูแลระบบกำหนดทีมและอนุมัติ</h2>
-      <p class="text-sm text-amber-700">บัญชีของคุณลงทะเบียนสำเร็จแล้ว แต่ยังไม่ได้รับการกำหนดทีมและอนุมัติจากผู้ดูแลระบบ กรุณารอหรือติดต่อผู้ดูแลระบบ</p>
+      <div id="pending-waiting">
+        <h2 class="text-lg font-semibold mb-2 text-amber-800">รอผู้ดูแลระบบกำหนดทีมและอนุมัติ</h2>
+        <p class="text-sm text-amber-700">บัญชีของคุณลงทะเบียนสำเร็จแล้ว แต่ยังไม่ได้รับการกำหนดทีมและอนุมัติจากผู้ดูแลระบบ กรุณารอหรือติดต่อผู้ดูแลระบบ</p>
+      </div>
+      <!-- ล็อกอินได้แต่ไม่มีโปรไฟล์ (ผู้ดูแลระบบเคยลบไป) — ส่งคำขอเข้าใช้งานใหม่ได้เอง; ช่องรุ่นอายุเติมโดย attendance.js -->
+      <form id="reapply-form" class="hidden space-y-4">
+        <div>
+          <h2 class="text-lg font-semibold mb-2 text-amber-800">บัญชีของคุณยังไม่มีคำขอเข้าใช้งาน</h2>
+          <p class="text-sm text-amber-700">โปรไฟล์ของบัญชีนี้อาจถูกผู้ดูแลระบบลบไปก่อนหน้านี้ กรอกข้อมูลเพื่อส่งคำขอให้ผู้ดูแลระบบอนุมัติอีกครั้ง</p>
+        </div>
+        <div>
+          <label class="field-label">อีเมล</label>
+          <input id="reapply-email" type="email" readonly class="field-input" />
+        </div>
+        <div>
+          <label class="field-label">ชื่อเล่น</label>
+          <input id="reapply-name" type="text" required maxlength="60" pattern="[^<>]*" title="ไม่เกิน 60 ตัวอักษร และห้ามใช้เครื่องหมาย < หรือ >" class="field-input" />
+        </div>
+        <div>
+          <label class="field-label">ขอเข้าใช้งานเป็น</label>
+          <div class="flex flex-wrap gap-4">
+            <label class="flex items-center gap-2 text-sm text-slate-700">
+              <input type="radio" name="reapply-role" value="coach" checked /> โค้ช
+            </label>
+            <label class="flex items-center gap-2 text-sm text-slate-700">
+              <input type="radio" name="reapply-role" value="executive" /> ผู้บริหารทีม
+            </label>
+            <label class="flex items-center gap-2 text-sm text-slate-700">
+              <input type="radio" name="reapply-role" value="staff" /> ทีมหลังบ้าน
+            </label>
+          </div>
+        </div>
+        <div id="reapply-coach-wrap">
+          <label class="field-label">ตำแหน่งโค้ช</label>
+          <select id="reapply-coach-position" class="field-input mb-3">
+            <option value="head_coach">Head Coach — หัวหน้าผู้ฝึกสอน</option>
+            <option value="assistant_coach">Assistant Coach — ผู้ช่วยผู้ฝึกสอน</option>
+            <option value="gk_coach">GK Coach — โค้ชผู้รักษาประตู</option>
+            <option value="fitness_coach">Fitness Coach — โค้ชฟิตเนส</option>
+          </select>
+          <label class="field-label">รุ่นอายุที่รับผิดชอบ</label>
+          <div id="reapply-age-group-checkboxes" class="grid grid-cols-3 sm:grid-cols-5 gap-2"></div>
+          <p id="reapply-age-group-hint" class="text-xs text-slate-400 mt-1"></p>
+        </div>
+        <p id="reapply-error" class="text-sm text-red-600"></p>
+        <button type="submit" class="btn btn-primary btn-block">ส่งคำขออนุมัติ</button>
+      </form>
       <button id="pending-logout-btn" class="btn btn-ghost-danger mt-4 px-0">ออกจากระบบ</button>
     </section>
 
@@ -529,7 +575,7 @@
               <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg> ลบบัญชีนี้ออกจากระบบ
             </button>
             <p class="text-xs text-slate-400 mt-1">
-              ลบข้อมูลบัญชีนี้ออกจากระบบถาวร (ไม่สามารถย้อนกลับได้) — ใช้เมื่อโค้ช/ผู้บริหารทีมคนนี้ไม่ได้ทำงานร่วมกับอคาเดมีแล้ว
+              ลบข้อมูลบัญชีนี้ออกจากระบบถาวร (ไม่สามารถย้อนกลับได้) — ใช้เมื่อโค้ช/ผู้บริหารทีมคนนี้ไม่ได้ทำงานร่วมกับอคาเดมีแล้ว (บัญชีล็อกอินของอีเมลนี้ยังอยู่ ถ้าสมัครหรือเข้าสู่ระบบอีกครั้งจะขึ้นเป็นคำขอใหม่ให้อนุมัติ)
             </p>
           </div>
         </div>
