@@ -1,7 +1,7 @@
 // หน้าจอ Match Day ในเมนู Attendance Check (ตรรกะล้วนๆ อยู่ที่ match-day.js) — เลือกชนิดวัน "Match Day" แล้วแสดงฟอร์ม 3 ส่วนแทนตารางเช็คชื่อ
 //   1. ข้อมูล Match  2. ข้อมูล Game + ตารางนักกีฬาทั้งรุ่น (+ ปุ่มเพิ่มนักกีฬาจากรุ่นอื่น)  3. Match Report
 // บันทึกลง matchReports (id คงที่ต่อทีม+วัน+รุ่น) และทำเครื่องหมาย sessions.matchDayAgeGroups ของวันนั้น (ใช้ตัดรุ่นนี้ออกจากสถิติเช็คชื่อซ้อม)
-import { collection, getDocs, getDoc, query, where, doc, setDoc, deleteDoc, arrayUnion, arrayRemove, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+import { collection, getDocs, query, where, documentId, doc, setDoc, deleteDoc, arrayUnion, arrayRemove, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 import { db } from "./firebase-init.js";
 import { icon } from "./icons.js";
 import { applyDataLabels, escapeHtml } from "./ui-utils.js";
@@ -65,16 +65,23 @@ function buildOwnRows(pool, ageGroup) {
     .map((p) => newRow(p, ageGroup));
 }
 
+// อ่านรายงาน Match Day ของทีมตัวเองด้วย query (where team) แทน getDoc ตรงๆ — เอกสารที่ยังไม่เคยบันทึกจะไม่มีอยู่จริง
+// กฎ read ของ matchReports เช็ค resource.data.team (ownsTeam) ซึ่ง resource เป็น null ตอนไม่มีเอกสาร getDoc จึงถูกปฏิเสธ
+// ("Missing or insufficient permissions") ทั้งที่ควรได้ "ยังไม่มี" — query ที่กรอง team ผ่านกฎและคืนผลว่างได้ตามปกติ
+async function getOwnMatchDay(id) {
+  const snap = await getDocs(query(collection(db, "matchReports"), where("team", "==", ctx.team), where(documentId(), "==", id)));
+  return snap.docs[0] ?? null;
+}
+
 async function loadAgeGroup(ageGroup) {
   state.ageGroup = ageGroup;
   state.status = "";
   state.errors = [];
   state.warnings = [];
   state.guest = { open: false, group: "", picked: new Set() };
-  const ref = doc(db, "matchReports", matchDayDocId(ctx.team, ctx.date, ageGroup));
-  const snap = await getDoc(ref);
+  const snap = await getOwnMatchDay(matchDayDocId(ctx.team, ctx.date, ageGroup));
   const own = buildOwnRows(state.pool, ageGroup);
-  if (snap.exists() && snap.data().matchDay) {
+  if (snap && snap.data().matchDay) {
     state.existing = { id: snap.id, ...snap.data() };
     const form = formFromReport(state.existing);
     // นักกีฬารุ่นนี้ที่เพิ่งเข้าทีมหลังบันทึก → เติมเป็นแถว "ไม่มีรายชื่อ" ให้ครบทั้งรุ่น
@@ -359,7 +366,7 @@ async function save() {
     });
     const session = await ctx.ensureSession(ctx.date);
     await setDoc(doc(db, "sessions", session.id), { matchDayAgeGroups: arrayUnion(state.ageGroup), updatedAt: serverTimestamp() }, { merge: true });
-    const snap = await getDoc(doc(db, "matchReports", id));
+    const snap = await getOwnMatchDay(id);
     state.existing = { id, ...snap.data() };
     state.status = "บันทึก Match Day แล้ว ✓";
   } catch (err) {
