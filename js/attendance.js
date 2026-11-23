@@ -72,7 +72,8 @@ import {
   TEAM_TRAINING_WEEKDAYS,
   isRecordOfCoach
 } from "./ui-utils.js";
-import { openAdminMeetings, renderCoachMeetingCard, renderCoachMeetingTasks, renderCoachNextMeeting, renderCoachMeetingHistory, loadCoachMeetingNotifications, loadCoachMeetingOverview } from "./coach-meetings-ui.js";
+import { openAdminMeetings, renderCoachMeetingCard, renderCoachMeetingTasks, renderCoachNextMeeting, renderCoachMeetingHistory, loadCoachMeetingNotifications, loadCoachMeetingOverview, coachMeetingTodoItems } from "./coach-meetings-ui.js";
+import { buildTodoItems, todoCarouselHtml, todoIndex, todoCountText } from "./home-todo.js";
 import { openAdminFitnessRounds } from "./fitness-rounds-ui.js";
 import { openAdminAthleteWindows } from "./athlete-windows-ui.js";
 import { openAdminAnnouncements } from "./admin-announcements-ui.js";
@@ -262,11 +263,11 @@ const athleteResultsFrame = document.getElementById("athlete-results-frame");
 const injuryMenuSection = document.getElementById("injury-menu-section");
 const injuryResultsSection = document.getElementById("injury-results-section");
 const teamEventsSection = document.getElementById("team-events-section");
-const dailyReminderBanner = document.getElementById("daily-reminder-banner");
-const dailyEventBanner = document.getElementById("daily-event-banner");
+const homeTodo = document.getElementById("home-todo");
 const homeDateLine = document.getElementById("home-date-line");
-const homeAllDone = document.getElementById("home-all-done");
 const dailyMeetingCard = document.getElementById("daily-meeting-card");
+const dailyReadNotes = document.getElementById("daily-read-notes");
+const dailyReadNotesCount = document.getElementById("daily-read-notes-count");
 const dailyExecutiveNotesList = document.getElementById("daily-executive-notes-list");
 const reportDateInput = document.getElementById("report-date");
 const reportLoadBtn = document.getElementById("report-load-btn");
@@ -926,108 +927,149 @@ function showDaily() {
   hideAllScreens();
   dailySection.classList.remove("hidden");
   homeDateLine.textContent = formatThaiDate(todayBangkok());
-  checkTodayReminders();
-  checkEventReminder();
-
-  renderCoachMeetingCard(dailyMeetingCard, myTeam, meetingCoachId(), {
-    position: myCoachPosition,
-    onChange: () => {
-      refreshNotifications();
-      refreshMeetingTaskCount();
-    }
-  });
-  loadExecutiveNotes(myTeam, dailyExecutiveNotesList);
+  refreshHomeTodo();
+  renderCoachMeetingCard(dailyMeetingCard, myTeam, meetingCoachId(), { position: myCoachPosition });
 }
 
 function formatThaiDate(dateStr) {
   return new Date(`${dateStr}T00:00:00`).toLocaleDateString("th-TH", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 }
 
-// เตือนงานประจำวันที่ยังไม่ได้ทำของ "วันนี้" (หน้า Home — หน้าแรกของโค้ช) เพื่อกันลืมเช็คชื่อ/ส่งแผน/ส่งรายงาน โดยไม่ต้องรอผู้ดูแลระบบ
-// ส่งข้อความเตือนย้อนหลัง ตรวจแค่ "เริ่มทำหรือยัง" ไม่ตรวจความครบถ้วน (มีระบบแจ้งเตือนของผู้ดูแลระบบดูแลส่วนนั้นอยู่แล้ว)
-// เตือนแผนฝึกเฉพาะวันฝึกซ้อมปกติของทีมที่ไม่ได้ถูกทำเครื่องหมาย "ไม่มีซ้อม" และยังไม่มีแผนของรุ่นที่ดูแลในวันนี้
-async function checkTodayReminders() {
-  if (!myTeam) return;
+// ---------- งานที่ต้องดำเนินการ (หน้า Home ของโค้ช) ----------
+// รวมงานค้างทุกชนิดเป็นการ์ดในแถบเลื่อน (home-todo.js) ทำเสร็จแล้วไม่ต้องแสดง = ดึงเฉพาะที่ยังค้างทุกครั้งที่เปิด/กลับมาหน้า Home
+// แต่ละแหล่งข้อมูลล้มเหลวได้โดยไม่กระทบแหล่งอื่น (เป็นตัวเตือนเสริม ไม่แสดง error ให้กวนใจ)
+
+// งานประจำวันของ "วันนี้" ที่ยังไม่ได้ทำ → ["checkin","plan","report"] เฉพาะที่ค้าง — ตรวจแค่ "เริ่มทำหรือยัง" ไม่ตรวจความครบถ้วน
+// (มีระบบแจ้งเตือนของผู้ดูแลระบบดูแลส่วนนั้นอยู่แล้ว) แผนฝึกเตือนเฉพาะวันซ้อมปกติของทีมที่ไม่ได้ถูกทำเครื่องหมาย "ไม่มีซ้อม"
+// และยังไม่มีแผนของรุ่นที่ดูแลในวันนี้
+async function collectTodayReminders() {
+  if (!myTeam) return [];
   const todayStr = todayBangkok();
-  dailyReminderBanner.classList.add("hidden");
-  dailyReminderBanner.innerHTML = "";
-  homeAllDone.classList.add("hidden");
-  try {
-    const [session, reportSnap, planSnap] = await Promise.all([
-      findSession(todayStr),
-      getDocs(query(collection(db, "trainingReports"), where("team", "==", myTeam), where("date", "==", todayStr))),
-      getDocs(query(collection(db, "trainingPlans"), where("team", "==", myTeam), where("date", "==", todayStr)))
-    ]);
-
-    const reminders = [];
-    if (!session) {
-      reminders.push({ text: "ยังไม่ได้เช็คชื่อการฝึกซ้อมวันนี้", action: openCheckinSection });
-    }
-    const [y, m, d] = todayStr.split("-").map(Number);
-    const weekday = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
-    const trainsToday = (TEAM_TRAINING_WEEKDAYS[myTeam] || []).includes(weekday);
-    const hasMyPlan = planSnap.docs.some((p) => {
-      const groups = p.data().ageGroups || [];
-      return myAgeGroups.length === 0 || groups.some((g) => myAgeGroups.includes(g));
-    });
-    if (trainsToday && !session?.noTraining && !hasMyPlan) {
-      reminders.push({ text: "ยังไม่ได้ส่งแผนการฝึกซ้อมวันนี้", action: openTrainingPlanSection });
-    }
-    if (reportSnap.empty) {
-      reminders.push({ text: "ยังไม่ได้ส่งรายงานการฝึกซ้อมวันนี้", action: openReportSection });
-    }
-    if (reminders.length === 0) {
-      homeAllDone.classList.remove("hidden");
-      return;
-    }
-
-    dailyReminderBanner.innerHTML = `<p class="text-sm font-semibold text-amber-800 mb-1">${icon("bell")} สิ่งที่ยังไม่ได้ทำวันนี้</p>`;
-    for (const r of reminders) {
-      const row = document.createElement("div");
-      row.className = "flex items-center justify-between gap-3";
-      row.innerHTML = `<p class="text-sm text-amber-700">${r.text}</p>`;
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "btn btn-secondary btn-sm";
-      btn.textContent = "ไปทำเลย →";
-      btn.addEventListener("click", r.action);
-      row.appendChild(btn);
-      dailyReminderBanner.appendChild(row);
-    }
-    dailyReminderBanner.classList.remove("hidden");
-  } catch (err) {
-    console.error(err);
-    // ไม่ต้องแสดง error ให้กวนใจ เพราะเป็นแค่ตัวเตือนเสริม ไม่ใช่ข้อมูลหลักของหน้านี้
-  }
+  const [session, reportSnap, planSnap] = await Promise.all([
+    findSession(todayStr),
+    getDocs(query(collection(db, "trainingReports"), where("team", "==", myTeam), where("date", "==", todayStr))),
+    getDocs(query(collection(db, "trainingPlans"), where("team", "==", myTeam), where("date", "==", todayStr)))
+  ]);
+  const daily = [];
+  if (!session) daily.push("checkin");
+  const [y, m, d] = todayStr.split("-").map(Number);
+  const weekday = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  const trainsToday = (TEAM_TRAINING_WEEKDAYS[myTeam] || []).includes(weekday);
+  const hasMyPlan = planSnap.docs.some((p) => {
+    const groups = p.data().ageGroups || [];
+    return myAgeGroups.length === 0 || groups.some((g) => myAgeGroups.includes(g));
+  });
+  if (trainsToday && !session?.noTraining && !hasMyPlan) daily.push("plan");
+  if (reportSnap.empty) daily.push("report");
+  return daily;
 }
-// เตือนแจ้ง Event ประจำเดือนถัดไปที่หน้า Home (ก่อนกำหนดส่ง 7 วัน — ดู eventReminder) ส่งแล้วหรือยังไม่ถึงช่วงเตือนก็ไม่แสดง
-async function checkEventReminder() {
-  dailyEventBanner.classList.add("hidden");
-  dailyEventBanner.innerHTML = "";
+
+// Event ประจำเดือนถัดไปที่ยังไม่แจ้ง (ก่อนกำหนดส่ง 7 วัน — ดู eventReminder) ส่งแล้วหรือยังไม่ถึงช่วงเตือน = null
+async function collectEventReminder() {
+  if (!myTeam) return null;
+  const now = bangkokStamp();
+  // เดือนที่ต้องแจ้งคือเดือนถัดไปเสมอ — ถามก่อนว่าถึงช่วงเตือนหรือยัง จะได้ไม่ต้องอ่านข้อมูลเมื่อยังไม่ถึงช่วง
+  const probe = eventReminder({ now, submitted: false });
+  if (!probe) return null;
+  const snap = await getDocs(query(collection(db, "monthlyEvents"), where("team", "==", myTeam), where("month", "==", probe.month)));
+  // เตือนเป็นรายบุคคล: ส่งแล้วถ้ามีเอกสารของโค้ชคนนี้ (หรือเอกสารแบบเดิมที่กรอกทั้งทีม ซึ่งไม่ผูกโค้ช)
+  const meId = meetingCoachId();
+  const submitted = snap.docs.some((d) => !d.data().coachId || d.data().coachId === meId);
+  if (!eventReminder({ now, submitted })) return null;
+  const leftText = probe.state === "overdue" ? "เลยกำหนดแล้ว" : probe.daysLeft > 0 ? `เหลืออีก ${probe.daysLeft} วัน` : "ครบกำหนดวันนี้";
+  return { monthLabel: eventMonthLabel(probe.month), deadlineLabel: deadlineLabel(probe.month), leftText };
+}
+
+// ข้อความจากผู้ดูแลระบบถึงทีมนี้ แยกเป็นที่ยังไม่อ่าน (ขึ้นในแถบงาน) กับที่อ่านแล้ว (พับไว้ใต้หน้า Home)
+async function collectHomeNotes() {
+  if (!myTeam) return { unread: [], read: [] };
+  const snap = await getDocs(query(collection(db, "executiveNotes"), where("team", "==", myTeam)));
+  const notes = [];
+  snap.forEach((d) => notes.push({ id: d.id, ...d.data() }));
+  notes.sort((a, b) => noteTime(b) - noteTime(a));
+  return { unread: notes.filter((n) => !n.read), read: notes.filter((n) => n.read) };
+}
+
+let homeTodoSeq = 0;
+async function refreshHomeTodo() {
   if (!myTeam) return;
-  try {
-    const now = bangkokStamp();
-    // เดือนที่ต้องแจ้งคือเดือนถัดไปเสมอ — ถามก่อนว่าถึงช่วงเตือนหรือยัง จะได้ไม่ต้องอ่านข้อมูลเมื่อยังไม่ถึงช่วง
-    const probe = eventReminder({ now, submitted: false });
-    if (!probe) return;
-    const snap = await getDocs(query(collection(db, "monthlyEvents"), where("team", "==", myTeam), where("month", "==", probe.month)));
-    // เตือนเป็นรายบุคคล: ส่งแล้วถ้ามีเอกสารของโค้ชคนนี้ (หรือเอกสารแบบเดิมที่กรอกทั้งทีม ซึ่งไม่ผูกโค้ช)
-    const meId = meetingCoachId();
-    const submitted = snap.docs.some((d) => !d.data().coachId || d.data().coachId === meId);
-    if (!eventReminder({ now, submitted })) return;
-    const left = probe.state === "overdue" ? `<span class="text-red-600 font-semibold">เลยกำหนดแล้ว</span>` : probe.daysLeft > 0 ? `เหลืออีก ${probe.daysLeft} วัน` : "ครบกำหนดวันนี้";
-    dailyEventBanner.innerHTML = `<div><p class="text-sm font-semibold text-amber-800">${icon("trophy")} ยังไม่ได้แจ้ง Event ของเดือน${escapeHtml(eventMonthLabel(probe.month))}</p><p class="text-sm text-amber-700">กรอกภายใน ${escapeHtml(deadlineLabel(probe.month))} · ${left}</p></div>`;
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "btn btn-secondary btn-sm";
-    btn.textContent = "ไปกรอกเลย →";
-    btn.addEventListener("click", openTeamEvents);
-    dailyEventBanner.appendChild(btn);
-    dailyEventBanner.classList.remove("hidden");
-  } catch (err) {
-    console.error(err); // ตัวเตือนเสริม ไม่แสดง error ให้กวนใจ
-  }
+  const seq = ++homeTodoSeq; // กลับมาหน้า Home ซ้ำเร็วๆ — ใช้ผลของรอบล่าสุดเท่านั้น
+  const quiet = (fallback) => (err) => {
+    console.error(err);
+    return fallback;
+  };
+  const [daily, event, meetingTasks, notes] = await Promise.all([
+    collectTodayReminders().catch(quiet([])),
+    collectEventReminder().catch(quiet(null)),
+    coachMeetingTodoItems(myTeam, meetingCoachId(), myCoachPosition).catch(quiet([])),
+    collectHomeNotes().catch(quiet({ unread: [], read: [] }))
+  ]);
+  if (seq !== homeTodoSeq) return;
+  const items = buildTodoItems({
+    daily,
+    event,
+    meetingTasks,
+    notes: notes.unread.map((n) => ({ id: n.id, refLabel: n.refLabel, message: n.message, type: n.type, createdBy: n.createdBy, postedAt: notePostedAt(n) }))
+  });
+  homeTodo.innerHTML = todoCarouselHtml(items);
+  homeTodo.classList.remove("hidden");
+  dailyExecutiveNotesList.innerHTML = notes.read.map((n) => executiveNoteCardHtml(n)).join("");
+  dailyReadNotesCount.textContent = notes.read.length > 0 ? `(${notes.read.length})` : "";
+  dailyReadNotes.classList.toggle("hidden", notes.read.length === 0);
 }
+
+const HOME_TODO_ACTIONS = {
+  checkin: () => openCheckinSection(),
+  plan: () => openTrainingPlanSection(),
+  report: () => openReportSection(),
+  event: () => openTeamEvents(),
+  meeting: () => openMeetingTasksSection(),
+  masc: () => openFootelligenceTest()
+};
+
+function syncHomeTodoPosition() {
+  const track = homeTodo.querySelector("[data-todo-track]");
+  const first = track?.querySelector(".todo-card");
+  if (!track || !first) return;
+  const count = track.querySelectorAll(".todo-card").length;
+  const step = first.offsetWidth + parseFloat(getComputedStyle(track).columnGap || "0");
+  const index = todoIndex(track.scrollLeft, step, count);
+  const counter = homeTodo.querySelector("[data-todo-count]");
+  if (counter) counter.textContent = todoCountText(index, count);
+  homeTodo.querySelectorAll(".todo-dot").forEach((dot, i) => dot.classList.toggle("todo-dot-on", i === index));
+}
+// scroll ไม่ bubble — ใช้ capture เพื่อฟังที่กล่อง (แถบเลื่อนถูกสร้างใหม่ทุกครั้งที่ refresh)
+homeTodo.addEventListener("scroll", syncHomeTodoPosition, true);
+
+homeTodo.addEventListener("click", async (e) => {
+  const stepBtn = e.target.closest("[data-todo-step]");
+  if (stepBtn) {
+    const track = homeTodo.querySelector("[data-todo-track]");
+    const first = track?.querySelector(".todo-card");
+    if (!first) return;
+    const step = first.offsetWidth + parseFloat(getComputedStyle(track).columnGap || "0");
+    track.scrollBy({ left: Number(stepBtn.dataset.todoStep) * step, behavior: "smooth" });
+    return;
+  }
+  const goBtn = e.target.closest("[data-todo-go]");
+  if (goBtn) {
+    HOME_TODO_ACTIONS[goBtn.dataset.todoGo]?.();
+    return;
+  }
+  const readBtn = e.target.closest("[data-todo-read]");
+  if (readBtn) {
+    readBtn.disabled = true;
+    try {
+      await updateDoc(doc(db, "executiveNotes", readBtn.dataset.todoRead), { read: true });
+      refreshNotifications(); // กระดิ่งของโค้ชนับข้อความที่ยังไม่อ่าน
+      await refreshHomeTodo();
+    } catch (err) {
+      console.error(err);
+      readBtn.disabled = false;
+      alert("อัปเดตไม่สำเร็จ: " + err.message);
+    }
+  }
+});
 // ---------- เมนูนำทางแบบเลื่อน (Hamburger Drawer) ----------
 function openDrawer() {
   renderDrawerItems();
@@ -4123,6 +4165,28 @@ async function enterExecutiveViewMode(team, returnSection, execRecordOverride, l
 let currentExecutiveNotesTeam = null;
 let currentExecutiveNotesListEl = null;
 
+const noteTime = (n) => (n.createdAt && typeof n.createdAt.toDate === "function" ? n.createdAt.toDate().getTime() : 0);
+const notePostedAt = (n) =>
+  n.createdAt && typeof n.createdAt.toDate === "function" ? n.createdAt.toDate().toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" }) : "-";
+
+function executiveNoteCardHtml(n) {
+  const typeIcon = n.type === "player" ? icon("star") : n.type === "coach" ? icon("alert-triangle") : icon("pin");
+  const unreadBadge = n.read ? "" : '<span class="badge badge-info">ใหม่</span>';
+  const readBtn = n.read
+    ? ""
+    : `<button type="button" class="btn btn-ghost btn-sm mt-2" data-mark-read-id="${n.id}">${icon("check")} ทำเครื่องหมายว่าอ่านแล้ว</button>`;
+  return `
+          <div class="card card-pad${n.read ? "" : " border-2 border-blue-200"}">
+            <div class="flex items-center justify-between gap-2 flex-wrap">
+              <p class="font-semibold">${typeIcon} ${escapeHtml(n.refLabel ?? "-")}</p>
+              ${unreadBadge}
+            </div>
+            <p class="text-sm text-slate-600 mt-1 whitespace-pre-line">${escapeHtml(n.message ?? "-")}</p>
+            <p class="text-xs text-slate-400 mt-2">จาก ${escapeHtml(n.createdBy ?? "ผู้ดูแลระบบ")} • ${notePostedAt(n)}</p>
+            ${readBtn}
+          </div>`;
+}
+
 async function loadExecutiveNotes(team, listEl) {
   currentExecutiveNotesTeam = team;
   currentExecutiveNotesListEl = listEl;
@@ -4131,40 +4195,14 @@ async function loadExecutiveNotes(team, listEl) {
     const snap = await getDocs(query(collection(db, "executiveNotes"), where("team", "==", team)));
     const notes = [];
     snap.forEach((d) => notes.push({ id: d.id, ...d.data() }));
-    notes.sort((a, b) => {
-      const ta = a.createdAt && typeof a.createdAt.toDate === "function" ? a.createdAt.toDate().getTime() : 0;
-      const tb = b.createdAt && typeof b.createdAt.toDate === "function" ? b.createdAt.toDate().getTime() : 0;
-      return tb - ta;
-    });
+    notes.sort((a, b) => noteTime(b) - noteTime(a));
 
     if (notes.length === 0) {
       listEl.innerHTML = '<p class="text-sm text-slate-400">ยังไม่มีข้อความจากผู้ดูแลระบบ</p>';
       return;
     }
 
-    listEl.innerHTML = notes
-      .map((n) => {
-        const typeIcon = n.type === "player" ? icon("star") : n.type === "coach" ? icon("alert-triangle") : icon("pin");
-        const postedAt =
-          n.createdAt && typeof n.createdAt.toDate === "function"
-            ? n.createdAt.toDate().toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" })
-            : "-";
-        const unreadBadge = n.read ? "" : '<span class="badge badge-info">ใหม่</span>';
-        const readBtn = n.read
-          ? ""
-          : `<button type="button" class="btn btn-ghost btn-sm mt-2" data-mark-read-id="${n.id}">${icon("check")} ทำเครื่องหมายว่าอ่านแล้ว</button>`;
-        return `
-          <div class="card card-pad${n.read ? "" : " border-2 border-blue-200"}">
-            <div class="flex items-center justify-between gap-2 flex-wrap">
-              <p class="font-semibold">${typeIcon} ${n.refLabel ?? "-"}</p>
-              ${unreadBadge}
-            </div>
-            <p class="text-sm text-slate-600 mt-1 whitespace-pre-line">${escapeHtml(n.message ?? "-")}</p>
-            <p class="text-xs text-slate-400 mt-2">จาก ${escapeHtml(n.createdBy ?? "ผู้ดูแลระบบ")} • ${postedAt}</p>
-            ${readBtn}
-          </div>`;
-      })
-      .join("");
+    listEl.innerHTML = notes.map(executiveNoteCardHtml).join("");
   } catch (err) {
     console.error(err);
     listEl.innerHTML = `<p class="text-sm text-red-600">โหลดข้อความไม่สำเร็จ: ${escapeHtml(err.message)}</p>`;

@@ -20,6 +20,7 @@
   <link rel="modulepreload" href="./js/admin-notifications.js" />
   <link rel="modulepreload" href="./js/coach-meetings-ui.js" />
   <link rel="modulepreload" href="./js/coach-meetings.js" />
+  <link rel="modulepreload" href="./js/home-todo.js" />
   <link rel="modulepreload" href="./js/fitness-rounds-ui.js" />
   <link rel="modulepreload" href="./js/fitness-calc.js" />
   <link rel="modulepreload" href="./js/athlete-windows-ui.js" />
@@ -2095,22 +2096,18 @@
         </div>
       </div>
 
-      <!-- เตือนงานประจำวันที่ยังไม่ได้ทำของ "วันนี้" (เช็คชื่อ/ส่งแผน/ส่งรายงานการฝึกซ้อม) เพื่อลดปัญหาโค้ชลืมทำ/ส่งสาย -->
-      <div id="daily-reminder-banner" class="hidden card card-warning card-pad space-y-2"></div>
-      <p id="home-all-done" class="hidden card card-pad text-sm text-emerald-700 font-medium">วันนี้ทำครบแล้ว ไม่มีงานค้าง</p>
-      <!-- เตือนแจ้ง Event ประจำเดือนถัดไป (ก่อนกำหนด 7 วัน ถึงสิ้นเดือน ถ้ายังไม่ส่ง) — ดู eventReminder ใน team-events.js -->
-      <div id="daily-event-banner" class="hidden card card-warning card-pad flex items-center justify-between gap-3 flex-wrap"></div>
+      <!-- งานที่ต้องดำเนินการ: เช็คชื่อ/แผน/รายงานของวันนี้ + Event ประจำเดือน + งานหลังประชุม + ข้อความที่ยังไม่อ่าน เป็นการ์ดใบละงานในแถบเลื่อน
+           (โค้ชเลื่อนเอง) ทำเสร็จแล้วการ์ดหายเมื่อกลับมาหน้านี้ — สร้างโดย refreshHomeTodo ใน attendance.js (ตรรกะที่ js/home-todo.js) -->
+      <div id="home-todo" class="hidden space-y-2"></div>
 
-      <!-- นัดประชุมโค้ชครั้งถัดไป + งานหลังประชุมของโค้ชคนนี้ (ซ้อนไว้จนกว่าจะมีนัด/งาน) -->
+      <!-- นัดประชุมโค้ชครั้งถัดไป (ซ่อนไว้จนกว่าจะมีนัด) -->
       <div id="daily-meeting-card" class="hidden"></div>
 
-      <!-- ข้อความที่ผู้ดูแลระบบส่งถึงทีมนี้โดยตรง -->
-      <div id="daily-executive-notes-section">
-        <h2 class="section-title mb-3"><span class="icon-badge"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em;flex-shrink:0" aria-hidden="true" ><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg></span> ข้อความจากผู้ดูแลระบบ</h2>
-        <div id="daily-executive-notes-list" class="space-y-3">
-          <p class="text-sm text-slate-400">กำลังโหลด...</p>
-        </div>
-      </div>
+      <!-- ข้อความจากผู้ดูแลระบบที่อ่านแล้ว (ที่ยังไม่อ่านอยู่ในแถบงานด้านบน) -->
+      <details id="daily-read-notes" class="hidden card card-pad">
+        <summary class="cursor-pointer font-semibold text-slate-900">ข้อความจากผู้ดูแลระบบที่อ่านแล้ว <span id="daily-read-notes-count" class="text-sm font-normal text-slate-500"></span></summary>
+        <div id="daily-executive-notes-list" class="space-y-3 mt-3"></div>
+      </details>
     </section>
   </main>
 

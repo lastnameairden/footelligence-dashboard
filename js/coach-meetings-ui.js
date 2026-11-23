@@ -849,26 +849,41 @@ async function onCardClick(e) {
   }
 }
 
-// opts = { position: ตำแหน่งโค้ช (กำหนดสาย), canSubmit: false เมื่อผู้ดูแลระบบสวมบทบาทดูแทนโค้ช, onChange: เรียกหลังส่งงานสำเร็จ (ให้กระดิ่งรีเฟรช) }
+// การ์ด "ประชุมโค้ชครั้งถัดไป" บนหน้า Home — งานหลังประชุมที่ยังไม่ส่งไม่แสดงตรงนี้แล้ว ขึ้นเป็นการ์ดในแถบ "งานที่ต้องดำเนินการ"
+// (coachMeetingTodoItems) และกรอกที่เมนู Meeting → งานหลังประชุม
+// opts = { position: ตำแหน่งโค้ช (กำหนดสาย) }
 export async function renderCoachMeetingCard(el, team, coachId, opts = {}) {
-  cardArgs.set(el, { team, coachId, opts, rerender: () => renderCoachMeetingCard(el, team, coachId, opts) });
-  if (!el.dataset.bound) {
-    el.dataset.bound = "1";
-    el.addEventListener("click", onCardClick);
-  }
   el.classList.add("hidden");
   el.innerHTML = "";
   if (!coachId) return;
   try {
     const track = coachTrackOf(opts.position);
-    const { next, tasks } = await fetchCoachMeetingData(team, coachId, track);
-    if (!next && tasks.length === 0) return;
+    const { next } = await fetchCoachMeetingData(team, coachId, track);
+    if (!next) return;
     el.className = "space-y-3";
-    el.innerHTML = (next ? nextMeetingCardHtml(next, track) : "") + tasks.map((t) => recapTaskCardHtml(t, coachId, opts.canSubmit !== false, coachTrackOf(opts.position))).join("");
+    el.innerHTML = nextMeetingCardHtml(next, track);
   } catch (err) {
     // การ์ดเสริมของหน้า Daily — ไม่แสดง error ให้กวนใจ (เหมือนตัวเตือนงานประจำวัน)
     console.error(err);
   }
+}
+
+// งานหลังประชุมที่ยังไม่ส่ง (ยังไม่ถึงกำหนดหรือเลยกำหนดแล้ว) ของโค้ชคนนี้ ในรูปที่แถบ "งานที่ต้องดำเนินการ" บนหน้า Home ใช้ (home-todo.js)
+export async function coachMeetingTodoItems(team, coachId, position) {
+  if (!coachId) return [];
+  const { tasks } = await fetchCoachMeetingData(team, coachId, coachTrackOf(position));
+  const today = todayBangkok();
+  return tasks
+    .filter((t) => t.status.state === "pending" || t.status.state === "overdue")
+    .map((t) => {
+      const left = daysUntil(t.status.deadline, today);
+      return {
+        dateLabel: thaiMeetingDateLabel(t.meeting.date),
+        deadlineLabel: thaiMeetingDateLabel(t.status.deadline),
+        leftText: left <= 0 ? "ครบกำหนดวันนี้" : `เหลือ ${left} วัน`,
+        overdue: t.status.state === "overdue"
+      };
+    });
 }
 
 // หน้า "งานหลังประชุม" (เมนูของโค้ช): แสดงเฉพาะงานหลังประชุม — ยังไม่ส่ง = ฟอร์มเปิดอยู่ / ส่งแล้ว = พับไว้ กางแก้ไขได้ (ย้อนหลังไม่เกิน RECENT_SUBMITTED_DAYS วัน)
