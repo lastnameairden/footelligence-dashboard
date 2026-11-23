@@ -15,6 +15,7 @@ import { db, auth } from "./firebase-init.js";
 import { AGES, POS, SECT, SB, CRITERIA, SCORE_VALUES, categoryRawScore, isEvaluationComplete, scoreToGrade } from "./masc-data.js";
 import { getCoachPlayerIds, escapeHtml, todayBangkok } from "./ui-utils.js";
 import { icon } from "./icons.js";
+import { mascPeriodName } from "./masc-period.js";
 // อยู่ใน iframe ของเมนูโค้ช: ซ่อนหัว/ท้ายหน้าและปุ่มย้อนกลับของหน้านี้ (ดู html.embedded ใน styles.css)
 if (window.self !== window.top) document.documentElement.classList.add("embedded");
 
@@ -150,7 +151,7 @@ async function loadMascRoundBanner() {
       const daysLeft = daysBetween(active.endDate, todayStr);
       mascRoundBanner.className = "card card-pad no-print bg-emerald-50 border-emerald-200";
       mascRoundBanner.innerHTML = `
-        <p class="font-semibold text-emerald-800">${icon("bell")} รอบประเมิน MASC ปัจจุบัน: ${active.label} (${escapeHtml(active.startDate)} – ${escapeHtml(active.endDate)})</p>
+        <p class="font-semibold text-emerald-800">${icon("bell")} รอบประเมิน MASC ปัจจุบัน: ${escapeHtml(mascPeriodName(active.label))} (${escapeHtml(active.startDate)} – ${escapeHtml(active.endDate)})</p>
         <p class="text-sm text-emerald-700 mt-1">${daysLeft > 0 ? `เหลือเวลาอีก ${daysLeft} วัน` : "หมดเขตวันนี้"}</p>
       `;
       mascRoundBanner.classList.remove("hidden");
@@ -471,7 +472,7 @@ async function loadHistoryForPlayer(playerId) {
     btn.type = "button";
     btn.className = "btn btn-secondary btn-sm";
     const dateText = ev.createdAt && ev.createdAt.toDate ? ev.createdAt.toDate().toLocaleDateString("th-TH") : "-";
-    btn.textContent = `${ev.assessmentPeriod || "-"} · ${ev.position || "-"} · ${dateText}`;
+    btn.textContent = `${mascPeriodName(ev.assessmentPeriod) || "-"} · ${ev.position || "-"} · ${dateText}`;
     btn.addEventListener("click", () => loadEvaluationIntoForm(ev));
     historyList.appendChild(btn);
   });
@@ -549,7 +550,7 @@ function loadEvaluationIntoForm(ev) {
   renderPositionSelectors();
   renderForm();
   formWrap.classList.remove("hidden");
-  setStatus(`กำลังดู/แก้ไขการประเมิน ${ev.assessmentPeriod || "-"} ที่บันทึกไว้`);
+  setStatus(`กำลังดู/แก้ไขการประเมิน ${mascPeriodName(ev.assessmentPeriod) || "-"} ที่บันทึกไว้`);
 }
 
 // ---------- บันทึก/ลบ ----------

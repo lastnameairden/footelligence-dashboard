@@ -2,6 +2,7 @@
 // ตรรกะล้วนๆ + HTML เป็นสตริง (ไม่พึ่ง DOM/Firebase) ทุกค่าคำนวณตอนแสดงจากข้อมูลเดิมของนักกีฬาคนนั้น ไม่เก็บลงฐานข้อมูล
 import { SCORE_CATEGORIES, SCORE_CATEGORY_COLORS, computeAvgScore, escapeHtml } from "./ui-utils.js";
 import { categoryRawScore, scoreToGrade } from "./masc-data.js";
+import { mascPeriodName } from "./masc-period.js";
 import { MATCH_RATING_MAX } from "./match-day.js";
 import { FITNESS_TEST_BY_CODE } from "./fitness-calc.js";
 import { NO_TREND_CODES, previousValue, trendBetween } from "./fitness-profile.js";
@@ -213,7 +214,7 @@ export function mascRounds(evaluations) {
   const latestByLabel = new Map();
   for (const e of [...evaluations].sort((a, b) => evalTime(a) - evalTime(b))) latestByLabel.set(e.assessmentPeriod || e.roundId || e.id || "-", e);
   const list = [...latestByLabel].map(([label, e]) => ({
-    label: String(label),
+    label: mascPeriodName(String(label)),
     time: evalTime(e),
     grades: Object.fromEntries(MASC_CATEGORIES.map((c) => [c.key, scoreToGrade(categoryRawScore(e.scores?.[c.key]))])),
     talent: e.talent || "",

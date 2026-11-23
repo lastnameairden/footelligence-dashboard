@@ -30,6 +30,7 @@
   <link rel="modulepreload" href="./js/fitness-entry-ui.js" />
   <link rel="modulepreload" href="./js/attendance-save.js" />
   <link rel="modulepreload" href="./js/team-theme.js" />
+  <link rel="modulepreload" href="./js/masc-period.js" />
   <link rel="modulepreload" href="./js/registration.js" />
   <link rel="modulepreload" href="./js/match-day-ui.js" />
   <link rel="modulepreload" href="./js/match-lineup.js" />
@@ -1057,11 +1058,11 @@
         <div>
           <label class="field-label">ช่วงที่ประเมิน</label>
           <select id="admin-masc-round-period-select" class="field-input w-full">
-            <option value="">-- เลือกช่วงที่ --</option>
-            <option>ช่วงที่ 1</option>
-            <option>ช่วงที่ 2</option>
-            <option>ช่วงที่ 3</option>
-            <option>ช่วงที่ 4</option>
+            <option value="">-- เลือกช่วงประเมิน --</option>
+            <option value="ช่วงที่ 1">1/2569</option>
+            <option value="ช่วงที่ 2">2/2569</option>
+            <option value="ช่วงที่ 3">3/2569</option>
+            <option value="ช่วงที่ 4">4/2569</option>
           </select>
         </div>
         <div class="grid grid-cols-2 gap-3">
@@ -1083,7 +1084,7 @@
           <table class="pro-table">
             <thead>
               <tr>
-                <th>ช่วงที่</th>
+                <th>ช่วงประเมิน</th>
                 <th>วันที่เริ่ม</th>
                 <th>วันที่สิ้นสุด</th>
                 <th>สถานะ</th>

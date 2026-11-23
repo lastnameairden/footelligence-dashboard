@@ -79,6 +79,7 @@ import { openAdminAnnouncements } from "./admin-announcements-ui.js";
 import { openFitnessEntry } from "./fitness-entry-ui.js";
 import { parseParentHeights } from "./fitness-calc.js";
 import { applyTeamTheme } from "./team-theme.js";
+import { mascPeriodName } from "./masc-period.js";
 import { normalizeEmail, registrationProblem, buildPendingProfile, isEmailInUse, isWrongCredential, WRONG_PASSWORD_FOR_EXISTING_EMAIL } from "./registration.js";
 import { initMatchDay, openMatchDay } from "./match-day-ui.js";
 import { buildAttendanceGrid, gridHtml, legendHtml } from "./attendance-grid.js";
@@ -1859,7 +1860,7 @@ async function enterMascCorrectionMode(round) {
   adminMascRoundEndInput.value = "";
   adminMascRoundStatus.textContent = "";
   updateMascRoundStartBtnLabel();
-  adminMascRoundCorrectionLabel.textContent = round.label;
+  adminMascRoundCorrectionLabel.textContent = mascPeriodName(round.label);
   adminMascRoundCorrectionSummary.innerHTML = '<p class="text-slate-500">กำลังตรวจสอบว่ารุ่นไหนยังประเมินไม่ครบ...</p>';
   adminMascRoundCorrectionNote.classList.remove("hidden");
   adminMascRoundCreateCard.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -2036,7 +2037,7 @@ function populateMascProgressRoundSelect(rounds) {
     return;
   }
   mascProgressRoundSelect.innerHTML = rounds
-    .map((r) => `<option value="${r.id}">${r.label} (${escapeHtml(r.startDate)} – ${escapeHtml(r.endDate)}) · ${mascRoundStatus(r).label}</option>`)
+    .map((r) => `<option value="${r.id}">${escapeHtml(mascPeriodName(r.label))} (${escapeHtml(r.startDate)} – ${escapeHtml(r.endDate)}) · ${mascRoundStatus(r).label}</option>`)
     .join("");
   // ค่าเริ่มต้น: รอบที่ "กำลังดำเนินการ" อยู่ตอนนี้ถ้ามี ไม่งั้นใช้รอบล่าสุด (rounds เรียงจากใหม่ไปเก่าอยู่แล้ว)
   const activeRound = rounds.find((r) => mascRoundStatus(r).label === "กำลังดำเนินการ");
@@ -2195,7 +2196,7 @@ function renderMascRoundList(rounds) {
       const isEnded = status.label === "สิ้นสุดแล้ว";
       return `
         <tr>
-          <td class="emphasis">${r.label ?? "-"}${r.isCorrectionRound ? ' <span class="badge badge-warning">รอบแก้ไข</span>' : ""}</td>
+          <td class="emphasis">${escapeHtml(mascPeriodName(r.label) ?? "-")}${r.isCorrectionRound ? ' <span class="badge badge-warning">รอบแก้ไข</span>' : ""}</td>
           <td>${escapeHtml(r.startDate ?? "-")}</td>
           <td>${escapeHtml(r.endDate ?? "-")}</td>
           <td><span class="badge ${status.className}">${status.label}</span></td>
@@ -2274,21 +2275,21 @@ adminMascRoundStartBtn.addEventListener("click", async () => {
             .filter((g) => g.team === team)
             .map((g) => g.ageGroup)
             .join(", ");
-          const message = `เปิดรอบแก้ไข MASC ${label} อีกครั้ง (รุ่น ${teamGroups} ยังประเมินไม่ครบ) ตั้งแต่วันที่ ${startLabel} ถึง ${endLabel} กรุณาดำเนินการให้แล้วเสร็จภายในกำหนด`;
-          return sendExecutiveNote({ team, type: "masc_round", refId: newDoc.id, refLabel: label, message, createdBy });
+          const message = `เปิดรอบแก้ไข MASC ${mascPeriodName(label)} อีกครั้ง (รุ่น ${teamGroups} ยังประเมินไม่ครบ) ตั้งแต่วันที่ ${startLabel} ถึง ${endLabel} กรุณาดำเนินการให้แล้วเสร็จภายในกำหนด`;
+          return sendExecutiveNote({ team, type: "masc_round", refId: newDoc.id, refLabel: mascPeriodName(label), message, createdBy });
         })
       );
     } else {
       notifiedTeams = TEAMS;
-      const message = `เริ่มรอบประเมิน MASC ${label} แล้ว ตั้งแต่วันที่ ${startLabel} ถึง ${endLabel} กรุณาดำเนินการให้แล้วเสร็จภายในกำหนด`;
+      const message = `เริ่มรอบประเมิน MASC ${mascPeriodName(label)} แล้ว ตั้งแต่วันที่ ${startLabel} ถึง ${endLabel} กรุณาดำเนินการให้แล้วเสร็จภายในกำหนด`;
       await Promise.all(
-        TEAMS.map((team) => sendExecutiveNote({ team, type: "masc_round", refId: newDoc.id, refLabel: label, message, createdBy }))
+        TEAMS.map((team) => sendExecutiveNote({ team, type: "masc_round", refId: newDoc.id, refLabel: mascPeriodName(label), message, createdBy }))
       );
     }
     adminMascRoundStatus.textContent =
       notifiedTeams.length > 0
-        ? `${isCorrection ? "เปิดรอบแก้ไข" : "เริ่มรอบประเมิน"} ${label} และแจ้งเตือน ${notifiedTeams.length} ทีมแล้ว ✓`
-        : `${isCorrection ? "เปิดรอบแก้ไข" : "เริ่มรอบประเมิน"} ${label} แล้ว (ไม่มีทีมที่ต้องแจ้งเตือนเพิ่ม)`;
+        ? `${isCorrection ? "เปิดรอบแก้ไข" : "เริ่มรอบประเมิน"} ${mascPeriodName(label)} และแจ้งเตือน ${notifiedTeams.length} ทีมแล้ว ✓`
+        : `${isCorrection ? "เปิดรอบแก้ไข" : "เริ่มรอบประเมิน"} ${mascPeriodName(label)} แล้ว (ไม่มีทีมที่ต้องแจ้งเตือนเพิ่ม)`;
     adminMascRoundStatus.className = "text-sm text-emerald-600 w-full";
     exitMascCorrectionMode();
     await loadMascRounds();

@@ -18,6 +18,7 @@
   <link rel="modulepreload" href="./js/ui-utils.js" />
   <link rel="modulepreload" href="./js/icons.js" />
   <link rel="modulepreload" href="./js/admin-notifications.js" />
+  <link rel="modulepreload" href="./js/masc-period.js" />
   <!-- modulepreload:end -->
   <style>
     @media print {
@@ -92,10 +93,11 @@
             <label class="field-label">ช่วงที่ประเมิน</label>
             <select id="masc-period-select" class="field-input w-40" disabled>
               <option value="">— เลือก —</option>
-              <option>ช่วงที่ 1</option>
-              <option>ช่วงที่ 2</option>
-              <option>ช่วงที่ 3</option>
-              <option>ช่วงที่ 4</option>
+              <!-- value คือค่าที่เก็บในฐานข้อมูล (ห้ามเปลี่ยน — ใช้จับคู่รอบกับผลประเมินเก่า) ข้อความที่เห็นคือ ช่วง/ปี (ดู js/masc-period.js) -->
+              <option value="ช่วงที่ 1">1/2569</option>
+              <option value="ช่วงที่ 2">2/2569</option>
+              <option value="ช่วงที่ 3">3/2569</option>
+              <option value="ช่วงที่ 4">4/2569</option>
             </select>
           </div>
           <button id="masc-new-btn" type="button" class="btn btn-secondary" disabled>+ ประเมินรอบใหม่</button>

@@ -30,6 +30,7 @@ import {
 } from "./ui-utils.js";
 import { CRITERIA, SECT, categoryRawScore, isEvaluationComplete, scoreToGrade } from "./masc-data.js";
 import { icon } from "./icons.js";
+import { mascPeriodName } from "./masc-period.js";
 import { staffCan } from "./staff-perms.js";
 import { periodAllowed } from "./athlete-windows.js";
 // อยู่ใน iframe ของเมนูโค้ช: ซ่อนหัว/ท้ายหน้าและปุ่มย้อนกลับของหน้านี้ (ดู html.embedded ใน styles.css)
@@ -410,7 +411,7 @@ function buildMascSection(evaluation) {
     .join("");
 
   return `
-    <p class="text-[10px] text-slate-400 mb-1">ประเมินล่าสุด: ${evaluation.assessmentPeriod || "-"} • อัปเดต ${updatedLabel} • ตำแหน่ง ${escapeHtml(evaluation.position ?? "-")} (${escapeHtml(evaluation.ageBracket ?? "-")}) • บทบาท: ${roleText}</p>
+    <p class="text-[10px] text-slate-400 mb-1">ประเมินล่าสุด: ${escapeHtml(mascPeriodName(evaluation.assessmentPeriod) || "-")} • อัปเดต ${updatedLabel} • ตำแหน่ง ${escapeHtml(evaluation.position ?? "-")} (${escapeHtml(evaluation.ageBracket ?? "-")}) • บทบาท: ${roleText}</p>
     <div class="grid grid-cols-2 gap-1.5">${categoryBlocks}</div>
     <div class="text-[10px] text-slate-600 space-y-0.5 mt-1.5">
       ${evaluation.talent ? `<p class="line-clamp-1"><span class="font-semibold text-slate-500">จุดเด่น:</span> ${evaluation.talent}</p>` : ""}
