@@ -266,9 +266,6 @@ const teamEventsSection = document.getElementById("team-events-section");
 const homeTodo = document.getElementById("home-todo");
 const homeDateLine = document.getElementById("home-date-line");
 const dailyMeetingCard = document.getElementById("daily-meeting-card");
-const dailyReadNotes = document.getElementById("daily-read-notes");
-const dailyReadNotesCount = document.getElementById("daily-read-notes-count");
-const dailyExecutiveNotesList = document.getElementById("daily-executive-notes-list");
 const reportDateInput = document.getElementById("report-date");
 const reportLoadBtn = document.getElementById("report-load-btn");
 const reportLoadStatus = document.getElementById("report-load-status");
@@ -980,14 +977,14 @@ async function collectEventReminder() {
   return { monthLabel: eventMonthLabel(probe.month), deadlineLabel: deadlineLabel(probe.month), leftText };
 }
 
-// ข้อความจากผู้ดูแลระบบถึงทีมนี้ แยกเป็นที่ยังไม่อ่าน (ขึ้นในแถบงาน) กับที่อ่านแล้ว (พับไว้ใต้หน้า Home)
+// ข้อความจากผู้ดูแลระบบถึงทีมนี้ที่ยังไม่อ่าน (ขึ้นเป็นการ์ดในแถบงาน) — ที่อ่านแล้วไม่แสดงบนหน้า Home
 async function collectHomeNotes() {
-  if (!myTeam) return { unread: [], read: [] };
+  if (!myTeam) return [];
   const snap = await getDocs(query(collection(db, "executiveNotes"), where("team", "==", myTeam)));
   const notes = [];
   snap.forEach((d) => notes.push({ id: d.id, ...d.data() }));
   notes.sort((a, b) => noteTime(b) - noteTime(a));
-  return { unread: notes.filter((n) => !n.read), read: notes.filter((n) => n.read) };
+  return notes.filter((n) => !n.read);
 }
 
 let homeTodoSeq = 0;
@@ -1002,20 +999,17 @@ async function refreshHomeTodo() {
     collectTodayReminders().catch(quiet([])),
     collectEventReminder().catch(quiet(null)),
     coachMeetingTodoItems(myTeam, meetingCoachId(), myCoachPosition).catch(quiet([])),
-    collectHomeNotes().catch(quiet({ unread: [], read: [] }))
+    collectHomeNotes().catch(quiet([]))
   ]);
   if (seq !== homeTodoSeq) return;
   const items = buildTodoItems({
     daily,
     event,
     meetingTasks,
-    notes: notes.unread.map((n) => ({ id: n.id, refLabel: n.refLabel, message: n.message, type: n.type, createdBy: n.createdBy, postedAt: notePostedAt(n) }))
+    notes: notes.map((n) => ({ id: n.id, refLabel: n.refLabel, message: n.message, type: n.type, createdBy: n.createdBy, postedAt: notePostedAt(n) }))
   });
   homeTodo.innerHTML = todoCarouselHtml(items);
   homeTodo.classList.remove("hidden");
-  dailyExecutiveNotesList.innerHTML = notes.read.map((n) => executiveNoteCardHtml(n)).join("");
-  dailyReadNotesCount.textContent = notes.read.length > 0 ? `(${notes.read.length})` : "";
-  dailyReadNotes.classList.toggle("hidden", notes.read.length === 0);
 }
 
 const HOME_TODO_ACTIONS = {
@@ -4159,9 +4153,9 @@ async function enterExecutiveViewMode(team, returnSection, execRecordOverride, l
   renderDrawerItems();
 }
 // ข้อความที่ผู้ดูแลระบบส่งถึงทีมนี้โดยตรง (เช่น แจ้งนักกีฬาที่มีพัฒนาการดี หรือแจ้งปัญหาของโค้ช) — ใช้ร่วมกันทั้ง
-// บัญชีผู้บริหารทีมจริง (executiveNotesList ในหน้าสรุปภาพรวม), โค้ชจริง (dailyExecutiveNotesList ในหน้า Daily
-// ซึ่งเป็นผู้รับผิดชอบตัวจริงที่ควรเห็นข้อความนี้ด้วย ไม่ใช่แค่ผู้บริหารทีม), และผู้ดูแลระบบที่สวมบทบาทเป็นทั้งสองแบบ
-// listEl ระบุปลายทางที่จะ render (รับพารามิเตอร์แทนการฝัง element เดียวตายตัว เพราะมีสองจุดที่ต้องใช้ร่วมกัน)
+// บัญชีผู้บริหารทีมจริง (executiveNotesList ในหน้าสรุปภาพรวม) และ Home ของทีมหลังบ้าน/ผู้บริหารที่แอดมินสวมบทบาท
+// (หน้า Home ของโค้ชแสดงเฉพาะข้อความที่ยังไม่อ่านเป็นการ์ดในแถบ "งานที่ต้องดำเนินการ" — ดู refreshHomeTodo)
+// listEl ระบุปลายทางที่จะ render (รับพารามิเตอร์แทนการฝัง element เดียวตายตัว เพราะมีหลายจุดที่ต้องใช้ร่วมกัน)
 let currentExecutiveNotesTeam = null;
 let currentExecutiveNotesListEl = null;
 
@@ -4222,7 +4216,6 @@ async function handleExecutiveNoteMarkRead(e) {
   }
 }
 staffHomeBody.addEventListener("click", handleExecutiveNoteMarkRead);
-dailyExecutiveNotesList.addEventListener("click", handleExecutiveNoteMarkRead);
 
 adminViewDashboardBtn.addEventListener("click", () => {
   const team = adminDashboardTeamSelect.value;
